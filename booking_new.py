@@ -6,6 +6,7 @@
 import streamlit as st
 from database import load_df_udc, get_booking_data_by_farol_reference, update_booking_data_by_farol_reference, get_data_bookingData
 from datetime import datetime, date
+import time
  
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
@@ -20,6 +21,10 @@ required_fields = {
 def show_booking_management_form():
     st.subheader("📦 New Booking")
  
+    # Inicializa estado do botão se necessário
+    if "button_disabled" not in st.session_state:
+        st.session_state.button_disabled = False
+ 
     # Usar referência armazenada na sessão
     farol_reference = st.session_state.get("selected_reference")
  
@@ -28,6 +33,7 @@ def show_booking_management_form():
         col1, col2 = st.columns([1, 1])
         with col2:
             if st.button("🔙 Back to Home"):
+                st.session_state.pop("button_disabled", None)
                 st.session_state["current_page"] = "main"
                 st.rerun()
         return
@@ -87,23 +93,38 @@ def show_booking_management_form():
  
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
-            salvar = st.form_submit_button("✅ Confirm")
+            salvar = st.form_submit_button(
+                "✅ Confirm",
+                disabled=st.session_state.get("button_disabled", False)
+            )
         with col_btn2:
             back = st.form_submit_button("🔙 Back to Home")
  
     if back:
+        st.session_state.pop("button_disabled", None)
         st.session_state["current_page"] = "main"
         st.session_state.pop("selected_reference", None)  # Limpar referência ao voltar
         st.rerun()
  
-    if salvar:
-        with st.spinner("Salvando Novo Booking..."):
+    if salvar and not st.session_state.get("button_disabled", False):
+        with st.spinner("Processando novo booking, por favor aguarde..."):
             if missing_fields:
                 st.error(f"Por favor, preencha os campos obrigatórios: {', '.join(missing_fields)}")
             else:
-                update_booking_data_by_farol_reference(farol_reference, values)
-                st.success("Dados atualizados com sucesso!")
-                st.session_state.pop("selected_reference", None)  # Limpa a referência após salvar
-                st.cache_data.clear()
-                st.session_state["current_page"] = "main"
-                st.rerun()
+                # Desabilita o botão imediatamente
+                st.session_state.button_disabled = True
+                
+                try:
+                    update_booking_data_by_farol_reference(farol_reference, values)
+                    st.success("✅ Dados atualizados com sucesso!")
+                    time.sleep(2)  # Aguarda 2 segundos
+                    # Limpa os estados antes de redirecionar
+                    st.session_state.pop("selected_reference", None)
+                    st.session_state.pop("button_disabled", None)
+                    st.cache_data.clear()
+                    st.session_state["current_page"] = "main"
+                    st.rerun()
+                except Exception as e:
+                    # Reabilita o botão em caso de erro
+                    st.session_state.button_disabled = False
+                    st.error(f"Erro ao atualizar os dados: {str(e)}")

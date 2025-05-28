@@ -7,6 +7,7 @@ import streamlit as st
 from database import load_df_udc, add_sales_record
 from datetime import datetime, timedelta
 import uuid
+import time
  
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
@@ -48,9 +49,10 @@ def show_add_form():
     """
     st.subheader("New Sales Record 🚢")
  
-    # Inicializa sessão se necessário
+    # Inicializa estados da sessão
     if "current_farol_reference" not in st.session_state:
         st.session_state.current_farol_reference = str(uuid.uuid4())
+        st.session_state.button_disabled = False  # Inicializa o estado do botão
  
     if "confirm_disabled_until" not in st.session_state:
         st.session_state.confirm_disabled_until = None
@@ -111,30 +113,41 @@ def show_add_form():
  
         col1, col2 = st.columns(2)
         with col1:
-            salvar = st.form_submit_button("✅ Confirm", disabled=confirm_disabled)
+            salvar = st.form_submit_button(
+                "✅ Confirm",
+                disabled=st.session_state.get("button_disabled", False)
+            )
         with col2:
             voltar = st.form_submit_button("🔙 Back to Home")
  
         # ---------- Ações do formulário ----------
-        if salvar:
+        if salvar and not st.session_state.get("button_disabled", False):
             if missing_fields:
                 st.error(f"Por favor, preencha os campos obrigatórios: {', '.join(missing_fields)}")
             else:
-                st.session_state.confirm_disabled_until = datetime.now() + timedelta(seconds=3)
+                # Desabilita o botão imediatamente
+                st.session_state.button_disabled = True
                 values["adjustment_id"] = st.session_state.current_farol_reference
                 values["user_insert"] = ''
  
-                with st.spinner("Salvando dados, por favor aguarde..."):
+                with st.spinner("Processando novo embarque, por favor aguarde..."):
                     if add_sales_record(values):
-                        st.success("Dados salvos com sucesso!")
-                        #atualizar_dados_shipments()
+                        st.success("✅ Dados salvos com sucesso!")
+                        time.sleep(2)  # Aguarda 2 segundos
+                        # Limpa os estados antes de redirecionar
                         st.session_state.pop("current_farol_reference", None)
+                        st.session_state.pop("button_disabled", None)
                         st.session_state["current_page"] = "main"
                         st.cache_data.clear()
                         st.rerun()
- 
+                    else:
+                        # Reabilita o botão em caso de erro
+                        st.session_state.button_disabled = False
+                        st.error("Erro ao salvar os dados. Por favor, tente novamente.")
  
         elif voltar:
+            # Limpa os estados ao voltar
             st.session_state.pop("current_farol_reference", None)
+            st.session_state.pop("button_disabled", None)
             st.session_state["current_page"] = "main"
             st.rerun()

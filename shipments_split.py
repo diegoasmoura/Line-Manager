@@ -5,6 +5,7 @@ import pandas as pd
 from database import load_df_udc, insert_adjustments_critic, perform_split_operation, get_split_data_by_farol_reference
 import re
 from uuid import uuid4
+import time
  
 # Carrega dados da UDC
 df_udc = load_df_udc()
@@ -18,6 +19,10 @@ def resetar_estado():
  
 def show_split_form():
     st.header("🛠️ Adjustments")
+ 
+    # Inicializa estado do botão se necessário
+    if "button_disabled" not in st.session_state:
+        st.session_state.button_disabled = False
  
     if st.session_state.get("show_success"):
         st.success("✅ Ajuste realizado com sucesso!")
@@ -55,7 +60,7 @@ def show_split_form():
         regex = re.compile(rf"^{base_pattern}(?:\.(\d+))?$")
         next_number = 1
         for i in range(num_splits):
-            new_ref = f"{base_ref}.{next_number + i:0>1}"
+            new_ref = f"{base_ref}.{next_number + i}"
             new_refs.append(new_ref)
         return new_refs
  
@@ -153,60 +158,78 @@ def show_split_form():
         col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
  
         with col_btn1:
-            if st.button("✅ Confirm"):
-                original_quantity = st.session_state["original_quantity"]
-                split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
-                total_split = split_quantities.sum()
- 
-                if not area or not reason or not responsibility:
-                    st.error("Erro: Preencha todos os campos de justificativa antes de confirmar.")
-                elif not comment.strip():
-                    st.error("Erro: O campo 'Comentários' é obrigatório.")
-                elif (split_quantities <= 0).any():
-                    st.error("Erro: Todos os splits devem ter quantidade maior que 0.")
-                elif changes:
-                    edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
-                    df_split.update(edited_display)
- 
-                    random_uuid = str(uuid4())
-                    with st.spinner("Salvando ajustes..."):
-                        success = insert_adjustments_critic(
-                            changes_df=pd.DataFrame(changes),
-                            random_uuid=random_uuid,
-                            area=area,
-                            reason=reason,
-                            responsibility=responsibility,
-                            comment=comment,
-                        )
- 
-                        perform_split_operation(
-                            farol_ref_original=selected_farol,
-                            edited_display=edited_display,
-                            num_splits=num_splits,
-                            comment=comment,
-                            area=area,
-                            reason=reason,
-                            responsibility=responsibility
-                        )
- 
-                    if success:
-                        st.session_state["show_success"] = True
-                        resetar_estado()
-                        st.rerun()
-                    else:
-                        st.error("Erro ao registrar os ajustes no banco de dados.")
-                else:
-                    st.warning("Nenhuma alteração detectada para registrar.")
- 
+            if st.button(
+                "✅ Confirm",
+                disabled=st.session_state.get("button_disabled", False)
+            ):
+                if not st.session_state.get("button_disabled", False):
+                    original_quantity = st.session_state["original_quantity"]
+                    split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
+                    total_split = split_quantities.sum()
+
+                    if not area or not reason or not responsibility:
+                        st.error("Erro: Preencha todos os campos de justificativa antes de confirmar.")
+                    elif not comment.strip():
+                        st.error("Erro: O campo 'Comentários' é obrigatório.")
+                    elif (split_quantities <= 0).any():
+                        st.error("Erro: Todos os splits devem ter quantidade maior que 0.")
+                    elif changes:
+                        # Desabilita o botão imediatamente
+                        st.session_state.button_disabled = True
+                        
+                        edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
+                        df_split.update(edited_display)
+
+                        random_uuid = str(uuid4())
+                        try:
+                            with st.spinner("Processando ajustes, por favor aguarde..."):
+                                success = insert_adjustments_critic(
+                                    changes_df=pd.DataFrame(changes),
+                                    random_uuid=random_uuid,
+                                    area=area,
+                                    reason=reason,
+                                    responsibility=responsibility,
+                                    comment=comment,
+                                )
+
+                                perform_split_operation(
+                                    farol_ref_original=selected_farol,
+                                    edited_display=edited_display,
+                                    num_splits=num_splits,
+                                    comment=comment,
+                                    area=area,
+                                    reason=reason,
+                                    responsibility=responsibility
+                                )
+
+                            if success:
+                                st.success("✅ Ajuste realizado com sucesso!")
+                                time.sleep(2)  # Aguarda 2 segundos
+                                # Limpa os estados antes de redirecionar
+                                resetar_estado()
+                                st.session_state.pop("button_disabled", None)
+                                st.session_state["current_page"] = "main"
+                                st.rerun()
+                            else:
+                                # Reabilita o botão em caso de erro
+                                st.session_state.button_disabled = False
+                                st.error("Erro ao registrar os ajustes no banco de dados.")
+                        except Exception as e:
+                            # Reabilita o botão em caso de erro
+                            st.session_state.button_disabled = False
+                            st.error(f"Erro ao processar os ajustes: {str(e)}")
+
         with col_btn2:
             if st.button("🗑️ Discard Changes"):
                 st.session_state["shipments_data"] = st.session_state["original_data"].copy()
+                st.session_state.pop("button_disabled", None)
                 resetar_estado()
                 st.success("Alterações descartadas com sucesso.")
                 st.rerun()
  
         with col_btn3:
             if st.button("🔙 Back to Home"):
+                st.session_state.pop("button_disabled", None)
                 resetar_estado()
                 st.session_state["current_page"] = "main"
                 st.rerun()

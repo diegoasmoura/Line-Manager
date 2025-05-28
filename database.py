@@ -462,32 +462,35 @@ def add_sales_record(form_values):
 def generate_next_farol_reference():
     # Obtendo df atualizado em tempo real, sem estar em cache
     df = fetch_shipments_data_sales()
- 
+
     date = datetime.today()
-    date_str = date.strftime('%Y%m%d')
+    date_str = date.strftime('%y%b').upper()  # Formato: 23NOV (ano com 2 dígitos + mês em maiúsculo)
     prefix = f'FR_{date_str}'
- 
-    # Filtra referências do mesmo dia
-    same_day_refs = df[df['Sales Farol Reference'].str.startswith(prefix, na=False)]
- 
-    if same_day_refs.empty:
-        return f'{prefix}.001'
- 
+
+    # Filtra referências do mesmo mês
+    same_month_refs = df[df['Sales Farol Reference'].str.startswith(prefix, na=False)]
+
+    if same_month_refs.empty:
+        return f'{prefix}_0001'
+
     # Extrai apenas a parte sequencial
     def extract_seq(ref):
         try:
-            parts = ref.split('.')
-            return int(parts[1]) if len(parts) > 1 else 0
+            parts = ref.split('_')
+            if len(parts) > 1:
+                seq_str = parts[-1]  # Pega o último elemento após o split
+                return int(seq_str)
+            return 0
         except:
             return 0  # fallback seguro
- 
-    same_day_refs['SEQ'] = same_day_refs['Sales Farol Reference'].apply(extract_seq)
- 
+
+    same_month_refs['SEQ'] = same_month_refs['Sales Farol Reference'].apply(extract_seq)
+
     # Encontra o maior SEQ
-    max_seq = same_day_refs['SEQ'].max()
+    max_seq = same_month_refs['SEQ'].max()
     next_seq = max_seq + 1
- 
-    return f'{prefix}.{next_seq:03}'
+
+    return f'{prefix}_{next_seq:04d}'
  
  
 #Adicionando os splits
