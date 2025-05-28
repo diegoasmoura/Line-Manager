@@ -14,15 +14,28 @@ Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["da
 Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
  
 def resetar_estado():
-    for key in ["selected_farol", "original_quantity", "split_editor", "selected_reference"]:
+    keys_to_remove = [
+        "selected_farol",
+        "original_quantity",
+        "split_editor",
+        "selected_reference",
+        "original_df_selected",
+        "editor_key",
+        "button_disabled"
+    ]
+    for key in keys_to_remove:
         st.session_state.pop(key, None)
- 
+
 def show_split_form():
     st.header("🛠️ Adjustments")
  
     # Inicializa estado do botão se necessário
     if "button_disabled" not in st.session_state:
         st.session_state.button_disabled = False
+
+    # Inicializa a chave do editor se não existir
+    if "editor_key" not in st.session_state:
+        st.session_state.editor_key = "split_editor_0"
  
     if st.session_state.get("show_success"):
         st.success("✅ Ajuste realizado com sucesso!")
@@ -44,7 +57,6 @@ def show_split_form():
             st.text_input("Farol Reference", value=selected_farol, disabled=True)
             st.session_state["selected_farol"] = selected_farol
         else:
-            #st.error("Nenhuma referência Farol selecionada. Por favor, volte à página principal e selecione um registro.")
             if st.button("🔙 Voltar para Home"):
                 resetar_estado()
                 st.session_state["current_page"] = "main"
@@ -88,6 +100,10 @@ def show_split_form():
        
         new_refs = get_next_farol_refs(selected_farol, num_splits)
  
+        # Guarda os dados originais na sessão se ainda não existirem
+        if "original_df_selected" not in st.session_state:
+            st.session_state["original_df_selected"] = df_selected.copy()
+ 
         df_split = pd.concat(
             [df_selected] + [df_selected.copy() for _ in range(num_splits)],
             ignore_index=True
@@ -112,11 +128,13 @@ def show_split_form():
  
         df_split_display = df_split[editable_columns].copy()
         st.markdown(f"#### You are splitting the original line into :green[{num_splits}] lines" if num_splits > 0 else "#### The main line will be adjusted")
+        
+        # Usa a chave dinâmica para o editor
         edited_display = st.data_editor(
             df_split_display,
             num_rows="fixed",
             use_container_width=True,
-            key="split_editor"
+            key=st.session_state.editor_key
         )
  
         changes = []
@@ -166,7 +184,7 @@ def show_split_form():
                     original_quantity = st.session_state["original_quantity"]
                     split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
                     total_split = split_quantities.sum()
-
+ 
                     if not area or not reason or not responsibility:
                         st.error("Erro: Preencha todos os campos de justificativa antes de confirmar.")
                     elif not comment.strip():
@@ -179,7 +197,7 @@ def show_split_form():
                         
                         edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
                         df_split.update(edited_display)
-
+ 
                         random_uuid = str(uuid4())
                         try:
                             with st.spinner("Processando ajustes, por favor aguarde..."):
@@ -191,7 +209,7 @@ def show_split_form():
                                     responsibility=responsibility,
                                     comment=comment,
                                 )
-
+ 
                                 perform_split_operation(
                                     farol_ref_original=selected_farol,
                                     edited_display=edited_display,
@@ -201,13 +219,12 @@ def show_split_form():
                                     reason=reason,
                                     responsibility=responsibility
                                 )
-
+ 
                             if success:
                                 st.success("✅ Ajuste realizado com sucesso!")
                                 time.sleep(2)  # Aguarda 2 segundos
                                 # Limpa os estados antes de redirecionar
                                 resetar_estado()
-                                st.session_state.pop("button_disabled", None)
                                 st.session_state["current_page"] = "main"
                                 st.rerun()
                             else:
@@ -218,18 +235,16 @@ def show_split_form():
                             # Reabilita o botão em caso de erro
                             st.session_state.button_disabled = False
                             st.error(f"Erro ao processar os ajustes: {str(e)}")
-
+ 
         with col_btn2:
             if st.button("🗑️ Discard Changes"):
-                st.session_state["shipments_data"] = st.session_state["original_data"].copy()
-                st.session_state.pop("button_disabled", None)
-                resetar_estado()
+                # Gera uma nova chave para forçar a recriação do editor
+                st.session_state.editor_key = f"split_editor_{time.time()}"
                 st.success("Alterações descartadas com sucesso.")
                 st.rerun()
  
         with col_btn3:
             if st.button("🔙 Back to Home"):
-                st.session_state.pop("button_disabled", None)
                 resetar_estado()
                 st.session_state["current_page"] = "main"
                 st.rerun()
