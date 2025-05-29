@@ -2,10 +2,11 @@
  
 import streamlit as st
 import pandas as pd
-from database import load_df_udc, insert_adjustments_critic, perform_split_operation, get_split_data_by_farol_reference
+from database import load_df_udc, insert_adjustments_critic, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales
 import re
 from uuid import uuid4
 import time
+from datetime import datetime
  
 # Carrega dados da UDC
 df_udc = load_df_udc()
@@ -67,13 +68,40 @@ def show_split_form():
         num_splits = st.number_input("Split number", min_value=0, max_value=13, value=0, step=1)
  
     def get_next_farol_refs(base_ref: str, num_splits: int) -> list[str]:
-        new_refs = []
+        """
+        Gera as próximas referências Farol disponíveis para splits.
+        
+        Args:
+            base_ref (str): Referência Farol base (ex: FR_23NOV_0001)
+            num_splits (int): Número de novas referências necessárias
+        
+        Returns:
+            list[str]: Lista com as novas referências geradas
+        """
+        # Obtém todas as referências existentes
+        df = fetch_shipments_data_sales()
+        
+        # Encontra todos os splits existentes para esta referência base
         base_pattern = re.escape(base_ref)
-        regex = re.compile(rf"^{base_pattern}(?:\.(\d+))?$")
-        next_number = 1
+        existing_splits = df[df['Sales Farol Reference'].str.match(rf'^{base_pattern}(?:\.(\d+))?$')]
+        
+        # Se não houver splits existentes, começa do 1
+        if existing_splits.empty:
+            next_split = 1
+        else:
+            # Extrai os números dos splits existentes
+            def extract_split_number(ref):
+                match = re.search(rf'^{base_pattern}\.(\d+)$', ref)
+                return int(match.group(1)) if match else 0
+            
+            split_numbers = [extract_split_number(ref) for ref in existing_splits['Sales Farol Reference']]
+            next_split = max(split_numbers) + 1 if split_numbers else 1
+        
+        # Gera as novas referências
+        new_refs = []
         for i in range(num_splits):
-            new_ref = f"{base_ref}.{next_number + i}"
-            new_refs.append(new_ref)
+            new_refs.append(f"{base_ref}.{next_split + i}")
+        
         return new_refs
  
     if selected_farol:
@@ -261,5 +289,41 @@ def show_split_form():
  
 if __name__ == "__main__":
     show_split_form()
+ 
+def generate_next_farol_reference():
+    # Obtendo df atualizado em tempo real, sem estar em cache
+    df = fetch_shipments_data_sales()
+
+    date = datetime.today()
+    date_str = date.strftime('%y%b').upper()  # Formato: 23NOV (ano com 2 dígitos + mês em maiúsculo)
+    prefix = f'FR_{date_str}'
+
+    # Filtra referências do mesmo mês
+    same_month_refs = df[df['Sales Farol Reference'].str.startswith(prefix, na=False)]
+
+    if same_month_refs.empty:
+        return f'{prefix}_0001'
+
+    # Extrai o número sequencial base (ignorando splits)
+    def extract_base_seq(ref):
+        try:
+            # Divide a referência em partes
+            parts = ref.split('_')
+            if len(parts) > 1:
+                # Pega a última parte e remove qualquer número de split após o ponto
+                seq_str = parts[-1].split('.')[0]
+                return int(seq_str)
+            return 0
+        except:
+            return 0  # fallback seguro
+
+    # Aplica a função em todas as referências
+    same_month_refs['SEQ'] = same_month_refs['Sales Farol Reference'].apply(extract_base_seq)
+
+    # Encontra o maior número sequencial
+    max_seq = same_month_refs['SEQ'].max()
+    next_seq = max_seq + 1
+
+    return f'{prefix}_{next_seq:04d}'
  
  
