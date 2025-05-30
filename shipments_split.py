@@ -209,20 +209,20 @@ def show_split_form():
                 disabled=st.session_state.get("button_disabled", False)
             ):
                 if not st.session_state.get("button_disabled", False):
-                    original_quantity = st.session_state["original_quantity"]
-                    split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
-                    total_split = split_quantities.sum()
- 
-                    if not area or not reason or not responsibility:
-                        st.error("Erro: Preencha todos os campos de justificativa antes de confirmar.")
-                    elif not comment.strip():
-                        st.error("Erro: O campo 'Comentários' é obrigatório.")
-                    elif (split_quantities <= 0).any():
+                    # Verifica se houve alterações na linha principal
+                    if not changes and num_splits == 0:
+                        st.warning("⚠️ Nenhuma alteração detectada no item principal.")
+                    elif not area or not reason or not responsibility:
+                        st.error("Erro: Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
+                    elif num_splits > 0 and (split_quantities <= 0).any():
                         st.error("Erro: Todos os splits devem ter quantidade maior que 0.")
-                    elif changes:
+                    else:
                         # Desabilita o botão imediatamente
                         st.session_state.button_disabled = True
-                        
+                        original_quantity = st.session_state["original_quantity"]
+                        split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
+                        total_split = split_quantities.sum()
+ 
                         edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
                         df_split.update(edited_display)
  

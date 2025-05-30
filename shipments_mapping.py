@@ -133,16 +133,11 @@ def non_editable_columns(stage):
 def drop_downs(data_show, df_udc):
     # Define opções de dropdown com base no grupo do UDC
     dropdown_options = {
- 
-        #Sales Data
- 
-        #Yes/No
+        # Sales Data (mantido como está)
         "Partial Allowed": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
         "PNL Destination": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
         "DTHC Prepaid": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
         "Afloat": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
- 
- 
         "Shipment Status": df_udc[df_udc["grupo"] == "Origin Status"]["dado"].dropna().unique().tolist(),
         "Type of Shipment": df_udc[df_udc["grupo"] == "Type of Shipment"]["dado"].dropna().unique().tolist(),
         "Container Type": df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().unique().tolist(),
@@ -152,18 +147,22 @@ def drop_downs(data_show, df_udc):
         "Mode": df_udc[df_udc["grupo"] == "Mode"]["dado"].dropna().unique().tolist(),
         "SKU": df_udc[df_udc["grupo"] == "Sku"]["dado"].dropna().unique().tolist(),
         "VIP PNL Risk": df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist(),
- 
- 
-        #Booking Management
+
+        # Booking Management
         "Booking Status": df_udc[df_udc["grupo"] == "Booking Status"]["dado"].dropna().unique().tolist(),
+        "Booking Container Type": df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().unique().tolist(),
+        "Booking Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist(),
+        "Booking Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
+        "Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
+        
+        # Container Delivery at Port
+        "Truck Loading Status": df_udc[df_udc["grupo"] == "Truck Loading Status"]["dado"].dropna().unique().tolist(),
+        "Status ITAS": df_udc[df_udc["grupo"] == "Status ITAS"]["dado"].dropna().unique().tolist(),
     }
- 
+
     # Tipo de editor para colunas específicas
     column_editors = {
- 
-        #Sales Data
-       
-        #Dropdowns
+        # Sales Data (mantido como está)
         "Shipment Status": "select",
         "Business": "select",
         "Sales Port of Loading POL": "select",
@@ -171,14 +170,12 @@ def drop_downs(data_show, df_udc):
         "Mode": "select",
         "SKU": "select",
         "VIP PNL Risk": "select",
-        "Partial Allowed": "select", #Yes/No
-        "PNL Destination": "select", #Yes/No
-        "DTHC Prepaid": "select", #Yes/No
-        "Afloat": "select", #Yes/No
+        "Partial Allowed": "select",
+        "PNL Destination": "select",
+        "DTHC Prepaid": "select",
+        "Afloat": "select",
         "Container Type": "select",
         "Type of Shipment": "select",
- 
-        #Datas
         "Sales Order Date": "date",
         "Requested Cut off Start Date": "date",
         "Requested Cut off End Date": "date",
@@ -189,20 +186,48 @@ def drop_downs(data_show, df_udc):
         "Allocation Date": "date",
         "Producer Nomination Date": "date",
         "First Vessel ETD": "date",
- 
-        #Numereos
         "Volume in Tons": "numeric",
         "Sales Quantity of Containers": "numeric",
         "Requested Shipment Week": "numeric",
- 
-        #Booking Management
+
+        # Booking Management
         "Booking Status": "select",
+        "Booking Container Type": "select",
+        "Booking Port of Loading POL": "select",
+        "Booking Port of Delivery POD": "select",
+        "Carrier": "select",
+        "Booking Request Date": "date",
+        "Booking Confirmation Date": "date",
+        "First Document Cut Off DOCCUT": "date",
+        "First Port Cut Off PORTCUT": "date",
+        "First Estimated Time Of Departure ETD": "date",
+        "First Estimated Time Of Arrival ETA": "date",
+        "Current Document Cut Off DOCCUT": "datetime",
+        "Current Port Cut Off PORTCUT": "datetime",
+        "Current Estimated Time Of Departure ETD": "datetime",
+        "Current Estimated Time Of Arrival ETA": "datetime",
+        "Booking Quantity of Containers": "numeric",
+        "Freight Rate USD": "numeric",
+        "Bogey Sale Price USD": "numeric",
+        "Freight PNL": "numeric",
+
+        # Container Delivery at Port
+        "Truck Loading Status": "select",
+        "Status ITAS": "select",
+        "Expected Truck Load Start Date": "date",
+        "Expected Truck Load End Date": "date",
+        "Actual Truck Load Date": "date",
+        "Expected Container Release Start Date": "date",
+        "Expected Container Release End Date": "date",
+        "Actual Container Release Date": "date",
+        "Quantity Tons Loaded Origin": "numeric",
+        "Quantity Containers Released": "numeric",
+        "Quantity Containers Released Different Shore": "numeric"
     }
-   
-    # Campos que não devem permitir oferecer a opçao de vazio (required=True)
+
+    # Campos obrigatórios (mantido e expandido)
     campos_obrigatorios = {
- 
-        "Booking Status": False,  # Exemplo de campo opcional
+        # Sales Data
         "DTHC Prepaid": True,
         "Afloat": True,
         "Shipment Status": True,
@@ -212,15 +237,22 @@ def drop_downs(data_show, df_udc):
         "Business": True,
         "Mode": True,
         "SKU": True,
- 
- 
+
+        # Booking Management
+        "Booking Status": True,
+        "Booking Container Type": True,
+        "Booking Port of Loading POL": True,
+        "Booking Port of Delivery POD": True,
+
+        # Container Delivery at Port
+        "Truck Loading Status": True,
     }
- 
+
     column_config = {}
- 
+
     for col in data_show.columns:
         editor_type = column_editors.get(col)
- 
+
         if editor_type == "select" and col in dropdown_options:
             required_field = campos_obrigatorios.get(col, False)
             column_config[col] = st.column_config.SelectboxColumn(
@@ -233,11 +265,16 @@ def drop_downs(data_show, df_udc):
                 label=col,
                 format="DD/MM/YYYY"
             )
+        elif editor_type == "datetime":
+            column_config[col] = st.column_config.DatetimeColumn(
+                label=col,
+                format="DD/MM/YYYY HH:mm"
+            )
         elif editor_type == "numeric":
             column_config[col] = st.column_config.NumberColumn(
                 label=col
             )
- 
+
     return column_config
  
  
