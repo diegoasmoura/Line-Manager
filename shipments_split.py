@@ -214,55 +214,58 @@ def show_split_form():
                         st.warning("⚠️ Nenhuma alteração detectada no item principal.")
                     elif not area or not reason or not responsibility:
                         st.error("Erro: Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
-                    elif num_splits > 0 and (split_quantities <= 0).any():
-                        st.error("Erro: Todos os splits devem ter quantidade maior que 0.")
                     else:
-                        # Desabilita o botão imediatamente
-                        st.session_state.button_disabled = True
-                        original_quantity = st.session_state["original_quantity"]
+                        # Obter as quantidades dos splits antes da verificação
                         split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
-                        total_split = split_quantities.sum()
+                        
+                        if num_splits > 0 and (split_quantities <= 0).any():
+                            st.error("Erro: Todos os splits devem ter quantidade maior que 0.")
+                        else:
+                            # Desabilita o botão imediatamente
+                            st.session_state.button_disabled = True
+                            original_quantity = st.session_state["original_quantity"]
+                            total_split = split_quantities.sum()
+
+                            edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
+                            df_split.update(edited_display)
  
-                        edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
-                        df_split.update(edited_display)
+                            random_uuid = str(uuid4())
+                            try:
+                                with st.spinner("Processando ajustes, por favor aguarde..."):
+                                    success = insert_adjustments_critic(
+                                        changes_df=pd.DataFrame(changes),
+                                        random_uuid=random_uuid,
+                                        area=area,
+                                        reason=reason,
+                                        responsibility=responsibility,
+                                        comment=comment,
+                                    )
  
-                        random_uuid = str(uuid4())
-                        try:
-                            with st.spinner("Processando ajustes, por favor aguarde..."):
-                                success = insert_adjustments_critic(
-                                    changes_df=pd.DataFrame(changes),
-                                    random_uuid=random_uuid,
-                                    area=area,
-                                    reason=reason,
-                                    responsibility=responsibility,
-                                    comment=comment,
-                                )
+                                    perform_split_operation(
+                                        farol_ref_original=selected_farol,
+                                        edited_display=edited_display,
+                                        num_splits=num_splits,
+                                        comment=comment,
+                                        area=area,
+                                        reason=reason,
+                                        responsibility=responsibility
+                                    )
  
-                                perform_split_operation(
-                                    farol_ref_original=selected_farol,
-                                    edited_display=edited_display,
-                                    num_splits=num_splits,
-                                    comment=comment,
-                                    area=area,
-                                    reason=reason,
-                                    responsibility=responsibility
-                                )
- 
-                            if success:
-                                st.success("✅ Ajuste realizado com sucesso!")
-                                time.sleep(2)  # Aguarda 2 segundos
-                                # Limpa os estados antes de redirecionar
-                                resetar_estado()
-                                st.session_state["current_page"] = "main"
-                                st.rerun()
-                            else:
+                                if success:
+                                    st.success("✅ Ajuste realizado com sucesso!")
+                                    time.sleep(2)  # Aguarda 2 segundos
+                                    # Limpa os estados antes de redirecionar
+                                    resetar_estado()
+                                    st.session_state["current_page"] = "main"
+                                    st.rerun()
+                                else:
+                                    # Reabilita o botão em caso de erro
+                                    st.session_state.button_disabled = False
+                                    st.error("Erro ao registrar os ajustes no banco de dados.")
+                            except Exception as e:
                                 # Reabilita o botão em caso de erro
                                 st.session_state.button_disabled = False
-                                st.error("Erro ao registrar os ajustes no banco de dados.")
-                        except Exception as e:
-                            # Reabilita o botão em caso de erro
-                            st.session_state.button_disabled = False
-                            st.error(f"Erro ao processar os ajustes: {str(e)}")
+                                st.error(f"Erro ao processar os ajustes: {str(e)}")
  
         with col_btn2:
             if st.button("🗑️ Discard Changes"):
