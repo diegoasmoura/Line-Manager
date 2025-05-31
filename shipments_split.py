@@ -47,7 +47,18 @@ def show_split_form():
         st.stop()
  
     df_shipments = st.session_state["original_data"]
-    farol_column = "Sales Farol Reference"
+    
+    # Determina qual coluna de referência usar com base no stage atual
+    stage = st.session_state.get("current_stage", "Sales Data")
+    if stage == "Sales Data":
+        farol_column = "Sales Farol Reference"
+    elif stage == "Booking Management":
+        farol_column = "Booking Farol Reference"
+    elif stage == "Container Delivery at Port":
+        farol_column = "Loading Farol Reference"
+    else:
+        farol_column = "Sales Farol Reference"  # fallback padrão
+        
     available_references = df_shipments[farol_column].dropna().unique()
  
     # Seleção da referência Farol com fallback para sessão

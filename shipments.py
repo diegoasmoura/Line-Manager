@@ -127,7 +127,10 @@ def exibir_shipments():
         ["Sales Data", "Booking Management", "Container Delivery at Port"],
         horizontal=True,
     )
- 
+    
+    # Salva o stage atual na sessão
+    st.session_state["current_stage"] = choose
+
     if choose == "Sales Data":
         farol_ref_col = "Sales Farol Reference"
         df = get_data_salesData()
