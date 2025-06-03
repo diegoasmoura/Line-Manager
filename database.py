@@ -464,7 +464,7 @@ def generate_next_farol_reference():
     df = fetch_shipments_data_sales()
 
     date = datetime.today()
-    date_str = date.strftime('%y%b').upper()  # Formato: 23NOV (ano com 2 dígitos + mês em maiúsculo)
+    date_str = date.strftime('%y.%m')  # Formato: 25.01 (ano com 2 dígitos.mês com 2 dígitos)
     prefix = f'FR_{date_str}'
 
     # Filtra referências do mesmo mês
@@ -478,7 +478,7 @@ def generate_next_farol_reference():
         try:
             parts = ref.split('_')
             if len(parts) > 1:
-                seq_str = parts[-1]  # Pega o último elemento após o split
+                seq_str = parts[-1].split('.')[0]  # Remove o número da versão se existir
                 return int(seq_str)
             return 0
         except:

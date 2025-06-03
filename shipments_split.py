@@ -83,7 +83,7 @@ def show_split_form():
         Gera as próximas referências Farol disponíveis para splits.
         
         Args:
-            base_ref (str): Referência Farol base (ex: FR_23NOV_0001)
+            base_ref (str): Referência Farol base (ex: FR_25.01_0001)
             num_splits (int): Número de novas referências necessárias
         
         Returns:
@@ -309,7 +309,7 @@ def generate_next_farol_reference():
     df = fetch_shipments_data_sales()
 
     date = datetime.today()
-    date_str = date.strftime('%y%b').upper()  # Formato: 23NOV (ano com 2 dígitos + mês em maiúsculo)
+    date_str = date.strftime('%y.%m')  # Formato: 25.01 (ano com 2 dígitos.mês com 2 dígitos)
     prefix = f'FR_{date_str}'
 
     # Filtra referências do mesmo mês
