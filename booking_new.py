@@ -32,7 +32,7 @@ def show_booking_management_form():
         st.warning("Nenhuma referência foi selecionada.")
         col1, col2 = st.columns([1, 1])
         with col2:
-            if st.button("🔙 Back to Home"):
+            if st.button("🔙 Back to Shipments"):
                 st.session_state.pop("button_disabled", None)
                 st.session_state["current_page"] = "main"
                 st.rerun()
@@ -98,7 +98,7 @@ def show_booking_management_form():
                 disabled=st.session_state.get("button_disabled", False)
             )
         with col_btn2:
-            back = st.form_submit_button("🔙 Back to Home")
+            back = st.form_submit_button("🔙 Back to Shipments")
  
     if back:
         st.session_state.pop("button_disabled", None)

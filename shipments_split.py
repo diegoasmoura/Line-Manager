@@ -240,26 +240,31 @@ def show_split_form():
                             edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
                             df_split.update(edited_display)
  
-                            random_uuid = str(uuid4())
+                            # Gera um único UUID para toda a requisição
+                            request_uuid = str(uuid4())
                             try:
                                 with st.spinner("Processando ajustes, por favor aguarde..."):
-                                    success = insert_adjustments_critic(
-                                        changes_df=pd.DataFrame(changes),
-                                        random_uuid=random_uuid,
-                                        area=area,
-                                        reason=reason,
-                                        responsibility=responsibility,
-                                        comment=comment,
-                                    )
+                                    # Processa os ajustes da linha principal
+                                    if changes:
+                                        success = insert_adjustments_critic(
+                                            changes_df=pd.DataFrame(changes),
+                                            random_uuid=request_uuid,  # Usa o mesmo UUID
+                                            area=area,
+                                            reason=reason,
+                                            responsibility=responsibility,
+                                            comment=comment,
+                                        )
  
-                                    perform_split_operation(
+                                    # Processa os splits usando o mesmo UUID
+                                    success = perform_split_operation(
                                         farol_ref_original=selected_farol,
                                         edited_display=edited_display,
                                         num_splits=num_splits,
                                         comment=comment,
                                         area=area,
                                         reason=reason,
-                                        responsibility=responsibility
+                                        responsibility=responsibility,
+                                        request_uuid=request_uuid  # Passa o UUID para a função
                                     )
  
                                 if success:
@@ -286,8 +291,7 @@ def show_split_form():
                 st.rerun()
  
         with col_btn3:
-            if st.button("🔙 Back to Home"):
-                resetar_estado()
+            if st.button("🔙 Back to Shipments"):
                 st.session_state["current_page"] = "main"
                 st.rerun()
  
@@ -296,8 +300,7 @@ def show_split_form():
         col_btn1, col_btn2 = st.columns(2)
  
         with col_btn2:
-            if st.button("🔙 Back to Home"):
-                resetar_estado()
+            if st.button("🔙 Back to Shipments"):
                 st.session_state["current_page"] = "main"
                 st.rerun()
  

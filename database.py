@@ -494,7 +494,7 @@ def generate_next_farol_reference():
  
  
 #Adicionando os splits
-def perform_split_operation(farol_ref_original, edited_display, num_splits, comment, area, reason, responsibility, user_insert=None):
+def perform_split_operation(farol_ref_original, edited_display, num_splits, comment, area, reason, responsibility, user_insert=None, request_uuid=None):
     conn = get_database_connection()
     reverse_map = get_reverse_mapping()
     new_farol_references = []
@@ -533,10 +533,11 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
                 if col and col in df.columns:
                     df.at[0, col] = value
  
-        new_adjustment_id = str(uuid.uuid4())
-        sales_copy.at[0, "adjustment_id"] = new_adjustment_id
-        booking_copy.at[0, "adjustment_id"] = new_adjustment_id
-        loading_copy.at[0, "adjustment_id"] = new_adjustment_id
+        # Usa o UUID compartilhado se fornecido, caso contrário gera um novo
+        adjustment_id = request_uuid if request_uuid else str(uuid.uuid4())
+        sales_copy.at[0, "adjustment_id"] = adjustment_id
+        booking_copy.at[0, "adjustment_id"] = adjustment_id
+        loading_copy.at[0, "adjustment_id"] = adjustment_id
  
         sales_copy.at[0, "s_creation_of_shipment"] = datetime.now()
         booking_copy = booking_copy.drop(columns=["b_creation_of_booking"], errors="ignore")
@@ -574,7 +575,7 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
     for data in insert_loading:
         insert_table("LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE", data, conn)
     for df, data in zip(insert_logs, insert_sales):
-        insert_adjustments_critic_splits(df, comment, data.get("adjustment_id"), area, reason, responsibility, user_insert)
+        insert_adjustments_critic_splits(df, comment, request_uuid if request_uuid else data.get("adjustment_id"), area, reason, responsibility, user_insert)
  
     conn.commit()
     conn.close()
@@ -593,50 +594,30 @@ def insert_table(full_table_name, row_dict, conn):
 # --- CONSULTA UNIFICADA ---
 def get_merged_data():
     query = """
-SELECT
-    s.s_farol_reference,
-    s.s_shipment_status,
-    s.s_type_of_shipment,
-    MAX(a.responsible_name) AS "Responsible Name",
-    MAX(a.area) AS "Area",
-    MAX(a.status) AS "Status",
-    MAX(a.request_carrier_date) AS "Booking Adjustment Request Date",
-    MAX(a.confirmation_date) AS "Booking Adjustment Confirmation Date",
-    MAX(a.row_inserted_date) AS row_inserted_date,
-    LISTAGG(
-        'Alterar o campo ' || a.column_name || ' de ' || a.previous_value || ' para ' || a.new_value || '/',
-        CHR(10)
-    ) WITHIN GROUP (ORDER BY a.column_name) AS ajuste
-FROM
-    LogTransp.VW_CON_Sales_Booking_Loading_Container s
-LEFT JOIN (
-    SELECT
-        adjustment_id,
+    SELECT 
         farol_reference,
+        adjustment_id,
         responsible_name,
         area,
+        request_type,
+        request_reason,
+        adjustments_owner,
         column_name,
         previous_value,
         new_value,
         status,
         request_carrier_date,
         confirmation_date,
-        row_inserted_date
-    FROM
-        LogTransp.F_CON_Adjustments_Log
-    WHERE
-        request_type = 'Critic'
-) a
-ON s.s_farol_reference = a.farol_reference
-GROUP BY
-    s.s_farol_reference,
-    s.s_shipment_status,
-    s.s_type_of_shipment
+        row_inserted_date,
+        comments,
+        stage
+    FROM LogTransp.F_CON_Adjustments_Log
+    WHERE request_type = 'Critic'
+    ORDER BY row_inserted_date DESC
     """
- 
+
     with get_database_connection() as conn:
         df = pd.read_sql_query(text(query), conn)
-        df.rename(columns=get_column_mapping(), inplace=True)
         return df
    
  
