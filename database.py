@@ -40,13 +40,17 @@ def get_data_salesData():
     try:
         conn = get_database_connection()
         df = pd.read_sql_query(text(query), conn)
+
+        print(df)
  
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
- 
+
+        print(df)
+        
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Sales Farol Reference","Shipment Status","Type of Shipment","Creation Of Shipment","Business","Customer", "Customer PO", "Sales Order Reference",
+        df = df[["Sales Farol Reference","Farol Status","Shipment Status","Type of Shipment","Creation Of Shipment","Business","Customer", "Customer PO", "Sales Order Reference",
             "Sales Order Date", "Mode", "Sales Incoterm", "SKU", "Plant of Origin", "Splitted Booking Reference",
             "Volume in Tons", "Sales Quantity of Containers",
             "Container Type", "Sales Port of Loading POL", "Sales Port of Delivery POD", "Sales Place of Receipt", "Sales Final Destination",
@@ -80,7 +84,7 @@ def get_data_bookingData():
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Booking Farol Reference", "Booking Status", "Booking Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
+        df = df[["Booking Farol Reference","Farol Status", "Booking Status", "Booking Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
             "Carrier", "Freight Forwarder", "Booking Request Date", "Booking Confirmation Date",
             "Booking Port of Loading POL","Booking Port of Delivery POD","Booking Place of Receipt","Booking Final Destination",
             "Vessel Name", "Voyage Carrier", "Port Terminal City", "Transhipment Port", "POD Country",
@@ -117,7 +121,7 @@ def get_data_loadingData():
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Loading Farol Reference","Truck Loading Status", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
+        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
             "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
             "Expected Truck Load Start Date", "Expected Truck Load End Date",
             "Quantity Tons Loaded Origin", "Actual Truck Load Date", "Container Release Farol",
@@ -213,7 +217,8 @@ def insert_adjustments_basics(changes_df, comment, random_uuid):
                 "process_stage": None,
                 "stage": row["Stage"],
                 "comments": comment,
-                "user_insert": None
+                "user_insert": None,
+                "status": "Approved"
             }
             for _, row in changes_df.iterrows()
         ]
@@ -315,7 +320,7 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
     except Exception as e:
         if conn:
             transaction.rollback()
-        print(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
+        st.error(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
         return False
  
     finally:
@@ -370,7 +375,7 @@ def insert_adjustments_critic_splits(changes_df, comment, random_uuid, area, rea
     except Exception as e:
         if conn:
             transaction.rollback()
-        print(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
+        st.error(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
         return False
  
     finally:

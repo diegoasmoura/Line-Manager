@@ -9,6 +9,8 @@ def get_column_mapping():
         "adjusts_basic" : "Adjusts Basic",
         "adjusts_critic" : "Adjusts Critic",
         "s_shipment_status": "Shipment Status",
+        "farol_status" : "Farol Status",
+
         "s_farol_reference": "Sales Farol Reference",
         "s_creation_of_shipment": "Creation Of Shipment",
         "s_customer_po": "Customer PO",
@@ -55,6 +57,8 @@ def get_column_mapping():
         "b_creation_of_booking": "Creation Of Booking",
         "b_booking_reference": "Booking Reference",
         "b_booking_status": "Booking Status",
+        "farol_status" : "Farol Status",
+
         "b_booking_owner": "Booking Owner",
         "b_carrier": "Carrier",
         "b_freight_forwarder": "Freight Forwarder",
@@ -93,6 +97,8 @@ def get_column_mapping():
         "l_id": "ID Loading",
         "l_farol_reference": "Loading Farol Reference",
         "l_truck_loading_status": "Truck Loading Status",
+        "farol_status" : "Farol Status",
+
         "l_creation_of_cargo_loading": "Creation Of Cargo Loading",
         "l_logistics_analyst": "Logistics Analyst",
         "l_supplier": "Supplier",
@@ -147,6 +153,7 @@ def drop_downs(data_show, df_udc):
         "Mode": df_udc[df_udc["grupo"] == "Mode"]["dado"].dropna().unique().tolist(),
         "SKU": df_udc[df_udc["grupo"] == "Sku"]["dado"].dropna().unique().tolist(),
         "VIP PNL Risk": df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist(),
+        "Farol Status": df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist(),
 
         # Booking Management
         "Booking Status": df_udc[df_udc["grupo"] == "Booking Status"]["dado"].dropna().unique().tolist(),
@@ -189,6 +196,7 @@ def drop_downs(data_show, df_udc):
         "Volume in Tons": "numeric",
         "Sales Quantity of Containers": "numeric",
         "Requested Shipment Week": "numeric",
+        "Farol Status": "select",
 
         # Booking Management
         "Booking Status": "select",
