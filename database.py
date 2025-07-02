@@ -420,7 +420,7 @@ def add_sales_record(form_values):
             "b_port_of_loading_pol": form_values.get("s_port_of_loading_pol"),
             "b_port_of_delivery_pod": form_values.get("s_port_of_delivery_pod"),
             "b_final_destination": form_values.get("s_final_destination"),
-            "b_booking_status": "New request",
+            "farol_status": "New request",
  
         }
  
@@ -435,7 +435,7 @@ def add_sales_record(form_values):
         # --- INSERT TABELA CONTAINER RELEASE ---
         cargo_values = {
             "l_farol_reference": farol_reference,
-            "l_truck_loading_status": "New request",
+            "farol_status": "New request",
  
         }
  
@@ -646,7 +646,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
     try:
         query = """
         UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-        SET b_booking_status = :b_booking_status,
+        SET farol_status = :farol_status,
             b_carrier = :b_carrier,
             b_creation_of_booking = :b_creation_of_booking,
             b_freight_forwarder = :b_freight_forwarder,
@@ -658,14 +658,20 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         # Atualiza a tabela de Sales Data
         query_sales = """
         UPDATE LogTransp.F_CON_SALES_DATA
-        SET s_shipment_status = :s_shipment_status
+        SET farol_status = :farol_status
         WHERE s_farol_reference = :ref
+        """
+        # Atualiza a tabela de Loading
+        query_loading = """
+        UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+        SET farol_status = :farol_status
+        WHERE l_farol_reference = :ref
         """
         # Executa ambas as queries
         conn.execute(
             text(query),
             {
-                "b_booking_status": "Booking requested", #values["b_booking_status"]
+                "farol_status": "Booking Requested", #values["b_booking_status"]
                 "b_creation_of_booking": datetime.now(),
                 "b_carrier": values["b_carrier"],
                 "b_freight_forwarder": values["b_freight_forwarder"],
@@ -678,7 +684,14 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         conn.execute(
             text(query_sales),
             {
-                "s_shipment_status": "Booking requested",
+                "farol_status": "Booking Requested",
+                "ref": farol_reference,
+            },
+        )
+        conn.execute(
+            text(query_loading),
+            {
+                "farol_status": "Booking Requested",
                 "ref": farol_reference,
             },
         )

@@ -71,7 +71,7 @@ def show_add_form():
         # Inputs em colunas organizadas
         col1, col2 = st.columns(2)
         with col1:
-            values["s_shipment_status"] = st.selectbox("**:green[Shipment Status]***", ["New request"], index=0, disabled=True)
+            values["farol_status"] = st.selectbox("**:green[Farol Status]***", ["New request"], index=0, disabled=True)
  
         col1, col2 = st.columns(2)
         with col1:

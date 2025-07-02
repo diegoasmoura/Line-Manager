@@ -238,7 +238,8 @@ def drop_downs(data_show, df_udc):
         # Sales Data
         "DTHC Prepaid": True,
         "Afloat": True,
-        "Shipment Status": True,
+        #"Shipment Status": True,
+        "Farol Status": True,
         "Type of Shipment": True,
         "Container Type": True,
         "Sales Port of Delivery POD": True,
@@ -246,14 +247,15 @@ def drop_downs(data_show, df_udc):
         "Mode": True,
         "SKU": True,
 
+
         # Booking Management
-        "Booking Status": True,
+        #"Booking Status": True,
         "Booking Container Type": True,
         "Booking Port of Loading POL": True,
         "Booking Port of Delivery POD": True,
 
         # Container Delivery at Port
-        "Truck Loading Status": True,
+        #"Truck Loading Status": True,
     }
 
     column_config = {}

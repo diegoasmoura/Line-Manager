@@ -56,10 +56,10 @@ def show_booking_management_form():
  
         col1, col2 = st.columns(2)
         with col1:
-            values["b_booking_status"] = st.selectbox(
-                "Booking Status",
-                [booking_data.get("b_booking_status", "N/A")],
-                index=0,
+            st.selectbox(
+                "Farol Status",
+                ["New request", "Booking requested"],
+                index=1,  # Seleciona 'Booking requested'
                 disabled=True
             )
         with col2:
@@ -115,6 +115,7 @@ def show_booking_management_form():
                 st.session_state.button_disabled = True
                 
                 try:
+                    values["farol_status"] = "Booking requested"
                     update_booking_data_by_farol_reference(farol_reference, values)
                     st.success("✅ Dados atualizados com sucesso!")
                     time.sleep(2)  # Aguarda 2 segundos
