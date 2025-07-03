@@ -255,17 +255,21 @@ def show_split_form():
                                             comment=comment,
                                         )
  
-                                    # Processa os splits usando o mesmo UUID
-                                    success = perform_split_operation(
-                                        farol_ref_original=selected_farol,
-                                        edited_display=edited_display,
-                                        num_splits=num_splits,
-                                        comment=comment,
-                                        area=area,
-                                        reason=reason,
-                                        responsibility=responsibility,
-                                        request_uuid=request_uuid  # Passa o UUID para a função
-                                    )
+                                    # Processa os splits apenas se houver splits
+                                    if num_splits > 0:
+                                        success = perform_split_operation(
+                                            farol_ref_original=selected_farol,
+                                            edited_display=edited_display,
+                                            num_splits=num_splits,
+                                            comment=comment,
+                                            area=area,
+                                            reason=reason,
+                                            responsibility=responsibility,
+                                            request_uuid=request_uuid  # Passa o UUID para a função
+                                        )
+                                    else:
+                                        # Se não há splits, considera sucesso se os ajustes da linha principal foram processados
+                                        success = True if not changes else success
  
                                 if success:
                                     st.success("✅ Ajuste realizado com sucesso!")
