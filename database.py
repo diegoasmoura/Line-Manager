@@ -295,23 +295,33 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
  
         farol_reference = changes_df.iloc[0]["Farol Reference"]
  
+        # Atualiza o Farol Status para "Adjustment Requested" em todas as tabelas
         update_sales_query = text("""
             UPDATE LogTransp.F_CON_SALES_DATA
-            SET s_shipment_status = :s_shipment_status
+            SET farol_status = :farol_status
             WHERE s_farol_reference = :ref
         """)
         update_booking_query = text("""
             UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-            SET b_booking_status = :b_booking_status
+            SET farol_status = :farol_status
             WHERE b_farol_reference = :ref
+        """)
+        update_loading_query = text("""
+            UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+            SET farol_status = :farol_status
+            WHERE l_farol_reference = :ref
         """)
  
         conn.execute(update_sales_query, {
-            "s_shipment_status": "New adjustment",
+            "farol_status": "Adjustment Requested",
             "ref": farol_reference
         })
         conn.execute(update_booking_query, {
-            "b_booking_status": "New adjustment",
+            "farol_status": "Adjustment Requested",
+            "ref": farol_reference
+        })
+        conn.execute(update_loading_query, {
+            "farol_status": "Adjustment Requested",
             "ref": farol_reference
         })
  
@@ -547,6 +557,11 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         sales_copy.at[0, "s_creation_of_shipment"] = datetime.now()
         booking_copy = booking_copy.drop(columns=["b_creation_of_booking"], errors="ignore")
         sales_copy.at[0, "s_type_of_shipment"] = "Split"
+        
+        # Define o Farol Status como "Adjustment Requested" para os splits
+        sales_copy.at[0, "farol_status"] = "Adjustment Requested"
+        booking_copy.at[0, "farol_status"] = "Adjustment Requested"
+        loading_copy.at[0, "farol_status"] = "Adjustment Requested"
  
         sales_dict = sales_copy.iloc[0].to_dict()
         booking_dict = booking_copy.iloc[0].to_dict()
@@ -581,6 +596,36 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         insert_table("LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE", data, conn)
     for df, data in zip(insert_logs, insert_sales):
         insert_adjustments_critic_splits(df, comment, request_uuid if request_uuid else data.get("adjustment_id"), area, reason, responsibility, user_insert)
+ 
+    # Atualiza o Farol Status da linha original para "Adjustment Requested"
+    update_sales_original = text("""
+        UPDATE LogTransp.F_CON_SALES_DATA
+        SET farol_status = :farol_status
+        WHERE s_farol_reference = :ref
+    """)
+    update_booking_original = text("""
+        UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
+        SET farol_status = :farol_status
+        WHERE b_farol_reference = :ref
+    """)
+    update_loading_original = text("""
+        UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+        SET farol_status = :farol_status
+        WHERE l_farol_reference = :ref
+    """)
+ 
+    conn.execute(update_sales_original, {
+        "farol_status": "Adjustment Requested",
+        "ref": farol_ref_original
+    })
+    conn.execute(update_booking_original, {
+        "farol_status": "Adjustment Requested",
+        "ref": farol_ref_original
+    })
+    conn.execute(update_loading_original, {
+        "farol_status": "Adjustment Requested",
+        "ref": farol_ref_original
+    })
  
     conn.commit()
     conn.close()
