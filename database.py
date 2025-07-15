@@ -69,22 +69,25 @@ def get_data_bookingData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL
+    # Consulta SQL com JOIN para verificar Type of Shipment na tabela Sales
     query = '''
-    SELECT *
-    FROM LogTransp.F_CON_BOOKING_MANAGEMENT
-    ORDER BY b_farol_reference'''
+    SELECT b.*, s.s_type_of_shipment
+    FROM LogTransp.F_CON_BOOKING_MANAGEMENT b
+    LEFT JOIN LogTransp.F_CON_SALES_DATA s ON b.b_farol_reference = s.s_farol_reference
+    ORDER BY b.b_farol_reference'''
  
     try:
         conn = get_database_connection()
         df = pd.read_sql_query(text(query), conn)
+
+        print(df.columns)
  
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Booking Farol Reference","Farol Status", "Booking Status", "Booking Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
+        df = df[["Booking Farol Reference","Farol Status", "Booking Status", "Type of Shipment", "Booking Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
             "Carrier", "Freight Forwarder", "Booking Request Date", "Booking Confirmation Date",
             "Booking Port of Loading POL","Booking Port of Delivery POD","Booking Place of Receipt","Booking Final Destination",
             "Vessel Name", "Voyage Carrier", "Port Terminal City", "Transhipment Port", "POD Country",
@@ -106,11 +109,12 @@ def get_data_loadingData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL
+    # Consulta SQL com JOIN para verificar Type of Shipment na tabela Sales
     query = '''
-    SELECT *
-    FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-    ORDER BY l_farol_reference'''
+    SELECT l.*, s.s_type_of_shipment
+    FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE l
+    LEFT JOIN LogTransp.F_CON_SALES_DATA s ON l.l_farol_reference = s.s_farol_reference
+    ORDER BY l.l_farol_reference'''
  
     try:
         conn = get_database_connection()
@@ -121,7 +125,7 @@ def get_data_loadingData():
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
+        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Type of Shipment", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
             "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
             "Expected Truck Load Start Date", "Expected Truck Load End Date",
             "Quantity Tons Loaded Origin", "Actual Truck Load Date", "Container Release Farol",
@@ -134,6 +138,7 @@ def get_data_loadingData():
     finally:
         if conn:
             conn.close()
+
  
  
 def fetch_shipments_data_sales():

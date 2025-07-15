@@ -140,6 +140,15 @@ def exibir_shipments():
     elif choose == "Container Delivery at Port":
         farol_ref_col = "Loading Farol Reference"
         df = get_data_loadingData()
+
+   # Aplica filtro para excluir splits pendentes de aprovação
+    # Agora todas as tabelas têm acesso ao Type of Shipment via JOIN
+    df = df[
+        ~(
+            (df["Type of Shipment"] == "Split") & 
+            (df["Farol Status"] == "Adjustment Requested")
+        )
+    ]
  
     previous_stage = st.session_state.get("previous_stage")
     unsaved_changes = st.session_state.get("changes") is not None and not st.session_state["changes"].empty
