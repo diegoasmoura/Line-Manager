@@ -44,7 +44,7 @@ def exibir_adjustments():
     df_original['stage'] = df_original['stage'].fillna("Not Specified")
 
     # Seção de Filtros
-    with st.expander("🔍 Search Filters", expanded=False):
+    with st.expander("🔍 Search Filters", expanded=True):
         # Primeira linha: Period e Search
         col1, col2 = st.columns(2)
         

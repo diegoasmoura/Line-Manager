@@ -184,7 +184,7 @@ def show_split_form():
                 continue
             if old_val != new_val:
                 changes.append({
-                    "Farol Reference": df_split.at[0, farol_column],
+                    "Farol Reference": df_split.at[0, "Sales Farol Reference"],  # Sempre usar Sales Farol Reference
                     "Coluna": col,
                     "Valor Anterior": str(old_val) if pd.notna(old_val) else "",
                     "Novo Valor": str(new_val) if pd.notna(new_val) else "",
