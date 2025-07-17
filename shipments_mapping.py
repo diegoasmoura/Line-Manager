@@ -128,9 +128,9 @@ def non_editable_columns(stage):
     if stage == "Sales Data":
         non_editable = ["Sales Farol Reference", "Creation Of Shipment", "Adjusts Basic", "Adjusts Critic"]
     elif stage == "Booking Management":
-        non_editable = ["Booking Farol Reference", "Creation Of Booking", "Adjusts Basic", "Adjusts Critic", "Type of Shipment"]
+        non_editable = ["Booking Farol Reference", "Creation Of Booking", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Booking Port of Loading POL", "Booking Port of Delivery POD"]
     elif stage == "Container Delivery at Port":
-        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment"]
+        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Sales Port of Loading POL", "Sales Port of Delivery POD"]
     else:
         non_editable = []
  

@@ -59,9 +59,15 @@ Na tela de Shipments, a exibição dos botões de ação depende do status origi
         * Alterações são desfeitas e a grade some
 
 📌 **Restrições de Edição por Stage:**
-* **Type of Shipment**: Editável apenas no stage "Sales Data"
-    * Nos stages "Booking Management" e "Container Delivery at Port" o campo aparece como somente leitura
-    * Isso garante integridade dos dados, pois o campo existe originalmente na tabela Sales Data e é trazido via JOIN para os outros stages
+* **Campos do Sales Data**: Editáveis apenas no stage "Sales Data"
+    * **Type of Shipment**: Somente leitura nos outros stages
+    * **Sales Quantity of Containers**: Somente leitura nos outros stages
+    * **Container Type**: Somente leitura nos outros stages
+    * **Booking Port of Loading POL**: Somente leitura no Booking Management (dados do Sales Data)
+    * **Booking Port of Delivery POD**: Somente leitura no Booking Management (dados do Sales Data)
+    * **Sales Port of Loading POL**: Somente leitura no Container Delivery at Port
+    * **Sales Port of Delivery POD**: Somente leitura no Container Delivery at Port
+    * Isso garante integridade dos dados, pois esses campos existem originalmente na tabela Sales Data e são trazidos via JOIN para os outros stages
 🟡 Farol Status – Controle e restrições
 * Os seguintes status estão disponíveis na coluna Farol Status da tela shipments.py:
     * New Request

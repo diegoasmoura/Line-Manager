@@ -69,9 +69,24 @@ def get_data_bookingData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL com JOIN para verificar Type of Shipment na tabela Sales
+    # Consulta SQL com JOIN para trazer campos do Sales Data
     query = '''
-    SELECT b.*, s.s_type_of_shipment
+    SELECT b.b_id, b.b_farol_reference, b.farol_status, b.b_creation_of_booking, b.b_booking_reference, 
+           b.b_booking_status, b.b_booking_owner, b.b_carrier, b.b_freight_forwarder, 
+           b.b_booking_request_date, b.b_booking_confirmation_date, b.b_vessel_name, b.b_voyage_carrier, 
+           b.b_port_terminal_city, b.b_place_of_receipt, b.b_final_destination, b.b_transhipment_port, 
+           b.b_pod_country, b.b_pod_country_acronym, b.b_destination_trade_region, 
+           b.b_first_document_cut_off_doccut, b.b_first_port_cut_off_portcut, 
+           b.b_first_estimated_time_of_departure_etd, b.b_first_estimated_time_of_arrival_eta, 
+           b.b_voyage_port_terminal, b.b_current_document_cut_off_doccut, b.b_current_port_cut_off_portcut, 
+           b.b_current_estimated_time_of_departure_etd, b.b_current_estimated_time_of_arrival_eta, 
+           b.b_freight_rate_usd, b.b_bogey_sale_price_usd, b.b_freightppnl, b.b_award_status, 
+           b.b_comments, b.adjustment_id,
+           s.s_type_of_shipment,
+           s.s_quantity_of_containers,
+           s.s_container_type,
+           s.s_port_of_loading_pol as b_port_of_loading_pol,
+           s.s_port_of_delivery_pod as b_port_of_delivery_pod
     FROM LogTransp.F_CON_BOOKING_MANAGEMENT b
     LEFT JOIN LogTransp.F_CON_SALES_DATA s ON b.b_farol_reference = s.s_farol_reference
     ORDER BY b.b_farol_reference'''
@@ -87,10 +102,10 @@ def get_data_bookingData():
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Booking Farol Reference","Farol Status", "Booking Status", "Type of Shipment", "Booking Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
+        df = df[["Booking Farol Reference","Farol Status", "Booking Status", "Type of Shipment", "Sales Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
             "Carrier", "Freight Forwarder", "Booking Request Date", "Booking Confirmation Date",
             "Booking Port of Loading POL","Booking Port of Delivery POD","Booking Place of Receipt","Booking Final Destination",
-            "Vessel Name", "Voyage Carrier", "Port Terminal City", "Transhipment Port", "POD Country",
+            "Container Type", "Vessel Name", "Voyage Carrier", "Port Terminal City", "Transhipment Port", "POD Country",
             "POD Country Acronym", "Destination Trade Region", "First Document Cut Off DOCCUT",
             "First Port Cut Off PORTCUT", "First Estimated Time Of Departure ETD",
             "First Estimated Time Of Arrival ETA", "Voyage Port Terminal", "Current Document Cut Off DOCCUT",
@@ -109,9 +124,14 @@ def get_data_loadingData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL com JOIN para verificar Type of Shipment na tabela Sales
+    # Consulta SQL com JOIN para trazer campos do Sales Data
     query = '''
-    SELECT l.*, s.s_type_of_shipment
+    SELECT l.*, 
+           s.s_type_of_shipment,
+           s.s_quantity_of_containers,
+           s.s_container_type,
+           s.s_port_of_loading_pol,
+           s.s_port_of_delivery_pod
     FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE l
     LEFT JOIN LogTransp.F_CON_SALES_DATA s ON l.l_farol_reference = s.s_farol_reference
     ORDER BY l.l_farol_reference'''
@@ -125,8 +145,8 @@ def get_data_loadingData():
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Type of Shipment", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
-            "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
+        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
+            "Sales Port of Loading POL", "Sales Port of Delivery POD", "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
             "Expected Truck Load Start Date", "Expected Truck Load End Date",
             "Quantity Tons Loaded Origin", "Actual Truck Load Date", "Container Release Farol",
             "Expected Container Release Start Date", "Expected Container Release End Date",
