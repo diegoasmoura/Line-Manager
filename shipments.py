@@ -195,6 +195,8 @@ def exibir_shipments():
     edited_df_clean = edited_df.drop(columns=["Selecionar"], errors="ignore")
  
     # Detecta e registra mudanças
+    status_blocked = False
+    status_blocked_message = ""
     if not edited_df_clean.equals(df_filtered_original):
         changes = []
         for index, row in edited_df_clean.iterrows():
@@ -203,6 +205,17 @@ def exibir_shipments():
                 if pd.isna(original_row[col]) and pd.isna(row[col]):
                     continue
                 if original_row[col] != row[col]:
+                    # Verifica se a alteração é proibida para 'Farol Status'
+                    if col == "Farol Status":
+                        from_status = original_row[col]
+                        to_status = row[col]
+                        if (
+                            from_status == "Adjustment Requested" and to_status != "Adjustment Requested"
+                        ) or (
+                            from_status != "Adjustment Requested" and to_status == "Adjustment Requested"
+                        ):
+                            status_blocked = True
+                            status_blocked_message = "⚠️ Status 'Adjustment Requested' não pode ser alterado diretamente. Use o módulo de ajustes para solicitar mudanças."
                     changes.append({
                         'Farol Reference': row.get(farol_ref_col, index),
                         "Coluna": col,
@@ -210,7 +223,10 @@ def exibir_shipments():
                         "Novo Valor": row[col],
                         "Stage": choose
                     })
-        if changes:
+        if status_blocked:
+            st.warning(status_blocked_message)
+            st.session_state["changes"] = pd.DataFrame()  # Limpa alterações
+        elif changes:
             changes_df = pd.DataFrame(changes)
             st.session_state["changes"] = changes_df
             #st.success(f"{len(changes)} alteração(ões) detectada(s).")
