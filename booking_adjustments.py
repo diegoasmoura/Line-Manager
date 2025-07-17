@@ -86,8 +86,12 @@ def exibir_adjustments():
 
     # Aplica os filtros
     if periodo_opcoes[periodo_selecionado] >= 0:
-        data_limite = datetime.now() - timedelta(days=periodo_opcoes[periodo_selecionado])
-        df_original = df_original[df_original['row_inserted_date'] >= data_limite]
+        if periodo_selecionado == "Today":
+            hoje = datetime.now().date()
+            df_original = df_original[df_original['row_inserted_date'].dt.date == hoje]
+        else:
+            data_limite = datetime.now() - timedelta(days=periodo_opcoes[periodo_selecionado])
+            df_original = df_original[df_original['row_inserted_date'] >= data_limite]
     
     if status_selecionado != "All":
         df_original = df_original[df_original['status'] == status_selecionado]

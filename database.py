@@ -258,12 +258,14 @@ def insert_adjustments_basics(changes_df, comment, random_uuid):
 def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, responsibility, user_insert=None):
     if changes_df is None or changes_df.empty:
         return False
- 
+
+    from datetime import datetime
     conn = None
     try:
         conn = get_database_connection()
         transaction = conn.begin()
- 
+
+        now = datetime.now()
         data_to_insert = [
             {
                 "farol_reference": row["Farol Reference"],
@@ -280,26 +282,27 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
                 "confirmation_date": None,
                 "stage": row["Stage"],
                 "comments": comment,
-                "user_insert": user_insert
+                "user_insert": user_insert,
+                "row_inserted_date": now
             }
             for _, row in changes_df.iterrows()
         ]
- 
+
         insert_query = text("""
             INSERT INTO LogTransp.F_CON_Adjustments_Log (
                 farol_reference, adjustment_id, responsible_name, area, request_type, request_reason, adjustments_owner, column_name,
                 previous_value, new_value, request_carrier_date, confirmation_date, stage,
-                comments, user_insert
+                comments, user_insert, row_inserted_date
             ) VALUES (
                 :farol_reference, :adjustment_id, :responsible_name, :area, :request_type, :request_reason, :adjustments_owner, :column_name,
                 :previous_value, :new_value, :request_carrier_date, :confirmation_date, :stage,
-                :comments, :user_insert
+                :comments, :user_insert, :row_inserted_date
             )
         """)
         conn.execute(insert_query, data_to_insert)
- 
+
         farol_reference = changes_df.iloc[0]["Farol Reference"]
- 
+
         # Atualiza o Farol Status para "Adjustment Requested" em todas as tabelas
         update_sales_query = text("""
             UPDATE LogTransp.F_CON_SALES_DATA
@@ -316,7 +319,7 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
             SET farol_status = :farol_status
             WHERE l_farol_reference = :ref
         """)
- 
+
         conn.execute(update_sales_query, {
             "farol_status": "Adjustment Requested",
             "ref": farol_reference
@@ -329,7 +332,7 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
             "farol_status": "Adjustment Requested",
             "ref": farol_reference
         })
- 
+
         transaction.commit()
         return True
     except Exception as e:
@@ -337,7 +340,7 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
             transaction.rollback()
         st.error(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
         return False
- 
+
     finally:
         if conn:
             conn.close()
@@ -345,12 +348,14 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
 def insert_adjustments_critic_splits(changes_df, comment, random_uuid, area, reason, responsibility, user_insert=None):
     if changes_df is None or changes_df.empty:
         return False
- 
+
+    from datetime import datetime
     conn = None
     try:
         conn = get_database_connection()
         transaction = conn.begin()
- 
+
+        now = datetime.now()
         data_to_insert = [
             {
                 "farol_reference": row["Farol Reference"],
@@ -367,24 +372,25 @@ def insert_adjustments_critic_splits(changes_df, comment, random_uuid, area, rea
                 "confirmation_date": None,
                 "stage": row["Stage"],
                 "comments": comment,
-                "user_insert": user_insert
+                "user_insert": user_insert,
+                "row_inserted_date": now
             }
             for _, row in changes_df.iterrows()
         ]
- 
+
         insert_query = text("""
             INSERT INTO LogTransp.F_CON_Adjustments_Log (
                 farol_reference, adjustment_id, responsible_name, area, request_type, request_reason, adjustments_owner, column_name,
                 previous_value, new_value, request_carrier_date, confirmation_date, stage,
-                comments, user_insert
+                comments, user_insert, row_inserted_date
             ) VALUES (
                 :farol_reference, :adjustment_id, :responsible_name, :area, :request_type, :request_reason, :adjustments_owner, :column_name,
                 :previous_value, :new_value, :request_carrier_date, :confirmation_date, :stage,
-                :comments, :user_insert
+                :comments, :user_insert, :row_inserted_date
             )
         """)
         conn.execute(insert_query, data_to_insert)
- 
+
         transaction.commit()
         return True
     except Exception as e:
