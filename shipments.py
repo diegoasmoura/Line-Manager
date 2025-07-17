@@ -308,16 +308,25 @@ def exibir_shipments():
     elif len(selected_rows) == 1:
         selected_farol_ref = selected_rows[farol_ref_col].values[0]
         st.session_state["selected_reference"] = selected_farol_ref
+        # Sempre usar o valor original do status para decidir os botões
+        # Encontrar o índice correspondente no DataFrame original filtrado
+        selected_index = selected_rows.index[0]
+        if "Farol Status" in df_filtered_original.columns:
+            original_status = df_filtered_original.loc[selected_index, "Farol Status"]
+        else:
+            original_status = None
         with col_booking:
-            if st.button("📦 New Booking"):
-                st.session_state["current_page"] = "booking"
-                st.rerun()
+            if original_status and str(original_status).strip().lower() == "new request".lower():
+                if st.button("📦 New Booking"):
+                    st.session_state["current_page"] = "booking"
+                    st.rerun()
         with col_split:
-            if st.button("🛠️ Adjustments"):
-                st.session_state["original_data"] = df
-                st.session_state["selected_reference"] = selected_farol_ref
-                st.session_state["current_page"] = "split"
-                st.rerun()
+            if original_status and str(original_status).strip().lower() != "new request".lower():
+                if st.button("🛠️ Adjustments"):
+                    st.session_state["original_data"] = df
+                    st.session_state["selected_reference"] = selected_farol_ref
+                    st.session_state["current_page"] = "split"
+                    st.rerun()
  
  
  

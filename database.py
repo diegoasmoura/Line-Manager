@@ -428,40 +428,7 @@ def add_sales_record(form_values):
         """)
         conn.execute(sales_query, form_values)
  
-        # --- INSERT TABELA BOOKING ---
-        booking_values = {
-            "b_farol_reference": farol_reference,
-            "b_quantity_of_containers": form_values.get("s_quantity_of_containers"),
-            "b_port_of_loading_pol": form_values.get("s_port_of_loading_pol"),
-            "b_port_of_delivery_pod": form_values.get("s_port_of_delivery_pod"),
-            "b_final_destination": form_values.get("s_final_destination"),
-            "farol_status": "New request",
- 
-        }
- 
-        booking_fields = ", ".join(booking_values.keys())
-        booking_placeholders = ", ".join([f":{key}" for key in booking_values.keys()])
-        booking_query = text(f"""
-            INSERT INTO LogTransp.F_CON_BOOKING_MANAGEMENT ({booking_fields})
-            VALUES ({booking_placeholders})
-        """)
-        conn.execute(booking_query, booking_values)
- 
-        # --- INSERT TABELA CONTAINER RELEASE ---
-        cargo_values = {
-            "l_farol_reference": farol_reference,
-            "farol_status": "New request",
- 
-        }
- 
-        cargo_fields = ", ".join(cargo_values.keys())
-        cargo_placeholders = ", ".join([f":{key}" for key in cargo_values.keys()])
-        cargo_query = text(f"""
-            INSERT INTO LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE ({cargo_fields})
-            VALUES ({cargo_placeholders})
-        """)
-        conn.execute(cargo_query, cargo_values)
- 
+        # Removido: criação automática de booking e container release
         # Commit final
         transaction.commit()
         return True
@@ -692,6 +659,18 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
  
 #Função utilizada para atualizar os dados da tabela de booking
 def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada no arquivo booking_new.py
+    from datetime import datetime
+    # Garante que booking e container release existam
+    insert_booking_if_not_exists(farol_reference, {
+        "b_quantity_of_containers": values.get("b_quantity_of_containers", 0),
+        "b_port_of_loading_pol": values.get("b_port_of_loading_pol", ""),
+        "b_port_of_delivery_pod": values.get("b_port_of_delivery_pod", ""),
+        "b_final_destination": values.get("b_final_destination", ""),
+        "farol_status": "Booking Requested"
+    })
+    insert_container_release_if_not_exists(farol_reference, {
+        "farol_status": "Booking Requested"
+    })
     conn = get_database_connection()
     try:
         query = """
@@ -704,7 +683,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             b_comments = :b_comments
         WHERE b_farol_reference = :ref
         """
- 
+
         # Atualiza a tabela de Sales Data
         query_sales = """
         UPDATE LogTransp.F_CON_SALES_DATA
@@ -730,7 +709,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                 "ref": farol_reference,
             },
         )
- 
+
         conn.execute(
             text(query_sales),
             {
@@ -777,6 +756,50 @@ def get_split_data_by_farol_reference(farol_reference):
         """
         result = conn.execute(text(query), {"ref": farol_reference}).mappings().fetchone()
         return result if result else None
+    finally:
+        conn.close()
+ 
+def insert_booking_if_not_exists(farol_reference, booking_data):
+    conn = get_database_connection()
+    try:
+        # Verifica se já existe
+        result = conn.execute(
+            text("SELECT COUNT(*) as count FROM LogTransp.F_CON_BOOKING_MANAGEMENT WHERE b_farol_reference = :ref"),
+            {"ref": farol_reference}
+        ).fetchone()
+        if result and result[0] == 0:
+            # Insere novo registro
+            booking_data["b_farol_reference"] = farol_reference
+            booking_fields = ", ".join(booking_data.keys())
+            booking_placeholders = ", ".join([f":{key}" for key in booking_data.keys()])
+            booking_query = text(f"""
+                INSERT INTO LogTransp.F_CON_BOOKING_MANAGEMENT ({booking_fields})
+                VALUES ({booking_placeholders})
+            """)
+            conn.execute(booking_query, booking_data)
+            conn.commit()
+    finally:
+        conn.close()
+
+def insert_container_release_if_not_exists(farol_reference, container_data):
+    conn = get_database_connection()
+    try:
+        # Verifica se já existe
+        result = conn.execute(
+            text("SELECT COUNT(*) as count FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE WHERE l_farol_reference = :ref"),
+            {"ref": farol_reference}
+        ).fetchone()
+        if result and result[0] == 0:
+            # Insere novo registro
+            container_data["l_farol_reference"] = farol_reference
+            container_fields = ", ".join(container_data.keys())
+            container_placeholders = ", ".join([f":{key}" for key in container_data.keys()])
+            container_query = text(f"""
+                INSERT INTO LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE ({container_fields})
+                VALUES ({container_placeholders})
+            """)
+            conn.execute(container_query, container_data)
+            conn.commit()
     finally:
         conn.close()
  

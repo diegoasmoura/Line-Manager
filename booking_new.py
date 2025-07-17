@@ -40,8 +40,19 @@ def show_booking_management_form():
  
     booking_data = get_booking_data_by_farol_reference(farol_reference)
     if not booking_data:
-        st.error("No booking data found for this Farol Reference.")
-        return
+        # Buscar dados básicos em F_CON_SALES_DATA para inicializar o formulário
+        from database import fetch_shipments_data_sales
+        df_sales = fetch_shipments_data_sales()
+        sales_row = df_sales[df_sales["Sales Farol Reference"] == farol_reference]
+        booking_data = {
+            "b_carrier": "",
+            "b_freight_forwarder": "",
+            "b_booking_request_date": None,
+            "b_comments": ""
+        }
+        if not sales_row.empty:
+            # Se quiser popular campos iniciais a partir de sales_row, pode fazer aqui
+            pass
  
     # Conversão segura da data
     request_date = booking_data["b_booking_request_date"]
