@@ -161,6 +161,90 @@ Após preenchimento da justificativa e confirmação:
 | Shipments (edição)     | Basic               | Approved  | Sim         | Não                   | Sim                                  |
 | Adjustments (crítico)   | Critic               | Pending     | Não        | Sim                    | Não (depende de validação posterior) |
 
----New request
-Booking Requested
+---
+
+## 📋 Gestão de Aprovações de Ajustes (Booking Adjustments)
+
+O módulo **Booking Adjustments** (`booking_adjustments.py`) é responsável pela revisão e aprovação dos ajustes críticos solicitados através da tela de Adjustments. Esta funcionalidade centraliza o controle de qualidade e validação das mudanças antes que sejam efetivadas no sistema.
+
+### 🎯 Funcionalidades Principais
+
+#### 🔍 **Filtros de Pesquisa**
+- **Período**: Hoje, Últimos 7 dias, Últimos 30 dias, Todos
+- **Busca por Farol Reference**: Campo de texto para localização rápida
+- **Status**: Filtragem por status de aprovação
+- **Área**: Filtro por área responsável pelo ajuste
+- **Stage**: Filtro por etapa do processo (Sales Data, Booking Management, etc.)
+
+#### 📊 **Visualizações Disponíveis**
+
+**1. Visão Agrupada por Farol Reference**
+- Agrupa todos os ajustes de uma mesma Farol Reference
+- Mostra resumo consolidado das alterações
+- Permite aprovação em lote para toda a referência
+- Exibe informações como:
+  - Área responsável
+  - Motivo do ajuste
+  - Proprietário do ajuste
+  - Data da solicitação
+  - Comentários
+
+**2. Visão em Lista**
+- Exibição detalhada de todos os registros
+- Visualização tabular completa dos ajustes
+
+### ⚙️ **Sistema de Aprovação**
+
+#### 🎮 **Controles de Status**
+O sistema utiliza os status oficiais da tabela UDC (Farol Status):
+- **Adjustment Requested**: Aguardando aprovação
+- **Booking Approved**: Ajuste aprovado e efetivado
+- **Booking Rejected**: Ajuste rejeitado
+- **Booking Cancelled**: Ajuste cancelado
+- **Received from Carrier**: Recebido do transportador
+
+#### ✅ **Processo de Aprovação**
+
+**1. Seleção do Status**
+- Dropdown com opções da UDC para garantir consistência
+- Aplicação do status para todos os ajustes da Farol Reference
+
+**2. Atualização em Lote**
+- Um clique aprova/rejeita todos os ajustes de uma referência
+- Atualização automática nas tabelas principais:
+  - `F_CON_SALES_DATA`
+  - `F_CON_BOOKING_MANAGEMENT`
+  - `F_CON_CARGO_LOADING_CONTAINER_RELEASE`
+
+**3. Rastreabilidade**
+- Data de confirmação registrada automaticamente
+- Histórico completo na `F_CON_ADJUSTMENTS_LOG`
+
+### 📝 **Resumo de Alterações**
+
+Para cada Farol Reference, o sistema exibe:
+- **Splits**: Novas referências criadas com quantidades
+- **Alterações de Campos**: Formato "Campo: Valor Anterior → Novo Valor"
+- **Detalhes Individuais**: Visualização opcional de cada ajuste específico
+
+### 🔧 **Controles de Interface**
+
+- **Update Status**: Botão principal para aplicar o status selecionado
+- **View Details**: Botão para mostrar/ocultar detalhes individuais dos ajustes
+- **Layout Responsivo**: Interface otimizada com colunas balanceadas
+
+### ⚠️ **Regras Importantes**
+
+1. **Aprovação Unificada**: Todos os ajustes de uma Farol Reference são aprovados/rejeitados em conjunto
+2. **Consistência UDC**: Apenas status válidos da tabela UDC são utilizados
+3. **Visibilidade de Splits**: Splits só ficam visíveis na tela principal após aprovação
+4. **Rastreabilidade Completa**: Todas as ações são logadas com data/hora
+
+### 📈 **Métricas Exibidas**
+
+- **Total Adjustments**: Número total de ajustes no filtro atual
+- **Farol References**: Quantidade de referências únicas afetadas
+- **Pending Adjustments**: Ajustes aguardando aprovação
+
+---
 
