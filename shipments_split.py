@@ -168,12 +168,40 @@ def show_split_form():
         df_split_display = df_split[editable_columns].copy()
         st.markdown(f"#### You are splitting the original line into :green[{num_splits}] lines" if num_splits > 0 else "#### The main line will be adjusted")
         
+        # Carregar opções de dropdown da UDC
+        pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
+        pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
+        carrier_options = df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist()
+
+        # Configuração de dropdowns para o data_editor
+        column_config = {
+            "Sales Port of Loading POL": st.column_config.SelectboxColumn(
+                "Sales Port of Loading POL",
+                options=pol_options,
+                required=False,
+                help="Selecione o porto de origem"
+            ),
+            "Sales Port of Delivery POD": st.column_config.SelectboxColumn(
+                "Sales Port of Delivery POD",
+                options=pod_options,
+                required=False,
+                help="Selecione o porto de destino"
+            ),
+            "Carrier": st.column_config.SelectboxColumn(
+                "Carrier",
+                options=carrier_options,
+                required=False,
+                help="Selecione o carrier"
+            ),
+        }
+
         # Usa a chave dinâmica para o editor
         edited_display = st.data_editor(
             df_split_display,
             num_rows="fixed",
             use_container_width=True,
-            key=st.session_state.editor_key
+            key=st.session_state.editor_key,
+            column_config=column_config
         )
  
         changes = []
