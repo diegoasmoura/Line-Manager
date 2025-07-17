@@ -57,6 +57,11 @@ Na tela de Shipments, a exibição dos botões de ação depende do status origi
         * Trigger é ativada, chamando a procedure que atualiza F_CON_SALES_DATA e F_CON_BOOKING_MANAGEMENT
     * Ao descartar:
         * Alterações são desfeitas e a grade some
+
+📌 **Restrições de Edição por Stage:**
+* **Type of Shipment**: Editável apenas no stage "Sales Data"
+    * Nos stages "Booking Management" e "Container Delivery at Port" o campo aparece como somente leitura
+    * Isso garante integridade dos dados, pois o campo existe originalmente na tabela Sales Data e é trazido via JOIN para os outros stages
 🟡 Farol Status – Controle e restrições
 * Os seguintes status estão disponíveis na coluna Farol Status da tela shipments.py:
     * New Request
