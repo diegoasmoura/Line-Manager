@@ -337,7 +337,7 @@ def exibir_adjustments():
 
     # Botão para voltar para Home
     if st.button("🔙 Back to Shipments"):
-        st.session_state["current_page"] = "main"
+        st.session_state["navigate_to"] = "Shipments"
         st.rerun()
 
 if __name__ == "__main__":

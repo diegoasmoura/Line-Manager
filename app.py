@@ -18,7 +18,16 @@ svg_lighthouse = """
 <path fill="currentColor" d="M12 15q1.25 0 2.125-.875T15 12t-.875-2.125T12 9t-2.125.875T9 12t.875 2.125T12 15m0 1q-1.671 0-2.835-1.164Q8 13.67 8 12t1.165-2.835T12 8t2.836 1.165T16 12t-1.164 2.836T12 16m-7-3.5H1.5v-1H5zm17.5 0H19v-1h3.5zM11.5 5V1.5h1V5zm0 17.5V19h1V3.5zM6.746 7.404l-2.16-2.098l.695-.745l2.111 2.135zM18.72 19.439l-2.117-2.141l.652-.702l2.16 2.098zM16.596 6.745l2.098-2.16l.745.695l-2.135 2.111zM4.562 18.72l2.14-2.117l.664.652l-2.08 2.179zM12 12"/>
 </svg>
 """
- 
+
+# Inicializa o estado do menu se não existir
+if "menu_choice" not in st.session_state:
+    st.session_state.menu_choice = "Shipments"
+
+# Verifica se há uma solicitação de navegação programática
+if "navigate_to" in st.session_state:
+    st.session_state.menu_choice = st.session_state["navigate_to"]
+    del st.session_state["navigate_to"]  # Remove após usar
+
 # Sidebar personalizada com SVG
 with st.sidebar:
     st.markdown(f"""
@@ -27,13 +36,20 @@ with st.sidebar:
     </h2>
     """, unsafe_allow_html=True)
  
+    # Lista de opções
+    options = ["Shipments", "Adjustments", "Op. Control", "Performance", "Tracking", "History", "Setup"]
+    
+    # Encontra o índice da opção atual
+    current_index = options.index(st.session_state.menu_choice) if st.session_state.menu_choice in options else 0
+    
     # Menu lateral com ícones
     choice = option_menu(
         None,
-        ["Shipments", "Adjustments" ,"Op. Control", "Performance", "Tracking", "History", "Setup"],
+        options,
         icons=["truck", "sliders","clipboard-data", "bar-chart", "geo-alt", "clock-history", "gear"],
         menu_icon="menu",
-        default_index=0,# Define "Shipments" como a aba inicial
+        default_index=current_index,
+        key=f"main_menu_{st.session_state.menu_choice}",  # Chave única baseada no estado
         styles={
             "container": {"padding": "0!important", "background-color": "#f8f9fa"},
             "icon": {"color": "#2c3f43", "font-size": "20px"},
@@ -41,20 +57,25 @@ with st.sidebar:
             "nav-link-selected": {"background-color": "#007681", "color": "white"},
         }
     )
- 
-# Exibição do conteúdo com base na escolha do usuário
-if choice == "Shipments":
+    
+    # Atualiza o estado do menu se houve mudança
+    if choice != st.session_state.menu_choice:
+        st.session_state.menu_choice = choice
+        st.rerun()
+
+# Usa o estado do menu para determinar qual página exibir
+if st.session_state.menu_choice == "Shipments":
     shipments.main()
-elif choice == "Adjustments":
+elif st.session_state.menu_choice == "Adjustments":
     booking_adjustments.exibir_adjustments()
-elif choice == "Op. Control":
+elif st.session_state.menu_choice == "Op. Control":
     operation_control.exibir_operation_control()
-elif choice == "Performance":
+elif st.session_state.menu_choice == "Performance":
     performance_control.exibir_performance_control()
-elif choice == "Tracking":
+elif st.session_state.menu_choice == "Tracking":
     tracking.exibir_tracking()
-elif choice == "History":
+elif st.session_state.menu_choice == "History":
     history.exibir_history()
-elif choice == "Setup":
+elif st.session_state.menu_choice == "Setup":
     setup.exibir_setup()
  
