@@ -333,8 +333,8 @@ def exibir_adjustments():
     with col3:
         with st.container():
             st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            pending_count = len(df_original[df_original['status'] == 'Pending'])
-            st.metric("⏳ Pending Adjustments", pending_count)
+            pending_farol_refs = df_original[df_original['status'] == 'Adjustment Requested']['farol_reference'].unique()
+            st.metric("⏳ Pending Adjustments", len(pending_farol_refs))
             st.markdown('</div>', unsafe_allow_html=True)
 
     # Exibe diretamente a grade de dados ajustados
