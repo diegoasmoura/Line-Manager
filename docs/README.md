@@ -194,6 +194,7 @@ O módulo **Booking Adjustments** (`booking_adjustments.py`) é responsável pel
 - Mesmas colunas da tela `shipments_split.py` para consistência
 - Status editável diretamente na grade
 - Resumo das alterações aplicadas ("Changes Made")
+- Comentários da solicitação original ("Comments")
 - Tratamento visual de splits como linhas separadas
 - Rastreabilidade via "Adjustment ID"
 
@@ -280,6 +281,7 @@ A visualização apresenta as **mesmas colunas da tela de split**, garantindo fa
 | **Cut-off End** | Data de Cut-off Fim | ❌ |
 | **Required Arrival** | Data de Chegada Requerida | ❌ |
 | **Changes Made** | Resumo das alterações aplicadas | ❌ |
+| **Comments** | Comentários informados na tela shipments_split.py | ❌ |
 | **Adjustment ID** | ID único do ajuste para rastreabilidade | ❌ |
 
 ### 🔄 **Processamento de Dados**
@@ -341,6 +343,11 @@ def generate_changes_summary(adjustments_df, farol_ref):
 - **Formato amigável**: "📝 Campo: Anterior → Novo"
 - **Splits destacados**: "🔧 Split: X containers"
 - **Múltiplas alterações**: Separadas por " | "
+
+#### **💬 Comments**
+- **Contexto**: Exibe comentários originais informados durante a solicitação
+- **Origem**: Dados vindos da tela `shipments_split.py`
+- **Fallback**: "Nenhum comentário" quando campo vazio
 
 #### **🔍 Adjustment ID**
 - **Rastreabilidade**: UUID único para cada conjunto de ajustes

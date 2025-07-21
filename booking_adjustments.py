@@ -11,6 +11,7 @@
 # - Status padrão "Adjustment Requested" (SEM opção em branco no dropdown)
 # - Normalização robusta: Remove opções vazias/None/strings vazias do SelectboxColumn
 # - Coluna "Changes Made" com resumo das alterações (📝 campos alterados, 🔧 splits)  
+# - Coluna "Comments" exibindo comentários informados na tela shipments_split.py
 # - Coluna "Adjustment ID" para rastreabilidade
 # - Detecção automática de mudanças no status com confirmação antes de aplicar
 # - Opções de status integradas com UDC (SelectboxColumn) sempre com "Adjustment Requested" primeiro
@@ -135,6 +136,10 @@ def get_adjusted_sales_data(farol_references, adjustments_df):
             # Pega o adjustment_id (assume que é o mesmo para toda a referência)
             adjustment_id = ref_adjustments['adjustment_id'].iloc[0] if not ref_adjustments.empty else ""
             
+            # Pega os comentários da solicitação
+            comments = ref_adjustments['comments'].iloc[0] if not ref_adjustments.empty and 'comments' in ref_adjustments.columns else ""
+            comments = comments if pd.notna(comments) and comments != "" else "Nenhum comentário"
+            
             # Pega o status atual e normaliza para "Adjustment Requested" por padrão
             if not ref_adjustments.empty:
                 current_status = ref_adjustments['status'].iloc[0]
@@ -171,6 +176,7 @@ def get_adjusted_sales_data(farol_references, adjustments_df):
                             "Requested Cut off End Date": adjusted_data["s_requested_deadlines_end_date"],
                             "Required Arrival Date": adjusted_data["s_required_arrival_date"],
                             "Changes Made": changes_summary,
+                            "Comments": comments,
                             "Adjustment ID": adjustment_id
                         }
                         adjusted_records.append(split_record)
@@ -189,6 +195,7 @@ def get_adjusted_sales_data(farol_references, adjustments_df):
                         "Requested Cut off End Date": adjusted_data["s_requested_deadlines_end_date"],
                         "Required Arrival Date": adjusted_data["s_required_arrival_date"],
                         "Changes Made": changes_summary,
+                        "Comments": comments,
                         "Adjustment ID": adjustment_id
                     }
                     adjusted_records.append(display_record)
@@ -567,6 +574,7 @@ def exibir_adjustments():
                         "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
                         "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
                         "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
+                        "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
                         "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
                     },
                     use_container_width=True,
