@@ -189,9 +189,13 @@ O módulo **Booking Adjustments** (`booking_adjustments.py`) é responsável pel
   - Data da solicitação
   - Comentários
 
-**2. Visão em Lista**
-- Exibição detalhada de todos os registros
-- Visualização tabular completa dos ajustes
+**2. Adjusted Data View (Visualização de Dados Ajustados)**
+- Simulação dos dados da `F_CON_SALES_DATA` com ajustes aplicados
+- Mesmas colunas da tela `shipments_split.py` para consistência
+- Status editável diretamente na grade
+- Resumo das alterações aplicadas ("Changes Made")
+- Tratamento visual de splits como linhas separadas
+- Rastreabilidade via "Adjustment ID"
 
 ### ⚙️ **Sistema de Aprovação**
 
@@ -245,6 +249,144 @@ Para cada Farol Reference, o sistema exibe:
 - **Total Adjustments**: Número total de ajustes no filtro atual
 - **Farol References**: Quantidade de referências únicas afetadas
 - **Pending Adjustments**: Ajustes aguardando aprovação
+
+---
+
+## 🔧 Visualização de Dados Ajustados (Adjusted Data View)
+
+A funcionalidade **Adjusted Data View** foi implementada para fornecer uma **simulação visual** dos dados da `F_CON_SALES_DATA` já com os ajustes aplicados, permitindo que os aprovadores visualizem exatamente como os dados ficaram antes de confirmar as mudanças definitivamente.
+
+### 🎯 **Objetivo Principal**
+
+- **Simulação Prévia**: Mostrar como os dados da `F_CON_SALES_DATA` ficaram após a aplicação dos ajustes solicitados
+- **Mesma Estrutura**: Utilizar as mesmas colunas exibidas na tela `shipments_split.py` para consistência visual
+- **Aprovação Informada**: Permitir que o aprovador veja o resultado final antes de tomar a decisão
+
+### 📊 **Estrutura de Colunas**
+
+A visualização apresenta as **mesmas colunas da tela de split**, garantindo familiaridade ao usuário:
+
+| Coluna | Descrição | Editável |
+|--------|-----------|----------|
+| **Farol Reference** | Referência única do embarque | ❌ |
+| **Status** | Status atual do ajuste | ✅ |
+| **Quantity** | Quantidade de containers (com splits aplicados) | ❌ |
+| **POL** | Porto de Carregamento | ❌ |
+| **POD** | Porto de Destino (com ajustes aplicados) | ❌ |
+| **Place of Receipt** | Local de Recebimento | ❌ |
+| **Final Destination** | Destino Final | ❌ |
+| **Carrier** | Transportador | ❌ |
+| **Cut-off Start** | Data de Cut-off Início | ❌ |
+| **Cut-off End** | Data de Cut-off Fim | ❌ |
+| **Required Arrival** | Data de Chegada Requerida | ❌ |
+| **Changes Made** | Resumo das alterações aplicadas | ❌ |
+| **Adjustment ID** | ID único do ajuste para rastreabilidade | ❌ |
+
+### 🔄 **Processamento de Dados**
+
+#### **1. Busca de Dados Originais**
+```python
+def get_original_sales_data(farol_reference):
+    # Busca dados base da F_CON_SALES_DATA
+    # para cada Farol Reference
+```
+
+#### **2. Aplicação de Ajustes**
+```python
+def apply_adjustments_to_data(original_data, adjustments_df):
+    # Aplica todos os ajustes (exceto splits) 
+    # aos dados originais
+```
+
+#### **3. Tratamento de Splits**
+- **Splits são exibidos como linhas separadas**
+- Cada split mostra a **quantidade dividida**
+- Mantém os **dados ajustados** aplicados
+
+#### **4. Resumo de Alterações**
+```python
+def generate_changes_summary(adjustments_df, farol_ref):
+    # Gera resumo no formato:
+    # 🔧 Split: X containers
+    # 📝 Campo: Valor Anterior → Novo Valor
+```
+
+### ⚡ **Funcionalidades Interativas**
+
+#### **🎛️ Status Editável In-Grid**
+- **Edição direta**: Status pode ser alterado diretamente na grade
+- **Dropdown limpo**: Sem opções vazias ou inválidas
+- **Opções válidas**:
+  - ✅ **Adjustment Requested** (padrão)
+  - ✅ **Booking Approved**
+  - ✅ **Booking Rejected** 
+  - ✅ **Booking Cancelled**
+  - ✅ **Received from Carrier**
+
+#### **🔄 Detecção de Mudanças**
+- Sistema detecta automaticamente alterações no Status
+- Exibe preview das mudanças antes da aplicação
+- Botões **Apply Changes** / **Cancel Changes** para controle total
+
+#### **💾 Atualização em Lote**
+- Aplica mudanças de status em **todas as tabelas relevantes**:
+  - `F_CON_SALES_DATA`
+  - `F_CON_BOOKING_MANAGEMENT`
+  - `F_CON_CARGO_LOADING_CONTAINER_RELEASE`
+- **Transação atômica**: Sucesso completo ou rollback total
+
+### 📋 **Informações Adicionais**
+
+#### **🎨 Changes Made**
+- **Formato amigável**: "📝 Campo: Anterior → Novo"
+- **Splits destacados**: "🔧 Split: X containers"
+- **Múltiplas alterações**: Separadas por " | "
+
+#### **🔍 Adjustment ID**
+- **Rastreabilidade**: UUID único para cada conjunto de ajustes
+- **Auditoria**: Facilita localização nos logs
+- **Consistência**: Mesmo ID para ajustes da mesma solicitação
+
+### ⚙️ **Validações e Robustez**
+
+#### **🛡️ Normalização de Status**
+- **Múltiplas camadas** de validação para eliminar valores vazios
+- **Status padrão**: "Adjustment Requested" sempre garantido
+- **Fallback seguro**: Lista nunca fica vazia
+
+#### **🔒 Integridade dos Dados**
+- **Somente Status editável**: Demais colunas protegidas
+- **Validação UDC**: Apenas status válidos da tabela UDC
+- **Consistência temporal**: Data de confirmação automática
+
+### 🎯 **Benefícios para o Usuário**
+
+#### **👁️ Visualização Clara**
+- **Preview completo**: Ver dados finais antes da aprovação
+- **Contexto visual**: Mesma interface familiar do split
+- **Comparação fácil**: "Changes Made" mostra o que mudou
+
+#### **⚡ Eficiência**
+- **Aprovação rápida**: Status direto na grade
+- **Menos cliques**: Sem necessidade de abrir modais
+- **Batch processing**: Múltiplas referências de uma vez
+
+#### **🔐 Controle Total**
+- **Preview das mudanças**: Ver antes de aplicar
+- **Cancelamento seguro**: Voltar atrás se necessário
+- **Rastreabilidade**: Histórico completo de ações
+
+### 🔄 **Substituição da List View**
+
+A **Adjusted Data View** substitui completamente a antiga **List View**, oferecendo:
+
+| Funcionalidade | List View Anterior | Adjusted Data View Nova |
+|---------------|-------------------|------------------------|
+| **Visualização** | Dados brutos da tabela | Dados simulados com ajustes |
+| **Interatividade** | Apenas leitura | Status editável |
+| **Contexto** | Sem informação de mudanças | Resumo completo das alterações |
+| **Splits** | Não mostrava divisões | Exibe splits como linhas separadas |
+| **Aprovação** | Processo separado | Integrado na visualização |
 
 ---
 
