@@ -424,7 +424,7 @@ def exibir_adjustments():
                 for change in status_changes:
                     st.info(f"**{change['farol_reference']}**: {change['old_status']} → {change['new_status']}")
                 
-                col1, col2 = st.columns([1, 4])
+                col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
                     if st.button("✅ Apply Changes", key="apply_status_changes", use_container_width=True):
                         success_count = 0
@@ -514,15 +514,28 @@ def exibir_adjustments():
                 with col2:
                     if st.button("❌ Cancel Changes", key="cancel_status_changes", use_container_width=True):
                         st.rerun()
+                
+                with col3:
+                    if st.button("🔙 Back to Shipments", key="back_to_shipments_changes", use_container_width=True):
+                        st.session_state["navigate_to"] = "Shipments"
+                        st.rerun()
+            else:
+                # Botão para voltar para Home quando não há mudanças de status
+                if st.button("🔙 Back to Shipments"):
+                    st.session_state["navigate_to"] = "Shipments"
+                    st.rerun()
         else:
             st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
+            # Botão para voltar quando não há dados ajustados
+            if st.button("🔙 Back to Shipments", key="back_no_adjusted_data"):
+                st.session_state["navigate_to"] = "Shipments"
+                st.rerun()
     else:
         st.info("Nenhum ajuste encontrado. Use os filtros acima para localizar ajustes específicos.")
-
-    # Botão para voltar para Home
-    if st.button("🔙 Back to Shipments"):
-        st.session_state["navigate_to"] = "Shipments"
-        st.rerun()
+        # Botão para voltar quando não há ajustes
+        if st.button("🔙 Back to Shipments", key="back_no_adjustments"):
+            st.session_state["navigate_to"] = "Shipments"
+            st.rerun()
 
 if __name__ == "__main__":
     exibir_adjustments()
