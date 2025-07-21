@@ -178,7 +178,16 @@ O módulo **Booking Adjustments** (`booking_adjustments.py`) é responsável pel
 
 #### 📊 **Visualizações Disponíveis**
 
-**1. Visão Agrupada por Farol Reference**
+**1. Adjusted Data View (Visualização de Dados Ajustados) [ABA PRINCIPAL]**
+- Simulação dos dados da `F_CON_SALES_DATA` com ajustes aplicados
+- Mesmas colunas da tela `shipments_split.py` para consistência
+- Status editável diretamente na grade
+- Resumo das alterações aplicadas ("Changes Made")
+- Comentários da solicitação original ("Comments")
+- Tratamento visual de splits como linhas separadas
+- Rastreabilidade via "Adjustment ID"
+
+**2. Visão Agrupada por Farol Reference**
 - Agrupa todos os ajustes de uma mesma Farol Reference
 - Mostra resumo consolidado das alterações
 - Permite aprovação em lote para toda a referência
@@ -188,15 +197,6 @@ O módulo **Booking Adjustments** (`booking_adjustments.py`) é responsável pel
   - Proprietário do ajuste
   - Data da solicitação
   - Comentários
-
-**2. Adjusted Data View (Visualização de Dados Ajustados)**
-- Simulação dos dados da `F_CON_SALES_DATA` com ajustes aplicados
-- Mesmas colunas da tela `shipments_split.py` para consistência
-- Status editável diretamente na grade
-- Resumo das alterações aplicadas ("Changes Made")
-- Comentários da solicitação original ("Comments")
-- Tratamento visual de splits como linhas separadas
-- Rastreabilidade via "Adjustment ID"
 
 ### ⚙️ **Sistema de Aprovação**
 
@@ -235,7 +235,9 @@ Para cada Farol Reference, o sistema exibe:
 ### 🔧 **Controles de Interface**
 
 - **Update Status**: Botão principal para aplicar o status selecionado
-- **View Details**: Botão para mostrar/ocultar detalhes individuais dos ajustes
+- **View Details**: Exibe dados ajustados simulados (mesmas colunas da Adjusted Data View)
+  - Visualização principal com dados simulados finais
+  - Seção adicional com detalhes técnicos dos ajustes individuais
 - **Layout Responsivo**: Interface otimizada com colunas balanceadas
 
 ### ⚠️ **Regras Importantes**
@@ -394,6 +396,28 @@ A **Adjusted Data View** substitui completamente a antiga **List View**, oferece
 | **Contexto** | Sem informação de mudanças | Resumo completo das alterações |
 | **Splits** | Não mostrava divisões | Exibe splits como linhas separadas |
 | **Aprovação** | Processo separado | Integrado na visualização |
+
+### 🔗 **Integração entre Visualizações**
+
+#### **Consistência Visual Total**
+- A funcionalidade **View Details** na aba **"Grouped by Farol Reference"** foi reformulada para usar as **mesmas colunas** da **Adjusted Data View**
+- Isso garante **consistência visual** e **experiência uniforme** em toda a interface
+
+#### **Estrutura em Duas Camadas**
+1. **📊 Visualização Principal**: Dados simulados com ajustes aplicados
+   - Mesma estrutura da Adjusted Data View (sem Status)
+   - Mostra resultado final após aplicação dos ajustes
+   
+2. **🔧 Detalhes Técnicos**: Seção adicional com informações do log
+   - Ajustes individuais campo por campo
+   - Valores anteriores e novos
+   - Status e stage de cada alteração
+
+#### **Benefícios da Integração**
+- **Familiaridade**: Usuário vê sempre a mesma estrutura de colunas
+- **Contexto Completo**: Dados finais + detalhes técnicos em um só lugar
+- **Eficiência**: Não precisa alternar entre abas para ver dados simulados
+- **Decisão Informada**: Preview completo antes da aprovação
 
 ---
 
