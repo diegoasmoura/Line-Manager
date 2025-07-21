@@ -424,9 +424,9 @@ def exibir_adjustments():
                 for change in status_changes:
                     st.info(f"**{change['farol_reference']}**: {change['old_status']} → {change['new_status']}")
                 
-                col1, col2, col3 = st.columns([1, 1, 1])
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    if st.button("✅ Apply Changes", key="apply_status_changes", use_container_width=True):
+                    if st.button("✅ Apply Changes", key="apply_status_changes"):
                         success_count = 0
                         error_count = 0
                         
@@ -512,11 +512,11 @@ def exibir_adjustments():
                             st.error(f"❌ {error_count} update(s) failed!")
                 
                 with col2:
-                    if st.button("❌ Cancel Changes", key="cancel_status_changes", use_container_width=True):
+                    if st.button("❌ Cancel Changes", key="cancel_status_changes"):
                         st.rerun()
                 
                 with col3:
-                    if st.button("🔙 Back to Shipments", key="back_to_shipments_changes", use_container_width=True):
+                    if st.button("🔙 Back to Shipments", key="back_to_shipments_changes"):
                         st.session_state["navigate_to"] = "Shipments"
                         st.rerun()
             else:
