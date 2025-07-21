@@ -176,27 +176,17 @@ O módulo **Booking Adjustments** (`booking_adjustments.py`) é responsável pel
 - **Área**: Filtro por área responsável pelo ajuste
 - **Stage**: Filtro por etapa do processo (Sales Data, Booking Management, etc.)
 
-#### 📊 **Visualizações Disponíveis**
+#### 📊 **Interface Simplificada**
 
-**1. Adjusted Data View (Visualização de Dados Ajustados) [ABA PRINCIPAL]**
-- Simulação dos dados da `F_CON_SALES_DATA` com ajustes aplicados
-- Mesmas colunas da tela `shipments_split.py` para consistência
-- Status editável diretamente na grade
-- Resumo das alterações aplicadas ("Changes Made")
-- Comentários da solicitação original ("Comments")
-- Tratamento visual de splits como linhas separadas
-- Rastreabilidade via "Adjustment ID"
-
-**2. Visão Agrupada por Farol Reference**
-- Agrupa todos os ajustes de uma mesma Farol Reference
-- Mostra resumo consolidado das alterações
-- Permite aprovação em lote para toda a referência
-- Exibe informações como:
-  - Área responsável
-  - Motivo do ajuste
-  - Proprietário do ajuste
-  - Data da solicitação
-  - Comentários
+**Grade Única de Adjustment Management**
+- **Interface direta**: Sem abas - grade principal para agilizar aprovações
+- **Dados simulados**: Visualização da `F_CON_SALES_DATA` com ajustes aplicados
+- **Colunas consistentes**: Mesmas colunas da tela `shipments_split.py`
+- **Edição in-line**: Status editável diretamente na grade via `st.data_editor`
+- **Resumo visual**: Coluna "Changes Made" com alterações aplicadas
+- **Comentários**: Coluna "Comments" da solicitação original
+- **Rastreabilidade**: "Adjustment ID" para controle completo
+- **Tratamento de splits**: Linhas separadas para cada split de embarque
 
 ### ⚙️ **Sistema de Aprovação**
 
@@ -255,15 +245,16 @@ Para cada Farol Reference, o sistema exibe:
 
 ---
 
-## 🔧 Visualização de Dados Ajustados (Adjusted Data View)
+## 🔧 Tela Principal de Adjustment Management
 
-A funcionalidade **Adjusted Data View** foi implementada para fornecer uma **simulação visual** dos dados da `F_CON_SALES_DATA` já com os ajustes aplicados, permitindo que os aprovadores visualizem exatamente como os dados ficaram antes de confirmar as mudanças definitivamente.
+A **interface simplificada** foi implementada para fornecer uma **experiência direta e eficiente** de aprovação de ajustes, mostrando uma **simulação visual** dos dados da `F_CON_SALES_DATA` já com os ajustes aplicados.
 
-### 🎯 **Objetivo Principal**
+### 🎯 **Design Simplificado**
 
-- **Simulação Prévia**: Mostrar como os dados da `F_CON_SALES_DATA` ficaram após a aplicação dos ajustes solicitados
-- **Mesma Estrutura**: Utilizar as mesmas colunas exibidas na tela `shipments_split.py` para consistência visual
-- **Aprovação Informada**: Permitir que o aprovador veja o resultado final antes de tomar a decisão
+- **Interface Única**: Sem abas - grade principal para agilizar o processo de aprovação
+- **Simulação Prévia**: Visualização dos dados já com ajustes aplicados
+- **Estrutura Consistente**: Mesmas colunas da tela `shipments_split.py`
+- **Aprovação Direta**: Edição de status in-line para decisões rápidas
 
 ### 📊 **Estrutura de Colunas**
 
@@ -396,28 +387,6 @@ A **Adjusted Data View** substitui completamente a antiga **List View**, oferece
 | **Contexto** | Sem informação de mudanças | Resumo completo das alterações |
 | **Splits** | Não mostrava divisões | Exibe splits como linhas separadas |
 | **Aprovação** | Processo separado | Integrado na visualização |
-
-### 🔗 **Integração entre Visualizações**
-
-#### **Consistência Visual Total**
-- A funcionalidade **View Details** na aba **"Grouped by Farol Reference"** foi reformulada para usar as **mesmas colunas** da **Adjusted Data View**
-- Isso garante **consistência visual** e **experiência uniforme** em toda a interface
-
-#### **Estrutura em Duas Camadas**
-1. **📊 Visualização Principal**: Dados simulados com ajustes aplicados
-   - Mesma estrutura da Adjusted Data View (sem Status)
-   - Mostra resultado final após aplicação dos ajustes
-   
-2. **🔧 Detalhes Técnicos**: Seção adicional com informações do log
-   - Ajustes individuais campo por campo
-   - Valores anteriores e novos
-   - Status e stage de cada alteração
-
-#### **Benefícios da Integração**
-- **Familiaridade**: Usuário vê sempre a mesma estrutura de colunas
-- **Contexto Completo**: Dados finais + detalhes técnicos em um só lugar
-- **Eficiência**: Não precisa alternar entre abas para ver dados simulados
-- **Decisão Informada**: Preview completo antes da aprovação
 
 ---
 

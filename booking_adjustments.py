@@ -1,10 +1,11 @@
 ##booking_adjustments.py
 # 
-# ✅ FUNCIONALIDADE: Adjusted Data View (substituindo List View)
-# Esta aba mostra os dados da F_CON_SALES_DATA já com os ajustes aplicados,
+# ✅ FUNCIONALIDADE: Tela Simplificada de Adjustment Management
+# Interface única e direta mostrando os dados da F_CON_SALES_DATA já com os ajustes aplicados,
 # simulando como ficaram após os splits/alterações solicitados no shipments_split.py
 # 
 # Funcionalidades implementadas:
+# - Interface simplificada: Grade direta (sem abas) para agilizar aprovações
 # - Exibição dos dados ajustados com as mesmas colunas do shipments_split.py
 # - Tabela editável (st.data_editor) com coluna "Status" editável diretamente na grade
 # - Coluna "Status" posicionada após "Farol Reference" para melhor visibilidade
@@ -18,7 +19,6 @@
 # - Botões "Apply Changes" e "Cancel Changes" para controle das alterações
 # - Atualização em lote das tabelas principais (Sales, Booking, Loading)
 # - Todas as colunas são read-only exceto "Status" para edição segura
-# - View Details na aba Grouped mostra dados ajustados + seção técnica (sem expanders aninhados)
 # 
 import streamlit as st
 import pandas as pd
@@ -337,403 +337,187 @@ def exibir_adjustments():
             st.metric("⏳ Pending Adjustments", pending_count)
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # Tabs para diferentes visualizações - Adjusted Data View como aba principal
-    tab1, tab2 = st.tabs(["🔧 Adjusted Data View", "📦 Grouped by Farol Reference"])
-    
-    with tab1:
-        # Nova aba: Visão de dados ajustados (substituindo List View)
-        if not df_original.empty:
-            # Gera os dados ajustados
-            df_adjusted = get_adjusted_sales_data(unique_farol_refs, df_original)
+    # Exibe diretamente a grade de dados ajustados
+    if not df_original.empty:
+        # Gera os dados ajustados
+        df_adjusted = get_adjusted_sales_data(unique_farol_refs, df_original)
+        
+        # Normaliza status vazios no DataFrame final antes de exibir
+        if not df_adjusted.empty and 'Status' in df_adjusted.columns:
+            df_adjusted['Status'] = df_adjusted['Status'].apply(
+                lambda x: "Adjustment Requested" if pd.isna(x) or x == "" or x is None or str(x).strip() == "" else x
+            )
+        
+        if not df_adjusted.empty:
+            # Obtém as opções de status da UDC
+            farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
+            relevant_status = [
+                "Adjustment Requested",  # Status padrão sempre primeiro
+                "Booking Approved", 
+                "Booking Rejected",
+                "Booking Cancelled",
+                "Received from Carrier"
+            ]
+            # Filtra apenas os status que existem na UDC, mantendo a ordem
+            available_options = [status for status in relevant_status if status in farol_status_options]
+            if not available_options:
+                available_options = relevant_status
             
-            # Normaliza status vazios no DataFrame final antes de exibir
-            if not df_adjusted.empty and 'Status' in df_adjusted.columns:
-                df_adjusted['Status'] = df_adjusted['Status'].apply(
-                    lambda x: "Adjustment Requested" if pd.isna(x) or x == "" or x is None or str(x).strip() == "" else x
-                )
+            # Garante que "Adjustment Requested" esteja sempre disponível e seja o primeiro
+            if "Adjustment Requested" not in available_options:
+                available_options.insert(0, "Adjustment Requested")
+            elif available_options[0] != "Adjustment Requested":
+                # Move "Adjustment Requested" para o início se não estiver
+                available_options.remove("Adjustment Requested")
+                available_options.insert(0, "Adjustment Requested")
             
-            if not df_adjusted.empty:
-                # Obtém as opções de status da UDC
-                farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
-                relevant_status = [
-                    "Adjustment Requested",  # Status padrão sempre primeiro
-                    "Booking Approved", 
-                    "Booking Rejected",
-                    "Booking Cancelled",
-                    "Received from Carrier"
-                ]
-                # Filtra apenas os status que existem na UDC, mantendo a ordem
-                available_options = [status for status in relevant_status if status in farol_status_options]
-                if not available_options:
-                    available_options = relevant_status
+            # Remove qualquer opção vazia ou None que possa estar na lista - MÚLTIPLAS VERIFICAÇÕES
+            available_options = [opt for opt in available_options if opt and str(opt).strip() and opt != "" and opt != " " and not pd.isna(opt) and opt is not None]
+            
+            # Garante que sempre temos pelo menos "Adjustment Requested" se a lista ficar vazia
+            if not available_options:
+                available_options = ["Adjustment Requested"]
+            
+            # Exibe a tabela editável com os dados ajustados
+            edited_df = st.data_editor(
+                df_adjusted,
+                column_config={
+                    "Sales Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True),
+                    "Status": st.column_config.SelectboxColumn("Status", width="medium", options=available_options, default="Adjustment Requested"),
+                    "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity", format="%d", disabled=True),
+                    "Sales Port of Loading POL": st.column_config.TextColumn("POL", width="medium", disabled=True),
+                    "Sales Port of Delivery POD": st.column_config.TextColumn("POD", width="medium", disabled=True),
+                    "Sales Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),
+                    "Sales Final Destination": st.column_config.TextColumn("Final Destination", width="medium", disabled=True),
+                    "Carrier": st.column_config.TextColumn("Carrier", width="medium", disabled=True),
+                    "Requested Cut off Start Date": st.column_config.DateColumn("Cut-off Start", disabled=True),
+                    "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
+                    "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
+                    "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
+                    "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
+                    "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
+                },
+                use_container_width=True,
+                hide_index=True,
+                key="adjusted_data_editor"
+            )
+            
+            # Detecta mudanças no status e aplica atualizações
+            status_changes = []
+            for i in range(len(df_adjusted)):
+                original_status = df_adjusted.iloc[i]['Status']
+                new_status = edited_df.iloc[i]['Status']
+                farol_ref = df_adjusted.iloc[i]['Sales Farol Reference']
                 
-                # Garante que "Adjustment Requested" esteja sempre disponível e seja o primeiro
-                if "Adjustment Requested" not in available_options:
-                    available_options.insert(0, "Adjustment Requested")
-                elif available_options[0] != "Adjustment Requested":
-                    # Move "Adjustment Requested" para o início se não estiver
-                    available_options.remove("Adjustment Requested")
-                    available_options.insert(0, "Adjustment Requested")
+                if original_status != new_status:
+                    status_changes.append({
+                        'farol_reference': farol_ref,
+                        'old_status': original_status,
+                        'new_status': new_status
+                    })
+            
+            # Aplica as mudanças de status se houver
+            if status_changes:
+                st.markdown("---")
+                st.markdown("### 🔄 Status Changes Detected")
                 
-                # Remove qualquer opção vazia ou None que possa estar na lista - MÚLTIPLAS VERIFICAÇÕES
-                available_options = [opt for opt in available_options if opt and str(opt).strip() and opt != "" and opt != " " and not pd.isna(opt) and opt is not None]
+                for change in status_changes:
+                    st.info(f"**{change['farol_reference']}**: {change['old_status']} → {change['new_status']}")
                 
-                # Garante que sempre temos pelo menos "Adjustment Requested" se a lista ficar vazia
-                if not available_options:
-                    available_options = ["Adjustment Requested"]
-                
-                # Exibe a tabela editável com os dados ajustados
-                edited_df = st.data_editor(
-                    df_adjusted,
-                    column_config={
-                        "Sales Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True),
-                        "Status": st.column_config.SelectboxColumn("Status", width="medium", options=available_options, default="Adjustment Requested"),
-                        "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity", format="%d", disabled=True),
-                        "Sales Port of Loading POL": st.column_config.TextColumn("POL", width="medium", disabled=True),
-                        "Sales Port of Delivery POD": st.column_config.TextColumn("POD", width="medium", disabled=True),
-                        "Sales Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),
-                        "Sales Final Destination": st.column_config.TextColumn("Final Destination", width="medium", disabled=True),
-                        "Carrier": st.column_config.TextColumn("Carrier", width="medium", disabled=True),
-                        "Requested Cut off Start Date": st.column_config.DateColumn("Cut-off Start", disabled=True),
-                        "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
-                        "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
-                        "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
-                        "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
-                        "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
-                    },
-                    use_container_width=True,
-                    hide_index=True,
-                    key="adjusted_data_editor"
-                )
-                
-                # Detecta mudanças no status e aplica atualizações
-                status_changes = []
-                for i in range(len(df_adjusted)):
-                    original_status = df_adjusted.iloc[i]['Status']
-                    new_status = edited_df.iloc[i]['Status']
-                    farol_ref = df_adjusted.iloc[i]['Sales Farol Reference']
-                    
-                    if original_status != new_status:
-                        status_changes.append({
-                            'farol_reference': farol_ref,
-                            'old_status': original_status,
-                            'new_status': new_status
-                        })
-                
-                # Aplica as mudanças de status se houver
-                if status_changes:
-                    st.markdown("---")
-                    st.markdown("### 🔄 Status Changes Detected")
-                    
-                    for change in status_changes:
-                        st.info(f"**{change['farol_reference']}**: {change['old_status']} → {change['new_status']}")
-                    
-                    col1, col2 = st.columns([1, 4])
-                    with col1:
-                        if st.button("✅ Apply Changes", key="apply_status_changes", use_container_width=True):
-                            success_count = 0
-                            error_count = 0
-                            
-                            for change in status_changes:
-                                try:
-                                    conn = get_database_connection()
-                                    transaction = conn.begin()
-                                    
-                                    # Atualiza o status nos ajustes
-                                    update_log_query = text("""
-                                        UPDATE LogTransp.F_CON_Adjustments_Log
-                                        SET status = :new_status,
-                                            confirmation_date = :confirmation_date
-                                        WHERE farol_reference = :farol_reference
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    if st.button("✅ Apply Changes", key="apply_status_changes", use_container_width=True):
+                        success_count = 0
+                        error_count = 0
+                        
+                        for change in status_changes:
+                            try:
+                                conn = get_database_connection()
+                                transaction = conn.begin()
+                                
+                                # Atualiza o status nos ajustes
+                                update_log_query = text("""
+                                    UPDATE LogTransp.F_CON_Adjustments_Log
+                                    SET status = :new_status,
+                                        confirmation_date = :confirmation_date
+                                    WHERE farol_reference = :farol_reference
+                                """)
+                                
+                                conn.execute(update_log_query, {
+                                    "new_status": change['new_status'],
+                                    "confirmation_date": datetime.now() if change['new_status'] in ["Booking Approved", "Booking Rejected", "Booking Cancelled"] else None,
+                                    "farol_reference": change['farol_reference']
+                                })
+                                
+                                # Determina os stages dos ajustes para esta referência
+                                stages_query = text("""
+                                    SELECT DISTINCT stage 
+                                    FROM LogTransp.F_CON_Adjustments_Log 
+                                    WHERE farol_reference = :farol_reference
+                                """)
+                                stages_result = conn.execute(stages_query, {"farol_reference": change['farol_reference']}).fetchall()
+                                stages = [row[0] for row in stages_result]
+                                
+                                # Atualiza o status nas tabelas principais
+                                if "Sales Data" in stages:
+                                    update_sales_query = text("""
+                                        UPDATE LogTransp.F_CON_SALES_DATA
+                                        SET farol_status = :farol_status
+                                        WHERE s_farol_reference = :farol_reference
                                     """)
-                                    
-                                    conn.execute(update_log_query, {
-                                        "new_status": change['new_status'],
-                                        "confirmation_date": datetime.now() if change['new_status'] in ["Booking Approved", "Booking Rejected", "Booking Cancelled"] else None,
+                                    conn.execute(update_sales_query, {
+                                        "farol_status": change['new_status'],
                                         "farol_reference": change['farol_reference']
                                     })
-                                    
-                                    # Determina os stages dos ajustes para esta referência
-                                    stages_query = text("""
-                                        SELECT DISTINCT stage 
-                                        FROM LogTransp.F_CON_Adjustments_Log 
-                                        WHERE farol_reference = :farol_reference
+                                
+                                if "Booking Management" in stages:
+                                    update_booking_query = text("""
+                                        UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
+                                        SET farol_status = :farol_status
+                                        WHERE b_farol_reference = :farol_reference
                                     """)
-                                    stages_result = conn.execute(stages_query, {"farol_reference": change['farol_reference']}).fetchall()
-                                    stages = [row[0] for row in stages_result]
-                                    
-                                    # Atualiza o status nas tabelas principais
-                                    if "Sales Data" in stages:
-                                        update_sales_query = text("""
-                                            UPDATE LogTransp.F_CON_SALES_DATA
-                                            SET farol_status = :farol_status
-                                            WHERE s_farol_reference = :farol_reference
-                                        """)
-                                        conn.execute(update_sales_query, {
-                                            "farol_status": change['new_status'],
-                                            "farol_reference": change['farol_reference']
-                                        })
-                                    
-                                    if "Booking Management" in stages:
-                                        update_booking_query = text("""
-                                            UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-                                            SET farol_status = :farol_status
-                                            WHERE b_farol_reference = :farol_reference
-                                        """)
-                                        conn.execute(update_booking_query, {
-                                            "farol_status": change['new_status'],
-                                            "farol_reference": change['farol_reference']
-                                        })
-                                    
-                                    if "Container Delivery at Port" in stages:
-                                        update_loading_query = text("""
-                                            UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-                                            SET farol_status = :farol_status
-                                            WHERE l_farol_reference = :farol_reference
-                                        """)
-                                        conn.execute(update_loading_query, {
-                                            "farol_status": change['new_status'],
-                                            "farol_reference": change['farol_reference']
-                                        })
-                                    
-                                    transaction.commit()
-                                    success_count += 1
-                                    
-                                except Exception as e:
-                                    if 'transaction' in locals():
-                                        transaction.rollback()
-                                    st.error(f"Error updating {change['farol_reference']}: {str(e)}")
-                                    error_count += 1
-                                finally:
-                                    if 'conn' in locals():
-                                        conn.close()
-                            
-                            if success_count > 0:
-                                st.success(f"✅ Successfully updated {success_count} status(es)!")
-                                if error_count == 0:
-                                    st.rerun()
-                            if error_count > 0:
-                                st.error(f"❌ {error_count} update(s) failed!")
-                    
-                    with col2:
-                        if st.button("❌ Cancel Changes", key="cancel_status_changes", use_container_width=True):
-                            st.rerun()
-            else:
-                st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
-        else:
-            st.info("Nenhum ajuste encontrado. Use os filtros acima para localizar ajustes específicos.")
-    
-    with tab2:
-        # Visão agrupada por Farol Reference
-        for farol_ref in unique_farol_refs:
-            # Filtra ajustes para este Farol Reference
-            df_farol = df_original[df_original['farol_reference'] == farol_ref].copy()
-            
-            # Pega a primeira linha para informações gerais
-            first_row = df_farol.iloc[0]
-            
-            # Verifica se há diferentes status dentro do mesmo Farol Reference
-            statuses = df_farol['status'].unique()
-            status_info = f"Status: {', '.join(statuses)}"
-            
-            # Cria um expander para cada Farol Reference
-            with st.expander(f"🔧 {farol_ref} - {len(df_farol)} ajustes - {status_info}", expanded=False):
-                
-                # Mostra informações resumidas
-                st.markdown(f"""
-                **Area:** {first_row['area']}  
-                **Stage:** {first_row['stage']}  
-                **Reason:** {first_row['request_reason']}  
-                **Adjustment Owner:** {first_row['adjustments_owner']}  
-                **Request Date:** {first_row['row_inserted_date'].strftime('%d/%m/%Y %H:%M')}  
-                **Comments:** {first_row['comments'] if pd.notna(first_row['comments']) else 'No comments'}
-                """)
-
-                # Mostra resumo das alterações
-                st.markdown("**📝 Summary of Changes:**")
-                
-                # Cria um resumo das alterações
-                changes_summary = []
-                for _, row in df_farol.iterrows():
-                    if row['column_name'] == 'Split':
-                        changes_summary.append(f"• **Split:** New reference created with {format_value(row['new_value'])} containers")
-                    else:
-                        changes_summary.append(f"• **{format_column_name(row['column_name'])}:** {format_value(row['previous_value'])} → {format_value(row['new_value'])}")
-                
-                for change in changes_summary:
-                    st.markdown(change)
-
-                # Seleção de status para toda a Farol Reference
-                col1, col2, col3 = st.columns([2, 1, 1])
-                
-                with col1:
-                    current_status = statuses[0] if len(statuses) == 1 else "Mixed"
-                    # Mapeia os status internos para os status da UDC
-                    status_mapping = {
-                        "Pending": "Adjustment Requested",
-                        "Approved": "Booking Approved", 
-                        "Rejected": "Booking Rejected"
-                    }
-                    
-                    # Opções disponíveis do UDC filtradas para os status relevantes de ajustes
-                    # Usa os status da UDC que são relevantes para ajustes
-                    relevant_status = [
-                        "Adjustment Requested",
-                        "Booking Approved", 
-                        "Booking Rejected",
-                        "Booking Cancelled",
-                        "Received from Carrier"
-                    ]
-                    
-                    # Filtra apenas os status que existem na UDC
-                    available_options = [status for status in relevant_status if status in farol_status_options]
-                    
-                    # Se nenhum status foi encontrado, usa os valores padrão
-                    if not available_options:
-                        available_options = relevant_status
-                    
-                    # Define o index baseado no status atual
-                    try:
-                        if current_status in available_options:
-                            default_index = available_options.index(current_status)
-                        elif current_status in status_mapping and status_mapping[current_status] in available_options:
-                            default_index = available_options.index(status_mapping[current_status])
-                        else:
-                            default_index = 0
-                    except (ValueError, IndexError):
-                        default_index = 0
-                    
-                    new_status = st.selectbox(
-                        "Status for all adjustments:",
-                        available_options,
-                        index=default_index,
-                        key=f"status_{farol_ref}"
-                    )
+                                    conn.execute(update_booking_query, {
+                                        "farol_status": change['new_status'],
+                                        "farol_reference": change['farol_reference']
+                                    })
+                                
+                                if "Container Delivery at Port" in stages:
+                                    update_loading_query = text("""
+                                        UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+                                        SET farol_status = :farol_status
+                                        WHERE l_farol_reference = :farol_reference
+                                    """)
+                                    conn.execute(update_loading_query, {
+                                        "farol_status": change['new_status'],
+                                        "farol_reference": change['farol_reference']
+                                    })
+                                
+                                transaction.commit()
+                                success_count += 1
+                                
+                            except Exception as e:
+                                if 'transaction' in locals():
+                                    transaction.rollback()
+                                st.error(f"Error updating {change['farol_reference']}: {str(e)}")
+                                error_count += 1
+                            finally:
+                                if 'conn' in locals():
+                                    conn.close()
+                        
+                        if success_count > 0:
+                            st.success(f"✅ Successfully updated {success_count} status(es)!")
+                            if error_count == 0:
+                                st.rerun()
+                        if error_count > 0:
+                            st.error(f"❌ {error_count} update(s) failed!")
                 
                 with col2:
-                    st.markdown("<br>", unsafe_allow_html=True)  # Espaçamento vertical
-                    if st.button(f"✅ Update Status", key=f"update_{farol_ref}", use_container_width=True):
-                        try:
-                            conn = get_database_connection()
-                            transaction = conn.begin()
-                            
-                            # Atualiza o status de todos os ajustes para esta Farol Reference
-                            update_log_query = text("""
-                                UPDATE LogTransp.F_CON_Adjustments_Log
-                                SET status = :new_status,
-                                    confirmation_date = :confirmation_date
-                                WHERE farol_reference = :farol_reference
-                            """)
-                            
-                            conn.execute(update_log_query, {
-                                "new_status": new_status,
-                                "confirmation_date": datetime.now() if new_status in ["Booking Approved", "Booking Rejected", "Booking Cancelled"] else None,
-                                "farol_reference": farol_ref
-                            })
-                            
-                            # Atualiza as tabelas principais com o novo status da UDC
-                            stages = df_farol['stage'].unique()
-                            
-                            if "Sales Data" in stages:
-                                update_sales_query = text("""
-                                    UPDATE LogTransp.F_CON_SALES_DATA
-                                    SET farol_status = :farol_status
-                                    WHERE s_farol_reference = :farol_reference
-                                """)
-                                conn.execute(update_sales_query, {
-                                    "farol_status": new_status,
-                                    "farol_reference": farol_ref
-                                })
-                            
-                            if "Booking Management" in stages:
-                                update_booking_query = text("""
-                                    UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-                                    SET farol_status = :farol_status
-                                    WHERE b_farol_reference = :farol_reference
-                                """)
-                                conn.execute(update_booking_query, {
-                                    "farol_status": new_status,
-                                    "farol_reference": farol_ref
-                                })
-                            
-                            if "Container Delivery at Port" in stages:
-                                update_loading_query = text("""
-                                    UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-                                    SET farol_status = :farol_status
-                                    WHERE l_farol_reference = :farol_reference
-                                """)
-                                conn.execute(update_loading_query, {
-                                    "farol_status": new_status,
-                                    "farol_reference": farol_ref
-                                })
-                            
-                            transaction.commit()
-                            st.success(f"✅ Status updated successfully for {farol_ref}!")
-                            st.rerun()
-                            
-                        except Exception as e:
-                            if 'transaction' in locals():
-                                transaction.rollback()
-                            st.error(f"Error updating status: {str(e)}")
-                        finally:
-                            if 'conn' in locals():
-                                conn.close()
-                
-                with col3:
-                    st.markdown("<br>", unsafe_allow_html=True)  # Espaçamento vertical
-                    if st.button("🔍 View Details", key=f"details_{farol_ref}", use_container_width=True):
-                        st.session_state[f"show_details_{farol_ref}"] = not st.session_state.get(f"show_details_{farol_ref}", False)
-                
-                # Mostra detalhes se solicitado
-                if st.session_state.get(f"show_details_{farol_ref}", False):
-                    st.markdown("**📋 Detailed View with Applied Adjustments:**")
-                    
-                    # Gera os dados ajustados para esta Farol Reference específica
-                    df_detail_adjusted = get_adjusted_sales_data([farol_ref], df_original)
-                    
-                    if not df_detail_adjusted.empty:
-                        # Remove a coluna Status para manter como está na aba principal
-                        df_display = df_detail_adjusted.drop(columns=['Status'])
-                        
-                        st.dataframe(
-                            df_display,
-                            column_config={
-                                "Sales Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium"),
-                                "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity", format="%d"),
-                                "Sales Port of Loading POL": st.column_config.TextColumn("POL", width="medium"),
-                                "Sales Port of Delivery POD": st.column_config.TextColumn("POD", width="medium"),
-                                "Sales Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium"),
-                                "Sales Final Destination": st.column_config.TextColumn("Final Destination", width="medium"),
-                                "Carrier": st.column_config.TextColumn("Carrier", width="medium"),
-                                "Requested Cut off Start Date": st.column_config.DateColumn("Cut-off Start"),
-                                "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End"),
-                                "Required Arrival Date": st.column_config.DateColumn("Required Arrival"),
-                                "Changes Made": st.column_config.TextColumn("Changes Made", width="large"),
-                                "Comments": st.column_config.TextColumn("Comments", width="large"),
-                                "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium")
-                            },
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                        
-                        # Adiciona seção adicional com informações técnicas dos ajustes individuais
-                        st.markdown("---")  # Separador visual
-                        st.markdown("**🔧 Technical Adjustment Details**")
-                        st.markdown("*Individual field-level adjustments from the adjustment log:*")
-                        st.dataframe(
-                            df_farol[['column_name', 'previous_value', 'new_value', 'status', 'stage']],
-                            column_config={
-                                "column_name": "Field",
-                                "previous_value": "Previous Value", 
-                                "new_value": "New Value",
-                                "status": "Status",
-                                "stage": "Stage"
-                            },
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                    else:
-                        st.warning("⚠️ Could not generate adjusted data preview for this Farol Reference.")
+                    if st.button("❌ Cancel Changes", key="cancel_status_changes", use_container_width=True):
+                        st.rerun()
+        else:
+            st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
+    else:
+        st.info("Nenhum ajuste encontrado. Use os filtros acima para localizar ajustes específicos.")
 
     # Botão para voltar para Home
     if st.button("🔙 Back to Shipments"):
