@@ -719,12 +719,13 @@ def exibir_adjustments():
             # Filtro por período
             st.subheader("Period")
             periodo_opcoes = {
+                "All": -1,
                 "Today": 0,
                 "Last 7 days": 7,
-                "Last 30 days": 30,
-                "All": -1
+                "Last 30 days": 30
             }
-            periodo_selecionado = st.radio("", list(periodo_opcoes.keys()), horizontal=True)
+            periodo_ordem = ["All", "Today", "Last 7 days", "Last 30 days"]
+            periodo_selecionado = st.radio("", periodo_ordem, horizontal=True, index=0)
         
         with col2:
             # Campo de busca
