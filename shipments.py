@@ -336,6 +336,36 @@ def exibir_shipments():
             st.session_state["selected_reference"] = selected_farol_ref
             st.session_state["current_page"] = "split"
             st.rerun()
+    # Botão View Attachments sempre visível, toggle, igual tela de ajustes
+    with _:
+        view_attachments_open = st.session_state.get("show_shipments_attachments", False)
+        if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
+            if view_attachments_open:
+                st.session_state["show_shipments_attachments"] = False
+                st.session_state["shipments_attachments_farol_ref"] = None
+            else:
+                st.session_state["show_shipments_attachments"] = True
+                st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
+            st.rerun()
+    # Seção de anexos
+    if st.session_state.get("show_shipments_attachments", False):
+        # Sincroniza referência se seleção mudar
+        if selected_farol_ref != st.session_state.get("shipments_attachments_farol_ref"):
+            if selected_farol_ref:
+                st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
+                st.rerun()
+            else:
+                st.session_state["show_shipments_attachments"] = False
+                st.session_state["shipments_attachments_farol_ref"] = None
+                st.rerun()
+        st.markdown("---")
+        st.markdown("### 📎 Attachment Management")
+        farol_ref = st.session_state.get("shipments_attachments_farol_ref")
+        if farol_ref:
+            from booking_adjustments import display_attachments_section
+            display_attachments_section(farol_ref)
+        else:
+            st.info("Selecione uma linha para visualizar os anexos.")
  
  
  

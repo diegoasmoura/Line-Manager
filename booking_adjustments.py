@@ -464,10 +464,72 @@ def get_file_icon(mime_type, file_name):
 def display_attachments_section(farol_reference):
     """
     Exibe a seção de anexos para um Farol Reference específico.
-    
-    Args:
-        farol_reference: Referência do Farol
     """
+    # CSS personalizado para cards de anexos e métricas (garante visual igual em todas as telas)
+    st.markdown("""
+    <style>
+    .attachment-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 18px;
+        margin: 15px 0;
+        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        text-align: center;
+        border-left: 4px solid #1f77b4;
+    }
+    .attachment-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        border-left-color: #0d47a1;
+    }
+    .file-icon {
+        font-size: 3em;
+        margin-bottom: 15px;
+        display: block;
+    }
+    .file-name {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 10px;
+        color: #333;
+        word-wrap: break-word;
+    }
+    .file-info {
+        font-size: 13px;
+        color: #666;
+        margin: 5px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    .metric-card {
+        background: linear-gradient(145deg, #f0f8ff, #e6f3ff);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        border: 1px solid #b3d9ff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .attachment-section {
+        background-color: #fafafa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        border: 1px solid #e0e0e0;
+    }
+    .upload-area {
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Seção de Upload com estilo melhorado
     with st.expander("📤 Add New Attachment", expanded=False):
