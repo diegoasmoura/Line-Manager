@@ -863,24 +863,25 @@ def exibir_adjustments():
             # Reordena colunas para colocar 'Selecionar' no início
             colunas_ordenadas = ['Selecionar'] + [col for col in df_adjusted.columns if col != 'Selecionar']
 
-            # Configuração das colunas, adicionando a coluna de seleção
+            # Configuração das colunas, padronizando os títulos conforme a tela de split
             column_config = {
                 'Selecionar': st.column_config.CheckboxColumn('Select', help='Selecione apenas uma linha'),
-                "Sales Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True),
-                "Status": st.column_config.SelectboxColumn("Status", width="medium", options=available_options, default="Adjustment Requested"),
-                "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity", format="%d", disabled=True),
-                "Sales Port of Loading POL": st.column_config.TextColumn("POL", width="medium", disabled=True),
-                "Sales Port of Delivery POD": st.column_config.TextColumn("POD", width="medium", disabled=True),
-                "Sales Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),
-                "Sales Final Destination": st.column_config.TextColumn("Final Destination", width="medium", disabled=True),
+                "Sales Farol Reference": st.column_config.TextColumn("Sales Farol Reference", width="medium", disabled=True),
+                "Status": st.column_config.SelectboxColumn("Farol Status", width="medium", options=available_options, default="Adjustment Requested"),
+                "Sales Quantity of Containers": st.column_config.NumberColumn("Sales Quantity of Containers", format="%d", disabled=True),
+                "Sales Port of Loading POL": st.column_config.TextColumn("Sales Port of Loading POL", width="medium", disabled=True),
+                "Sales Port of Delivery POD": st.column_config.TextColumn("Sales Port of Delivery POD", width="medium", disabled=True),
+                "Sales Place of Receipt": st.column_config.TextColumn("Sales Place of Receipt", width="medium", disabled=True),
+                "Sales Final Destination": st.column_config.TextColumn("Sales Final Destination", width="medium", disabled=True),
                 "Carrier": st.column_config.TextColumn("Carrier", width="medium", disabled=True),
-                "Requested Cut off Start Date": st.column_config.DateColumn("Cut-off Start", disabled=True),
-                "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
-                "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
+                "Requested Cut off Start Date": st.column_config.DateColumn("Requested Cut off Start Date", disabled=True),
+                "Requested Cut off End Date": st.column_config.DateColumn("Requested Cut off End Date", disabled=True),
+                "Required Arrival Date": st.column_config.DateColumn("Required Arrival Date", disabled=True),
                 "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
                 "Attachments": st.column_config.NumberColumn("Attachments", format="%d", disabled=True),
                 "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
-                "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
+                "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True),
+                "Inserted Date": st.column_config.DatetimeColumn("Inserted Date", disabled=True, format="%d/%m/%Y %H:%M")
             }
 
             # Exibe a tabela editável com a coluna de seleção
