@@ -798,6 +798,25 @@ def exibir_adjustments():
             )
         
         if not df_adjusted.empty:
+            # Adiciona coluna Attachments com a contagem de anexos por Farol Reference
+            def count_attachments(farol_ref):
+                conn = get_database_connection()
+                try:
+                    query = text("""
+                        SELECT COUNT(*) as total FROM LogTransp.F_CON_ANEXOS WHERE farol_reference = :ref
+                    """)
+                    result = conn.execute(query, {"ref": farol_ref}).fetchone()
+                    return int(result[0]) if result else 0
+                finally:
+                    conn.close()
+            
+            df_adjusted['Attachments'] = df_adjusted['Sales Farol Reference'].apply(count_attachments)
+            # Reordena para colocar Attachments antes de Comments
+            cols = list(df_adjusted.columns)
+            if 'Attachments' in cols and 'Comments' in cols:
+                cols.insert(cols.index('Comments'), cols.pop(cols.index('Attachments')))
+                df_adjusted = df_adjusted[cols]
+
             # Obtém as opções de status da UDC
             farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
             relevant_status = [
@@ -843,6 +862,7 @@ def exibir_adjustments():
                     "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
                     "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
                     "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
+                    "Attachments": st.column_config.NumberColumn("Attachments", format="%d", disabled=True),
                     "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
                     "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
                 },
@@ -873,6 +893,7 @@ def exibir_adjustments():
                 for change in status_changes:
                     st.info(f"**{change['farol_reference']}**: {change['old_status']} → {change['new_status']}")
                 
+                # Reorganizar os botões para ficarem lado a lado: Apply, Cancel, View Attachments, Back
                 col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     if st.button("✅ Apply Changes", key="apply_status_changes"):
@@ -963,20 +984,17 @@ def exibir_adjustments():
                 with col2:
                     if st.button("❌ Cancel Changes", key="cancel_status_changes"):
                         st.rerun()
-                
                 with col3:
-                    if st.button("🔙 Back to Shipments", key="back_to_shipments_changes"):
-                        st.session_state["navigate_to"] = "Shipments"
-                        st.rerun()
-                
-                with col4:
-                    # Botão para ver anexos mesmo quando há mudanças de status
                     if st.button("📎 View Attachments", key="view_attachments_changes"):
                         st.session_state["show_attachments"] = True
                         st.rerun()
+                with col4:
+                    if st.button("🔙 Back to Shipments", key="back_to_shipments_changes"):
+                        st.session_state["navigate_to"] = "Shipments"
+                        st.rerun()
             else:
-                # Botões quando não há mudanças de status
-                col1, col2 = st.columns(2)
+                # Seção de botões quando não há mudanças de status
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     if st.button("🔙 Back to Shipments"):
                         st.session_state["navigate_to"] = "Shipments"
@@ -985,6 +1003,7 @@ def exibir_adjustments():
                     if st.button("📎 View Attachments", key="view_attachments_no_changes"):
                         st.session_state["show_attachments"] = True
                         st.rerun()
+                # col3 e col4 ficam vazios
             
             # Seção de Anexos
             if st.session_state.get("show_attachments", False):
@@ -1008,8 +1027,8 @@ def exibir_adjustments():
                     st.rerun()
         else:
             st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
-            # Botões quando não há dados ajustados
-            col1, col2 = st.columns(2)
+            # Botões juntos e alinhados
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 if st.button("🔙 Back to Shipments", key="back_no_adjusted_data"):
                     st.session_state["navigate_to"] = "Shipments"
@@ -1018,6 +1037,7 @@ def exibir_adjustments():
                 if st.button("📎 View Attachments", key="view_attachments_no_adjusted_data"):
                     st.session_state["show_attachments"] = True
                     st.rerun()
+            # col3 e col4 ficam vazios
                     
             # Seção de Anexos mesmo sem dados ajustados
             if st.session_state.get("show_attachments", False):
@@ -1045,7 +1065,7 @@ def exibir_adjustments():
     else:
         st.info("Nenhum ajuste encontrado. Use os filtros acima para localizar ajustes específicos.")
         # Botões quando não há ajustes
-        col1, col2 = st.columns(2)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             if st.button("🔙 Back to Shipments", key="back_no_adjustments"):
                 st.session_state["navigate_to"] = "Shipments"
