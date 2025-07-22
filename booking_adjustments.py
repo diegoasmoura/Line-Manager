@@ -470,26 +470,26 @@ def display_attachments_section(farol_reference):
     """
     
     # Seção de Upload com estilo melhorado
-    with st.expander("📤 Adicionar Novo Anexo", expanded=False):
+    with st.expander("📤 Add New Attachment", expanded=False):
         st.markdown('<div class="upload-area">', unsafe_allow_html=True)
         uploaded_files = st.file_uploader(
-            "Arraste e solte arquivos aqui ou clique para selecionar",
+            "Drag and drop files here or click to select",
             accept_multiple_files=True,
             type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
             key=f"uploader_{farol_reference}",
-            help="Tipos de arquivo suportados: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
+            help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
         if uploaded_files:
-            st.success(f"✅ {len(uploaded_files)} arquivo(s) selecionado(s):")
+            st.success(f"✅ {len(uploaded_files)} file(s) selected:")
             for file in uploaded_files:
                 st.write(f"📁 **{file.name}** - {format_file_size(len(file.getvalue()))}")
             
             col1, col2 = st.columns([1, 4])
             with col1:
-                if st.button("💾 Salvar Anexos", key=f"save_attachments_{farol_reference}", type="primary"):
-                    progress_bar = st.progress(0, text="Salvando anexos...")
+                if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):
+                    progress_bar = st.progress(0, text="Saving attachments...")
                     success_count = 0
                     
                     for i, file in enumerate(uploaded_files):
@@ -500,15 +500,15 @@ def display_attachments_section(farol_reference):
                             success_count += 1
                         
                         progress = (i + 1) / len(uploaded_files)
-                        progress_bar.progress(progress, text=f"Salvando anexo {i+1} de {len(uploaded_files)}...")
+                        progress_bar.progress(progress, text=f"Saving attachment {i+1} of {len(uploaded_files)}...")
                     
                     progress_bar.empty()
                     
                     if success_count == len(uploaded_files):
-                        st.success(f"✅ {success_count} anexo(s) salvos com sucesso!")
+                        st.success(f"✅ {success_count} attachment(s) saved successfully!")
                         st.balloons()  # Efeito visual de sucesso
                     else:
-                        st.warning(f"⚠️ {success_count} de {len(uploaded_files)} anexos foram salvos.")
+                        st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
                     
                     # Força atualização da lista
                     st.rerun()
@@ -517,7 +517,7 @@ def display_attachments_section(farol_reference):
     attachments_df = get_attachments_for_farol(farol_reference)
     
     if not attachments_df.empty:
-        st.markdown(f"### 📋 Anexos Existentes ({len(attachments_df)})")
+        st.markdown(f"### 📋 Existing Attachments ({len(attachments_df)})")
         
         # Calcula o número de colunas baseado no número de anexos (máximo 3)
         num_cols = min(3, len(attachments_df))
@@ -567,8 +567,8 @@ def display_attachments_section(farol_reference):
                         # Botão de download direto para todos os tipos de arquivo
                         file_content, file_name, mime_type = get_attachment_content(attachment['id'])
                         if file_content:
-                            st.download_button(
-                                label="⬇️ Baixar",
+                                                    st.download_button(
+                            label="⬇️ Download",
                                 data=file_content,
                                 file_name=file_name,
                                 mime=mime_type,
@@ -576,39 +576,39 @@ def display_attachments_section(farol_reference):
                                 use_container_width=True
                             )
                         else:
-                            st.button("⬇️ Indisponível", key=f"unavailable_{attachment['id']}", use_container_width=True, disabled=True)
+                            st.button("⬇️ Unavailable", key=f"unavailable_{attachment['id']}", use_container_width=True, disabled=True)
                     
                     with col_btn2:
                         # Botão inicial de excluir
-                        if st.button("🗑️ Excluir", key=f"delete_{attachment['id']}", use_container_width=True):
+                        if st.button("🗑️ Delete", key=f"delete_{attachment['id']}", use_container_width=True):
                             st.session_state[confirm_key] = True
                             st.rerun()
                 
                 else:
                     # Modo de confirmação - botões horizontais em nova linha
-                    st.warning("⚠️ Confirmar exclusão?")
+                    st.warning("⚠️ Confirm deletion?")
                     
                     col_confirm1, col_confirm2 = st.columns(2)
                     with col_confirm1:
-                        if st.button("✅ Sim, excluir", key=f"confirm_yes_{attachment['id']}", use_container_width=True):
+                        if st.button("✅ Yes, delete", key=f"confirm_yes_{attachment['id']}", use_container_width=True):
                             if delete_attachment(attachment['id']):
-                                st.success("✅ Anexo excluído com sucesso!")
+                                st.success("✅ Attachment deleted successfully!")
                                 st.session_state[confirm_key] = False
                                 st.rerun()
                             else:
-                                st.error("❌ Erro ao excluir anexo!")
+                                st.error("❌ Error deleting attachment!")
                                 st.session_state[confirm_key] = False
                     
                     with col_confirm2:
-                        if st.button("❌ Cancelar", key=f"confirm_no_{attachment['id']}", use_container_width=True):
+                        if st.button("❌ Cancel", key=f"confirm_no_{attachment['id']}", use_container_width=True):
                             st.session_state[confirm_key] = False
                             st.rerun()
         
 
             
     else:
-        st.info("📂 Nenhum anexo encontrado para esta referência.")
-        st.markdown("💡 **Dica:** Use a seção 'Adicionar Novo Anexo' acima para enviar arquivos relacionados a este Farol Reference.")
+        st.info("📂 No attachments found for this reference.")
+        st.markdown("💡 **Tip:** Use the 'Add New Attachment' section above to upload files related to this Farol Reference.")
 
 def exibir_adjustments():
     st.title("📋 Adjustment Request Management")
@@ -971,7 +971,7 @@ def exibir_adjustments():
                 
                 with col4:
                     # Botão para ver anexos mesmo quando há mudanças de status
-                    if st.button("📎 Ver Anexos", key="view_attachments_changes"):
+                    if st.button("📎 View Attachments", key="view_attachments_changes"):
                         st.session_state["show_attachments"] = True
                         st.rerun()
             else:
@@ -982,19 +982,19 @@ def exibir_adjustments():
                         st.session_state["navigate_to"] = "Shipments"
                         st.rerun()
                 with col2:
-                    if st.button("📎 Ver Anexos", key="view_attachments_no_changes"):
+                    if st.button("📎 View Attachments", key="view_attachments_no_changes"):
                         st.session_state["show_attachments"] = True
                         st.rerun()
             
             # Seção de Anexos
             if st.session_state.get("show_attachments", False):
                 st.markdown("---")
-                st.markdown("### 📎 Gestão de Anexos")
+                st.markdown("### 📎 Attachment Management")
                 
                 # Seletor de Farol Reference para anexos
                 farol_refs_for_attachments = unique_farol_refs.tolist()
                 selected_farol_ref = st.selectbox(
-                    "Selecione o Farol Reference para gerenciar anexos:",
+                    "Select Farol Reference to manage attachments:",
                     farol_refs_for_attachments,
                     key="farol_ref_attachments"
                 )
@@ -1003,7 +1003,7 @@ def exibir_adjustments():
                     display_attachments_section(selected_farol_ref)
                 
                 # Botão para ocultar seção de anexos
-                if st.button("🔼 Ocultar Anexos", key="hide_attachments"):
+                if st.button("🔼 Hide Attachments", key="hide_attachments"):
                     st.session_state["show_attachments"] = False
                     st.rerun()
         else:
@@ -1015,20 +1015,20 @@ def exibir_adjustments():
                     st.session_state["navigate_to"] = "Shipments"
                     st.rerun()
             with col2:
-                if st.button("📎 Ver Anexos", key="view_attachments_no_adjusted_data"):
+                if st.button("📎 View Attachments", key="view_attachments_no_adjusted_data"):
                     st.session_state["show_attachments"] = True
                     st.rerun()
                     
             # Seção de Anexos mesmo sem dados ajustados
             if st.session_state.get("show_attachments", False):
                 st.markdown("---")
-                st.markdown("### 📎 Gestão de Anexos")
+                st.markdown("### 📎 Attachment Management")
                 
                 if unique_farol_refs is not None and len(unique_farol_refs) > 0:
                     # Seletor de Farol Reference para anexos
                     farol_refs_for_attachments = unique_farol_refs.tolist()
                     selected_farol_ref = st.selectbox(
-                        "Selecione o Farol Reference para gerenciar anexos:",
+                        "Select Farol Reference to manage attachments:",
                         farol_refs_for_attachments,
                         key="farol_ref_attachments_no_adjusted"
                     )
@@ -1036,10 +1036,10 @@ def exibir_adjustments():
                     if selected_farol_ref:
                         display_attachments_section(selected_farol_ref)
                 else:
-                    st.info("📂 Nenhuma referência disponível para anexos.")
+                    st.info("📂 No references available for attachments.")
                 
                 # Botão para ocultar seção de anexos
-                if st.button("🔼 Ocultar Anexos", key="hide_attachments_no_adjusted"):
+                if st.button("🔼 Hide Attachments", key="hide_attachments_no_adjusted"):
                     st.session_state["show_attachments"] = False
                     st.rerun()
     else:
@@ -1052,17 +1052,17 @@ def exibir_adjustments():
                 st.rerun()
         with col2:
             # Permitir anexos mesmo sem ajustes usando input manual de Farol Reference
-            if st.button("📎 Adicionar Anexos", key="add_attachments_no_adjustments"):
+            if st.button("📎 Add Attachments", key="add_attachments_no_adjustments"):
                 st.session_state["show_manual_attachments"] = True
                 st.rerun()
                 
         # Seção de anexos manual quando não há ajustes
         if st.session_state.get("show_manual_attachments", False):
             st.markdown("---")
-            st.markdown("### 📎 Gestão de Anexos")
+            st.markdown("### 📎 Attachment Management")
             
             manual_farol_ref = st.text_input(
-                "Digite o Farol Reference para gerenciar anexos:",
+                "Enter Farol Reference to manage attachments:",
                 key="manual_farol_ref_input",
                 placeholder="Ex: FAR123456"
             )
@@ -1070,10 +1070,10 @@ def exibir_adjustments():
             if manual_farol_ref and manual_farol_ref.strip():
                 display_attachments_section(manual_farol_ref.strip())
             else:
-                st.info("Digite um Farol Reference válido para gerenciar anexos.")
+                st.info("Enter a valid Farol Reference to manage attachments.")
             
             # Botão para ocultar seção de anexos
-            if st.button("🔼 Ocultar Anexos", key="hide_manual_attachments"):
+            if st.button("🔼 Hide Attachments", key="hide_manual_attachments"):
                 st.session_state["show_manual_attachments"] = False
                 st.rerun()
 
