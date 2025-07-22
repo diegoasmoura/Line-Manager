@@ -1014,9 +1014,16 @@ def exibir_adjustments():
                     if st.button("❌ Cancel Changes", key="cancel_status_changes"):
                         st.rerun()
                 with col3:
-                    if st.button("📎 View Attachments", key="view_attachments_changes", disabled=(selected_farol_ref is None)):
-                        st.session_state["show_attachments"] = True
-                        st.session_state["attachments_farol_ref"] = selected_farol_ref
+                    # Botão toggle para anexos
+                    view_attachments_open = st.session_state.get("show_attachments", False)
+                    if st.button("�� View Attachments", key="view_attachments_changes", disabled=(selected_farol_ref is None)):
+                        # Toggle: se já está aberto, fecha; se está fechado, abre
+                        if view_attachments_open:
+                            st.session_state["show_attachments"] = False
+                            st.session_state["attachments_farol_ref"] = None
+                        else:
+                            st.session_state["show_attachments"] = True
+                            st.session_state["attachments_farol_ref"] = selected_farol_ref
                         st.rerun()
                 with col4:
                     if st.button("🔙 Back to Shipments", key="back_to_shipments_changes"):
@@ -1030,20 +1037,27 @@ def exibir_adjustments():
                         st.session_state["navigate_to"] = "Shipments"
                         st.rerun()
                 with col2:
+                    # Repetir a mesma lógica para os outros blocos de botões de anexos (view_attachments_no_changes, view_attachments_no_adjusted_data)
+                    view_attachments_open = st.session_state.get("show_attachments", False)
                     if st.button("📎 View Attachments", key="view_attachments_no_changes", disabled=(selected_farol_ref is None)):
-                        st.session_state["show_attachments"] = True
-                        st.session_state["attachments_farol_ref"] = selected_farol_ref
+                        # Toggle: se já está aberto, fecha; se está fechado, abre
+                        if view_attachments_open:
+                            st.session_state["show_attachments"] = False
+                            st.session_state["attachments_farol_ref"] = None
+                        else:
+                            st.session_state["show_attachments"] = True
+                            st.session_state["attachments_farol_ref"] = selected_farol_ref
                         st.rerun()
                 # col3 e col4 ficam vazios
             # Seção de Anexos
             if st.session_state.get("show_attachments", False):
                 # Sincroniza a referência de anexos com a seleção atual
-                if (selected_farol_ref != st.session_state.get("attachments_farol_ref")) or (selected_rows is not None and len(selected_rows) > 1):
-                    if selected_farol_ref and len(selected_rows) == 1:
+                if selected_farol_ref != st.session_state.get("attachments_farol_ref"):
+                    if selected_farol_ref:
                         st.session_state["attachments_farol_ref"] = selected_farol_ref
                         st.rerun()
                     else:
-                        # Se nenhuma linha ou mais de uma linha está selecionada, fecha a seção de anexos
+                        # Se nenhuma linha está selecionada, fecha a seção de anexos
                         st.session_state["show_attachments"] = False
                         st.session_state["attachments_farol_ref"] = None
                         st.rerun()
@@ -1054,10 +1068,6 @@ def exibir_adjustments():
                     display_attachments_section(farol_ref)
                 else:
                     st.info("Selecione uma linha para visualizar os anexos.")
-                if st.button("🔼 Hide Attachments", key="hide_attachments"):
-                    st.session_state["show_attachments"] = False
-                    st.session_state["attachments_farol_ref"] = None
-                    st.rerun()
         else:
             st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
             # Botões juntos e alinhados
@@ -1067,9 +1077,16 @@ def exibir_adjustments():
                     st.session_state["navigate_to"] = "Shipments"
                     st.rerun()
             with col2:
+                # Repetir a mesma lógica para os outros blocos de botões de anexos (view_attachments_no_changes, view_attachments_no_adjusted_data)
+                view_attachments_open = st.session_state.get("show_attachments", False)
                 if st.button("📎 View Attachments", key="view_attachments_no_adjusted_data", disabled=(selected_farol_ref is None)):
-                    st.session_state["show_attachments"] = True
-                    st.session_state["attachments_farol_ref"] = selected_farol_ref
+                    # Toggle: se já está aberto, fecha; se está fechado, abre
+                    if view_attachments_open:
+                        st.session_state["show_attachments"] = False
+                        st.session_state["attachments_farol_ref"] = None
+                    else:
+                        st.session_state["show_attachments"] = True
+                        st.session_state["attachments_farol_ref"] = selected_farol_ref
                     st.rerun()
             # col3 e col4 ficam vazios
             # Seção de Anexos mesmo sem dados ajustados
@@ -1081,9 +1098,6 @@ def exibir_adjustments():
                     display_attachments_section(farol_ref)
                 else:
                     st.info("Selecione uma linha para visualizar os anexos.")
-                if st.button("🔼 Hide Attachments", key="hide_attachments_no_adjusted"):
-                    st.session_state["show_attachments"] = False
-                    st.rerun()
     else:
         st.info("Nenhum ajuste encontrado. Use os filtros acima para localizar ajustes específicos.")
         # Botões quando não há ajustes

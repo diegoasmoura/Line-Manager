@@ -295,38 +295,47 @@ def exibir_shipments():
  
     # Verifica se linha foi selecionada
     selected_rows = edited_df[edited_df["Selecionar"] == True]
- 
+    selected_farol_ref = None
+    original_status = None
+    selected_index = None
+    if len(selected_rows) == 1:
+        selected_farol_ref = selected_rows[farol_ref_col].values[0]
+        st.session_state["selected_reference"] = selected_farol_ref
+        selected_index = selected_rows.index[0]
+        if "Farol Status" in df_filtered_original.columns:
+            original_status = df_filtered_original.loc[selected_index, "Farol Status"]
+    
     st.markdown("---")
     col_new, col_booking, col_split, _ = st.columns([1, 1, 1, 4])
     with col_new:
         if st.button("🚢 New Shipment"):
             st.session_state["current_page"] = "add"
             st.rerun()
- 
-    if len(selected_rows) > 1:
-        st.warning("⚠️ Por favor, selecione apenas **uma** linha.")
-    elif len(selected_rows) == 1:
-        selected_farol_ref = selected_rows[farol_ref_col].values[0]
-        st.session_state["selected_reference"] = selected_farol_ref
-        # Sempre usar o valor original do status para decidir os botões
-        # Encontrar o índice correspondente no DataFrame original filtrado
-        selected_index = selected_rows.index[0]
-        if "Farol Status" in df_filtered_original.columns:
-            original_status = df_filtered_original.loc[selected_index, "Farol Status"]
-        else:
-            original_status = None
-        with col_booking:
-            if original_status and str(original_status).strip().lower() == "new request".lower():
-                if st.button("📦 New Booking"):
-                    st.session_state["current_page"] = "booking"
-                    st.rerun()
-        with col_split:
-            if original_status and str(original_status).strip().lower() != "new request".lower():
-                if st.button("🛠️ Adjustments"):
-                    st.session_state["original_data"] = df
-                    st.session_state["selected_reference"] = selected_farol_ref
-                    st.session_state["current_page"] = "split"
-                    st.rerun()
+    # Botões sempre visíveis, mas desabilitados se não houver seleção única
+    with col_booking:
+        new_booking_disabled = True
+        if selected_farol_ref and original_status is not None:
+            new_booking_disabled = not (str(original_status).strip().lower() == "new request".lower())
+        # Se não há seleção única, desabilita
+        if len(selected_rows) != 1:
+            new_booking_disabled = True
+        st.button("📦 New Booking", disabled=new_booking_disabled, key="new_booking_btn")
+        if st.session_state.get("new_booking_btn") and not new_booking_disabled:
+            st.session_state["current_page"] = "booking"
+            st.rerun()
+    with col_split:
+        adjustments_disabled = True
+        if selected_farol_ref and original_status is not None:
+            adjustments_disabled = not (str(original_status).strip().lower() != "new request".lower())
+        # Se não há seleção única, desabilita
+        if len(selected_rows) != 1:
+            adjustments_disabled = True
+        st.button("🛠️ Adjustments", disabled=adjustments_disabled, key="adjustments_btn")
+        if st.session_state.get("adjustments_btn") and not adjustments_disabled:
+            st.session_state["original_data"] = df
+            st.session_state["selected_reference"] = selected_farol_ref
+            st.session_state["current_page"] = "split"
+            st.rerun()
  
  
  
