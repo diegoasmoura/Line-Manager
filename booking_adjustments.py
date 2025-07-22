@@ -437,11 +437,6 @@ def display_attachments_section(farol_reference):
     Args:
         farol_reference: Referência do Farol
     """
-    st.markdown(f"""
-    <div class="attachment-section">
-        <h3 style="color: #1f77b4; margin-bottom: 20px;">📎 Anexos para {farol_reference}</h3>
-    </div>
-    """, unsafe_allow_html=True)
     
     # Seção de Upload com estilo melhorado
     with st.expander("📤 Adicionar Novo Anexo", expanded=False):
@@ -569,20 +564,7 @@ def display_attachments_section(farol_reference):
                             f"**📋 Stage:** {attachment.get('process_stage', 'N/A')}"
                         )
         
-        # Estatísticas dos anexos
-        st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("📊 Total de Anexos", len(attachments_df))
-        
-        with col2:
-            unique_extensions = attachments_df['file_extension'].nunique() if 'file_extension' in attachments_df.columns else 0
-            st.metric("📁 Extensões Únicas", unique_extensions)
-        
-        with col3:
-            unique_types = attachments_df['mime_type'].nunique()
-            st.metric("🏷️ Tipos MIME", unique_types)
+
             
     else:
         st.info("📂 Nenhum anexo encontrado para esta referência.")
