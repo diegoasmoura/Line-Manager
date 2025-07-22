@@ -846,30 +846,46 @@ def exibir_adjustments():
             if not available_options:
                 available_options = ["Adjustment Requested"]
             
-            # Exibe a tabela editável com os dados ajustados
+            # Adiciona coluna de seleção (checkbox) igual ao shipments.py
+            df_adjusted['Selecionar'] = False
+            # Reordena colunas para colocar 'Selecionar' no início
+            colunas_ordenadas = ['Selecionar'] + [col for col in df_adjusted.columns if col != 'Selecionar']
+
+            # Configuração das colunas, adicionando a coluna de seleção
+            column_config = {
+                'Selecionar': st.column_config.CheckboxColumn('Select', help='Selecione apenas uma linha'),
+                "Sales Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True),
+                "Status": st.column_config.SelectboxColumn("Status", width="medium", options=available_options, default="Adjustment Requested"),
+                "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity", format="%d", disabled=True),
+                "Sales Port of Loading POL": st.column_config.TextColumn("POL", width="medium", disabled=True),
+                "Sales Port of Delivery POD": st.column_config.TextColumn("POD", width="medium", disabled=True),
+                "Sales Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),
+                "Sales Final Destination": st.column_config.TextColumn("Final Destination", width="medium", disabled=True),
+                "Carrier": st.column_config.TextColumn("Carrier", width="medium", disabled=True),
+                "Requested Cut off Start Date": st.column_config.DateColumn("Cut-off Start", disabled=True),
+                "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
+                "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
+                "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
+                "Attachments": st.column_config.NumberColumn("Attachments", format="%d", disabled=True),
+                "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
+                "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
+            }
+
+            # Exibe a tabela editável com a coluna de seleção
             edited_df = st.data_editor(
-                df_adjusted,
-                column_config={
-                    "Sales Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True),
-                    "Status": st.column_config.SelectboxColumn("Status", width="medium", options=available_options, default="Adjustment Requested"),
-                    "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity", format="%d", disabled=True),
-                    "Sales Port of Loading POL": st.column_config.TextColumn("POL", width="medium", disabled=True),
-                    "Sales Port of Delivery POD": st.column_config.TextColumn("POD", width="medium", disabled=True),
-                    "Sales Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),
-                    "Sales Final Destination": st.column_config.TextColumn("Final Destination", width="medium", disabled=True),
-                    "Carrier": st.column_config.TextColumn("Carrier", width="medium", disabled=True),
-                    "Requested Cut off Start Date": st.column_config.DateColumn("Cut-off Start", disabled=True),
-                    "Requested Cut off End Date": st.column_config.DateColumn("Cut-off End", disabled=True),
-                    "Required Arrival Date": st.column_config.DateColumn("Required Arrival", disabled=True),
-                    "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
-                    "Attachments": st.column_config.NumberColumn("Attachments", format="%d", disabled=True),
-                    "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
-                    "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True)
-                },
+                df_adjusted[colunas_ordenadas],
+                column_config=column_config,
                 use_container_width=True,
                 hide_index=True,
                 key="adjusted_data_editor"
             )
+
+            # Permitir selecionar apenas uma linha por vez
+            selected_rows = edited_df[edited_df['Selecionar'] == True]
+            if len(selected_rows) > 1:
+                st.warning("⚠️ Por favor, selecione apenas **uma** linha.")
+            selected_farol_ref = selected_rows['Sales Farol Reference'].values[0] if len(selected_rows) == 1 else None
+            st.session_state['selected_farol_ref'] = selected_farol_ref
             
             # Detecta mudanças no status e aplica atualizações
             status_changes = []
@@ -985,8 +1001,9 @@ def exibir_adjustments():
                     if st.button("❌ Cancel Changes", key="cancel_status_changes"):
                         st.rerun()
                 with col3:
-                    if st.button("📎 View Attachments", key="view_attachments_changes"):
+                    if st.button("📎 View Attachments", key="view_attachments_changes", disabled=(selected_farol_ref is None)):
                         st.session_state["show_attachments"] = True
+                        st.session_state["attachments_farol_ref"] = selected_farol_ref
                         st.rerun()
                 with col4:
                     if st.button("🔙 Back to Shipments", key="back_to_shipments_changes"):
@@ -1000,28 +1017,20 @@ def exibir_adjustments():
                         st.session_state["navigate_to"] = "Shipments"
                         st.rerun()
                 with col2:
-                    if st.button("📎 View Attachments", key="view_attachments_no_changes"):
+                    if st.button("📎 View Attachments", key="view_attachments_no_changes", disabled=(selected_farol_ref is None)):
                         st.session_state["show_attachments"] = True
+                        st.session_state["attachments_farol_ref"] = selected_farol_ref
                         st.rerun()
                 # col3 e col4 ficam vazios
-            
             # Seção de Anexos
             if st.session_state.get("show_attachments", False):
                 st.markdown("---")
                 st.markdown("### 📎 Attachment Management")
-                
-                # Seletor de Farol Reference para anexos
-                farol_refs_for_attachments = unique_farol_refs.tolist()
-                selected_farol_ref = st.selectbox(
-                    "Select Farol Reference to manage attachments:",
-                    farol_refs_for_attachments,
-                    key="farol_ref_attachments"
-                )
-                
-                if selected_farol_ref:
-                    display_attachments_section(selected_farol_ref)
-                
-                # Botão para ocultar seção de anexos
+                farol_ref = st.session_state.get("attachments_farol_ref")
+                if farol_ref:
+                    display_attachments_section(farol_ref)
+                else:
+                    st.info("Selecione uma linha para visualizar os anexos.")
                 if st.button("🔼 Hide Attachments", key="hide_attachments"):
                     st.session_state["show_attachments"] = False
                     st.rerun()
@@ -1034,31 +1043,20 @@ def exibir_adjustments():
                     st.session_state["navigate_to"] = "Shipments"
                     st.rerun()
             with col2:
-                if st.button("📎 View Attachments", key="view_attachments_no_adjusted_data"):
+                if st.button("📎 View Attachments", key="view_attachments_no_adjusted_data", disabled=(selected_farol_ref is None)):
                     st.session_state["show_attachments"] = True
+                    st.session_state["attachments_farol_ref"] = selected_farol_ref
                     st.rerun()
             # col3 e col4 ficam vazios
-                    
             # Seção de Anexos mesmo sem dados ajustados
             if st.session_state.get("show_attachments", False):
                 st.markdown("---")
                 st.markdown("### 📎 Attachment Management")
-                
-                if unique_farol_refs is not None and len(unique_farol_refs) > 0:
-                    # Seletor de Farol Reference para anexos
-                    farol_refs_for_attachments = unique_farol_refs.tolist()
-                    selected_farol_ref = st.selectbox(
-                        "Select Farol Reference to manage attachments:",
-                        farol_refs_for_attachments,
-                        key="farol_ref_attachments_no_adjusted"
-                    )
-                    
-                    if selected_farol_ref:
-                        display_attachments_section(selected_farol_ref)
+                farol_ref = st.session_state.get("attachments_farol_ref")
+                if farol_ref:
+                    display_attachments_section(farol_ref)
                 else:
-                    st.info("📂 No references available for attachments.")
-                
-                # Botão para ocultar seção de anexos
+                    st.info("Selecione uma linha para visualizar os anexos.")
                 if st.button("🔼 Hide Attachments", key="hide_attachments_no_adjusted"):
                     st.session_state["show_attachments"] = False
                     st.rerun()
@@ -1070,32 +1068,7 @@ def exibir_adjustments():
             if st.button("🔙 Back to Shipments", key="back_no_adjustments"):
                 st.session_state["navigate_to"] = "Shipments"
                 st.rerun()
-        with col2:
-            # Permitir anexos mesmo sem ajustes usando input manual de Farol Reference
-            if st.button("📎 Add Attachments", key="add_attachments_no_adjustments"):
-                st.session_state["show_manual_attachments"] = True
-                st.rerun()
-                
-        # Seção de anexos manual quando não há ajustes
-        if st.session_state.get("show_manual_attachments", False):
-            st.markdown("---")
-            st.markdown("### 📎 Attachment Management")
-            
-            manual_farol_ref = st.text_input(
-                "Enter Farol Reference to manage attachments:",
-                key="manual_farol_ref_input",
-                placeholder="Ex: FAR123456"
-            )
-            
-            if manual_farol_ref and manual_farol_ref.strip():
-                display_attachments_section(manual_farol_ref.strip())
-            else:
-                st.info("Enter a valid Farol Reference to manage attachments.")
-            
-            # Botão para ocultar seção de anexos
-            if st.button("🔼 Hide Attachments", key="hide_manual_attachments"):
-                st.session_state["show_manual_attachments"] = False
-                st.rerun()
+        # Removido botão e input manual de anexos para referência manual
 
 if __name__ == "__main__":
     exibir_adjustments()
