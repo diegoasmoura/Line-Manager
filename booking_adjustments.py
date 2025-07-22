@@ -25,6 +25,10 @@ import pandas as pd
 from database import get_merged_data, get_database_connection, load_df_udc
 from sqlalchemy import text
 from datetime import datetime, timedelta
+import os
+import base64
+import mimetypes
+import uuid
 
 def get_original_sales_data(farol_reference):
     """Busca os dados originais da F_CON_SALES_DATA para um farol reference específico."""
@@ -225,8 +229,438 @@ def format_value(value):
         return "Não informado"
     return str(value)
 
+
+
+def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
+    """
+    Salva um anexo na tabela F_CON_ANEXOS.
+    
+    Args:
+        farol_reference: Referência do Farol
+        uploaded_file: Arquivo enviado pelo Streamlit file_uploader
+        user_id: ID do usuário que enviou o arquivo
+    
+    Returns:
+        bool: True se salvou com sucesso, False caso contrário
+    """
+    try:
+        conn = get_database_connection()
+        
+        # Lê o conteúdo do arquivo
+        file_content = uploaded_file.read()
+        
+        # Obtém informações do arquivo
+        file_name = uploaded_file.name
+        # Obtém apenas o nome sem extensão e a extensão separadamente
+        file_name_without_ext = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+        file_extension = file_name.rsplit('.', 1)[1].upper() if '.' in file_name else ''
+        file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
+        
+        # Gera o próximo ID numérico para a tabela
+        id_query = text("SELECT NVL(MAX(id), 0) + 1 as next_id FROM LogTransp.F_CON_ANEXOS")
+        next_id = conn.execute(id_query).fetchone()[0]
+        
+        # SQL com estrutura REAL da tabela
+        insert_query = text("""
+            INSERT INTO LogTransp.F_CON_ANEXOS (
+                id,
+                farol_reference,
+                adjustment_id,
+                process_stage,
+                type_,
+                file_name,
+                file_extension,
+                upload_timestamp,
+                attachment,
+                user_insert
+            ) VALUES (
+                :id,
+                :farol_reference,
+                :adjustment_id,
+                :process_stage,
+                :type_,
+                :file_name,
+                :file_extension,
+                :upload_timestamp,
+                :attachment,
+                :user_insert
+            )
+        """)
+        
+        conn.execute(insert_query, {
+            "id": next_id,
+            "farol_reference": farol_reference,
+            "adjustment_id": str(uuid.uuid4()),  # Gera UUID para adjustment_id
+            "process_stage": "Attachment Management",
+            "type_": file_type,
+            "file_name": file_name_without_ext,
+            "file_extension": file_extension,
+            "upload_timestamp": datetime.now(),
+            "attachment": file_content,
+            "user_insert": user_id
+        })
+        
+        conn.commit()
+        conn.close()
+        return True
+        
+    except Exception as e:
+        st.error(f"Erro ao salvar anexo: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return False
+
+def get_attachments_for_farol(farol_reference):
+    """
+    Busca todos os anexos para uma referência específica do Farol.
+    
+    Args:
+        farol_reference: Referência do Farol
+    
+    Returns:
+        DataFrame: DataFrame com os anexos encontrados
+    """
+    try:
+        conn = get_database_connection()
+        
+        # SQL com estrutura REAL da tabela
+        query = text("""
+            SELECT 
+                id,
+                farol_reference,
+                adjustment_id,
+                process_stage,
+                type_ as mime_type,
+                file_name,
+                file_extension,
+                upload_timestamp as upload_date,
+                user_insert as uploaded_by
+            FROM LogTransp.F_CON_ANEXOS 
+            WHERE farol_reference = :farol_reference
+            ORDER BY upload_timestamp DESC
+        """)
+        
+        result = conn.execute(query, {"farol_reference": farol_reference}).mappings().fetchall()
+        conn.close()
+        
+        if result:
+            df = pd.DataFrame([dict(row) for row in result])
+            # Adiciona colunas compatíveis para o código existente
+            df['description'] = "Anexo para " + farol_reference
+            # Reconstrói nome completo do arquivo
+            df['full_file_name'] = df.apply(lambda row: f"{row['file_name']}.{row['file_extension']}" if row['file_extension'] else row['file_name'], axis=1)
+            return df
+        else:
+            return pd.DataFrame()
+            
+    except Exception as e:
+        st.error(f"Erro ao buscar anexos: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return pd.DataFrame()
+
+def get_attachment_content(attachment_id):
+    """
+    Busca o conteúdo de um anexo específico.
+    
+    Args:
+        attachment_id: ID numérico do anexo
+    
+    Returns:
+        tuple: (file_content, file_name, mime_type) ou (None, None, None) se não encontrado
+    """
+    try:
+        conn = get_database_connection()
+        
+        query = text("""
+            SELECT attachment, file_name, file_extension, type_ as mime_type
+            FROM LogTransp.F_CON_ANEXOS 
+            WHERE id = :attachment_id
+        """)
+        
+        result = conn.execute(query, {"attachment_id": attachment_id}).mappings().fetchone()
+        conn.close()
+        
+        if result:
+            # Reconstrói o nome do arquivo com extensão
+            full_file_name = f"{result['file_name']}.{result['file_extension']}" if result['file_extension'] else result['file_name']
+            return result['attachment'], full_file_name, result['mime_type']
+        else:
+            return None, None, None
+            
+    except Exception as e:
+        st.error(f"Erro ao buscar conteúdo do anexo: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return None, None, None
+
+def format_file_size(size_bytes):
+    """Formata o tamanho do arquivo em uma string legível."""
+    if size_bytes == 0:
+        return "0 B"
+    size_names = ["B", "KB", "MB", "GB"]
+    import math
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return f"{s} {size_names[i]}"
+
+def get_file_icon(mime_type, file_name):
+    """Retorna um ícone apropriado baseado no tipo de arquivo."""
+    if not mime_type:
+        return "📄"
+    
+    if mime_type.startswith('image/'):
+        return "🖼️"
+    elif mime_type.startswith('video/'):
+        return "🎥"
+    elif mime_type.startswith('audio/'):
+        return "🎵"
+    elif mime_type in ['application/pdf']:
+        return "📕"
+    elif mime_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+        return "📊"
+    elif mime_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+        return "📝"
+    elif mime_type in ['application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']:
+        return "📋"
+    elif mime_type.startswith('text/'):
+        return "📄"
+    else:
+        return "📎"
+
+def display_attachments_section(farol_reference):
+    """
+    Exibe a seção de anexos para um Farol Reference específico.
+    
+    Args:
+        farol_reference: Referência do Farol
+    """
+    st.markdown(f"""
+    <div class="attachment-section">
+        <h3 style="color: #1f77b4; margin-bottom: 20px;">📎 Anexos para {farol_reference}</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Seção de Upload com estilo melhorado
+    with st.expander("📤 Adicionar Novo Anexo", expanded=False):
+        st.markdown('<div class="upload-area">', unsafe_allow_html=True)
+        uploaded_files = st.file_uploader(
+            "Arraste e solte arquivos aqui ou clique para selecionar",
+            accept_multiple_files=True,
+            type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
+            key=f"uploader_{farol_reference}",
+            help="Tipos de arquivo suportados: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        if uploaded_files:
+            st.success(f"✅ {len(uploaded_files)} arquivo(s) selecionado(s):")
+            for file in uploaded_files:
+                st.write(f"📁 **{file.name}** - {format_file_size(len(file.getvalue()))}")
+            
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("💾 Salvar Anexos", key=f"save_attachments_{farol_reference}", type="primary"):
+                    progress_bar = st.progress(0, text="Salvando anexos...")
+                    success_count = 0
+                    
+                    for i, file in enumerate(uploaded_files):
+                        # Reseta o ponteiro do arquivo
+                        file.seek(0)
+                        
+                        if save_attachment_to_db(farol_reference, file):
+                            success_count += 1
+                        
+                        progress = (i + 1) / len(uploaded_files)
+                        progress_bar.progress(progress, text=f"Salvando anexo {i+1} de {len(uploaded_files)}...")
+                    
+                    progress_bar.empty()
+                    
+                    if success_count == len(uploaded_files):
+                        st.success(f"✅ {success_count} anexo(s) salvos com sucesso!")
+                        st.balloons()  # Efeito visual de sucesso
+                    else:
+                        st.warning(f"⚠️ {success_count} de {len(uploaded_files)} anexos foram salvos.")
+                    
+                    # Força atualização da lista
+                    st.rerun()
+
+    # Lista de Anexos Existentes
+    attachments_df = get_attachments_for_farol(farol_reference)
+    
+    if not attachments_df.empty:
+        st.markdown(f"### 📋 Anexos Existentes ({len(attachments_df)})")
+        
+        # Calcula o número de colunas baseado no número de anexos (máximo 3)
+        num_cols = min(3, len(attachments_df))
+        cols = st.columns(num_cols)
+        
+        for idx, attachment in attachments_df.iterrows():
+            col_idx = idx % num_cols
+            
+            with cols[col_idx]:
+                # Card do anexo com CSS customizado
+                file_icon = get_file_icon(attachment['mime_type'], attachment['file_name'])
+                
+                # Nome do arquivo truncado para exibição
+                display_name = attachment.get('full_file_name', attachment['file_name'])
+                if len(display_name) > 25:
+                    display_name = display_name[:22] + "..."
+                
+                st.markdown(
+                    f"""
+                    <div class="attachment-card">
+                        <div class="file-icon">{file_icon}</div>
+                        <div class="file-name" title="{attachment.get('full_file_name', attachment['file_name'])}">{display_name}</div>
+                        <div class="file-info">
+                            <span>📁 .{attachment.get('file_extension', 'N/A').lower()}</span>
+                        </div>
+                        <div class="file-info">
+                            <span>👤 {attachment['uploaded_by']}</span>
+                        </div>
+                        <div class="file-info">
+                            <span>📅 {attachment['upload_date'].strftime('%d/%m/%Y %H:%M') if pd.notna(attachment['upload_date']) else 'N/A'}</span>
+                        </div>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+                
+                # Botões de ação com melhor layout
+                col_btn1, col_btn2 = st.columns(2)
+                
+                with col_btn1:
+                    # Botão de visualizar (para imagens) ou download
+                    if attachment['mime_type'] and attachment['mime_type'].startswith('image/'):
+                        if st.button("👁️ Ver", key=f"view_{attachment['id']}", use_container_width=True):
+                            file_content, file_name, mime_type = get_attachment_content(attachment['id'])
+                            if file_content:
+                                st.image(file_content, caption=file_name)
+                                st.success(f"✅ Visualizando: {file_name}")
+                    else:
+                        if st.button("⬇️ Baixar", key=f"download_{attachment['id']}", use_container_width=True):
+                            file_content, file_name, mime_type = get_attachment_content(attachment['id'])
+                            if file_content:
+                                st.download_button(
+                                    label="💾 Download",
+                                    data=file_content,
+                                    file_name=file_name,
+                                    mime=mime_type,
+                                    key=f"download_btn_{attachment['id']}",
+                                    use_container_width=True
+                                )
+                
+                with col_btn2:
+                    # Botão de informações
+                    if st.button("ℹ️ Info", key=f"info_{attachment['id']}", use_container_width=True):
+                        # Reconstrói o nome completo do arquivo
+                        full_file_name = f"{attachment['file_name']}.{attachment.get('file_extension', '')}" if attachment.get('file_extension') else attachment['file_name']
+                        
+                        st.info(
+                            f"**📄 Nome Completo:** {full_file_name}\n\n"
+                            f"**🏷️ Tipo MIME:** {attachment['mime_type']}\n\n"
+                            f"**📁 Extensão:** {attachment.get('file_extension', 'N/A')}\n\n"
+                            f"**👤 Enviado por:** {attachment['uploaded_by']}\n\n"
+                            f"**📅 Data de Upload:** {attachment['upload_date'].strftime('%d/%m/%Y às %H:%M:%S') if pd.notna(attachment['upload_date']) else 'N/A'}\n\n"
+                            f"**🆔 ID:** {attachment['id']}\n\n"
+                            f"**🔧 Adjustment ID:** {attachment.get('adjustment_id', 'N/A')[:8]}...\n\n"
+                            f"**📋 Stage:** {attachment.get('process_stage', 'N/A')}"
+                        )
+        
+        # Estatísticas dos anexos
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("📊 Total de Anexos", len(attachments_df))
+        
+        with col2:
+            unique_extensions = attachments_df['file_extension'].nunique() if 'file_extension' in attachments_df.columns else 0
+            st.metric("📁 Extensões Únicas", unique_extensions)
+        
+        with col3:
+            unique_types = attachments_df['mime_type'].nunique()
+            st.metric("🏷️ Tipos MIME", unique_types)
+            
+    else:
+        st.info("📂 Nenhum anexo encontrado para esta referência.")
+        st.markdown("💡 **Dica:** Use a seção 'Adicionar Novo Anexo' acima para enviar arquivos relacionados a este Farol Reference.")
+
 def exibir_adjustments():
     st.title("📋 Adjustment Request Management")
+    
+    # CSS personalizado para cards de anexos e métricas
+    st.markdown("""
+    <style>
+    .attachment-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 15px 0;
+        background: linear-gradient(145deg, #ffffff, #f5f5f5);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        text-align: center;
+    }
+    
+    .attachment-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    .file-icon {
+        font-size: 3em;
+        margin-bottom: 15px;
+        display: block;
+    }
+    
+    .file-name {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 10px;
+        color: #333;
+        word-wrap: break-word;
+    }
+    
+    .file-info {
+        font-size: 13px;
+        color: #666;
+        margin: 5px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    
+    .metric-card {
+        background: linear-gradient(145deg, #f0f8ff, #e6f3ff);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        border: 1px solid #b3d9ff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .attachment-section {
+        background-color: #fafafa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        border: 1px solid #e0e0e0;
+    }
+    
+    .upload-area {
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # Carrega os dados da UDC
     df_udc = load_df_udc()
@@ -519,23 +953,114 @@ def exibir_adjustments():
                     if st.button("🔙 Back to Shipments", key="back_to_shipments_changes"):
                         st.session_state["navigate_to"] = "Shipments"
                         st.rerun()
+                
+                with col4:
+                    # Botão para ver anexos mesmo quando há mudanças de status
+                    if st.button("📎 Ver Anexos", key="view_attachments_changes"):
+                        st.session_state["show_attachments"] = True
+                        st.rerun()
             else:
-                # Botão para voltar para Home quando não há mudanças de status
-                if st.button("🔙 Back to Shipments"):
-                    st.session_state["navigate_to"] = "Shipments"
+                # Botões quando não há mudanças de status
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🔙 Back to Shipments"):
+                        st.session_state["navigate_to"] = "Shipments"
+                        st.rerun()
+                with col2:
+                    if st.button("📎 Ver Anexos", key="view_attachments_no_changes"):
+                        st.session_state["show_attachments"] = True
+                        st.rerun()
+            
+            # Seção de Anexos
+            if st.session_state.get("show_attachments", False):
+                st.markdown("---")
+                st.markdown("### 📎 Gestão de Anexos")
+                
+                # Seletor de Farol Reference para anexos
+                farol_refs_for_attachments = unique_farol_refs.tolist()
+                selected_farol_ref = st.selectbox(
+                    "Selecione o Farol Reference para gerenciar anexos:",
+                    farol_refs_for_attachments,
+                    key="farol_ref_attachments"
+                )
+                
+                if selected_farol_ref:
+                    display_attachments_section(selected_farol_ref)
+                
+                # Botão para ocultar seção de anexos
+                if st.button("🔼 Ocultar Anexos", key="hide_attachments"):
+                    st.session_state["show_attachments"] = False
                     st.rerun()
         else:
             st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
-            # Botão para voltar quando não há dados ajustados
-            if st.button("🔙 Back to Shipments", key="back_no_adjusted_data"):
-                st.session_state["navigate_to"] = "Shipments"
-                st.rerun()
+            # Botões quando não há dados ajustados
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔙 Back to Shipments", key="back_no_adjusted_data"):
+                    st.session_state["navigate_to"] = "Shipments"
+                    st.rerun()
+            with col2:
+                if st.button("📎 Ver Anexos", key="view_attachments_no_adjusted_data"):
+                    st.session_state["show_attachments"] = True
+                    st.rerun()
+                    
+            # Seção de Anexos mesmo sem dados ajustados
+            if st.session_state.get("show_attachments", False):
+                st.markdown("---")
+                st.markdown("### 📎 Gestão de Anexos")
+                
+                if unique_farol_refs is not None and len(unique_farol_refs) > 0:
+                    # Seletor de Farol Reference para anexos
+                    farol_refs_for_attachments = unique_farol_refs.tolist()
+                    selected_farol_ref = st.selectbox(
+                        "Selecione o Farol Reference para gerenciar anexos:",
+                        farol_refs_for_attachments,
+                        key="farol_ref_attachments_no_adjusted"
+                    )
+                    
+                    if selected_farol_ref:
+                        display_attachments_section(selected_farol_ref)
+                else:
+                    st.info("📂 Nenhuma referência disponível para anexos.")
+                
+                # Botão para ocultar seção de anexos
+                if st.button("🔼 Ocultar Anexos", key="hide_attachments_no_adjusted"):
+                    st.session_state["show_attachments"] = False
+                    st.rerun()
     else:
         st.info("Nenhum ajuste encontrado. Use os filtros acima para localizar ajustes específicos.")
-        # Botão para voltar quando não há ajustes
-        if st.button("🔙 Back to Shipments", key="back_no_adjustments"):
-            st.session_state["navigate_to"] = "Shipments"
-            st.rerun()
+        # Botões quando não há ajustes
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔙 Back to Shipments", key="back_no_adjustments"):
+                st.session_state["navigate_to"] = "Shipments"
+                st.rerun()
+        with col2:
+            # Permitir anexos mesmo sem ajustes usando input manual de Farol Reference
+            if st.button("📎 Adicionar Anexos", key="add_attachments_no_adjustments"):
+                st.session_state["show_manual_attachments"] = True
+                st.rerun()
+                
+        # Seção de anexos manual quando não há ajustes
+        if st.session_state.get("show_manual_attachments", False):
+            st.markdown("---")
+            st.markdown("### 📎 Gestão de Anexos")
+            
+            manual_farol_ref = st.text_input(
+                "Digite o Farol Reference para gerenciar anexos:",
+                key="manual_farol_ref_input",
+                placeholder="Ex: FAR123456"
+            )
+            
+            if manual_farol_ref and manual_farol_ref.strip():
+                display_attachments_section(manual_farol_ref.strip())
+            else:
+                st.info("Digite um Farol Reference válido para gerenciar anexos.")
+            
+            # Botão para ocultar seção de anexos
+            if st.button("🔼 Ocultar Anexos", key="hide_manual_attachments"):
+                st.session_state["show_manual_attachments"] = False
+                st.rerun()
 
 if __name__ == "__main__":
     exibir_adjustments()
