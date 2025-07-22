@@ -737,21 +737,12 @@ def exibir_adjustments():
     # Mostra contadores em cards
     col1, col2, col3 = st.columns(3)
     with col1:
-        with st.container():
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("📊 Total Adjustments", len(df_original))
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.metric("📊 Total Adjustments", len(df_original))
     with col2:
-        with st.container():
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric("📦 Farol References", len(unique_farol_refs))
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.metric("📦 Farol References", len(unique_farol_refs))
     with col3:
-        with st.container():
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            pending_farol_refs = df_original[df_original['status'] == 'Adjustment Requested']['farol_reference'].unique()
-            st.metric("⏳ Pending Adjustments", len(pending_farol_refs))
-            st.markdown('</div>', unsafe_allow_html=True)
+        pending_farol_refs = df_original[df_original['status'] == 'Adjustment Requested']['farol_reference'].unique()
+        st.metric("⏳ Pending Adjustments", len(pending_farol_refs))
 
     # Exibe diretamente a grade de dados ajustados
     if not df_original.empty:
