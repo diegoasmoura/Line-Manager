@@ -1012,11 +1012,14 @@ def exibir_adjustments():
                 
                 with col2:
                     if st.button("❌ Cancel Changes", key="cancel_status_changes"):
+                        # Limpa o estado do editor para restaurar a tabela original
+                        if "adjusted_data_editor" in st.session_state:
+                            del st.session_state["adjusted_data_editor"]
                         st.rerun()
                 with col3:
                     # Botão toggle para anexos
                     view_attachments_open = st.session_state.get("show_attachments", False)
-                    if st.button("�� View Attachments", key="view_attachments_changes", disabled=(selected_farol_ref is None)):
+                    if st.button("📎 View Attachments", key="view_attachments_changes", disabled=(selected_farol_ref is None)):
                         # Toggle: se já está aberto, fecha; se está fechado, abre
                         if view_attachments_open:
                             st.session_state["show_attachments"] = False
