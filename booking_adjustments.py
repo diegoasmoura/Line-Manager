@@ -812,11 +812,22 @@ def exibir_adjustments():
                     conn.close()
             
             df_adjusted['Attachments'] = df_adjusted['Sales Farol Reference'].apply(count_attachments)
-            # Reordena para colocar Attachments antes de Comments
+            # Adiciona coluna de data de inserção (row_inserted_date) após Comments
+            # Busca a data de inserção da referência no df_original
+            def get_inserted_date(farol_ref):
+                row = df_original[df_original['farol_reference'] == farol_ref]
+                if not row.empty:
+                    return row.iloc[0]['row_inserted_date']
+                return None
+            df_adjusted['Inserted Date'] = df_adjusted['Sales Farol Reference'].apply(get_inserted_date)
+            # Reordena para colocar Attachments antes de Comments e Inserted Date após Comments
             cols = list(df_adjusted.columns)
             if 'Attachments' in cols and 'Comments' in cols:
                 cols.insert(cols.index('Comments'), cols.pop(cols.index('Attachments')))
-                df_adjusted = df_adjusted[cols]
+            if 'Inserted Date' in cols and 'Comments' in cols:
+                idx = cols.index('Comments')
+                cols.insert(idx + 1, cols.pop(cols.index('Inserted Date')))
+            df_adjusted = df_adjusted[cols]
 
             # Obtém as opções de status da UDC
             farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
