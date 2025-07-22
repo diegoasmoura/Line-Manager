@@ -1024,6 +1024,16 @@ def exibir_adjustments():
                 # col3 e col4 ficam vazios
             # Seção de Anexos
             if st.session_state.get("show_attachments", False):
+                # Sincroniza a referência de anexos com a seleção atual
+                if (selected_farol_ref != st.session_state.get("attachments_farol_ref")) or (selected_rows is not None and len(selected_rows) > 1):
+                    if selected_farol_ref and len(selected_rows) == 1:
+                        st.session_state["attachments_farol_ref"] = selected_farol_ref
+                        st.rerun()
+                    else:
+                        # Se nenhuma linha ou mais de uma linha está selecionada, fecha a seção de anexos
+                        st.session_state["show_attachments"] = False
+                        st.session_state["attachments_farol_ref"] = None
+                        st.rerun()
                 st.markdown("---")
                 st.markdown("### 📎 Attachment Management")
                 farol_ref = st.session_state.get("attachments_farol_ref")
@@ -1033,6 +1043,7 @@ def exibir_adjustments():
                     st.info("Selecione uma linha para visualizar os anexos.")
                 if st.button("🔼 Hide Attachments", key="hide_attachments"):
                     st.session_state["show_attachments"] = False
+                    st.session_state["attachments_farol_ref"] = None
                     st.rerun()
         else:
             st.info("Nenhum dado ajustado encontrado. Verifique se há ajustes registrados para as referências filtradas.")
