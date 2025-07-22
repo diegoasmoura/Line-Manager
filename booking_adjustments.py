@@ -360,6 +360,37 @@ def get_attachments_for_farol(farol_reference):
             conn.close()
         return pd.DataFrame()
 
+def delete_attachment(attachment_id):
+    """
+    Exclui um anexo específico do banco de dados.
+    
+    Args:
+        attachment_id: ID numérico do anexo
+    
+    Returns:
+        bool: True se excluído com sucesso, False caso contrário
+    """
+    try:
+        conn = get_database_connection()
+        
+        query = text("""
+            DELETE FROM LogTransp.F_CON_ANEXOS 
+            WHERE id = :attachment_id
+        """)
+        
+        result = conn.execute(query, {"attachment_id": attachment_id})
+        conn.commit()
+        conn.close()
+        
+        return result.rowcount > 0
+        
+    except Exception as e:
+        st.error(f"Erro ao excluir anexo: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return False
+
 def get_attachment_content(attachment_id):
     """
     Busca o conteúdo de um anexo específico.
@@ -523,46 +554,55 @@ def display_attachments_section(farol_reference):
                     unsafe_allow_html=True
                 )
                 
-                # Botões de ação com melhor layout
-                col_btn1, col_btn2 = st.columns(2)
+                # Controle de estado de confirmação
+                confirm_key = f"confirm_delete_{attachment['id']}"
+                if confirm_key not in st.session_state:
+                    st.session_state[confirm_key] = False
                 
-                with col_btn1:
-                    # Botão de visualizar (para imagens) ou download
-                    if attachment['mime_type'] and attachment['mime_type'].startswith('image/'):
-                        if st.button("👁️ Ver", key=f"view_{attachment['id']}", use_container_width=True):
-                            file_content, file_name, mime_type = get_attachment_content(attachment['id'])
-                            if file_content:
-                                st.image(file_content, caption=file_name)
-                                st.success(f"✅ Visualizando: {file_name}")
-                    else:
-                        if st.button("⬇️ Baixar", key=f"download_{attachment['id']}", use_container_width=True):
-                            file_content, file_name, mime_type = get_attachment_content(attachment['id'])
-                            if file_content:
-                                st.download_button(
-                                    label="💾 Download",
-                                    data=file_content,
-                                    file_name=file_name,
-                                    mime=mime_type,
-                                    key=f"download_btn_{attachment['id']}",
-                                    use_container_width=True
-                                )
+                if not st.session_state[confirm_key]:
+                    # Botões normais - Download e Excluir
+                    col_btn1, col_btn2 = st.columns(2)
+                    
+                    with col_btn1:
+                        # Botão de download direto para todos os tipos de arquivo
+                        file_content, file_name, mime_type = get_attachment_content(attachment['id'])
+                        if file_content:
+                            st.download_button(
+                                label="⬇️ Baixar",
+                                data=file_content,
+                                file_name=file_name,
+                                mime=mime_type,
+                                key=f"download_btn_{attachment['id']}",
+                                use_container_width=True
+                            )
+                        else:
+                            st.button("⬇️ Indisponível", key=f"unavailable_{attachment['id']}", use_container_width=True, disabled=True)
+                    
+                    with col_btn2:
+                        # Botão inicial de excluir
+                        if st.button("🗑️ Excluir", key=f"delete_{attachment['id']}", use_container_width=True):
+                            st.session_state[confirm_key] = True
+                            st.rerun()
                 
-                with col_btn2:
-                    # Botão de informações
-                    if st.button("ℹ️ Info", key=f"info_{attachment['id']}", use_container_width=True):
-                        # Reconstrói o nome completo do arquivo
-                        full_file_name = f"{attachment['file_name']}.{attachment.get('file_extension', '')}" if attachment.get('file_extension') else attachment['file_name']
-                        
-                        st.info(
-                            f"**📄 Nome Completo:** {full_file_name}\n\n"
-                            f"**🏷️ Tipo MIME:** {attachment['mime_type']}\n\n"
-                            f"**📁 Extensão:** {attachment.get('file_extension', 'N/A')}\n\n"
-                            f"**👤 Enviado por:** {attachment['uploaded_by']}\n\n"
-                            f"**📅 Data de Upload:** {attachment['upload_date'].strftime('%d/%m/%Y às %H:%M:%S') if pd.notna(attachment['upload_date']) else 'N/A'}\n\n"
-                            f"**🆔 ID:** {attachment['id']}\n\n"
-                            f"**🔧 Adjustment ID:** {attachment.get('adjustment_id', 'N/A')[:8]}...\n\n"
-                            f"**📋 Stage:** {attachment.get('process_stage', 'N/A')}"
-                        )
+                else:
+                    # Modo de confirmação - botões horizontais em nova linha
+                    st.warning("⚠️ Confirmar exclusão?")
+                    
+                    col_confirm1, col_confirm2 = st.columns(2)
+                    with col_confirm1:
+                        if st.button("✅ Sim, excluir", key=f"confirm_yes_{attachment['id']}", use_container_width=True):
+                            if delete_attachment(attachment['id']):
+                                st.success("✅ Anexo excluído com sucesso!")
+                                st.session_state[confirm_key] = False
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao excluir anexo!")
+                                st.session_state[confirm_key] = False
+                    
+                    with col_confirm2:
+                        if st.button("❌ Cancelar", key=f"confirm_no_{attachment['id']}", use_container_width=True):
+                            st.session_state[confirm_key] = False
+                            st.rerun()
         
 
             
@@ -578,18 +618,20 @@ def exibir_adjustments():
     <style>
     .attachment-card {
         border: 1px solid #e0e0e0;
-        border-radius: 10px;
-        padding: 20px;
+        border-radius: 12px;
+        padding: 18px;
         margin: 15px 0;
-        background: linear-gradient(145deg, #ffffff, #f5f5f5);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
         text-align: center;
+        border-left: 4px solid #1f77b4;
     }
     
     .attachment-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        border-left-color: #0d47a1;
     }
     
     .file-icon {
