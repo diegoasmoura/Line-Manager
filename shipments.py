@@ -28,10 +28,10 @@ def aplicar_filtros_interativos(df):
     if "expander_filtros_aberto" not in st.session_state:
         st.session_state["expander_filtros_aberto"] = False
  
-    with st.expander("🔎 Filtros Avançados (opcional)", expanded=st.session_state["expander_filtros_aberto"]):
+    with st.expander(" Advanced Filters (optional)", expanded=st.session_state["expander_filtros_aberto"]):
  
         colunas_filtradas = st.multiselect(
-            "Colunas para aplicar filtro:",
+            "Columns to filter:",
             df.columns.tolist(),
             default=[],
             key="colunas_filtradas_filtros"
@@ -44,19 +44,19 @@ def aplicar_filtros_interativos(df):
  
             if col_data.dtype == "object":
                 unique_vals = sorted(col_data.dropna().unique().tolist())
-                filtros[col] = st.multiselect(f"Filtrar {col}", unique_vals, default=unique_vals, key=f"{col}_multiselect")
+                filtros[col] = st.multiselect(f"Filter {col}", unique_vals, default=unique_vals, key=f"{col}_multiselect")
  
             elif pd.api.types.is_numeric_dtype(col_data):
                 min_val, max_val = int(col_data.min()), int(col_data.max())
-                filtros[col] = st.slider(f"{col} entre", min_val, max_val, (min_val, max_val), key=f"{col}_slider")
+                filtros[col] = st.slider(f"{col} between", min_val, max_val, (min_val, max_val), key=f"{col}_slider")
  
             elif pd.api.types.is_bool_dtype(col_data):
-                filtros[col] = st.radio(f"Incluir {col}?", ["Todos", True, False], horizontal=True, key=f"{col}_radio")
+                filtros[col] = st.radio(f"Include {col}?", ["All", True, False], horizontal=True, key=f"{col}_radio")
  
             elif pd.api.types.is_datetime64_any_dtype(col_data):
                 min_date = col_data.min().date()
                 max_date = col_data.max().date()
-                selected_range = st.date_input(f"Período para {col}", value=(min_date, max_date), key=f"{col}_date")
+                selected_range = st.date_input(f"Period for {col}", value=(min_date, max_date), key=f"{col}_date")
                 if isinstance(selected_range, (tuple, list, pd.DatetimeIndex)):
                     srange = list(selected_range)
                 else:
@@ -81,7 +81,7 @@ def aplicar_filtros_interativos(df):
                 elif val[0] == "range":
                     end_of_day = val[2] + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
                     df = df[(df[col] >= val[1]) & (df[col] <= end_of_day)]
-            elif isinstance(val, str) and val != "Todos":
+            elif isinstance(val, str) and val != "All":
                 df = df[df[col] == (val == "True")]
             elif isinstance(val, bool):
                 df = df[df[col] == val]
@@ -170,15 +170,15 @@ def exibir_shipments():
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
  
-    # 🔽 Adiciona coluna de seleção
-    df["Selecionar"] = False
-    column_config["Selecionar"] = st.column_config.CheckboxColumn("Select", help="Select only one line")
+    #  Adiciona coluna de seleção
+    df["Select"] = False
+    column_config["Select"] = st.column_config.CheckboxColumn("Select", help="Select only one line")
  
     # Reordena colunas
-    colunas_ordenadas = ["Selecionar"] + [col for col in df.columns if col != "Selecionar"]
+    colunas_ordenadas = ["Select"] + [col for col in df.columns if col != "Select"]
  
-    # Guarda cópias sem a coluna "Selecionar" para comparação
-    df_filtered_original = df.drop(columns=["Selecionar"], errors="ignore").copy()
+    # Guarda cópias sem a coluna "Select" para comparação
+    df_filtered_original = df.drop(columns=["Select"], errors="ignore").copy()
  
     # Exibe data_editor
     edited_df = st.data_editor(
@@ -190,9 +190,13 @@ def exibir_shipments():
         column_config=column_config,
         hide_index=True,
     )
- 
-    # Remove "Selecionar" para comparação
-    edited_df_clean = edited_df.drop(columns=["Selecionar"], errors="ignore")
+
+    # Contador discreto de registros
+    total_records = len(edited_df)
+    st.caption(f"Total: {total_records} shipping records")
+    
+    # Remove "Select" para comparação
+    edited_df_clean = edited_df.drop(columns=["Select"], errors="ignore")
  
     # Detecta e registra mudanças
     status_blocked = False
@@ -215,7 +219,7 @@ def exibir_shipments():
                             from_status != "Adjustment Requested" and to_status == "Adjustment Requested"
                         ):
                             status_blocked = True
-                            status_blocked_message = "⚠️ Status 'Adjustment Requested' não pode ser alterado diretamente. Use o módulo de ajustes para solicitar mudanças."
+                            status_blocked_message = "⚠️ Status 'Adjustment Requested' cannot be changed directly. Use the adjustments module to request changes."
                     changes.append({
                         'Farol Reference': row.get(farol_ref_col, index),
                         "Coluna": col,
@@ -241,8 +245,8 @@ def exibir_shipments():
         st.markdown("### ✏️ Changes Made")
         changes_df = st.session_state["changes"].copy()
    
-        # Garante que a coluna Comentários exista
-        if "Comentários" not in changes_df.columns:
+        # Garante que a coluna Comments exista
+        if "Comments" not in changes_df.columns:
            
             #Adicionando o stage para popular a tabela de log
             changes_df["Stage"] = choose
@@ -252,12 +256,12 @@ def exibir_shipments():
         with col_left:
  
             st.dataframe(
-                changes_df[["Farol Reference", "Coluna", "Valor Anterior", "Novo Valor","Stage"]],
+                changes_df[["Farol Reference", "Column", "Previous Value", "New Value","Stage"]],
                 use_container_width=True,
                 hide_index=True)
    
         with col_right:
-            st.text_area("📌 Informações Complementares", key="info_complementar")
+            st.text_area("📌 Additional Information", key="info_complementar")
    
            
         col1, col2, col3, col4  = st.columns([1, 1, 2, 3])
@@ -272,7 +276,7 @@ def exibir_shipments():
                         random_uuid
                     )
                     if success:
-                        st.success("✅ Alterações registradas com sucesso no banco!")
+                        st.success("✅ Changes successfully registered in the database!")
                         st.session_state["changes"] = pd.DataFrame()
                        
                         #Liberando o cache salvo das consultas
@@ -281,23 +285,28 @@ def exibir_shipments():
                         st.rerun()
                         
                     else:
-                        st.error("❌ Erro ao registrar os ajustes no banco.")
+                        st.error("❌ Error registering adjustments in the database.")
                 else:
-                    st.error("⚠️ O campo 'Informações Complementares' é obrigatório.")
+                    st.error("⚠️ The 'Additional Information' field is required.")
  
         with col2:
             if st.button("❌ Discard Changes"):
  
-                st.warning("Alterações descartadas.")
+                st.warning("Changes discarded.")
                 st.session_state["changes"] = pd.DataFrame()
                 st.session_state["grid_update_key"] = str(time.time())
                 st.rerun()
  
     # Verifica se linha foi selecionada
-    selected_rows = edited_df[edited_df["Selecionar"] == True]
+    selected_rows = edited_df[edited_df["Select"] == True]
     selected_farol_ref = None
     original_status = None
     selected_index = None
+    
+    # Validação para permitir apenas uma seleção
+    if len(selected_rows) > 1:
+        st.warning("⚠️ Please select only **one** row.")
+    
     if len(selected_rows) == 1:
         selected_farol_ref = selected_rows[farol_ref_col].values[0]
         st.session_state["selected_reference"] = selected_farol_ref
@@ -339,7 +348,7 @@ def exibir_shipments():
     # Botão View Attachments sempre visível, toggle, igual tela de ajustes
     with _:
         view_attachments_open = st.session_state.get("show_shipments_attachments", False)
-        if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
+        if st.button(" View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
             if view_attachments_open:
                 st.session_state["show_shipments_attachments"] = False
                 st.session_state["shipments_attachments_farol_ref"] = None
@@ -365,7 +374,7 @@ def exibir_shipments():
             from booking_adjustments import display_attachments_section
             display_attachments_section(farol_ref)
         else:
-            st.info("Selecione uma linha para visualizar os anexos.")
+            st.info("Select a row to view attachments.")
  
  
  
