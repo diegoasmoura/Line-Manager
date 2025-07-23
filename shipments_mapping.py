@@ -1,6 +1,7 @@
 ## shipments_mapping.py
  
 import streamlit as st
+import pandas as pd
  
 def get_column_mapping():
     return {
@@ -33,7 +34,7 @@ def get_column_mapping():
         "s_requested_shipment_week": "Requested Shipment Week",
         "s_requested_deadlines_start_date":"Requested Cut off Start Date",
         "s_requested_deadlines_end_date":"Requested Cut off End Date",
-        "s_dthc_prepaid": "DTHC Prepaid",
+        "s_dthc_prepaid": "DTHC",
         "s_afloat": "Afloat",
         "s_shipment_period_start_date": "Shipment Period Start Date",
         "s_shipment_period_end_date": "Shipment Period End Date",
@@ -142,7 +143,7 @@ def drop_downs(data_show, df_udc):
         # Sales Data (mantido como está)
         "Partial Allowed": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
         "PNL Destination": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
-        "DTHC Prepaid": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
+        "DTHC": df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist(),
         "Afloat": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
         "Shipment Status": df_udc[df_udc["grupo"] == "Origin Status"]["dado"].dropna().unique().tolist(),
         "Type of Shipment": df_udc[df_udc["grupo"] == "Type of Shipment"]["dado"].dropna().unique().tolist(),
@@ -179,7 +180,7 @@ def drop_downs(data_show, df_udc):
         "VIP PNL Risk": "select",
         "Partial Allowed": "select",
         "PNL Destination": "select",
-        "DTHC Prepaid": "select",
+        "DTHC": "select",
         "Afloat": "select",
         "Container Type": "select",
         "Type of Shipment": "select",
@@ -236,7 +237,7 @@ def drop_downs(data_show, df_udc):
     # Campos obrigatórios (mantido e expandido)
     campos_obrigatorios = {
         # Sales Data
-        "DTHC Prepaid": True,
+        "DTHC": True,
         "Afloat": True,
         #"Shipment Status": True,
         "Farol Status": True,

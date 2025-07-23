@@ -54,7 +54,7 @@ def get_data_salesData():
             "Sales Order Date", "Mode", "Sales Incoterm", "SKU", "Plant of Origin", "Splitted Booking Reference",
             "Volume in Tons", "Sales Quantity of Containers",
             "Container Type", "Sales Port of Loading POL", "Sales Port of Delivery POD", "Sales Place of Receipt", "Sales Final Destination",
-            "Requested Shipment Week","Requested Cut off Start Date", "Requested Cut off End Date", "DTHC Prepaid", "Afloat", "Shipment Period Start Date", "Shipment Period End Date",
+            "Requested Shipment Week","Requested Cut off Start Date", "Requested Cut off End Date", "DTHC", "Afloat", "Shipment Period Start Date", "Shipment Period End Date",
             "Partial Allowed", "VIP PNL Risk", "PNL Destination", "Required Arrival Date", "LC Received",
             "Allocation Date", "Producer Nomination Date", "First Vessel ETD", "Comments Sales","Sales Owner"]]
  

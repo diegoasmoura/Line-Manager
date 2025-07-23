@@ -13,6 +13,7 @@ import time
 df_udc = load_df_udc()
 ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
 ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
+dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist()
  
 # ---------- 3. Constantes ----------
 # Campos do formulário e seus nomes internos
@@ -93,7 +94,7 @@ def show_add_form():
  
         col1, col2 = st.columns(2)
         with col1:
-            values["s_dthc_prepaid"] = st.selectbox("**:green[DTHC Prepaid]***", ["", "Yes", "No"])
+            values["s_dthc_prepaid"] = st.selectbox("**:green[DTHC]***", [""] + dthc_options)
         with col2:
             values["s_afloat"] = st.selectbox("**:green[Afloat]***", ["", "Yes", "No"])
  
