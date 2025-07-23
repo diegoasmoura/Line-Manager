@@ -155,7 +155,16 @@ def show_add_form():
         if uploaded_file:
             try:
                 df_excel = pd.read_excel(uploaded_file)
-                st.dataframe(df_excel)
+                # Não filtra mais as colunas, exibe todas na ordem original
+                highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"]
+
+                def highlight_specific_cols(s):
+                    return [
+                        'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
+                        for _ in s
+                    ]
+
+                st.dataframe(df_excel.style.apply(highlight_specific_cols, axis=0))
                 # Não há colunas obrigatórias para '???', então não validar essas
                 required_cols = [
                     "HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"
