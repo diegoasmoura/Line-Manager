@@ -10,7 +10,7 @@ def get_column_mapping():
         "adjusts_basic" : "Adjusts Basic",
         "adjusts_critic" : "Adjusts Critic",
         "s_shipment_status": "Shipment Status",
-        "farol_status" : "Farol Status",
+        "s_farol_status" : "Farol Status",
 
         "s_farol_reference": "Sales Farol Reference",
         "s_creation_of_shipment": "Creation Of Shipment",
@@ -58,7 +58,7 @@ def get_column_mapping():
         "b_creation_of_booking": "Creation Of Booking",
         "b_booking_reference": "Booking Reference",
         "b_booking_status": "Booking Status",
-        "farol_status" : "Farol Status",
+        "b_farol_status" : "Farol Status",
 
         "b_booking_owner": "Booking Owner",
         "b_carrier": "Carrier",
@@ -98,7 +98,7 @@ def get_column_mapping():
         "l_id": "ID Loading",
         "l_farol_reference": "Loading Farol Reference",
         "l_truck_loading_status": "Truck Loading Status",
-        "farol_status" : "Farol Status",
+        "l_farol_status" : "Farol Status",
 
         "l_creation_of_cargo_loading": "Creation Of Cargo Loading",
         "l_logistics_analyst": "Logistics Analyst",

@@ -71,7 +71,7 @@ def get_data_bookingData():
  
     # Consulta SQL com JOIN para trazer campos do Sales Data
     query = '''
-    SELECT b.b_id, b.b_farol_reference, b.farol_status, b.b_creation_of_booking, b.b_booking_reference, 
+    SELECT b.b_id, b.b_farol_reference, b.b_farol_status, b.b_creation_of_booking, b.b_booking_reference, 
            b.b_booking_status, b.b_booking_owner, b.b_carrier, b.b_freight_forwarder, 
            b.b_booking_request_date, b.b_booking_confirmation_date, b.b_vessel_name, b.b_voyage_carrier, 
            b.b_port_terminal_city, b.b_place_of_receipt, b.b_final_destination, b.b_transhipment_port, 
@@ -326,17 +326,17 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
         # Atualiza o Farol Status para "Adjustment Requested" em todas as tabelas
         update_sales_query = text("""
             UPDATE LogTransp.F_CON_SALES_DATA
-            SET farol_status = :farol_status
+            SET s_farol_status = :farol_status
             WHERE s_farol_reference = :ref
         """)
         update_booking_query = text("""
             UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-            SET farol_status = :farol_status
+            SET b_farol_status = :farol_status
             WHERE b_farol_reference = :ref
         """)
         update_loading_query = text("""
             UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-            SET farol_status = :farol_status
+            SET l_farol_status = :farol_status
             WHERE l_farol_reference = :ref
         """)
 
@@ -557,9 +557,9 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         sales_copy.at[0, "s_type_of_shipment"] = "Split"
         
         # Define o Farol Status como "Adjustment Requested" para os splits
-        sales_copy.at[0, "farol_status"] = "Adjustment Requested"
-        booking_copy.at[0, "farol_status"] = "Adjustment Requested"
-        loading_copy.at[0, "farol_status"] = "Adjustment Requested"
+        sales_copy.at[0, "s_farol_status"] = "Adjustment Requested"
+        booking_copy.at[0, "b_farol_status"] = "Adjustment Requested"
+        loading_copy.at[0, "l_farol_status"] = "Adjustment Requested"
  
         sales_dict = sales_copy.iloc[0].to_dict()
         booking_dict = booking_copy.iloc[0].to_dict()
@@ -598,17 +598,17 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
     # Atualiza o Farol Status da linha original para "Adjustment Requested"
     update_sales_original = text("""
         UPDATE LogTransp.F_CON_SALES_DATA
-        SET farol_status = :farol_status
+        SET s_farol_status = :farol_status
         WHERE s_farol_reference = :ref
     """)
     update_booking_original = text("""
         UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-        SET farol_status = :farol_status
+        SET b_farol_status = :farol_status
         WHERE b_farol_reference = :ref
     """)
     update_loading_original = text("""
         UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-        SET farol_status = :farol_status
+        SET l_farol_status = :farol_status
         WHERE l_farol_reference = :ref
     """)
  
@@ -692,16 +692,16 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         "b_port_of_loading_pol": values.get("b_port_of_loading_pol", ""),
         "b_port_of_delivery_pod": values.get("b_port_of_delivery_pod", ""),
         "b_final_destination": values.get("b_final_destination", ""),
-        "farol_status": "Booking Requested"
+        "b_farol_status": "Booking Requested"
     })
     insert_container_release_if_not_exists(farol_reference, {
-        "farol_status": "Booking Requested"
+        "l_farol_status": "Booking Requested"
     })
     conn = get_database_connection()
     try:
         query = """
         UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-        SET farol_status = :farol_status,
+        SET b_farol_status = :farol_status,
             b_carrier = :b_carrier,
             b_creation_of_booking = :b_creation_of_booking,
             b_freight_forwarder = :b_freight_forwarder,
@@ -713,13 +713,13 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         # Atualiza a tabela de Sales Data
         query_sales = """
         UPDATE LogTransp.F_CON_SALES_DATA
-        SET farol_status = :farol_status
+        SET s_farol_status = :farol_status
         WHERE s_farol_reference = :ref
         """
         # Atualiza a tabela de Loading
         query_loading = """
         UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-        SET farol_status = :farol_status
+        SET l_farol_status = :farol_status
         WHERE l_farol_reference = :ref
         """
         # Executa ambas as queries

@@ -74,7 +74,7 @@ def show_add_form():
 
             col1, col2 = st.columns(2)
             with col1:
-                values["farol_status"] = st.selectbox("**:green[Farol Status]***", ["New request"], index=0, disabled=True)
+                values["s_farol_status"] = st.selectbox("**:green[Farol Status]***", ["New request"], index=0, disabled=True)
 
             col1, col2 = st.columns(2)
             with col1:
@@ -193,7 +193,7 @@ def show_add_form():
                         except Exception:
                             hc_val = 0
                         values = {
-                            "farol_status": "New request",
+                            "s_farol_status": "New request",
                             "s_type_of_shipment": "Forecast",
                             "s_quantity_of_containers": hc_val,
                             "s_requested_shipment_week": row.get("Week", ""),

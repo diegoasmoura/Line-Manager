@@ -1010,7 +1010,7 @@ def exibir_adjustments():
                                 # Atualiza o status nas três tabelas SEM checar o stage
                                 update_sales_query = text("""
                                     UPDATE LogTransp.F_CON_SALES_DATA
-                                    SET farol_status = :farol_status
+                                    SET s_farol_status = :farol_status
                                     WHERE s_farol_reference = :farol_reference
                                 """)
                                 conn.execute(update_sales_query, {
@@ -1019,7 +1019,7 @@ def exibir_adjustments():
                                 })
                                 update_booking_query = text("""
                                     UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-                                    SET farol_status = :farol_status,
+                                    SET b_farol_status = :farol_status,
                                         b_creation_of_booking = :creation_date
                                     WHERE b_farol_reference = :farol_reference
                                 """)
@@ -1030,7 +1030,7 @@ def exibir_adjustments():
                                 })
                                 update_loading_query = text("""
                                     UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-                                    SET farol_status = :farol_status,
+                                    SET l_farol_status = :farol_status,
                                         l_creation_of_cargo_loading = :creation_date
                                     WHERE l_farol_reference = :farol_reference
                                 """)

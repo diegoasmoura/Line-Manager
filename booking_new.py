@@ -126,7 +126,7 @@ def show_booking_management_form():
                 st.session_state.button_disabled = True
                 
                 try:
-                    values["farol_status"] = "Booking requested"
+                    values["b_farol_status"] = "Booking requested"
                     update_booking_data_by_farol_reference(farol_reference, values)
                     st.success("✅ Dados atualizados com sucesso!")
                     time.sleep(2)  # Aguarda 2 segundos
