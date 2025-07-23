@@ -156,10 +156,9 @@ def show_add_form():
             try:
                 df_excel = pd.read_excel(uploaded_file)
                 st.dataframe(df_excel)
+                # Não há colunas obrigatórias para '???', então não validar essas
                 required_cols = [
-                    "Type of Shipment", "Quantity of Containers", "Port of Loading POL", "Port of Delivery POD",
-                    "Final Destination", "Requested Shipment Week", "Requested Cut off Start Date",
-                    "Requested Cut off End Date", "DTHC", "Afloat", "Required Arrival Date", "Comments Sales"
+                    "HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"
                 ]
                 missing_cols = [col for col in required_cols if col not in df_excel.columns]
                 if missing_cols:
@@ -168,20 +167,23 @@ def show_add_form():
                     if st.button("Confirm Bulk Upload", key="confirm_mass_upload"):
                         success, fail = 0, 0
                         for idx, row in df_excel.iterrows():
+                            sales_comments = (str(row.get("RESTRIÇÃO ARMADOR +", "")) + " " + str(row.get("CONTRATO OPÇÃO DESTINO", ""))).strip()
+                            tipo_embarque_val = row.get("TIPO EMBARQUE", "")
+                            s_afloat_val = "Yes" if str(tipo_embarque_val).strip().lower() == "afloat" else "No"
                             values = {
                                 "farol_status": "New request",
-                                "s_type_of_shipment": row["Type of Shipment"],
-                                "s_quantity_of_containers": row["Quantity of Containers"],
-                                "s_port_of_loading_pol": row["Port of Loading POL"],
-                                "s_port_of_delivery_pod": row["Port of Delivery POD"],
-                                "s_final_destination": row["Final Destination"],
-                                "s_requested_shipment_week": row["Requested Shipment Week"],
-                                "s_requested_deadlines_start_date": row["Requested Cut off Start Date"],
-                                "s_requested_deadlines_end_date": row["Requested Cut off End Date"],
-                                "s_dthc_prepaid": row["DTHC"],
-                                "s_afloat": row["Afloat"],
-                                "s_required_arrival_date": row["Required Arrival Date"],
-                                "s_comments": row.get("Comments Sales", ""),
+                                "s_type_of_shipment": "Forecast",  # Sempre Forecast
+                                "s_quantity_of_containers": row.get("HC", ""),
+                                "s_requested_shipment_week": row.get("Week", ""),
+                                "s_required_arrival_date": row.get("LIMITE EMBARQUE - PNL", ""),
+                                "s_requested_deadlines_start_date": "",  # ???
+                                "s_requested_deadlines_end_date": "",    # ???
+                                "s_dthc_prepaid": row.get("DTHC", ""),
+                                "s_afloat": s_afloat_val,
+                                "s_port_of_loading_pol": "",  # ???
+                                "s_port_of_delivery_pod": row.get("POD", ""),
+                                "s_final_destination": row.get("INLAND", ""),
+                                "s_comments": sales_comments,
                                 "adjustment_id": str(uuid.uuid4()),
                                 "user_insert": ''
                             }
