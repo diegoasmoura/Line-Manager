@@ -943,7 +943,7 @@ def exibir_adjustments():
                 "Attachments": st.column_config.NumberColumn("Attachments", format="%d", disabled=True),
                 "Comments": st.column_config.TextColumn("Comments", width="large", disabled=True),
                 "Adjustment ID": st.column_config.TextColumn("Adjustment ID", width="medium", disabled=True),
-                "Inserted Date": st.column_config.DatetimeColumn("Inserted Date", disabled=True, format="%d/%m/%Y %H:%M")
+                "Inserted Date": st.column_config.DatetimeColumn("Inserted Date", disabled=True)
             }
 
             # Exibe a tabela editável com a coluna de seleção
