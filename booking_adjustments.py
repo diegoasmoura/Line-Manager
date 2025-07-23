@@ -995,7 +995,6 @@ def exibir_adjustments():
                             try:
                                 conn = get_database_connection()
                                 transaction = conn.begin()
-                                
                                 # Atualiza o status nos ajustes
                                 update_log_query = text("""
                                     UPDATE LogTransp.F_CON_Adjustments_Log
@@ -1003,56 +1002,39 @@ def exibir_adjustments():
                                         confirmation_date = :confirmation_date
                                     WHERE farol_reference = :farol_reference
                                 """)
-                                
                                 conn.execute(update_log_query, {
                                     "new_status": change['new_status'],
                                     "confirmation_date": datetime.now() if change['new_status'] in ["Booking Approved", "Booking Rejected", "Booking Cancelled"] else None,
                                     "farol_reference": change['farol_reference']
                                 })
-                                
-                                # Determina os stages dos ajustes para esta referência
-                                stages_query = text("""
-                                    SELECT DISTINCT stage 
-                                    FROM LogTransp.F_CON_Adjustments_Log 
-                                    WHERE farol_reference = :farol_reference
+                                # Atualiza o status nas três tabelas SEM checar o stage
+                                update_sales_query = text("""
+                                    UPDATE LogTransp.F_CON_SALES_DATA
+                                    SET farol_status = :farol_status
+                                    WHERE s_farol_reference = :farol_reference
                                 """)
-                                stages_result = conn.execute(stages_query, {"farol_reference": change['farol_reference']}).fetchall()
-                                stages = [row[0] for row in stages_result]
-                                
-                                # Atualiza o status nas tabelas principais
-                                if "Sales Data" in stages:
-                                    update_sales_query = text("""
-                                        UPDATE LogTransp.F_CON_SALES_DATA
-                                        SET farol_status = :farol_status
-                                        WHERE s_farol_reference = :farol_reference
-                                    """)
-                                    conn.execute(update_sales_query, {
-                                        "farol_status": change['new_status'],
-                                        "farol_reference": change['farol_reference']
-                                    })
-                                
-                                if "Booking Management" in stages:
-                                    update_booking_query = text("""
-                                        UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-                                        SET farol_status = :farol_status
-                                        WHERE b_farol_reference = :farol_reference
-                                    """)
-                                    conn.execute(update_booking_query, {
-                                        "farol_status": change['new_status'],
-                                        "farol_reference": change['farol_reference']
-                                    })
-                                
-                                if "Container Delivery at Port" in stages:
-                                    update_loading_query = text("""
-                                        UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-                                        SET farol_status = :farol_status
-                                        WHERE l_farol_reference = :farol_reference
-                                    """)
-                                    conn.execute(update_loading_query, {
-                                        "farol_status": change['new_status'],
-                                        "farol_reference": change['farol_reference']
-                                    })
-                                
+                                conn.execute(update_sales_query, {
+                                    "farol_status": change['new_status'],
+                                    "farol_reference": change['farol_reference']
+                                })
+                                update_booking_query = text("""
+                                    UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
+                                    SET farol_status = :farol_status
+                                    WHERE b_farol_reference = :farol_reference
+                                """)
+                                conn.execute(update_booking_query, {
+                                    "farol_status": change['new_status'],
+                                    "farol_reference": change['farol_reference']
+                                })
+                                update_loading_query = text("""
+                                    UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+                                    SET farol_status = :farol_status
+                                    WHERE l_farol_reference = :farol_reference
+                                """)
+                                conn.execute(update_loading_query, {
+                                    "farol_status": change['new_status'],
+                                    "farol_reference": change['farol_reference']
+                                })
                                 transaction.commit()
                                 success_count += 1
                                 
