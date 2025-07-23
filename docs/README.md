@@ -6,6 +6,58 @@ Este sistema foi desenvolvido para organizar e rastrear embarques de algodão, p
 
 ---
 
+## 🧭 Menu Principal e Fluxo de Navegação
+
+O sistema utiliza um menu lateral (sidebar) com as opções:
+- Shipments
+- Adjustments
+- Op. Control
+- Performance
+- Tracking
+- History
+- Setup
+
+O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os módulos correspondentes.
+
+---
+
+## 🧩 Funcionalidades e Fluxos Atualizados
+
+- O botão **View Attachments** está disponível em todas as telas principais, sempre visível (toggle), mas desabilitado se nenhuma linha estiver selecionada.
+- O layout dos anexos é padronizado em todas as telas, com cards visuais, ícones, informações e botões de download/exclusão.
+- Ao aprovar um ajuste na tela de `booking_adjustments.py`, o status é atualizado **sempre** nas três tabelas principais: `F_CON_SALES_DATA`, `F_CON_BOOKING_MANAGEMENT` e `F_CON_CARGO_LOADING_CONTAINER_RELEASE`, independentemente do campo `stage`.
+- O campo **Inserted Date** agora é exibido corretamente, com conversão explícita para datetime.
+- O formulário de novo embarque (`shipments_new.py`) exibe corretamente todas as opções de DTHC.
+- O sistema de anexos está documentado em detalhes no `ANEXOS_README.md`.
+- Os módulos `Operation Control`, `Performance Control`, `Tracking` e `History` atualmente exibem apenas um print/placeholder.
+
+---
+
+## 📑 Resumo das Telas
+
+- **Shipments**: Cadastro, edição, ajustes, splits, anexos.
+- **Adjustments**: Aprovação/rejeição de ajustes críticos, atualização em lote de status, gestão de anexos.
+- **Booking Management**: Solicitação e edição de bookings.
+- **Operation Control, Performance, Tracking, History, Setup**: (Placeholders para futuras implementações)
+
+---
+
+## 🔄 Principais Fluxos
+
+1. **Cadastro de Embarque**: Shipments > New Shipment > Preencher formulário > Confirmar.
+2. **Solicitar Booking**: Shipments > Selecionar embarque com status "New Request" > New Booking > Preencher > Confirmar.
+3. **Ajuste Crítico/Split**: Shipments > Selecionar embarque > Adjustments > Preencher > Confirmar.
+4. **Aprovação de Ajustes**: Adjustments > Filtrar/Selecionar > Editar status > Apply Changes.
+5. **Gestão de Anexos**: Em qualquer tela, selecionar embarque > View Attachments > Upload/Download/Excluir.
+
+---
+
+## 📎 Anexos
+
+Para detalhes completos sobre o sistema de anexos, consulte o arquivo [ANEXOS_README.md](../ANEXOS_README.md).
+
+---
+
 ## 👥 Equipes (Stages)
 
 * Sales

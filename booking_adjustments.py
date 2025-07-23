@@ -1019,20 +1019,24 @@ def exibir_adjustments():
                                 })
                                 update_booking_query = text("""
                                     UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-                                    SET farol_status = :farol_status
+                                    SET farol_status = :farol_status,
+                                        b_creation_of_booking = :creation_date
                                     WHERE b_farol_reference = :farol_reference
                                 """)
                                 conn.execute(update_booking_query, {
                                     "farol_status": change['new_status'],
+                                    "creation_date": datetime.now(),
                                     "farol_reference": change['farol_reference']
                                 })
                                 update_loading_query = text("""
                                     UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-                                    SET farol_status = :farol_status
+                                    SET farol_status = :farol_status,
+                                        l_creation_of_cargo_loading = :creation_date
                                     WHERE l_farol_reference = :farol_reference
                                 """)
                                 conn.execute(update_loading_query, {
                                     "farol_status": change['new_status'],
+                                    "creation_date": datetime.now(),
                                     "farol_reference": change['farol_reference']
                                 })
                                 transaction.commit()
