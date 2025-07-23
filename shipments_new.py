@@ -150,72 +150,96 @@ def show_add_form():
                 st.rerun()
 
     with tab_excel:
-        with st.form("excel_upload_box"):
-            st.markdown("Download the <a href='/docs/template_embarques.xlsx' download>Excel template</a> to ensure the correct format.", unsafe_allow_html=True)
-            uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
-            df_excel = None
-            if uploaded_file:
-                try:
-                    df_excel = pd.read_excel(uploaded_file)
-                    highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"]
-                    def highlight_specific_cols(s):
-                        return [
-                            'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
-                            for _ in s
-                        ]
-                    st.dataframe(df_excel.style.apply(highlight_specific_cols, axis=0))
-                except Exception as e:
-                    st.error(f"Error processing file: {str(e)}")
-            col1, col2 = st.columns(2)
-            with col1:
-                confirm_bulk = st.form_submit_button("✅ Confirm Bulk Upload")
-            with col2:
-                back_bulk = st.form_submit_button("🔙 Back to Shipments")
-            if back_bulk:
-                st.session_state["current_page"] = "main"
-                st.rerun()
-            if df_excel is not None:
+        st.markdown("Download the <a href='/docs/template_embarques.xlsx' download>Excel template</a> to ensure the correct format.", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
+        df_excel = None
+        
+        # Processa e exibe o arquivo automaticamente quando carregado
+        if uploaded_file:
+            try:
+                df_excel = pd.read_excel(uploaded_file)
+                highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"]
+                def highlight_specific_cols(s):
+                    return [
+                        'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
+                        for _ in s
+                    ]
+                st.dataframe(df_excel.style.apply(highlight_specific_cols, axis=0))
+                
+                # Validação das colunas obrigatórias
                 required_cols = [
                     "HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"
                 ]
                 missing_cols = [col for col in required_cols if col not in df_excel.columns]
                 if missing_cols:
                     st.error(f"The file is missing the required columns: {', '.join(missing_cols)}")
-                elif confirm_bulk:
-                    success, fail = 0, 0
-                    for idx, row in df_excel.iterrows():
-                        sales_comments = (str(row.get("RESTRIÇÃO ARMADOR +", "")) + " " + str(row.get("CONTRATO OPÇÃO DESTINO", ""))).strip()
-                        tipo_embarque_val = row.get("TIPO EMBARQUE", "")
-                        s_afloat_val = "Yes" if str(tipo_embarque_val).strip().lower() == "afloat" else "No"
-                        hc_val = row.get("HC", "")
-                        try:
-                            hc_val = int(float(hc_val)) if pd.notna(hc_val) and str(hc_val).strip() != "" else 0
-                        except Exception:
-                            hc_val = 0
-                        values = {
-                            "s_farol_status": "New request",
-                            "s_type_of_shipment": "Forecast",
-                            "s_quantity_of_containers": hc_val,
-                            "s_requested_shipment_week": row.get("Week", ""),
-                            "s_required_arrival_date": row.get("LIMITE EMBARQUE - PNL", ""),
-                            "s_requested_deadlines_start_date": "",
-                            "s_requested_deadlines_end_date": "",
-                            "s_dthc_prepaid": row.get("DTHC", ""),
-                            "s_afloat": s_afloat_val,
-                            "s_port_of_loading_pol": "",
-                            "s_port_of_delivery_pod": row.get("POD", ""),
-                            "s_final_destination": row.get("INLAND", ""),
-                            "s_comments": sales_comments,
-                            "adjustment_id": str(uuid.uuid4()),
-                            "user_insert": ''
-                        }
-                        try:
-                            if add_sales_record(values):
-                                success += 1
-                            else:
-                                fail += 1
-                        except Exception as e:
+                else:
+                    st.success(f"✅ File loaded successfully! Found {len(df_excel)} rows to process.")
+                    
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+        
+        # Formulário apenas para os botões
+        with st.form("excel_upload_box"):
+            col1, col2 = st.columns(2)
+            with col1:
+                confirm_bulk = st.form_submit_button("✅ Confirm Bulk Upload", disabled=(df_excel is None))
+            with col2:
+                back_bulk = st.form_submit_button("🔙 Back to Shipments")
+            
+            if back_bulk:
+                st.session_state["current_page"] = "main"
+                st.rerun()
+            
+            if confirm_bulk and df_excel is not None:
+                success, fail = 0, 0
+                progress_bar = st.progress(0, text="Processing shipments...")
+                
+                for idx, row in df_excel.iterrows():
+                    sales_comments = (str(row.get("RESTRIÇÃO ARMADOR +", "")) + " " + str(row.get("CONTRATO OPÇÃO DESTINO", ""))).strip()
+                    tipo_embarque_val = row.get("TIPO EMBARQUE", "")
+                    s_afloat_val = "Yes" if str(tipo_embarque_val).strip().lower() == "afloat" else "No"
+                    hc_val = row.get("HC", "")
+                    try:
+                        hc_val = int(float(hc_val)) if pd.notna(hc_val) and str(hc_val).strip() != "" else 0
+                    except Exception:
+                        hc_val = 0
+                    values = {
+                        "s_farol_status": "New request",
+                        "s_type_of_shipment": "Forecast",
+                        "s_quantity_of_containers": hc_val,
+                        "s_requested_shipment_week": row.get("Week", ""),
+                        "s_required_arrival_date": row.get("LIMITE EMBARQUE - PNL", ""),
+                        "s_requested_deadlines_start_date": "",
+                        "s_requested_deadlines_end_date": "",
+                        "s_dthc_prepaid": row.get("DTHC", ""),
+                        "s_afloat": s_afloat_val,
+                        "s_port_of_loading_pol": "",
+                        "s_port_of_delivery_pod": row.get("POD", ""),
+                        "s_final_destination": row.get("INLAND", ""),
+                        "s_comments": sales_comments,
+                        "adjustment_id": str(uuid.uuid4()),
+                        "user_insert": ''
+                    }
+                    try:
+                        if add_sales_record(values):
+                            success += 1
+                        else:
                             fail += 1
-                    st.success(f"{success} shipments successfully uploaded!")
-                    if fail:
-                        st.error(f"{fail} shipments failed. Please check the file data.")
+                    except Exception as e:
+                        fail += 1
+                    
+                    # Atualiza a barra de progresso
+                    progress = (idx + 1) / len(df_excel)
+                    progress_bar.progress(progress, text=f"Processing shipment {idx+1} of {len(df_excel)}...")
+                
+                progress_bar.empty()
+                st.success(f"✅ {success} shipments successfully uploaded!")
+                if fail:
+                    st.error(f"❌ {fail} shipments failed. Please check the file data.")
+                
+                # Limpa o cache e volta para a tela principal
+                st.cache_data.clear()
+                time.sleep(2)
+                st.session_state["current_page"] = "main"
+                st.rerun()
