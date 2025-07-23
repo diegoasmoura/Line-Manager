@@ -47,18 +47,17 @@ required_fields = {
 # ---------- 4. Função principal ----------
 def show_add_form():
     """
-    Exibe o formulário para adicionar um novo registro de vendas.
+    Displays the form to add a new sales record.
     """
     st.subheader("New Sales Record 🚢")
 
-    tab_manual, tab_excel = st.tabs(["Cadastro Manual", "Upload Excel (Massa)"])
+    tab_manual, tab_excel = st.tabs(["Manual Entry", "Excel Upload (Bulk)"])
 
     with tab_manual:
-        # ---------- Formulário Manual ----------
-        # Inicializa estados da sessão
+        # ---------- Manual Form ----------
         if "current_farol_reference" not in st.session_state:
             st.session_state.current_farol_reference = str(uuid.uuid4())
-            st.session_state.button_disabled = False  # Inicializa o estado do botão
+            st.session_state.button_disabled = False
 
         if "confirm_disabled_until" not in st.session_state:
             st.session_state.confirm_disabled_until = None
@@ -73,7 +72,6 @@ def show_add_form():
             values = {}
             missing_fields = []
 
-            # Inputs em colunas organizadas
             col1, col2 = st.columns(2)
             with col1:
                 values["farol_status"] = st.selectbox("**:green[Farol Status]***", ["New request"], index=0, disabled=True)
@@ -109,9 +107,8 @@ def show_add_form():
                 values["s_port_of_delivery_pod"] = st.selectbox("**:green[Port of Delivery POD]***", [""] + ports_pod_options)
 
             values["s_final_destination"] = st.text_input("**Final Destination**")
-            values["s_comments"] = st.text_area("**Comments Sales**")
+            values["s_comments"] = st.text_area("**Sales Comments**")
 
-            # Verifica campos obrigatórios
             for field, label in required_fields.items():
                 if not values.get(field):
                     missing_fields.append(label)
@@ -125,47 +122,40 @@ def show_add_form():
             with col2:
                 voltar = st.form_submit_button("🔙 Back to Shipments")
 
-            # ---------- Ações do formulário ----------
             if salvar and not st.session_state.get("button_disabled", False):
                 if missing_fields:
-                    st.error(f"Por favor, preencha os campos obrigatórios: {', '.join(missing_fields)}")
+                    st.error(f"Please fill in the required fields: {', '.join(missing_fields)}")
                 else:
-                    # Desabilita o botão imediatamente
                     st.session_state.button_disabled = True
                     values["adjustment_id"] = st.session_state.current_farol_reference
                     values["user_insert"] = ''
 
-                    with st.spinner("Processando novo embarque, por favor aguarde..."):
+                    with st.spinner("Processing new shipment, please wait..."):
                         if add_sales_record(values):
-                            st.success("✅ Dados salvos com sucesso!")
-                            time.sleep(2)  # Aguarda 2 segundos
-                            # Limpa os estados antes de redirecionar
+                            st.success("✅ Data saved successfully!")
+                            time.sleep(2)
                             st.session_state.pop("current_farol_reference", None)
                             st.session_state.pop("button_disabled", None)
                             st.session_state["current_page"] = "main"
                             st.cache_data.clear()
                             st.rerun()
                         else:
-                            # Reabilita o botão em caso de erro
                             st.session_state.button_disabled = False
-                            st.error("Erro ao salvar os dados. Por favor, tente novamente.")
+                            st.error("Error saving data. Please try again.")
 
             elif voltar:
-                # Limpa os estados ao voltar
                 st.session_state.pop("current_farol_reference", None)
                 st.session_state.pop("button_disabled", None)
                 st.session_state["current_page"] = "main"
                 st.rerun()
 
     with tab_excel:
-        # --- Upload em massa via Excel ---
-        st.markdown("Baixe o <a href='/docs/template_embarques.xlsx' download>template de Excel</a> para garantir o formato correto.", unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("Selecione um arquivo Excel (.xlsx)", type=["xlsx"], key="excel_mass_upload")
+        st.markdown("Download the <a href='/docs/template_embarques.xlsx' download>Excel template</a> to ensure the correct format.", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
         if uploaded_file:
             try:
                 df_excel = pd.read_excel(uploaded_file)
-                st.dataframe(df_excel)  # Mostra a grade completa para revisão
-                # Colunas obrigatórias esperadas
+                st.dataframe(df_excel)
                 required_cols = [
                     "Type of Shipment", "Quantity of Containers", "Port of Loading POL", "Port of Delivery POD",
                     "Final Destination", "Requested Shipment Week", "Requested Cut off Start Date",
@@ -173,9 +163,9 @@ def show_add_form():
                 ]
                 missing_cols = [col for col in required_cols if col not in df_excel.columns]
                 if missing_cols:
-                    st.error(f"O arquivo está faltando as colunas obrigatórias: {', '.join(missing_cols)}")
+                    st.error(f"The file is missing the required columns: {', '.join(missing_cols)}")
                 else:
-                    if st.button("Confirmar Lançamento em Massa", key="confirm_mass_upload"):
+                    if st.button("Confirm Bulk Upload", key="confirm_mass_upload"):
                         success, fail = 0, 0
                         for idx, row in df_excel.iterrows():
                             values = {
@@ -202,8 +192,8 @@ def show_add_form():
                                     fail += 1
                             except Exception as e:
                                 fail += 1
-                        st.success(f"{success} embarques lançados com sucesso!")
+                        st.success(f"{success} shipments successfully uploaded!")
                         if fail:
-                            st.error(f"{fail} embarques falharam. Verifique os dados do arquivo.")
+                            st.error(f"{fail} shipments failed. Please check the file data.")
             except Exception as e:
-                st.error(f"Erro ao processar o arquivo: {str(e)}")
+                st.error(f"Error processing file: {str(e)}")
