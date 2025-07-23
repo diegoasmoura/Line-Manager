@@ -150,22 +150,22 @@ def show_add_form():
                 st.rerun()
 
     with tab_excel:
-        st.markdown("Download the <a href='/docs/template_embarques.xlsx' download>Excel template</a> to ensure the correct format.", unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
-        df_excel = None
-        if uploaded_file:
-            try:
-                df_excel = pd.read_excel(uploaded_file)
-                highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"]
-                def highlight_specific_cols(s):
-                    return [
-                        'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
-                        for _ in s
-                    ]
-                st.dataframe(df_excel.style.apply(highlight_specific_cols, axis=0))
-            except Exception as e:
-                st.error(f"Error processing file: {str(e)}")
-        with st.form("excel_upload_form"):
+        with st.form("excel_upload_box"):
+            st.markdown("Download the <a href='/docs/template_embarques.xlsx' download>Excel template</a> to ensure the correct format.", unsafe_allow_html=True)
+            uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
+            df_excel = None
+            if uploaded_file:
+                try:
+                    df_excel = pd.read_excel(uploaded_file)
+                    highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"]
+                    def highlight_specific_cols(s):
+                        return [
+                            'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
+                            for _ in s
+                        ]
+                    st.dataframe(df_excel.style.apply(highlight_specific_cols, axis=0))
+                except Exception as e:
+                    st.error(f"Error processing file: {str(e)}")
             col1, col2 = st.columns(2)
             with col1:
                 confirm_bulk = st.form_submit_button("✅ Confirm Bulk Upload")
