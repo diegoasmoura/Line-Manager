@@ -8,6 +8,7 @@ from database import load_df_udc, add_sales_record
 from datetime import datetime, timedelta
 import uuid
 import time
+import pandas as pd # Added for Excel upload
  
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
@@ -63,6 +64,57 @@ def show_add_form():
         st.session_state.confirm_disabled_until is not None and
         now < st.session_state.confirm_disabled_until
     )
+ 
+    # --- Upload em massa via Excel ---
+    with st.expander("📥 Upload Excel (Lançamento Massivo)", expanded=False):
+        st.markdown("Baixe o <a href='/docs/template_embarques.xlsx' download>template de Excel</a> para garantir o formato correto.", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("Selecione um arquivo Excel (.xlsx)", type=["xlsx"], key="excel_mass_upload")
+        if uploaded_file:
+            try:
+                df_excel = pd.read_excel(uploaded_file)
+                st.dataframe(df_excel.head())
+                # Colunas obrigatórias esperadas
+                required_cols = [
+                    "Type of Shipment", "Quantity of Containers", "Port of Loading POL", "Port of Delivery POD",
+                    "Final Destination", "Requested Shipment Week", "Requested Cut off Start Date",
+                    "Requested Cut off End Date", "DTHC", "Afloat", "Required Arrival Date", "Comments Sales"
+                ]
+                missing_cols = [col for col in required_cols if col not in df_excel.columns]
+                if missing_cols:
+                    st.error(f"O arquivo está faltando as colunas obrigatórias: {', '.join(missing_cols)}")
+                else:
+                    if st.button("Confirmar Lançamento em Massa", key="confirm_mass_upload"):
+                        success, fail = 0, 0
+                        for idx, row in df_excel.iterrows():
+                            values = {
+                                "farol_status": "New request",
+                                "s_type_of_shipment": row["Type of Shipment"],
+                                "s_quantity_of_containers": row["Quantity of Containers"],
+                                "s_port_of_loading_pol": row["Port of Loading POL"],
+                                "s_port_of_delivery_pod": row["Port of Delivery POD"],
+                                "s_final_destination": row["Final Destination"],
+                                "s_requested_shipment_week": row["Requested Shipment Week"],
+                                "s_requested_deadlines_start_date": row["Requested Cut off Start Date"],
+                                "s_requested_deadlines_end_date": row["Requested Cut off End Date"],
+                                "s_dthc_prepaid": row["DTHC"],
+                                "s_afloat": row["Afloat"],
+                                "s_required_arrival_date": row["Required Arrival Date"],
+                                "s_comments": row.get("Comments Sales", ""),
+                                "adjustment_id": str(uuid.uuid4()),
+                                "user_insert": ''
+                            }
+                            try:
+                                if add_sales_record(values):
+                                    success += 1
+                                else:
+                                    fail += 1
+                            except Exception as e:
+                                fail += 1
+                        st.success(f"{success} embarques lançados com sucesso!")
+                        if fail:
+                            st.error(f"{fail} embarques falharam. Verifique os dados do arquivo.")
+            except Exception as e:
+                st.error(f"Erro ao processar o arquivo: {str(e)}")
  
     # ---------- Formulário ----------
     with st.form("add_form"):
