@@ -231,6 +231,27 @@ def format_value(value):
 
 
 
+def get_file_type(uploaded_file):
+    ext = uploaded_file.name.split('.')[-1].lower()
+    mapping = {
+        'pdf': 'PDF',
+        'doc': 'Word',
+        'docx': 'Word',
+        'xls': 'Excel',
+        'xlsx': 'Excel',
+        'ppt': 'PowerPoint',
+        'pptx': 'PowerPoint',
+        'txt': 'Texto',
+        'csv': 'CSV',
+        'png': 'Imagem',
+        'jpg': 'Imagem',
+        'jpeg': 'Imagem',
+        'gif': 'Imagem',
+        'zip': 'Compactado',
+        'rar': 'Compactado'
+    }
+    return mapping.get(ext, 'Outro')
+
 def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
     """
     Salva um anexo na tabela F_CON_ANEXOS.
@@ -254,7 +275,8 @@ def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
         # Obtém apenas o nome sem extensão e a extensão separadamente
         file_name_without_ext = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
         file_extension = file_name.rsplit('.', 1)[1].upper() if '.' in file_name else ''
-        file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
+        # file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
+        file_type = get_file_type(uploaded_file)
         
         # Gera o próximo ID numérico para a tabela
         id_query = text("SELECT NVL(MAX(id), 0) + 1 as next_id FROM LogTransp.F_CON_ANEXOS")
