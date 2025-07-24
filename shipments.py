@@ -222,9 +222,9 @@ def exibir_shipments():
                             status_blocked_message = "⚠️ Status 'Adjustment Requested' cannot be changed directly. Use the adjustments module to request changes."
                     changes.append({
                         'Farol Reference': row.get(farol_ref_col, index),
-                        "Coluna": col,
-                        "Valor Anterior": original_row[col],
-                        "Novo Valor": row[col],
+                        "Column": col,
+                        "Previous Value": original_row[col],
+                        "New Value": row[col],
                         "Stage": choose
                     })
         if status_blocked:
