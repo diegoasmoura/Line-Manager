@@ -944,13 +944,13 @@ def exibir_adjustments():
             
             # Adiciona coluna de seleção (checkbox) igual ao shipments.py
             df_adjusted['Selecionar'] = False
-            # Reordena colunas para colocar 'Selecionar' no início
-            colunas_ordenadas = ['Selecionar'] + [col for col in df_adjusted.columns if col != 'Selecionar']
+            # Reordena colunas para colocar 'Selecionar' e 'Sales Farol Reference' no início
+            colunas_ordenadas = ['Selecionar', 'Sales Farol Reference'] + [col for col in df_adjusted.columns if col not in ['Selecionar', 'Sales Farol Reference']]
 
             # Configuração das colunas, padronizando os títulos conforme a tela de split
             column_config = {
-                'Selecionar': st.column_config.CheckboxColumn('Select', help='Selecione apenas uma linha'),
-                "Sales Farol Reference": st.column_config.TextColumn("Sales Farol Reference", width="medium", disabled=True),
+                'Selecionar': st.column_config.CheckboxColumn('Select', help='Selecione apenas uma linha', pinned="left"),
+                "Sales Farol Reference": st.column_config.TextColumn("Sales Farol Reference", width="medium", disabled=True, pinned="left"),
                 "Status": st.column_config.SelectboxColumn("Farol Status", width="medium", options=available_options, default="Adjustment Requested"),
                 "Sales Quantity of Containers": st.column_config.NumberColumn("Sales Quantity of Containers", format="%d", disabled=True),
                 "Sales Port of Loading POL": st.column_config.TextColumn("Sales Port of Loading POL", width="medium", disabled=True),
@@ -968,7 +968,7 @@ def exibir_adjustments():
                 "Inserted Date": st.column_config.DatetimeColumn("Inserted Date", disabled=True)
             }
 
-            # Exibe a tabela editável com a coluna de seleção
+            # Exibe a tabela editável com as colunas fixas à esquerda
             edited_df = st.data_editor(
                 df_adjusted[colunas_ordenadas],
                 column_config=column_config,

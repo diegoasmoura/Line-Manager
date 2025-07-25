@@ -172,10 +172,19 @@ def exibir_shipments():
  
     #  Adiciona coluna de seleção
     df["Select"] = False
-    column_config["Select"] = st.column_config.CheckboxColumn("Select", help="Select only one line")
- 
+    column_config["Select"] = st.column_config.CheckboxColumn("Select", help="Select only one line", pinned="left")
+
+    # Descobre o nome da coluna Farol Reference conforme o stage
+    farol_ref_col = (
+        "Sales Farol Reference" if choose == "Sales Data"
+        else "Booking Farol Reference" if choose == "Booking Management"
+        else "Loading Farol Reference"
+    )
+    # Garante que a coluna Farol Reference está pinada à esquerda
+    column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
+
     # Reordena colunas
-    colunas_ordenadas = ["Select"] + [col for col in df.columns if col != "Select"]
+    colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
  
     # Guarda cópias sem a coluna "Select" para comparação
     df_filtered_original = df.drop(columns=["Select"], errors="ignore").copy()
