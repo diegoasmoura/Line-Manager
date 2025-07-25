@@ -348,7 +348,7 @@ def exibir_shipments():
     # Botão View Attachments sempre visível, toggle, igual tela de ajustes
     with _:
         view_attachments_open = st.session_state.get("show_shipments_attachments", False)
-        if st.button(" View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
+        if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
             if view_attachments_open:
                 st.session_state["show_shipments_attachments"] = False
                 st.session_state["shipments_attachments_farol_ref"] = None
