@@ -51,8 +51,14 @@ def show_booking_management_form():
             "b_comments": ""
         }
         if not sales_row.empty:
-            # Se quiser popular campos iniciais a partir de sales_row, pode fazer aqui
-            pass
+            sales_row = sales_row.iloc[0]
+            # Preenchendo os campos do formulário com os dados do registro de vendas
+            booking_data["sales_quantity_of_containers"] = sales_row.get("Sales Quantity of Containers", "")
+            booking_data["requested_cut_off_start_date"] = sales_row.get("Requested Cut off Start Date", "")
+            booking_data["requested_cut_off_end_date"] = sales_row.get("Requested Cut off End Date", "")
+            booking_data["booking_port_of_loading_pol"] = sales_row.get("Sales Port of Loading POL", "")
+            booking_data["booking_port_of_delivery_pod"] = sales_row.get("Sales Port of Delivery POD", "")
+            booking_data["final_destination"] = sales_row.get("Sales Final Destination", "")
  
     # Conversão segura da data
     request_date = booking_data["b_booking_request_date"]
@@ -62,19 +68,38 @@ def show_booking_management_form():
         request_date = date.today()
  
     with st.form("booking_form"):
-        values = {}
-        missing_fields = []
- 
-        col1, col2 = st.columns(2)
-        with col1:
+        # Primeira linha: Farol Status, Farol Reference
+        col_top1, col_top2 = st.columns(2)
+        with col_top1:
             st.selectbox(
                 "Farol Status",
                 ["New request", "Booking requested"],
                 index=1,  # Seleciona 'Booking requested'
                 disabled=True
             )
-        with col2:
+        with col_top2:
             st.text_input("Farol Reference", value=farol_reference, disabled=True)
+
+        # Segunda linha: Quantity, Cut off Start, Cut off End
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.text_input("Quantity of Containers", value=booking_data.get("sales_quantity_of_containers", ""), disabled=True)
+        with col2:
+            st.text_input("Requested Cut off Start Date", value=str(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
+        with col3:
+            st.text_input("Requested Cut off End Date", value=str(booking_data.get("requested_cut_off_end_date", "")), disabled=True)
+
+        # Terceira linha: POL, POD, Final Destination
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.text_input("Booking Port of Loading POL", value=booking_data.get("booking_port_of_loading_pol", ""), disabled=True)
+        with col5:
+            st.text_input("Booking Port of Delivery POD", value=booking_data.get("booking_port_of_delivery_pod", ""), disabled=True)
+        with col6:
+            st.text_input("Final Destination", value=booking_data.get("final_destination", ""), disabled=True)
+
+        values = {}
+        missing_fields = []
  
         col1, col2 = st.columns(2)
         with col1:
