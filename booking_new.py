@@ -59,6 +59,8 @@ def show_booking_management_form():
             booking_data["booking_port_of_loading_pol"] = sales_row.get("Sales Port of Loading POL", "")
             booking_data["booking_port_of_delivery_pod"] = sales_row.get("Sales Port of Delivery POD", "")
             booking_data["final_destination"] = sales_row.get("Sales Final Destination", "")
+            booking_data["dthc"] = sales_row.get("DTHC", "")
+            booking_data["requested_shipment_week"] = sales_row.get("Requested Shipment Week", "")
  
     # Conversão segura da data
     request_date = booking_data["b_booking_request_date"]
@@ -79,6 +81,14 @@ def show_booking_management_form():
             )
         with col_top2:
             st.text_input("Farol Reference", value=farol_reference, disabled=True)
+
+        # Nova linha: DTHC e Requested Shipment Week (layout de 3, mas só 2 campos)
+        col_dthc, col_week, _ = st.columns(3)
+        with col_dthc:
+            st.text_input("DTHC", value=booking_data.get("dthc", ""), disabled=True)
+        with col_week:
+            st.text_input("Requested Shipment Week", value=booking_data.get("requested_shipment_week", ""), disabled=True)
+        # A terceira coluna fica vazia para manter o alinhamento
 
         # Segunda linha: Quantity, Cut off Start, Cut off End
         col1, col2, col3 = st.columns(3)
