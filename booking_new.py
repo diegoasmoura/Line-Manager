@@ -11,6 +11,8 @@ import time
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
 carriers = df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist()
+ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
+ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
  
 # ---------- 3. Constantes ----------
 required_fields = {
@@ -70,6 +72,9 @@ def show_booking_management_form():
         request_date = date.today()
  
     with st.form("booking_form"):
+        values = {}  # Inicialize aqui, logo no início do formulário
+        missing_fields = []
+ 
         # Primeira linha: Farol Status, Farol Reference
         col_top1, col_top2 = st.columns(2)
         with col_top1:
@@ -102,15 +107,20 @@ def show_booking_management_form():
         # Terceira linha: POL, POD, Final Destination
         col4, col5, col6 = st.columns(3)
         with col4:
-            st.text_input("Booking Port of Loading POL", value=booking_data.get("booking_port_of_loading_pol", ""), disabled=True)
+            values["booking_port_of_loading_pol"] = st.selectbox(
+                "Booking Port of Loading POL",
+                [booking_data.get("booking_port_of_loading_pol", "")] + [opt for opt in ports_pol_options if opt != booking_data.get("booking_port_of_loading_pol", "")],
+                index=0 if booking_data.get("booking_port_of_loading_pol", "") else 0
+            )
         with col5:
-            st.text_input("Booking Port of Delivery POD", value=booking_data.get("booking_port_of_delivery_pod", ""), disabled=True)
+            values["booking_port_of_delivery_pod"] = st.selectbox(
+                "Booking Port of Delivery POD",
+                [booking_data.get("booking_port_of_delivery_pod", "")] + [opt for opt in ports_pod_options if opt != booking_data.get("booking_port_of_delivery_pod", "")],
+                index=0 if booking_data.get("booking_port_of_delivery_pod", "") else 0
+            )
         with col6:
             st.text_input("Final Destination", value=booking_data.get("final_destination", ""), disabled=True)
 
-        values = {}
-        missing_fields = []
- 
         col1, col2 = st.columns(2)
         with col1:
             current_carrier = booking_data.get("b_carrier", "")
@@ -162,6 +172,9 @@ def show_booking_management_form():
                 
                 try:
                     values["b_farol_status"] = "Booking requested"
+                    # Adiciona os campos POL e POD para atualização
+                    values["booking_port_of_loading_pol"] = values.get("booking_port_of_loading_pol", "")
+                    values["booking_port_of_delivery_pod"] = values.get("booking_port_of_delivery_pod", "")
                     update_booking_data_by_farol_reference(farol_reference, values)
                     st.success("✅ Dados atualizados com sucesso!")
                     time.sleep(2)  # Aguarda 2 segundos

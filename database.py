@@ -713,7 +713,9 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         # Atualiza a tabela de Sales Data
         query_sales = """
         UPDATE LogTransp.F_CON_SALES_DATA
-        SET s_farol_status = :farol_status
+        SET s_farol_status = :farol_status,
+            s_port_of_loading_pol = :pol,
+            s_port_of_delivery_pod = :pod
         WHERE s_farol_reference = :ref
         """
         # Atualiza a tabela de Loading
@@ -740,6 +742,8 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             text(query_sales),
             {
                 "farol_status": "Booking Requested",
+                "pol": values.get("booking_port_of_loading_pol", ""),
+                "pod": values.get("booking_port_of_delivery_pod", ""),
                 "ref": farol_reference,
             },
         )
