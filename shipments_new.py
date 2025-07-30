@@ -158,7 +158,7 @@ def show_add_form():
         if uploaded_file:
             try:
                 df_excel = pd.read_excel(uploaded_file)
-                highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"]
+                highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND", "TERM"]
                 def highlight_specific_cols(s):
                     return [
                         'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
@@ -204,6 +204,16 @@ def show_add_form():
                         hc_val = int(float(hc_val)) if pd.notna(hc_val) and str(hc_val).strip() != "" else 0
                     except Exception:
                         hc_val = 0
+                    
+                    # Mapeamento do campo TERM para s_vip_pnl_risk
+                    term_val = str(row.get("TERM", "")).strip().upper()
+                    s_vip_pnl_risk = ""
+                    if term_val in ["VIP", "PNL", "RISK"]:
+                        s_vip_pnl_risk = term_val
+                    
+                    # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
+                    s_pnl_destination = "Yes" if s_vip_pnl_risk == "PNL" else "No"
+                    
                     values = {
                         "s_farol_status": "New request",
                         "s_type_of_shipment": "Forecast",
@@ -215,6 +225,8 @@ def show_add_form():
                         "s_dthc_prepaid": row.get("DTHC", ""),
                         "s_afloat": s_afloat_val,
                         "s_port_of_loading_pol": "",
+                        "s_vip_pnl_risk": s_vip_pnl_risk,
+                        "s_pnl_destination": s_pnl_destination,
                         "s_port_of_delivery_pod": row.get("POD", ""),
                         "s_final_destination": row.get("INLAND", ""),
                         "s_comments": sales_comments,
