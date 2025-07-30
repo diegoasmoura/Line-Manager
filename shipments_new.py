@@ -15,6 +15,7 @@ df_udc = load_df_udc()
 ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
 ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
 dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist()
+vip_pnl_risk_options = df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist()
  
 # ---------- 3. Constantes ----------
 # Campos do formulário e seus nomes internos
@@ -106,7 +107,12 @@ def show_add_form():
             with col2:
                 values["s_port_of_delivery_pod"] = st.selectbox("**:green[Port of Delivery POD]***", [""] + ports_pod_options)
 
-            values["s_final_destination"] = st.text_input("**Final Destination**")
+            col1, col2 = st.columns(2)
+            with col1:
+                values["s_final_destination"] = st.text_input("**Final Destination**")
+            with col2:
+                values["s_vip_pnl_risk"] = st.selectbox("**Restriction Type**", [""] + vip_pnl_risk_options)
+
             values["s_comments"] = st.text_area("**Sales Comments**")
 
             for field, label in required_fields.items():
@@ -129,6 +135,9 @@ def show_add_form():
                     st.session_state.button_disabled = True
                     values["adjustment_id"] = st.session_state.current_farol_reference
                     values["user_insert"] = ''
+                    
+                    # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
+                    values["s_pnl_destination"] = "Yes" if values.get("s_vip_pnl_risk") == "PNL" else "No"
 
                     with st.spinner("Processing new shipment, please wait..."):
                         if add_sales_record(values):
