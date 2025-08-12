@@ -360,6 +360,7 @@ def get_attachments_for_farol(farol_reference):
                 user_insert as uploaded_by
             FROM LogTransp.F_CON_ANEXOS 
             WHERE farol_reference = :farol_reference
+              AND (process_stage IS NULL OR process_stage <> 'Attachment Deleted')
             ORDER BY upload_timestamp DESC
         """)
         
@@ -382,30 +383,32 @@ def get_attachments_for_farol(farol_reference):
             conn.close()
         return pd.DataFrame()
 
-def delete_attachment(attachment_id):
+def delete_attachment(attachment_id, deleted_by="system"):
     """
-    Exclui um anexo específico do banco de dados.
+    Marca um anexo como excluído (soft delete) para respeitar o trigger que bloqueia DELETE.
     
     Args:
         attachment_id: ID numérico do anexo
+        deleted_by: usuário que solicitou a exclusão
     
     Returns:
-        bool: True se excluído com sucesso, False caso contrário
+        bool: True se marcado como excluído com sucesso, False caso contrário
     """
     try:
         conn = get_database_connection()
         
+        # Atualiza metadados e marca o estágio como deletado
         query = text("""
-            DELETE FROM LogTransp.F_CON_ANEXOS 
-            WHERE id = :attachment_id
+            UPDATE LogTransp.F_CON_ANEXOS
+               SET process_stage = 'Attachment Deleted',
+                   user_update = :user_update,
+                   date_update = SYSDATE
+             WHERE id = :attachment_id
         """)
-        
-        result = conn.execute(query, {"attachment_id": attachment_id})
+        result = conn.execute(query, {"attachment_id": attachment_id, "user_update": deleted_by})
         conn.commit()
         conn.close()
-        
         return result.rowcount > 0
-        
     except Exception as e:
         st.error(f"Erro ao excluir anexo: {str(e)}")
         if 'conn' in locals():
@@ -607,98 +610,80 @@ def display_attachments_section(farol_reference):
 
     # Lista de Anexos Existentes
     attachments_df = get_attachments_for_farol(farol_reference)
-    
-    if not attachments_df.empty:
-        st.markdown(f"### 📋 Existing Attachments ({len(attachments_df)})")
-        
-        # Calcula o número de colunas baseado no número de anexos (máximo 3)
-        num_cols = min(3, len(attachments_df))
-        cols = st.columns(num_cols)
-        
-        for row_index, (idx, attachment) in enumerate(attachments_df.iterrows()):
-            col_idx = row_index % num_cols
-            row_unique = f"{attachment['id']}_{row_index}"
-            
-            with cols[col_idx]:
-                # Card do anexo com CSS customizado
-                file_icon = get_file_icon(attachment['mime_type'], attachment['file_name'])
-                
-                # Nome do arquivo truncado para exibição
-                display_name = attachment.get('full_file_name', attachment['file_name'])
-                if len(display_name) > 25:
-                    display_name = display_name[:22] + "..."
-                
-                st.markdown(
-                    f"""
-                    <div class="attachment-card">
-                        <div class="file-icon">{file_icon}</div>
-                        <div class="file-name" title="{attachment.get('full_file_name', attachment['file_name'])}">{display_name}</div>
-                        <div class="file-info">
-                            <span>📁 .{attachment.get('file_extension', 'N/A').lower()}</span>
-                        </div>
-                        <div class="file-info">
-                            <span>👤 {attachment['uploaded_by']}</span>
-                        </div>
-                        <div class="file-info">
-                            <span>📅 {attachment['upload_date'].strftime('%d/%m/%Y %H:%M') if pd.notna(attachment['upload_date']) else 'N/A'}</span>
-                        </div>
-                    </div>
-                    """, 
-                    unsafe_allow_html=True
-                )
-                
-                # Controle de estado de confirmação
-                confirm_key = f"confirm_delete_{row_unique}"
-                if confirm_key not in st.session_state:
-                    st.session_state[confirm_key] = False
-                
-                if not st.session_state[confirm_key]:
-                    # Botões normais - Download e Excluir
-                    col_btn1, col_btn2 = st.columns(2)
-                    
-                    with col_btn1:
-                        # Botão de download direto para todos os tipos de arquivo
-                        file_content, file_name, mime_type = get_attachment_content(attachment['id'])
-                        if file_content:
-                            st.download_button(
-                                label="⬇️ Download",
-                                data=file_content,
-                                file_name=file_name,
-                                mime=mime_type,
-                                key=f"download_btn_{row_unique}",
-                                use_container_width=True
-                            )
-                        else:
-                            st.button("⬇️ Unavailable", key=f"unavailable_{row_unique}", use_container_width=True, disabled=True)
-                    
-                    with col_btn2:
-                        # Botão inicial de excluir
-                        if st.button("🗑️ Delete", key=f"delete_{row_unique}", use_container_width=True):
-                            st.session_state[confirm_key] = True
-                            st.rerun()
-                
-                else:
-                    # Modo de confirmação - botões horizontais em nova linha
-                    st.warning("⚠️ Confirm deletion?")
-                    
-                    col_confirm1, col_confirm2 = st.columns(2)
-                    with col_confirm1:
-                        if st.button("✅ Yes, delete", key=f"confirm_yes_{row_unique}", use_container_width=True):
-                            if delete_attachment(attachment['id']):
-                                st.success("✅ Attachment deleted successfully!")
-                                st.session_state[confirm_key] = False
-                                st.rerun()
-                            else:
-                                st.error("❌ Error deleting attachment!")
-                                st.session_state[confirm_key] = False
-                    
-                    with col_confirm2:
-                        if st.button("❌ Cancel", key=f"confirm_no_{row_unique}", use_container_width=True):
-                            st.session_state[confirm_key] = False
-                            st.rerun()
-        
 
-            
+    st.divider()
+    st.subheader("Attachments")
+
+    if not attachments_df.empty:
+        # Ordena por data/hora (mais recente primeiro)
+        dfv = attachments_df.sort_values('upload_date', ascending=False).reset_index(drop=True)
+
+        # Cabeçalho
+        h1, h2, h3, h4, h5, h6 = st.columns([5, 2, 2, 2, 1, 1])
+        h1.markdown("**File**")
+        h2.markdown("**Type/Ext**")
+        h3.markdown("**User**")
+        h4.markdown("**Date**")
+        h5.markdown("**Download**")
+        h6.markdown("**Delete**")
+
+        # Linhas
+        for row_index, (_, att) in enumerate(dfv.iterrows()):
+            row_key = f"{farol_reference}_{att['id']}_{row_index}"
+            confirm_key = f"confirm_del_flat_{row_key}"
+            c1, c2, c3, c4, c5, c6 = st.columns([5, 2, 2, 2, 1, 1])
+            with c1:
+                st.write(att.get('full_file_name', att['file_name']))
+            with c2:
+                ext = (att.get('file_extension') or '').lower()
+                st.write(att.get('mime_type') or ext or 'N/A')
+            with c3:
+                st.write(att.get('uploaded_by', ''))
+            with c4:
+                st.write(att['upload_date'].strftime('%Y-%m-%d %H:%M') if pd.notna(att['upload_date']) else 'N/A')
+            with c5:
+                fc, fn, mt = get_attachment_content(att['id'])
+                st.download_button("⬇️", data=fc or b"", file_name=fn or "file", mime=mt or "application/octet-stream",
+                                   key=f"dl_flat_{row_key}", use_container_width=True, disabled=fc is None)
+            with c6:
+                if not st.session_state.get(confirm_key, False):
+                    if st.button("🗑️", key=f"del_flat_{row_key}", use_container_width=True):
+                        st.session_state[confirm_key] = True
+                        st.rerun()
+
+            # Barra de confirmação em linha separada e largura total
+            if st.session_state.get(confirm_key, False):
+                wc1, wc2, wc3 = st.columns([6, 1, 1])
+                with wc1:
+                    st.warning("⚠️ Are you sure you want to delete?")
+                with wc2:
+                    if st.button("✅ Yes", key=f"yes_flat_{row_key}", use_container_width=True):
+                        if delete_attachment(att['id'], deleted_by=st.session_state.get('current_user', 'system')):
+                            st.success("✅ Attachment deleted successfully!")
+                        else:
+                            st.error("❌ Error deleting attachment!")
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+                with wc3:
+                    if st.button("❌ No", key=f"no_flat_{row_key}", use_container_width=True):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+
+        # Download em lote (zip) - todos
+        from io import BytesIO
+        import zipfile
+        fc_total = []
+        for _, att in dfv.iterrows():
+            fc, fn, mt = get_attachment_content(att['id'])
+            if fc and fn:
+                fc_total.append((fn, fc))
+        if fc_total:
+            buf = BytesIO()
+            with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+                for fn, fc in fc_total:
+                    zf.writestr(fn, fc)
+            st.download_button("⬇️ Download all as .zip", data=buf.getvalue(), file_name="attachments.zip",
+                               mime="application/zip", key=f"dl_zip_all_{farol_reference}")
     else:
         st.info("📂 No attachments found for this reference.")
         st.markdown("💡 **Tip:** Use the 'Add New Attachment' section above to upload files related to this Farol Reference.")
