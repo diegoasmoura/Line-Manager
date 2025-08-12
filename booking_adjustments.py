@@ -552,7 +552,13 @@ def display_attachments_section(farol_reference):
     }
     </style>
     """, unsafe_allow_html=True)
-    
+
+    # Controle de versão do uploader para permitir reset após salvar
+    uploader_version_key = f"uploader_ver_{farol_reference}"
+    if uploader_version_key not in st.session_state:
+        st.session_state[uploader_version_key] = 0
+    current_uploader_version = st.session_state[uploader_version_key]
+
     # Seção de Upload com estilo melhorado
     with st.expander("📤 Add New Attachment", expanded=False):
         st.markdown('<div class="upload-area">', unsafe_allow_html=True)
@@ -560,7 +566,7 @@ def display_attachments_section(farol_reference):
             "Drag and drop files here or click to select",
             accept_multiple_files=True,
             type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
-            key=f"uploader_{farol_reference}",
+            key=f"uploader_{farol_reference}_{current_uploader_version}",
             help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
         )
         st.markdown('</div>', unsafe_allow_html=True)
@@ -590,11 +596,13 @@ def display_attachments_section(farol_reference):
                     
                     if success_count == len(uploaded_files):
                         st.success(f"✅ {success_count} attachment(s) saved successfully!")
-                        st.balloons()  # Efeito visual de sucesso
                     else:
                         st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
-                    
-                    # Força atualização da lista
+
+                    # Incrementa a versão do uploader para resetar a seleção na próxima execução
+                    st.session_state[uploader_version_key] += 1
+
+                    # Força atualização da lista (com uploader recriado)
                     st.rerun()
 
     # Lista de Anexos Existentes
@@ -607,8 +615,9 @@ def display_attachments_section(farol_reference):
         num_cols = min(3, len(attachments_df))
         cols = st.columns(num_cols)
         
-        for idx, attachment in attachments_df.iterrows():
-            col_idx = idx % num_cols
+        for row_index, (idx, attachment) in enumerate(attachments_df.iterrows()):
+            col_idx = row_index % num_cols
+            row_unique = f"{attachment['id']}_{row_index}"
             
             with cols[col_idx]:
                 # Card do anexo com CSS customizado
@@ -639,7 +648,7 @@ def display_attachments_section(farol_reference):
                 )
                 
                 # Controle de estado de confirmação
-                confirm_key = f"confirm_delete_{attachment['id']}"
+                confirm_key = f"confirm_delete_{row_unique}"
                 if confirm_key not in st.session_state:
                     st.session_state[confirm_key] = False
                 
@@ -651,20 +660,20 @@ def display_attachments_section(farol_reference):
                         # Botão de download direto para todos os tipos de arquivo
                         file_content, file_name, mime_type = get_attachment_content(attachment['id'])
                         if file_content:
-                                                    st.download_button(
-                            label="⬇️ Download",
+                            st.download_button(
+                                label="⬇️ Download",
                                 data=file_content,
                                 file_name=file_name,
                                 mime=mime_type,
-                                key=f"download_btn_{attachment['id']}",
+                                key=f"download_btn_{row_unique}",
                                 use_container_width=True
                             )
                         else:
-                            st.button("⬇️ Unavailable", key=f"unavailable_{attachment['id']}", use_container_width=True, disabled=True)
+                            st.button("⬇️ Unavailable", key=f"unavailable_{row_unique}", use_container_width=True, disabled=True)
                     
                     with col_btn2:
                         # Botão inicial de excluir
-                        if st.button("🗑️ Delete", key=f"delete_{attachment['id']}", use_container_width=True):
+                        if st.button("🗑️ Delete", key=f"delete_{row_unique}", use_container_width=True):
                             st.session_state[confirm_key] = True
                             st.rerun()
                 
@@ -674,7 +683,7 @@ def display_attachments_section(farol_reference):
                     
                     col_confirm1, col_confirm2 = st.columns(2)
                     with col_confirm1:
-                        if st.button("✅ Yes, delete", key=f"confirm_yes_{attachment['id']}", use_container_width=True):
+                        if st.button("✅ Yes, delete", key=f"confirm_yes_{row_unique}", use_container_width=True):
                             if delete_attachment(attachment['id']):
                                 st.success("✅ Attachment deleted successfully!")
                                 st.session_state[confirm_key] = False
@@ -684,7 +693,7 @@ def display_attachments_section(farol_reference):
                                 st.session_state[confirm_key] = False
                     
                     with col_confirm2:
-                        if st.button("❌ Cancel", key=f"confirm_no_{attachment['id']}", use_container_width=True):
+                        if st.button("❌ Cancel", key=f"confirm_no_{row_unique}", use_container_width=True):
                             st.session_state[confirm_key] = False
                             st.rerun()
         
