@@ -16,7 +16,7 @@ DB_CONFIG = {
     "host": "127.0.0.1",  # Ou "127.0.0.1"
     "port": "1521",
     "name": "ORCLPDB1",  # O SERVICE NAME do seu PDB no Docker!
-    "user": "ps218125",
+    "user": "LOGTRANSP",
     "password": "40012330" # Use a senha que você definiu ao criar PS218125
 }
  

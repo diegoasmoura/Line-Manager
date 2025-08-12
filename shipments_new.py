@@ -138,6 +138,26 @@ def show_add_form():
                     
                     # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
                     values["s_pnl_destination"] = "Yes" if values.get("s_vip_pnl_risk") == "PNL" else "No"
+                    
+                    # Mapeamento do s_final_destination baseado no s_vip_pnl_risk
+                    vip_pnl_risk_val = values.get("s_vip_pnl_risk", "")
+                    if vip_pnl_risk_val == "PNL":
+                        values["s_final_destination"] = "PNL"
+                    elif vip_pnl_risk_val == "VIP":
+                        values["s_final_destination"] = "VIP"
+                    elif vip_pnl_risk_val == "RISK":
+                        values["s_final_destination"] = "RISK"
+                    else:
+                        values["s_final_destination"] = ""
+                    
+                    # Tratamento da data s_required_arrival_date no formulário manual
+                    if values.get("s_required_arrival_date"):
+                        try:
+                            # Converte para datetime se for uma data válida
+                            if isinstance(values["s_required_arrival_date"], str):
+                                values["s_required_arrival_date"] = pd.to_datetime(values["s_required_arrival_date"])
+                        except (ValueError, TypeError):
+                            values["s_required_arrival_date"] = None
 
                     with st.spinner("Processing new shipment, please wait..."):
                         if add_sales_record(values):
@@ -223,12 +243,43 @@ def show_add_form():
                     # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
                     s_pnl_destination = "Yes" if s_vip_pnl_risk == "PNL" else "No"
                     
+                    # Mapeamento do s_final_destination baseado no s_vip_pnl_risk
+                    if s_vip_pnl_risk == "PNL":
+                        s_final_destination = "PNL"
+                    elif s_vip_pnl_risk == "VIP":
+                        s_final_destination = "VIP"
+                    elif s_vip_pnl_risk == "RISK":
+                        s_final_destination = "RISK"
+                    else:
+                        s_final_destination = ""
+                    
+                    # Tratamento da coluna LIMITE EMBARQUE - PNL para validar se é uma data válida
+                    limite_embarque_val = row.get("LIMITE EMBARQUE - PNL", "")
+                    s_required_arrival_date = None
+                    
+                    if pd.notna(limite_embarque_val) and str(limite_embarque_val).strip() != "":
+                        try:
+                            # Tenta converter para datetime
+                            if isinstance(limite_embarque_val, str):
+                                # Se for string, tenta fazer parse
+                                parsed_date = pd.to_datetime(limite_embarque_val)
+                                s_required_arrival_date = parsed_date
+                            elif isinstance(limite_embarque_val, (int, float)):
+                                # Se for número (como 0), ignora
+                                s_required_arrival_date = None
+                            else:
+                                # Se for datetime/date, mantém como está
+                                s_required_arrival_date = limite_embarque_val
+                        except (ValueError, TypeError):
+                            # Se não conseguir converter, ignora o valor
+                            s_required_arrival_date = None
+                    
                     values = {
                         "s_farol_status": "New request",
                         "s_type_of_shipment": "Forecast",
                         "s_quantity_of_containers": hc_val,
                         "s_requested_shipment_week": row.get("Week", ""),
-                        "s_required_arrival_date": row.get("LIMITE EMBARQUE - PNL", ""),
+                        "s_required_arrival_date": s_required_arrival_date,
                         "s_requested_deadlines_start_date": "",
                         "s_requested_deadlines_end_date": "",
                         "s_dthc_prepaid": row.get("DTHC", ""),
@@ -237,7 +288,7 @@ def show_add_form():
                         "s_vip_pnl_risk": s_vip_pnl_risk,
                         "s_pnl_destination": s_pnl_destination,
                         "s_port_of_delivery_pod": row.get("POD", ""),
-                        "s_final_destination": row.get("INLAND", ""),
+                        "s_final_destination": s_final_destination,
                         "s_comments": sales_comments,
                         "adjustment_id": str(uuid.uuid4()),
                         "user_insert": ''
