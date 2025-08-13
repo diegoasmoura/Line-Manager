@@ -278,11 +278,7 @@ def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
         # file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
         file_type = get_file_type(uploaded_file)
         
-        # Gera o próximo ID numérico para a tabela
-        id_query = text("SELECT NVL(MAX(id), 0) + 1 as next_id FROM LogTransp.F_CON_ANEXOS")
-        next_id = conn.execute(id_query).fetchone()[0]
-        
-        # SQL com estrutura REAL da tabela
+        # SQL com estrutura REAL da tabela (deixe trigger preencher ID)
         insert_query = text("""
             INSERT INTO LogTransp.F_CON_ANEXOS (
                 id,
@@ -310,7 +306,7 @@ def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
         """)
         
         conn.execute(insert_query, {
-            "id": next_id,
+            "id": None,
             "farol_reference": farol_reference,
             "adjustment_id": str(uuid.uuid4()),  # Gera UUID para adjustment_id
             "process_stage": "Attachment Management",

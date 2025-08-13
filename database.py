@@ -1,5 +1,6 @@
 ## database.py
- 
+
+import os
 import streamlit as st
 from sqlalchemy import create_engine, text
 import pandas as pd
@@ -11,19 +12,24 @@ import uuid
 # Data e hora atuais
 now = datetime.now()
  
-# Configurações do banco de dados
+# Configurações do banco de dados (podem ser sobrescritas por variáveis de ambiente)
 DB_CONFIG = {
-    "host": "127.0.0.1",  # Ou "127.0.0.1"
-    "port": "1521",
-    "name": "ORCLPDB1",  # O SERVICE NAME do seu PDB no Docker!
-    "user": "LOGTRANSP",
-    "password": "40012330" # Use a senha que você definiu ao criar PS218125
+    "host": os.getenv("LOGTRANSP_DB_HOST", "127.0.0.1"),
+    "port": os.getenv("LOGTRANSP_DB_PORT", "1521"),
+    "name": os.getenv("LOGTRANSP_DB_NAME", "ORCLPDB1"),
+    "user": os.getenv("LOGTRANSP_DB_USER", "LOGTRANSP"),
+    "password": os.getenv("LOGTRANSP_DB_PASSWORD", "40012330"),
 }
- 
+
+# Engine único reutilizável com pre-ping
+ENGINE = create_engine(
+    f'oracle+oracledb://{DB_CONFIG["user"]}:{DB_CONFIG["password"]}@{DB_CONFIG["host"]}:{DB_CONFIG["port"]}/?service_name={DB_CONFIG["name"]}',
+    pool_pre_ping=True,
+)
+
 def get_database_connection():
-    """Cria e retorna a conexão com o banco de dados."""
-    engine = create_engine(f'oracle+oracledb://{DB_CONFIG["user"]}:{DB_CONFIG["password"]}@{DB_CONFIG["host"]}:{DB_CONFIG["port"]}/?service_name={DB_CONFIG["name"]}')
-    return engine.connect()
+    """Cria e retorna a conexão com o banco de dados (conn deve ser fechado pelo chamador)."""
+    return ENGINE.connect()
  
 #Obter os dados das tabelas principais Sales
 #@st.cache_data(ttl=300)
