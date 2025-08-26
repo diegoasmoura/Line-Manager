@@ -164,6 +164,27 @@ def exibir_shipments():
         st.session_state["previous_stage"] = choose
  
     df = aplicar_filtros_interativos(df)
+
+    # KPIs abaixo do título, após filtros e antes da grid
+    k1, k2, k3, k4 = st.columns(4)
+
+    if "Farol Status" in df.columns:
+        status_series = df["Farol Status"].astype(str).str.strip().str.lower()
+        booking_requested = int((status_series == "booking requested").sum())
+        received_from_carrier = int((status_series == "received from carrier").sum())
+        pending_adjustments = int((status_series == "adjustment requested").sum())
+    else:
+        booking_requested = received_from_carrier = pending_adjustments = 0
+    total_visible = int(len(df))
+
+    with k1:
+        st.metric("📋 Booking Requested", booking_requested)
+    with k2:
+        st.metric("📨 Received from Carrier", received_from_carrier)
+    with k3:
+        st.metric("📦 Total (grid)", total_visible)
+    with k4:
+        st.metric("⚠️ Pending Adjustments", pending_adjustments)
  
     # Define colunas não editáveis e configurações de dropdowns
     disabled_columns = non_editable_columns(choose)
