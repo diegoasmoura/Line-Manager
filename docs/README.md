@@ -4,7 +4,181 @@ Farol doc
 
 Este sistema foi desenvolvido para organizar e rastrear embarques de algodão, permitindo o controle de dados de vendas, solicitações de booking, ajustes e divisão de rotas. É dividido em **stages** (etapas), cada uma com responsabilidades específicas.
 
+#️⃣ Guia de Instalação e Execução
+
+## ✅ Pré‑requisitos
+
+- Python 3.10+
+- Acesso a um banco Oracle (Oracle Database ou Oracle XE)
+- Pacotes Python do projeto (veja `requirements.txt`)
+
+Observação: a conexão usa o driver python-oracledb em modo thin (não requer Instant Client). Se desejar usar o modo thick, configure o client Oracle no host.
+
+## 📦 Instalação
+
+1) Crie e ative um ambiente virtual:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # macOS/Linux
+# .\.venv\Scripts\activate  # Windows PowerShell
+```
+
+2) Instale as dependências:
+
+```bash
+pip install -r requirements.txt
+```
+
+## 🗄️ Configuração do Banco Oracle
+
+O app espera o schema `LOGTRANSP` com as tabelas, triggers, views e procedures deste repositório.
+
+- Scripts recomendados: use os arquivos em `Tabelas Oracle 0.2/` (ordem: 001 … 019) e os auxiliares:
+  - `DATA - INSERT INTO F_CON_DE_PARA_TABELAS.sql`
+  - `Preenchendo tabela GLOBAL.sql` (popular UDC/Global Variables)
+
+Exemplo de criação de usuário (ajuste conforme sua instância):
+
+```sql
+CREATE USER LOGTRANSP IDENTIFIED BY "<senha>";
+GRANT CONNECT, RESOURCE TO LOGTRANSP;
+ALTER USER LOGTRANSP QUOTA UNLIMITED ON USERS;
+```
+
+Service Name padrão esperado: `ORCLPDB1` (ajuste via variável de ambiente se necessário).
+
+## 🔐 Variáveis de Ambiente
+
+As credenciais podem (e devem) ser definidas por variáveis de ambiente. Defaults atuais estão em `database.py` e são apenas para desenvolvimento local.
+
+- `LOGTRANSP_DB_HOST` (padrão: `127.0.0.1`)
+- `LOGTRANSP_DB_PORT` (padrão: `1521`)
+- `LOGTRANSP_DB_NAME` (Service Name, padrão: `ORCLPDB1`)
+- `LOGTRANSP_DB_USER` (padrão: `LOGTRANSP`)
+- `LOGTRANSP_DB_PASSWORD` (sem padrão público; defina no seu ambiente)
+
+Exemplo (macOS/Linux):
+
+```bash
+export LOGTRANSP_DB_HOST=127.0.0.1
+export LOGTRANSP_DB_PORT=1521
+export LOGTRANSP_DB_NAME=ORCLPDB1
+export LOGTRANSP_DB_USER=LOGTRANSP
+export LOGTRANSP_DB_PASSWORD=***
+```
+
+## ▶️ Execução
+
+No diretório `Projeto/`:
+
+```bash
+streamlit run app.py
+```
+
+O menu lateral navega entre `Shipments`, `Adjustments`, `Op. Control`, `Performance`, `Tracking`, `History` e `Setup`.
+
+## 📄 Template de Upload em Massa (Excel)
+
+A tela "New Sales Record → Excel Upload (Bulk)" exige o arquivo `Projeto/docs/template_embarques.xlsx` com os cabeçalhos obrigatórios abaixo. Caso o arquivo não exista, crie um Excel com estas colunas (ordem livre, nomes exatos):
+
+- HC
+- Week
+- LIMITE EMBARQUE - PNL
+- DTHC
+- TIPO EMBARQUE
+- POD
+- INLAND
+
+Notas:
+- A coluna "LIMITE EMBARQUE - PNL" deve ser uma data válida (ou deixar em branco).
+- "TIPO EMBARQUE" com valor "Afloat" define `Afloat = Yes`.
+- O campo "TERM" (se presente) pode ser usado para mapear `VIP/PNL/RISK`.
+
+## 🔢 UDC (Global Variables) – Listas de Opções
+
+O sistema carrega opções da tabela `F_CON_GLOBAL_VARIABLES` para dropdowns. Garanta que os grupos estejam populados (vide `Preenchendo tabela GLOBAL.sql`). Grupos utilizados incluem, entre outros:
+
+- Porto Origem, Porto Destino, Carrier, DTHC, VIP PNL Risk, Yes No
+- Business, Mode, Sku, Farol Status, Type of Shipment, Booking Status
+- Truck Loading Status, Status ITAS
+
+## 🧠 Ícones do Farol Status
+
+Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de exibição e limpeza de valores antes de salvar no banco.
+
+## ⚠️ Observações Importantes
+
+- Os módulos `Operation Control`, `Performance Control`, `Tracking` e `History` estão como placeholders.
+- Na tela `Shipments`, o status "Adjustment Requested" não pode ser alterado diretamente; use `Adjustments`.
+- Em `Adjustments`, a atualização de status reflete nas três tabelas principais (Sales, Booking, Loading).
+
+## 🧱 Estrutura de Pastas (resumo)
+
+- `Projeto/app.py`: Roteamento e menu lateral (Streamlit).
+- `Projeto/database.py`: Conexão Oracle (SQLAlchemy + python-oracledb) e operações SQL.
+- `Projeto/shipments*.py`: Tela principal, criação e ajustes/splits.
+- `Projeto/booking_adjustments.py`: Revisão/aprovação de ajustes e anexos.
+- `Projeto/docs/`: Este README e guias.
+- `Tabelas Oracle 0.2/`: Scripts de criação das tabelas/objetos.
+
 ---
+
+## 🧠 Como o sistema funciona
+
+### Arquitetura geral
+
+- Frontend em Streamlit (`app.py`) com um menu lateral que navega entre módulos.
+- Camada de dados em `database.py` usando SQLAlchemy + `python-oracledb` para acessar Oracle.
+- As telas `shipments.py`, `shipments_new.py`, `shipments_split.py` e `booking_new.py` compõem o fluxo operacional principal; `booking_adjustments.py` orquestra a aprovação dos ajustes e gerencia anexos.
+- O arquivo `shipments_mapping.py` centraliza o mapeamento entre nomes de colunas do banco e rótulos exibidos na UI, além de configurar colunas editáveis e dropdowns com dados da UDC.
+
+### Tabelas principais
+
+- `F_CON_SALES_DATA` (Sales Data): entrada e base dos embarques.
+- `F_CON_BOOKING_MANAGEMENT` (Booking): dados de solicitação/gestão de booking.
+- `F_CON_CARGO_LOADING_CONTAINER_RELEASE` (Loading): controle de carregamento/entrega em porto.
+- `F_CON_ADJUSTMENTS_LOG` (Log): trilha de ajustes básicos e críticos (inclui splits).
+- `F_CON_GLOBAL_VARIABLES` (UDC): listas de opções para dropdowns.
+- `F_CON_ANEXOS` (Attachments): armazenamento de arquivos por `farol_reference`.
+
+### Fluxo operacional
+
+1) Cadastro (Sales)
+- Usuário cria um novo embarque em `shipments_new.py` (manual ou upload Excel).
+- Registro é inserido em `F_CON_SALES_DATA` com status inicial "New request".
+
+2) Solicitar Booking
+- Em `shipments.py`, com a linha selecionada e status original "New request", o botão "New Booking" habilita a tela `booking_new.py`.
+- Ao confirmar, atualiza `F_CON_BOOKING_MANAGEMENT` e sincroniza status "Booking Requested" em Sales e Loading.
+
+3) Ajustes e Splits (críticos)
+- Em `shipments.py`, com status original diferente de "New request", o botão "Adjustments" abre `shipments_split.py`.
+- O usuário pode:
+  - Ajustar campos não editáveis na grade principal (sem split), ou
+  - Criar splits (novas referências derivadas `FR_... .N`), definindo quantidades e destinos.
+- Ao confirmar, os ajustes são gravados em `F_CON_ADJUSTMENTS_LOG` com `request_type = 'Critic'` e status normalizado para "Adjustment Requested" nas três tabelas (Sales, Booking, Loading). Splits são inseridos como novas linhas com status "Adjustment Requested" e ficam ocultos da listagem até aprovação.
+
+4) Aprovação de Ajustes
+- `booking_adjustments.py` exibe uma visão ajustada (simulada) da `F_CON_SALES_DATA` aplicando as mudanças pendentes e exibindo os splits como linhas separadas.
+- O aprovador altera o campo "Status" para cada referência e aplica em lote. O sistema atualiza o status nas três tabelas e registra `confirmation_date` no log quando aplicável.
+
+5) Anexos
+- A seção de anexos está disponível como toggle em `Shipments` e `Adjustments`.
+- Uploads são persistidos em `F_CON_ANEXOS`, com metadados e conteúdo binário. Exclusão é soft delete (marca `process_stage = 'Attachment Deleted'`).
+
+### Regras de negócio essenciais
+
+- "Adjustment Requested" não pode ser editado diretamente em `Shipments`.
+- Splits permanecem ocultos até aprovação; a listagem filtra `(Type of Shipment == 'Split' and Farol Status == 'Adjustment Requested')`.
+- Aprovação altera o status em Sales, Booking e Loading, independentemente do stage do ajuste.
+- UDC abastece dropdowns; falta de dados na UDC impacta opções da UI.
+
+### Estado e experiência do usuário
+
+- A navegação e os botões dependem do status ORIGINAL no banco, evitando burlar o fluxo apenas editando a grid.
+- Em grids, somente colunas permitidas são editáveis; confirmações pedem comentários quando necessário e fazem commits atômicos.
+- Campos de datas são normalizados e, quando não válidos, caem para `None` de forma segura.
 
 ## 🧭 Menu Principal e Fluxo de Navegação
 
