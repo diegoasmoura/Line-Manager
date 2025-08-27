@@ -197,6 +197,9 @@ def exibir_shipments():
  
     # Define colunas não editáveis e configurações de dropdowns
     disabled_columns = non_editable_columns(choose)
+    # Ajusta nomes das colunas desabilitadas considerando renomeações para "Farol Reference"
+    if rename_map:
+        disabled_columns = [rename_map.get(col, col) for col in disabled_columns]
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
  
@@ -209,6 +212,31 @@ def exibir_shipments():
 
     # Reordena colunas
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
+
+    # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
+    editable_cols = []
+    for c in colunas_ordenadas:
+        if c == "Select":
+            continue
+        if c not in disabled_columns:
+            editable_cols.append(c)
+    # Garante inclusão de colunas de Booking por convenção de nome
+    for c in colunas_ordenadas:
+        if c.startswith(("B_", "b_", "Booking ")) and c not in disabled_columns and c not in editable_cols:
+            editable_cols.append(c)
+    if editable_cols:
+        # nth-child é 1-based e considera apenas colunas visíveis
+        editable_idx = [colunas_ordenadas.index(c) + 1 for c in editable_cols]
+        selectors = []
+        for i in editable_idx:
+            selectors += [
+                f'[data-testid="stDataEditor"] thead th:nth-child({i})',
+                f'[data-testid="stDataEditor"] tbody td:nth-child({i})',
+                f'[data-testid="stDataFrame"] thead th:nth-child({i})',
+                f'[data-testid="stDataFrame"] tbody td:nth-child({i})',
+            ]
+        css = ", ".join(selectors) + " { background-color: #FFF8E1 !important; }"
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
  
     # Guarda cópias sem a coluna "Select" para comparação
     df_filtered_original = df.drop(columns=["Select"], errors="ignore").copy()
