@@ -593,7 +593,7 @@ def add_sales_record(form_values):
             if col:
                 unified_values[col] = v
         # valores padrão
-        unified_values.setdefault("FAROL_STATUS", "New Request")
+        unified_values.setdefault("FAROL_STATUS", "New request")
         unified_values.setdefault("STAGE", "Sales Data")
 
         fields = ", ".join(unified_values.keys())
