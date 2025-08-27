@@ -124,7 +124,7 @@ def exibir_shipments():
  
     choose = st.radio(
         "Choose the stage",
-        ["Sales Data", "Booking Management", "Container Delivery at Port"],
+        ["Sales Data", "Booking Management"],
         horizontal=True,
     )
     
@@ -135,8 +135,6 @@ def exibir_shipments():
         df = get_data_salesData()
     elif choose == "Booking Management":
         df = get_data_bookingData()
-    elif choose == "Container Delivery at Port":
-        df = get_data_loadingData()
 
     # Padroniza o rótulo exibido para a referência Farol
     rename_map = {}
