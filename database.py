@@ -433,16 +433,11 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
 
         farol_reference = changes_df.iloc[0]["Farol Reference"]
 
-        # Atualiza o Farol Status para "Adjustment Requested" em todas as tabelas
-        update_sales_query = text("""
-            UPDATE LogTransp.F_CON_SALES_DATA
-            SET s_farol_status = :farol_status
-            WHERE s_farol_reference = :ref
-        """)
-        update_booking_query = text("""
-            UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-            SET b_farol_status = :farol_status
-            WHERE b_farol_reference = :ref
+        # Atualiza o Farol Status para "Adjustment Requested" na tabela unificada e na tabela de Loading
+        update_unified_query = text("""
+            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+            SET FAROL_STATUS = :farol_status
+            WHERE FAROL_REFERENCE = :ref
         """)
         update_loading_query = text("""
             UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
@@ -450,11 +445,7 @@ def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, re
             WHERE l_farol_reference = :ref
         """)
 
-        conn.execute(update_sales_query, {
-            "farol_status": "Adjustment Requested",
-            "ref": farol_reference
-        })
-        conn.execute(update_booking_query, {
+        conn.execute(update_unified_query, {
             "farol_status": "Adjustment Requested",
             "ref": farol_reference
         })
@@ -603,6 +594,7 @@ def add_sales_record(form_values):
                 unified_values[col] = v
         # valores padrão
         unified_values.setdefault("FAROL_STATUS", "New Request")
+        unified_values.setdefault("STAGE", "Sales Data")
 
         fields = ", ".join(unified_values.keys())
         placeholders = ", ".join([f":{key}" for key in unified_values.keys()])
@@ -670,9 +662,8 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
     reverse_map = get_reverse_mapping()
     new_farol_references = []
  
-    # Etapa 1: Consultar registros originais uma vez
-    sales = pd.read_sql(text("SELECT * FROM LogTransp.F_CON_SALES_DATA WHERE s_farol_reference = :ref"), conn, params={"ref": farol_ref_original})
-    booking = pd.read_sql(text("SELECT * FROM LogTransp.F_CON_BOOKING_MANAGEMENT WHERE b_farol_reference = :ref"), conn, params={"ref": farol_ref_original})
+    # Etapa 1: Consultar registros originais uma vez (unificada e loading)
+    unified = pd.read_sql(text("SELECT * FROM LogTransp.F_CON_SALES_BOOKING_DATA WHERE FAROL_REFERENCE = :ref"), conn, params={"ref": farol_ref_original})
     loading = pd.read_sql(text("SELECT * FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE WHERE l_farol_reference = :ref"), conn, params={"ref": farol_ref_original})
  
     insert_sales = []
@@ -688,14 +679,12 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         new_farol_references.append(new_ref)
  
         # Copiar e modificar os dados
-        sales_copy = sales.copy()
-        booking_copy = booking.copy()
+        unified_copy = unified.copy()
         loading_copy = loading.copy()
  
         for df, ref_key, prefix in [
-            (sales_copy, reverse_map["Sales Farol Reference"], "Sales"),
-            (booking_copy, reverse_map["Booking Farol Reference"], "Booking"),
-            (loading_copy, reverse_map["Loading Farol Reference"], "Loading"),
+            (unified_copy, "FAROL_REFERENCE", "Sales"),
+            (loading_copy, reverse_map.get("Loading Farol Reference", "l_farol_reference"), "Loading"),
         ]:
             df.at[0, ref_key] = new_ref
             for ui_label, value in row.items():
@@ -706,29 +695,26 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
  
         # Usa o UUID compartilhado se fornecido, caso contrário gera um novo
         adjustment_id = request_uuid if request_uuid else str(uuid.uuid4())
-        sales_copy.at[0, "adjustment_id"] = adjustment_id
-        booking_copy.at[0, "adjustment_id"] = adjustment_id
+        unified_copy.at[0, "ADJUSTMENT_ID"] = adjustment_id
         loading_copy.at[0, "adjustment_id"] = adjustment_id
  
-        sales_copy.at[0, "s_creation_of_shipment"] = datetime.now()
-        booking_copy = booking_copy.drop(columns=["b_creation_of_booking"], errors="ignore")
-        sales_copy.at[0, "s_type_of_shipment"] = "Split"
+        unified_copy.at[0, "S_CREATION_OF_SHIPMENT"] = datetime.now()
+        unified_copy.at[0, "S_TYPE_OF_SHIPMENT"] = "Split"
         
         # Define o Farol Status como "Adjustment Requested" para os splits
-        sales_copy.at[0, "s_farol_status"] = "Adjustment Requested"
-        booking_copy.at[0, "b_farol_status"] = "Adjustment Requested"
+        unified_copy.at[0, "FAROL_STATUS"] = "Adjustment Requested"
         loading_copy.at[0, "l_farol_status"] = "Adjustment Requested"
  
-        sales_dict = sales_copy.iloc[0].to_dict()
-        booking_dict = booking_copy.iloc[0].to_dict()
+        unified_dict = unified_copy.iloc[0].to_dict()
         loading_dict = loading_copy.iloc[0].to_dict()
  
-        sales_dict.pop("s_id", None)
-        booking_dict.pop("b_id", None)
+        unified_dict.pop("ID", None)
         loading_dict.pop("l_id", None)
  
-        insert_sales.append(sales_dict)
-        insert_booking.append(booking_dict)
+        insert_sales = []  # não usamos mais, mantido para compatibilidade do fluxo
+        insert_booking = []
+        insert_unified = [] if 'insert_unified' not in locals() else insert_unified
+        insert_unified.append(unified_dict)
         insert_loading.append(loading_dict)
  
         # Captura do valor de containers do split
@@ -744,25 +730,18 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         }]))
  
     # Inserções em lote
-    for data in insert_sales:
-        insert_table("LogTransp.F_CON_SALES_DATA", data, conn)
-    for data in insert_booking:
-        insert_table("LogTransp.F_CON_BOOKING_MANAGEMENT", data, conn)
+    for data in insert_unified:
+        insert_table("LogTransp.F_CON_SALES_BOOKING_DATA", data, conn)
     for data in insert_loading:
         insert_table("LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE", data, conn)
     for df, data in zip(insert_logs, insert_sales):
         insert_adjustments_critic_splits(df, comment, request_uuid if request_uuid else data.get("adjustment_id"), area, reason, responsibility, user_insert)
  
     # Atualiza o Farol Status da linha original para "Adjustment Requested"
-    update_sales_original = text("""
-        UPDATE LogTransp.F_CON_SALES_DATA
-        SET s_farol_status = :farol_status
-        WHERE s_farol_reference = :ref
-    """)
-    update_booking_original = text("""
-        UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-        SET b_farol_status = :farol_status
-        WHERE b_farol_reference = :ref
+    update_unified_original = text("""
+        UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+        SET FAROL_STATUS = :farol_status
+        WHERE FAROL_REFERENCE = :ref
     """)
     update_loading_original = text("""
         UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
@@ -770,11 +749,7 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         WHERE l_farol_reference = :ref
     """)
  
-    conn.execute(update_sales_original, {
-        "farol_status": "Adjustment Requested",
-        "ref": farol_ref_original
-    })
-    conn.execute(update_booking_original, {
+    conn.execute(update_unified_original, {
         "farol_status": "Adjustment Requested",
         "ref": farol_ref_original
     })
@@ -872,6 +847,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             B_FREIGHT_FORWARDER = :b_freight_forwarder,
             B_BOOKING_REQUEST_DATE = :b_booking_request_date,
             B_COMMENTS = :b_comments,
+            STAGE = :stage,
             S_PORT_OF_LOADING_POL = :pol,
             S_PORT_OF_DELIVERY_POD = :pod
         WHERE FAROL_REFERENCE = :ref
@@ -892,6 +868,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                 "b_freight_forwarder": values["b_freight_forwarder"],
                 "b_booking_request_date": values["b_booking_request_date"],
                 "b_comments": values["b_comments"],
+                "stage": "Booking Management",
                 "pol": values.get("booking_port_of_loading_pol", ""),
                 "pod": values.get("booking_port_of_delivery_pod", ""),
                 "ref": farol_reference,

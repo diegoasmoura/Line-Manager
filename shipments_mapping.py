@@ -48,7 +48,7 @@ def get_column_mapping():
         # "s_first_vessel_etd": "First Vessel ETD",  # coluna removida na unificada
         "s_sales_owner": "Sales Owner",
         "s_comments": "Comments Sales",
-        "s_stage":"Stage",
+        # s_stage não existe mais na unificada; usamos coluna unificada STAGE
         "s_place_of_receipt":"Sales Place of Receipt",
  
  
