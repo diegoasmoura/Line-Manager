@@ -87,13 +87,13 @@ def show_add_form():
             with col1:
                 values["s_requested_shipment_week"] = st.number_input("**:green[Requested Shipment Week]***", min_value=1, max_value=52, step=1)
             with col2:
-                values["s_required_arrival_date"] = st.date_input("**Required Arrival Date**")
+                values["s_required_arrival_date"] = st.date_input("**Required Arrival Date**", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
-                values["s_requested_deadlines_start_date"] = st.date_input("Requested Cut off Start Date")
+                values["s_requested_deadlines_start_date"] = st.date_input("Requested Cut off Start Date", value=None)
             with col2:
-                values["s_requested_deadlines_end_date"] = st.date_input("**Requested Cut off End Date**")
+                values["s_requested_deadlines_end_date"] = st.date_input("**Requested Cut off End Date**", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
