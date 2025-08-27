@@ -36,18 +36,18 @@ def get_original_sales_data(farol_reference):
     try:
         query = """
         SELECT 
-            s_farol_reference,
-            s_quantity_of_containers,
-            s_port_of_loading_pol,
-            s_port_of_delivery_pod,
-            s_place_of_receipt,
-            s_final_destination,
-            s_carrier,
-            s_requested_deadlines_start_date,
-            s_requested_deadlines_end_date,
-            s_required_arrival_date
-        FROM LogTransp.F_CON_SALES_DATA
-        WHERE s_farol_reference = :ref
+            FAROL_REFERENCE                    AS s_farol_reference,
+            S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
+            S_PORT_OF_LOADING_POL              AS s_port_of_loading_pol,
+            S_PORT_OF_DELIVERY_POD             AS s_port_of_delivery_pod,
+            S_PLACE_OF_RECEIPT                 AS s_place_of_receipt,
+            S_FINAL_DESTINATION                AS s_final_destination,
+            B_VOYAGE_CARRIER                   AS s_carrier,
+            S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
+            S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+            S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date
+        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+        WHERE FAROL_REFERENCE = :ref
         """
         result = conn.execute(text(query), {"ref": farol_reference}).mappings().fetchone()
         return dict(result) if result else None
@@ -885,7 +885,10 @@ def exibir_adjustments():
                 finally:
                     conn.close()
             
-            df_adjusted['Attachments'] = df_adjusted['Sales Farol Reference'].apply(count_attachments)
+            # Uniformiza rótulo para exibição
+            if 'Sales Farol Reference' in df_adjusted.columns:
+                df_adjusted.rename(columns={'Sales Farol Reference': 'Farol Reference'}, inplace=True)
+            df_adjusted['Attachments'] = df_adjusted['Farol Reference'].apply(count_attachments)
             # Adiciona coluna de data de inserção (row_inserted_date) após Comments
             # Busca a data de inserção da referência no df_original
             def get_inserted_date(farol_ref):
@@ -893,7 +896,7 @@ def exibir_adjustments():
                 if not row.empty:
                     return row.iloc[0]['row_inserted_date']
                 return None
-            df_adjusted['Inserted Date'] = df_adjusted['Sales Farol Reference'].apply(get_inserted_date)
+            df_adjusted['Inserted Date'] = df_adjusted['Farol Reference'].apply(get_inserted_date)
             # Reordena para colocar Attachments antes de Comments e Inserted Date após Comments
             cols = list(df_adjusted.columns)
             if 'Attachments' in cols and 'Comments' in cols:
@@ -935,12 +938,12 @@ def exibir_adjustments():
             # Adiciona coluna de seleção (checkbox) igual ao shipments.py
             df_adjusted['Selecionar'] = False
             # Reordena colunas para colocar 'Selecionar' e 'Sales Farol Reference' no início
-            colunas_ordenadas = ['Selecionar', 'Sales Farol Reference'] + [col for col in df_adjusted.columns if col not in ['Selecionar', 'Sales Farol Reference']]
+            colunas_ordenadas = ['Selecionar', 'Farol Reference'] + [col for col in df_adjusted.columns if col not in ['Selecionar', 'Farol Reference']]
 
             # Configuração das colunas, padronizando os títulos conforme a tela de split
             column_config = {
                 'Selecionar': st.column_config.CheckboxColumn('Select', help='Selecione apenas uma linha', pinned="left"),
-                "Sales Farol Reference": st.column_config.TextColumn("Sales Farol Reference", width="medium", disabled=True, pinned="left"),
+                "Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True, pinned="left"),
                 "Status": st.column_config.SelectboxColumn("Farol Status", width="medium", options=available_options, default="Adjustment Requested"),
                 "Sales Quantity of Containers": st.column_config.NumberColumn("Sales Quantity of Containers", format="%d", disabled=True),
                 "Sales Port of Loading POL": st.column_config.TextColumn("Sales Port of Loading POL", width="medium", disabled=True),
@@ -971,7 +974,7 @@ def exibir_adjustments():
             selected_rows = edited_df[edited_df['Selecionar'] == True]
             if len(selected_rows) > 1:
                 st.warning("⚠️ Por favor, selecione apenas **uma** linha.")
-            selected_farol_ref = selected_rows['Sales Farol Reference'].values[0] if len(selected_rows) == 1 else None
+            selected_farol_ref = selected_rows['Farol Reference'].values[0] if len(selected_rows) == 1 else None
             st.session_state['selected_farol_ref'] = selected_farol_ref
             
             # Detecta mudanças no status e aplica atualizações
@@ -979,7 +982,7 @@ def exibir_adjustments():
             for i in range(len(df_adjusted)):
                 original_status = df_adjusted.iloc[i]['Status']
                 new_status = edited_df.iloc[i]['Status']
-                farol_ref = df_adjusted.iloc[i]['Sales Farol Reference']
+                farol_ref = df_adjusted.iloc[i]['Farol Reference']
                 
                 if original_status != new_status:
                     status_changes.append({
@@ -1021,23 +1024,12 @@ def exibir_adjustments():
                                 })
                                 # Atualiza o status nas três tabelas SEM checar o stage
                                 update_sales_query = text("""
-                                    UPDATE LogTransp.F_CON_SALES_DATA
-                                    SET s_farol_status = :farol_status
-                                    WHERE s_farol_reference = :farol_reference
+                                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                                    SET FAROL_STATUS = :farol_status
+                                    WHERE FAROL_REFERENCE = :farol_reference
                                 """)
                                 conn.execute(update_sales_query, {
                                     "farol_status": change['new_status'],
-                                    "farol_reference": change['farol_reference']
-                                })
-                                update_booking_query = text("""
-                                    UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-                                    SET b_farol_status = :farol_status,
-                                        b_creation_of_booking = :creation_date
-                                    WHERE b_farol_reference = :farol_reference
-                                """)
-                                conn.execute(update_booking_query, {
-                                    "farol_status": change['new_status'],
-                                    "creation_date": datetime.now(),
                                     "farol_reference": change['farol_reference']
                                 })
                                 update_loading_query = text("""

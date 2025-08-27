@@ -50,14 +50,18 @@ def show_split_form():
     
     # Determina qual coluna de referência usar com base no stage atual
     stage = st.session_state.get("current_stage", "Sales Data")
-    if stage == "Sales Data":
-        farol_column = "Sales Farol Reference"
-    elif stage == "Booking Management":
-        farol_column = "Booking Farol Reference"
-    elif stage == "Container Delivery at Port":
-        farol_column = "Loading Farol Reference"
+    # Padroniza para um único rótulo se já renomeado na tela principal
+    if "Farol Reference" in df_shipments.columns:
+        farol_column = "Farol Reference"
     else:
-        farol_column = "Sales Farol Reference"  # fallback padrão
+        if stage == "Sales Data":
+            farol_column = "Sales Farol Reference"
+        elif stage == "Booking Management":
+            farol_column = "Booking Farol Reference"
+        elif stage == "Container Delivery at Port":
+            farol_column = "Loading Farol Reference"
+        else:
+            farol_column = "Sales Farol Reference"  # fallback padrão
         
     available_references = df_shipments[farol_column].dropna().unique()
  
@@ -94,7 +98,8 @@ def show_split_form():
         
         # Encontra todos os splits existentes para esta referência base
         base_pattern = re.escape(base_ref)
-        existing_splits = df[df['Sales Farol Reference'].str.match(rf'^{base_pattern}(?:\.(\d+))?$')]
+        ref_col = 'Farol Reference' if 'Farol Reference' in df.columns else 'Sales Farol Reference'
+        existing_splits = df[df[ref_col].str.match(rf'^{base_pattern}(?:\.(\d+))?$')]
         
         # Se não houver splits existentes, começa do 1
         if existing_splits.empty:
@@ -105,7 +110,7 @@ def show_split_form():
                 match = re.search(rf'^{base_pattern}\.(\d+)$', ref)
                 return int(match.group(1)) if match else 0
             
-            split_numbers = [extract_split_number(ref) for ref in existing_splits['Sales Farol Reference']]
+            split_numbers = [extract_split_number(ref) for ref in existing_splits[ref_col]]
             next_split = max(split_numbers) + 1 if split_numbers else 1
         
         # Gera as novas referências
@@ -125,7 +130,7 @@ def show_split_form():
            
         # Criar DataFrame inicial com os dados obtidos
         df_selected = pd.DataFrame([{
-            "Sales Farol Reference": split_data["s_farol_reference"],
+            "Farol Reference": split_data["s_farol_reference"],
             "Sales Quantity of Containers": split_data["s_quantity_of_containers"],
             "Sales Port of Loading POL": split_data["s_port_of_loading_pol"],
             "Sales Port of Delivery POD": split_data["s_port_of_delivery_pod"],
@@ -149,11 +154,11 @@ def show_split_form():
         )
        
         for i, ref in enumerate(new_refs, start=1):
-            df_split.at[i, "Sales Farol Reference"] = ref
+            df_split.at[i, "Farol Reference"] = ref
             df_split.at[i, "Sales Quantity of Containers"] = 0
  
         editable_columns = [
-            "Sales Farol Reference",
+            "Farol Reference",
             "Sales Quantity of Containers",
             "Sales Port of Loading POL",
             "Sales Port of Delivery POD",

@@ -132,14 +132,23 @@ def exibir_shipments():
     st.session_state["current_stage"] = choose
 
     if choose == "Sales Data":
-        farol_ref_col = "Sales Farol Reference"
         df = get_data_salesData()
     elif choose == "Booking Management":
-        farol_ref_col = "Booking Farol Reference"
         df = get_data_bookingData()
     elif choose == "Container Delivery at Port":
-        farol_ref_col = "Loading Farol Reference"
         df = get_data_loadingData()
+
+    # Padroniza o rótulo exibido para a referência Farol
+    rename_map = {}
+    if "Sales Farol Reference" in df.columns:
+        rename_map["Sales Farol Reference"] = "Farol Reference"
+    if "Booking Farol Reference" in df.columns:
+        rename_map["Booking Farol Reference"] = "Farol Reference"
+    if "Loading Farol Reference" in df.columns:
+        rename_map["Loading Farol Reference"] = "Farol Reference"
+    if rename_map:
+        df.rename(columns=rename_map, inplace=True)
+    farol_ref_col = "Farol Reference"
 
    # Aplica filtro para excluir splits pendentes de aprovação
     # Agora todas as tabelas têm acesso ao Type of Shipment via JOIN
@@ -195,12 +204,6 @@ def exibir_shipments():
     df["Select"] = False
     column_config["Select"] = st.column_config.CheckboxColumn("Select", help="Select only one line", pinned="left")
 
-    # Descobre o nome da coluna Farol Reference conforme o stage
-    farol_ref_col = (
-        "Sales Farol Reference" if choose == "Sales Data"
-        else "Booking Farol Reference" if choose == "Booking Management"
-        else "Loading Farol Reference"
-    )
     # Garante que a coluna Farol Reference está pinada à esquerda
     column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
 

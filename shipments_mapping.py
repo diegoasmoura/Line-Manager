@@ -45,7 +45,7 @@ def get_column_mapping():
         "s_lc_received": "LC Received",
         "s_allocation_date": "Allocation Date",
         "s_producer_nomination_date": "Producer Nomination Date",
-        "s_first_vessel_etd": "First Vessel ETD",
+        # "s_first_vessel_etd": "First Vessel ETD",  # coluna removida na unificada
         "s_sales_owner": "Sales Owner",
         "s_comments": "Comments Sales",
         "s_stage":"Stage",
@@ -193,7 +193,7 @@ def drop_downs(data_show, df_udc):
         "LC Received": "date",
         "Allocation Date": "date",
         "Producer Nomination Date": "date",
-        "First Vessel ETD": "date",
+        # "First Vessel ETD": "date",  # coluna removida na unificada
         "Volume in Tons": "numeric",
         "Sales Quantity of Containers": "numeric",
         "Requested Shipment Week": "numeric",

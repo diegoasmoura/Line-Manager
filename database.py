@@ -37,11 +37,49 @@ def get_data_salesData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL
+    # Consulta SQL (tabela unificada) com aliases para manter compatibilidade
     query = '''
-    SELECT *
-    FROM LogTransp.F_CON_SALES_DATA
-    ORDER BY s_farol_reference'''
+    SELECT 
+        FAROL_REFERENCE                    AS s_farol_reference,
+        FAROL_STATUS                       AS s_farol_status,
+        S_SHIPMENT_STATUS                  AS s_shipment_status,
+        S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
+        S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
+        S_CUSTOMER_PO                      AS s_customer_po,
+        S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
+        S_SALE_ORDER_DATE                  AS s_sales_order_date,
+        S_BUSINESS                         AS s_business,
+        S_CUSTOMER                         AS s_customer,
+        S_MODE                             AS s_mode,
+        S_INCOTERM                         AS s_incoterm,
+        S_SKU                              AS s_sku,
+        S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
+        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
+        S_VOLUME_IN_TONS                   AS s_volume_in_tons,
+        S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
+        S_CONTAINER_TYPE                   AS s_container_type,
+        S_PORT_OF_LOADING_POL              AS s_port_of_loading_pol,
+        S_PORT_OF_DELIVERY_POD             AS s_port_of_delivery_pod,
+        S_PLACE_OF_RECEIPT                 AS s_place_of_receipt,
+        S_FINAL_DESTINATION                AS s_final_destination,
+        S_REQUESTED_SHIPMENT_WEEK          AS s_requested_shipment_week,
+        S_DTHC_PREPAID                     AS s_dthc_prepaid,
+        S_AFLOAT                           AS s_afloat,
+        S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
+        S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
+        S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
+        S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
+        S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+        S_PARTIAL_ALLOWED                  AS s_partial_allowed,
+        S_VIP_PNL_RISK                     AS s_vip_pnl_risk,
+        S_PNL_DESTINATION                  AS s_pnl_destination,
+        S_LC_RECEIVED                      AS s_lc_received,
+        S_ALLOCATION_DATE                  AS s_allocation_date,
+        S_PRODUCER_NOMINATION_DATE         AS s_producer_nomination_date,
+        S_SALE_OWNER                       AS s_sales_owner,
+        S_COMMENTS                         AS s_comments
+    FROM LogTransp.F_CON_SALES_BOOKING_DATA
+    ORDER BY FAROL_REFERENCE'''
  
     try:
         conn = get_database_connection()
@@ -62,7 +100,7 @@ def get_data_salesData():
             "Container Type", "Sales Port of Loading POL", "Sales Port of Delivery POD", "Sales Place of Receipt", "Sales Final Destination",
             "Requested Shipment Week","Requested Cut off Start Date", "Requested Cut off End Date", "DTHC", "Afloat", "Shipment Period Start Date", "Shipment Period End Date",
             "Partial Allowed", "VIP PNL Risk", "PNL Destination", "Required Arrival Date", "LC Received",
-            "Allocation Date", "Producer Nomination Date", "First Vessel ETD", "Comments Sales","Sales Owner"]]
+            "Allocation Date", "Producer Nomination Date", "Comments Sales","Sales Owner"]]
  
         return df
     finally:
@@ -75,27 +113,54 @@ def get_data_bookingData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL com JOIN para trazer campos do Sales Data
+    # Consulta SQL (tabela unificada) com aliases para manter compatibilidade
     query = '''
-    SELECT b.b_id, b.b_farol_reference, b.b_farol_status, b.b_creation_of_booking, b.b_booking_reference, 
-           b.b_booking_status, b.b_booking_owner, b.b_carrier, b.b_freight_forwarder, 
-           b.b_booking_request_date, b.b_booking_confirmation_date, b.b_vessel_name, b.b_voyage_carrier, 
-           b.b_port_terminal_city, b.b_place_of_receipt, b.b_final_destination, b.b_transhipment_port, 
-           b.b_pod_country, b.b_pod_country_acronym, b.b_destination_trade_region, 
-           b.b_first_document_cut_off_doccut, b.b_first_port_cut_off_portcut, 
-           b.b_first_estimated_time_of_departure_etd, b.b_first_estimated_time_of_arrival_eta, 
-           b.b_voyage_port_terminal, b.b_current_document_cut_off_doccut, b.b_current_port_cut_off_portcut, 
-           b.b_current_estimated_time_of_departure_etd, b.b_current_estimated_time_of_arrival_eta, 
-           b.b_freight_rate_usd, b.b_bogey_sale_price_usd, b.b_freightppnl, b.b_award_status, 
-           b.b_comments, b.adjustment_id,
-           s.s_type_of_shipment,
-           s.s_quantity_of_containers,
-           s.s_container_type,
-           s.s_port_of_loading_pol as b_port_of_loading_pol,
-           s.s_port_of_delivery_pod as b_port_of_delivery_pod
-    FROM LogTransp.F_CON_BOOKING_MANAGEMENT b
-    LEFT JOIN LogTransp.F_CON_SALES_DATA s ON b.b_farol_reference = s.s_farol_reference
-    ORDER BY b.b_farol_reference'''
+    SELECT 
+        ID                                  AS b_id,
+        FAROL_REFERENCE                      AS b_farol_reference,
+        FAROL_STATUS                         AS b_farol_status,
+        B_CREATION_OF_BOOKING                AS b_creation_of_booking,
+        B_BOOKING_REFERENCE                  AS b_booking_reference,
+        B_BOOKING_STATUS                     AS b_booking_status,
+        B_BOOKING_OWNER                      AS b_booking_owner,
+        B_VOYAGE_CARRIER                     AS b_carrier,
+        B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
+        B_BOOKING_REQUEST_DATE               AS b_booking_request_date,
+        B_BOOKING_CONFIRMATION_DATE          AS b_booking_confirmation_date,
+        B_VESSEL_NAME                        AS b_vessel_name,
+        B_VOYAGE_CARRIER                     AS b_voyage_carrier,
+        B_PORT_TERMINAL_CITY                 AS b_port_terminal_city,
+        S_PLACE_OF_RECEIPT                   AS b_place_of_receipt,
+        S_FINAL_DESTINATION                  AS b_final_destination,
+        B_TRANSHIPMENT_PORT                  AS b_transhipment_port,
+        B_POD_COUNTRY                        AS b_pod_country,
+        B_POD_COUNTRY_ACRONYM                AS b_pod_country_acronym,
+        B_DESTINATION_TRADE_REGION           AS b_destination_trade_region,
+        /* A unificada possui apenas um conjunto de cut-offs/ETAs/ETDs: replicar para first/current */
+        B_DOCUMENT_CUT_OFF_DOCCUT            AS b_first_document_cut_off_doccut,
+        B_PORT_CUT_OFF_PORTCUT               AS b_first_port_cut_off_portcut,
+        B_ESTIMATED_TIME_OF_DEPARTURE_ETD    AS b_first_estimated_time_of_departure_etd,
+        B_ESTIMATED_TIME_OF_ARRIVAL_ETA      AS b_first_estimated_time_of_arrival_eta,
+        /* current (replicado) */
+        B_DOCUMENT_CUT_OFF_DOCCUT            AS b_current_document_cut_off_doccut,
+        B_PORT_CUT_OFF_PORTCUT               AS b_current_port_cut_off_portcut,
+        B_ESTIMATED_TIME_OF_DEPARTURE_ETD    AS b_current_estimated_time_of_departure_etd,
+        B_ESTIMATED_TIME_OF_ARRIVAL_ETA      AS b_current_estimated_time_of_arrival_eta,
+        /* demais valores */
+        B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
+        B_BOGEY_SALE_PRICE_USD               AS b_bogey_sale_price_usd,
+        B_FreightPpnl                        AS b_freightppnl,
+        B_AWARD_STATUS                       AS b_award_status,
+        B_COMMENTS                           AS b_comments,
+        ADJUSTMENT_ID                        AS adjustment_id,
+        /* Campos de Sales necessários para exibição no Booking */
+        S_TYPE_OF_SHIPMENT                   AS s_type_of_shipment,
+        S_QUANTITY_OF_CONTAINERS             AS s_quantity_of_containers,
+        S_CONTAINER_TYPE                     AS s_container_type,
+        S_PORT_OF_LOADING_POL                AS b_port_of_loading_pol,
+        S_PORT_OF_DELIVERY_POD               AS b_port_of_delivery_pod
+    FROM LogTransp.F_CON_SALES_BOOKING_DATA
+    ORDER BY FAROL_REFERENCE'''
  
     try:
         conn = get_database_connection()
@@ -114,7 +179,7 @@ def get_data_bookingData():
             "Container Type", "Vessel Name", "Voyage Carrier", "Port Terminal City", "Transhipment Port", "POD Country",
             "POD Country Acronym", "Destination Trade Region", "First Document Cut Off DOCCUT",
             "First Port Cut Off PORTCUT", "First Estimated Time Of Departure ETD",
-            "First Estimated Time Of Arrival ETA", "Voyage Port Terminal", "Current Document Cut Off DOCCUT",
+            "First Estimated Time Of Arrival ETA", "Current Document Cut Off DOCCUT",
             "Current Port Cut Off PORTCUT", "Current Estimated Time Of Departure ETD",
             "Current Estimated Time Of Arrival ETA", "Freight Rate USD", "Bogey Sale Price USD",
             "Freight PNL", "Award Status", "Comments Booking"]]
@@ -130,16 +195,16 @@ def get_data_loadingData():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL com JOIN para trazer campos do Sales Data
+    # Consulta SQL com JOIN para trazer campos do Sales (a partir da tabela unificada)
     query = '''
     SELECT l.*, 
-           s.s_type_of_shipment,
-           s.s_quantity_of_containers,
-           s.s_container_type,
-           s.s_port_of_loading_pol,
-           s.s_port_of_delivery_pod
+           s.S_TYPE_OF_SHIPMENT         AS s_type_of_shipment,
+           s.S_QUANTITY_OF_CONTAINERS   AS s_quantity_of_containers,
+           s.S_CONTAINER_TYPE           AS s_container_type,
+           s.S_PORT_OF_LOADING_POL      AS s_port_of_loading_pol,
+           s.S_PORT_OF_DELIVERY_POD     AS s_port_of_delivery_pod
     FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE l
-    LEFT JOIN LogTransp.F_CON_SALES_DATA s ON l.l_farol_reference = s.s_farol_reference
+    LEFT JOIN LogTransp.F_CON_SALES_BOOKING_DATA s ON l.l_farol_reference = s.farol_reference
     ORDER BY l.l_farol_reference'''
  
     try:
@@ -171,11 +236,50 @@ def fetch_shipments_data_sales():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None
  
-    # Consulta SQL
+    # Consulta SQL (tabela unificada) com aliases para manter compatibilidade
     query = '''
-    SELECT *
-    FROM LogTransp.F_CON_SALES_DATA
-    ORDER BY s_farol_reference'''
+    SELECT 
+        FAROL_REFERENCE                    AS s_farol_reference,
+        FAROL_STATUS                       AS s_farol_status,
+        S_SHIPMENT_STATUS                  AS s_shipment_status,
+        S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
+        S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
+        S_CUSTOMER_PO                      AS s_customer_po,
+        S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
+        S_SALE_ORDER_DATE                  AS s_sales_order_date,
+        S_BUSINESS                         AS s_business,
+        S_CUSTOMER                         AS s_customer,
+        S_MODE                             AS s_mode,
+        S_INCOTERM                         AS s_incoterm,
+        S_SKU                              AS s_sku,
+        S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
+        S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
+        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
+        S_VOLUME_IN_TONS                   AS s_volume_in_tons,
+        S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
+        S_CONTAINER_TYPE                   AS s_container_type,
+        S_PORT_OF_LOADING_POL              AS s_port_of_loading_pol,
+        S_PORT_OF_DELIVERY_POD             AS s_port_of_delivery_pod,
+        S_PLACE_OF_RECEIPT                 AS s_place_of_receipt,
+        S_FINAL_DESTINATION                AS s_final_destination,
+        S_REQUESTED_SHIPMENT_WEEK          AS s_requested_shipment_week,
+        S_DTHC_PREPAID                     AS s_dthc_prepaid,
+        S_AFLOAT                           AS s_afloat,
+        S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
+        S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
+        S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
+        S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
+        S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+        S_PARTIAL_ALLOWED                  AS s_partial_allowed,
+        S_VIP_PNL_RISK                     AS s_vip_pnl_risk,
+        S_PNL_DESTINATION                  AS s_pnl_destination,
+        S_LC_RECEIVED                      AS s_lc_received,
+        S_ALLOCATION_DATE                  AS s_allocation_date,
+        S_PRODUCER_NOMINATION_DATE         AS s_producer_nomination_date,
+        S_SALE_OWNER                       AS s_sales_owner,
+        S_COMMENTS                         AS s_comments
+    FROM LogTransp.F_CON_SALES_BOOKING_DATA
+    ORDER BY FAROL_REFERENCE'''
  
     try:
         conn = get_database_connection()
@@ -451,14 +555,62 @@ def add_sales_record(form_values):
         form_values["s_plant_of_origin"] = "Not used in the cotton business"
         form_values["s_container_type"] = "40HC"
  
-        # --- INSERT TABELA DE VENDAS ---
-        sales_fields = ", ".join(form_values.keys())
-        sales_placeholders = ", ".join([f":{key}" for key in form_values.keys()])
-        sales_query = text(f"""
-            INSERT INTO LogTransp.F_CON_SALES_DATA ({sales_fields})
-            VALUES ({sales_placeholders})
+        # --- MAPA PARA TABELA UNIFICADA ---
+        unified_map = {
+            # chaves de entrada -> colunas unificadas
+            "s_farol_reference": "FAROL_REFERENCE",
+            "s_creation_of_shipment": "S_CREATION_OF_SHIPMENT",
+            "s_customer_po": "S_CUSTOMER_PO",
+            "s_sales_order_reference": "S_SALE_ORDER_REFERENCE",
+            "s_sales_order_date": "S_SALE_ORDER_DATE",
+            "s_business": "S_BUSINESS",
+            "s_customer": "S_CUSTOMER",
+            "s_mode": "S_MODE",
+            "s_incoterm": "S_INCOTERM",
+            "s_sku": "S_SKU",
+            "s_plant_of_origin": "S_PLANT_OF_ORIGIN",
+            "s_type_of_shipment": "S_TYPE_OF_SHIPMENT",
+            "s_splitted_booking_reference": "S_SPLITTED_BOOKING_REFERENCE",
+            "s_volume_in_tons": "S_VOLUME_IN_TONS",
+            "s_quantity_of_containers": "S_QUANTITY_OF_CONTAINERS",
+            "s_container_type": "S_CONTAINER_TYPE",
+            "s_port_of_loading_pol": "S_PORT_OF_LOADING_POL",
+            "s_port_of_delivery_pod": "S_PORT_OF_DELIVERY_POD",
+            "s_place_of_receipt": "S_PLACE_OF_RECEIPT",
+            "s_final_destination": "S_FINAL_DESTINATION",
+            "s_requested_shipment_week": "S_REQUESTED_SHIPMENT_WEEK",
+            "s_dthc_prepaid": "S_DTHC_PREPAID",
+            "s_afloat": "S_AFLOAT",
+            "s_shipment_period_start_date": "S_SHIPMENT_PERIOD_START_DATE",
+            "s_shipment_period_end_date": "S_SHIPMENT_PERIOD_END_DATE",
+            "s_required_arrival_date": "S_REQUIRED_ARRIVAL_DATE",
+            "s_requested_deadlines_start_date": "S_REQUESTED_DEADLINE_START_DATE",
+            "s_requested_deadlines_end_date": "S_REQUESTED_DEADLINE_END_DATE",
+            "s_partial_allowed": "S_PARTIAL_ALLOWED",
+            "s_vip_pnl_risk": "S_VIP_PNL_RISK",
+            "s_pnl_destination": "S_PNL_DESTINATION",
+            "s_lc_received": "S_LC_RECEIVED",
+            "s_allocation_date": "S_ALLOCATION_DATE",
+            "s_producer_nomination_date": "S_PRODUCER_NOMINATION_DATE",
+            "s_sales_owner": "S_SALE_OWNER",
+            "s_comments": "S_COMMENTS",
+        }
+
+        unified_values = {}
+        for k, v in form_values.items():
+            col = unified_map.get(k)
+            if col:
+                unified_values[col] = v
+        # valores padrão
+        unified_values.setdefault("FAROL_STATUS", "New Request")
+
+        fields = ", ".join(unified_values.keys())
+        placeholders = ", ".join([f":{key}" for key in unified_values.keys()])
+        insert_query = text(f"""
+            INSERT INTO LogTransp.F_CON_SALES_BOOKING_DATA ({fields})
+            VALUES ({placeholders})
         """)
-        conn.execute(sales_query, form_values)
+        conn.execute(insert_query, unified_values)
  
         # Removido: criação automática de booking e container release
         # Commit final
@@ -680,9 +832,23 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
     conn = get_database_connection()
     try:
         query = """
-        SELECT b_booking_status, b_carrier, b_freight_forwarder, b_booking_request_date, b_comments
-        FROM LogTransp.F_CON_BOOKING_MANAGEMENT
-        WHERE b_farol_reference = :ref
+        SELECT 
+            B_BOOKING_STATUS      AS b_booking_status,
+            B_VOYAGE_CARRIER      AS b_carrier,
+            B_FREIGHT_FORWARDER   AS b_freight_forwarder,
+            B_BOOKING_REQUEST_DATE AS b_booking_request_date,
+            B_COMMENTS            AS b_comments,
+            -- Pré-preenchimento (campos de Sales na unificada)
+            S_DTHC_PREPAID                    AS dthc,
+            S_REQUESTED_SHIPMENT_WEEK         AS requested_shipment_week,
+            S_QUANTITY_OF_CONTAINERS          AS sales_quantity_of_containers,
+            S_REQUESTED_DEADLINE_START_DATE   AS requested_cut_off_start_date,
+            S_REQUESTED_DEADLINE_END_DATE     AS requested_cut_off_end_date,
+            S_PORT_OF_LOADING_POL             AS booking_port_of_loading_pol,
+            S_PORT_OF_DELIVERY_POD            AS booking_port_of_delivery_pod,
+            S_FINAL_DESTINATION               AS final_destination
+        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+        WHERE FAROL_REFERENCE = :ref
         """
         result = conn.execute(text(query), {"ref": farol_reference}).mappings().fetchone()
         return result if result else None
@@ -692,37 +858,23 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
 #Função utilizada para atualizar os dados da tabela de booking
 def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada no arquivo booking_new.py
     from datetime import datetime
-    # Garante que booking e container release existam
-    insert_booking_if_not_exists(farol_reference, {
-        "b_quantity_of_containers": values.get("b_quantity_of_containers", 0),
-        "b_port_of_loading_pol": values.get("b_port_of_loading_pol", ""),
-        "b_port_of_delivery_pod": values.get("b_port_of_delivery_pod", ""),
-        "b_final_destination": values.get("b_final_destination", ""),
-        "b_farol_status": "Booking Requested"
-    })
+    # Garante que loading exista
     insert_container_release_if_not_exists(farol_reference, {
         "l_farol_status": "Booking Requested"
     })
     conn = get_database_connection()
     try:
         query = """
-        UPDATE LogTransp.F_CON_BOOKING_MANAGEMENT
-        SET b_farol_status = :farol_status,
-            b_carrier = :b_carrier,
-            b_creation_of_booking = :b_creation_of_booking,
-            b_freight_forwarder = :b_freight_forwarder,
-            b_booking_request_date = :b_booking_request_date,
-            b_comments = :b_comments
-        WHERE b_farol_reference = :ref
-        """
-
-        # Atualiza a tabela de Sales Data
-        query_sales = """
-        UPDATE LogTransp.F_CON_SALES_DATA
-        SET s_farol_status = :farol_status,
-            s_port_of_loading_pol = :pol,
-            s_port_of_delivery_pod = :pod
-        WHERE s_farol_reference = :ref
+        UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+        SET FAROL_STATUS = :farol_status,
+            B_VOYAGE_CARRIER = :b_carrier,
+            B_CREATION_OF_BOOKING = :b_creation_of_booking,
+            B_FREIGHT_FORWARDER = :b_freight_forwarder,
+            B_BOOKING_REQUEST_DATE = :b_booking_request_date,
+            B_COMMENTS = :b_comments,
+            S_PORT_OF_LOADING_POL = :pol,
+            S_PORT_OF_DELIVERY_POD = :pod
+        WHERE FAROL_REFERENCE = :ref
         """
         # Atualiza a tabela de Loading
         query_loading = """
@@ -734,20 +886,12 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         conn.execute(
             text(query),
             {
-                "farol_status": "Booking Requested", #values["b_booking_status"]
+                "farol_status": "Booking Requested", #values.get("b_booking_status", "Booking Requested")
                 "b_creation_of_booking": datetime.now(),
                 "b_carrier": values["b_carrier"],
                 "b_freight_forwarder": values["b_freight_forwarder"],
                 "b_booking_request_date": values["b_booking_request_date"],
                 "b_comments": values["b_comments"],
-                "ref": farol_reference,
-            },
-        )
-
-        conn.execute(
-            text(query_sales),
-            {
-                "farol_status": "Booking Requested",
                 "pol": values.get("booking_port_of_loading_pol", ""),
                 "pod": values.get("booking_port_of_delivery_pod", ""),
                 "ref": farol_reference,
@@ -773,22 +917,22 @@ def get_split_data_by_farol_reference(farol_reference):
     try:
         query = """
         SELECT
-            s.s_farol_reference,
-            s.s_quantity_of_containers,
-            s.s_volume_in_tons,
-            s.s_customer,
-            s.s_sales_order_reference,
-            s.s_port_of_loading_pol,
-            s.s_port_of_delivery_pod,
-            s.s_place_of_receipt,
-            s.s_final_destination,
-            s.s_shipment_status,
-            s.s_requested_deadlines_start_date,
-            s.s_requested_deadlines_end_date,
-            s.s_required_arrival_date,
-            s.s_carrier
-        FROM LogTransp.F_CON_SALES_DATA s
-        WHERE s.s_farol_reference = :ref
+            FAROL_REFERENCE                    AS s_farol_reference,
+            S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
+            S_VOLUME_IN_TONS                   AS s_volume_in_tons,
+            S_CUSTOMER                         AS s_customer,
+            S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
+            S_PORT_OF_LOADING_POL              AS s_port_of_loading_pol,
+            S_PORT_OF_DELIVERY_POD             AS s_port_of_delivery_pod,
+            S_PLACE_OF_RECEIPT                 AS s_place_of_receipt,
+            S_FINAL_DESTINATION                AS s_final_destination,
+            S_SHIPMENT_STATUS                  AS s_shipment_status,
+            S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
+            S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+            S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
+            B_CARRIER                          AS s_carrier
+        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+        WHERE FAROL_REFERENCE = :ref
         """
         result = conn.execute(text(query), {"ref": farol_reference}).mappings().fetchone()
         return result if result else None
