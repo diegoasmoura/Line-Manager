@@ -258,7 +258,7 @@ def exibir_shipments():
                         "Column": col,
                         "Previous Value": original_row[col],
                         "New Value": row[col],
-                        "Stage": choose
+                        "Stage": "Sales Data"
                     })
         if status_blocked:
             st.warning(status_blocked_message)
@@ -281,8 +281,8 @@ def exibir_shipments():
         # Garante que a coluna Comments exista
         if "Comments" not in changes_df.columns:
            
-            #Adicionando o stage para popular a tabela de log
-            changes_df["Stage"] = choose
+            # Stage único:
+            changes_df["Stage"] = "Sales Data"
            
         col_left, col_adjust, col_right  = st.columns([3,1,3])  # Grade e campo de texto lado a lado
    

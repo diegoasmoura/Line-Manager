@@ -847,7 +847,6 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             B_FREIGHT_FORWARDER = :b_freight_forwarder,
             B_BOOKING_REQUEST_DATE = :b_booking_request_date,
             B_COMMENTS = :b_comments,
-            STAGE = :stage,
             S_PORT_OF_LOADING_POL = :pol,
             S_PORT_OF_DELIVERY_POD = :pod
         WHERE FAROL_REFERENCE = :ref
@@ -868,7 +867,6 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                 "b_freight_forwarder": values["b_freight_forwarder"],
                 "b_booking_request_date": values["b_booking_request_date"],
                 "b_comments": values["b_comments"],
-                "stage": "Booking Management",
                 "pol": values.get("booking_port_of_loading_pol", ""),
                 "pod": values.get("booking_port_of_delivery_pod", ""),
                 "ref": farol_reference,
