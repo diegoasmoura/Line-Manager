@@ -43,7 +43,14 @@ def exibir_history():
     with c3:
         st.metric("Quantity of Containers", int(df.iloc[0].get("S_QUANTITY_OF_CONTAINERS", 0) or 0))
     with c4:
-        st.metric("Inserted", str(df.iloc[0].get("ROW_INSERTED_DATE", "-")))
+        ins = df.iloc[0].get("ROW_INSERTED_DATE", "-")
+        try:
+            # Converte epoch ms para datetime legível, se for numérico
+            if isinstance(ins, (int, float)):
+                ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M')
+        except Exception:
+            pass
+        st.metric("Inserted", str(ins))
 
     st.markdown("---")
 
@@ -73,6 +80,13 @@ def exibir_history():
     ]
 
     df_show = df[[c for c in display_cols if c in df.columns]].copy()
+
+    # Converte epoch (ms) para datetime para exibição correta na grade
+    if "ROW_INSERTED_DATE" in df_show.columns:
+        try:
+            df_show["ROW_INSERTED_DATE"] = pd.to_datetime(df_show["ROW_INSERTED_DATE"], unit="ms", errors="coerce")
+        except Exception:
+            pass
 
     # Aplica aliases iguais aos da grade principal quando disponíveis
     mapping_main = get_column_mapping()
@@ -112,6 +126,17 @@ def exibir_history():
 
     df_show.rename(columns=rename_map, inplace=True)
 
+    # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
+    if "Inserted Date" in df_show.columns:
+        # Ordena pela data (crescente)
+        try:
+            df_show = df_show.sort_values("Inserted Date", ascending=True)
+        except Exception:
+            pass
+        # Reordena colunas
+        ordered_cols = ["Inserted Date"] + [c for c in df_show.columns if c != "Inserted Date"]
+        df_show = df_show[ordered_cols]
+
     # Opções para Farol Status vindas da UDC (mesma lógica da Adjustment Request Management)
     df_udc = load_df_udc()
     farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
@@ -141,10 +166,19 @@ def exibir_history():
         )
     }
     # Demais colunas somente leitura
+    # Adiciona coluna de seleção e configura
+    df_show.insert(0, "Selecionar", False)
+    column_config["Selecionar"] = st.column_config.CheckboxColumn(
+        "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+    )
+
     for col in df_show.columns:
         if col == "Farol Status":
             continue
-        column_config[col] = st.column_config.TextColumn(col, disabled=True)
+        if col == "Inserted Date":
+            column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+        else:
+            column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
     original_df = df_show.copy()
     edited_df = st.data_editor(
@@ -157,8 +191,12 @@ def exibir_history():
     )
 
     # Detecta mudanças de Farol Status
+    # Permite alteração apenas para linhas selecionadas
+    selected = edited_df[edited_df["Selecionar"] == True]
+    if len(selected) > 1:
+        st.warning("⚠️ Selecione apenas uma linha para aplicar mudanças.")
     status_changes = []
-    for i in range(len(original_df)):
+    for i in selected.index:
         old_status = str(original_df.iloc[i].get("Farol Status", ""))
         new_status = str(edited_df.iloc[i].get("Farol Status", ""))
         farol_ref = original_df.iloc[i].get("Farol Reference") or original_df.iloc[i].get("FAROL_REFERENCE")

@@ -2,7 +2,7 @@
  
 import streamlit as st
 import pandas as pd
-from database import load_df_udc, insert_adjustments_critic, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales
+from database import load_df_udc, insert_adjustments_critic, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales, upsert_return_carrier_from_unified, insert_return_carrier_snapshot, insert_return_carrier_from_ui
 import re
 from uuid import uuid4
 import time
@@ -279,7 +279,9 @@ def show_split_form():
                             original_quantity = st.session_state["original_quantity"]
                             total_split = split_quantities.sum()
 
-                            edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
+                            # Recalcula a quantidade do item original APENAS quando há splits
+                            if num_splits > 0:
+                                edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
                             df_split.update(edited_display)
  
                             # Gera um único UUID para toda a requisição
@@ -298,8 +300,9 @@ def show_split_form():
                                         )
  
                                     # Processa os splits apenas se houver splits
+                                    new_split_refs = []
                                     if num_splits > 0:
-                                        success = perform_split_operation(
+                                        new_split_refs = perform_split_operation(
                                             farol_ref_original=selected_farol,
                                             edited_display=edited_display,
                                             num_splits=num_splits,
@@ -309,11 +312,22 @@ def show_split_form():
                                             responsibility=responsibility,
                                             request_uuid=request_uuid  # Passa o UUID para a função
                                         )
+                                        success = True if new_split_refs is not None else False
                                     else:
                                         # Se não há splits, considera sucesso se os ajustes da linha principal foram processados
                                         success = True if not changes else success
  
                                 if success:
+                                    # Upsert de Return Carriers para a referência original e splits
+                                    try:
+                                        # Insere snapshot baseado na UI para original e splits (valores exatos do editor)
+                                        # Para original (índice 0) e splits (1..num_splits), usa o que está no editor
+                                        for i in range(0, 1 + (num_splits or 0)):
+                                            ui_row = edited_display.iloc[i].to_dict()
+                                            insert_return_carrier_from_ui(ui_row, user_insert=st.session_state.get('current_user', 'system'))
+                                    except Exception as _e:
+                                        # Não bloqueia o fluxo se a criação de retorno falhar; apenas informa
+                                        st.warning(f"Aviso: não foi possível registrar retorno de carrier: {str(_e)}")
                                     st.success("✅ Ajuste realizado com sucesso!")
                                     time.sleep(2)  # Aguarda 2 segundos
                                     # Limpa os estados antes de redirecionar
