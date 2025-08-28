@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from database import get_return_carriers_by_farol, get_return_carriers_recent
+from shipments_mapping import get_column_mapping
 
 def exibir_history():
     st.title("📜 Return Carriers History")
@@ -66,11 +67,46 @@ def exibir_history():
         "P_PDF_NAME",
         "ROW_INSERTED_DATE",
         "USER_INSERT",
-        "USER_UPDATE",
-        "DATE_UPDATE",
     ]
 
     df_show = df[[c for c in display_cols if c in df.columns]].copy()
+
+    # Aplica aliases iguais aos da grade principal quando disponíveis
+    mapping_main = get_column_mapping()
+    mapping_upper = {k.upper(): v for k, v in mapping_main.items()}
+
+    def prettify(col: str) -> str:
+        # Fallback: transforma COL_NAME -> Col Name e normaliza acrônimos
+        label = col.replace("_", " ").title()
+        # Normaliza acrônimos comuns
+        replaces = {
+            "Pol": "POL",
+            "Pod": "POD",
+            "Etd": "ETD",
+            "Eta": "ETA",
+            "Pdf": "PDF",
+            "Id": "ID",
+        }
+        for k, v in replaces.items():
+            label = label.replace(k, v)
+        return label
+
+    custom_overrides = {
+        "FAROL_REFERENCE": "Farol Reference",
+        "B_BOOKING_STATUS": "Booking Status",
+        "ROW_INSERTED_DATE": "Inserted Date",
+        "USER_INSERT": "Inserted By",
+        # Remover prefixos B_/P_ dos rótulos solicitados
+        "B_GATE_OPENING": "Gate Opening",
+        "P_STATUS": "Status",
+        "P_PDF_NAME": "PDF Name",
+    }
+
+    rename_map = {}
+    for col in df_show.columns:
+        rename_map[col] = custom_overrides.get(col, mapping_upper.get(col, prettify(col)))
+
+    df_show.rename(columns=rename_map, inplace=True)
     st.dataframe(df_show, use_container_width=True, hide_index=True)
 
     st.markdown("---")
