@@ -102,7 +102,7 @@ def get_data_salesData():
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas
-            "Creation Of Shipment", "Requested Shipment Week", "Requested Cut off Start Date", "Requested Cut off End Date",
+            "Creation Of Shipment", "Requested Shipment Week", "Requested Deadline Start Date", "Requested Deadline End Date",
             "Shipment Period Start Date", "Shipment Period End Date", "Required Arrival Date",
             # Pedido e cliente
             "Sales Order Reference", "Sales Order Date", "Business", "Customer", "Mode", "SKU", "Plant of Origin",

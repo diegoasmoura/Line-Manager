@@ -137,8 +137,8 @@ def show_split_form():
             "Place of Receipt": split_data["s_place_of_receipt"],
             "Final Destination": split_data["s_final_destination"],
             "Voyage Carrier": split_data["s_carrier"],
-            "Requested Cut off Start Date": split_data["s_requested_deadlines_start_date"],
-            "Requested Cut off End Date": split_data["s_requested_deadlines_end_date"],
+                    "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
+        "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
             "Required Arrival Date": split_data["s_required_arrival_date"]
         }])
        
@@ -165,8 +165,8 @@ def show_split_form():
             "Place of Receipt",
             "Final Destination",
             "Voyage Carrier",
-            "Requested Cut off Start Date",
-            "Requested Cut off End Date",
+                    "Requested Deadline Start Date",
+        "Requested Deadline End Date",
             "Required Arrival Date"
         ]
  

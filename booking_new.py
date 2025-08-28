@@ -56,8 +56,8 @@ def show_booking_management_form():
             sales_row = sales_row.iloc[0]
             # Preenchendo os campos do formulário com os dados do registro de vendas
             booking_data["sales_quantity_of_containers"] = sales_row.get("Sales Quantity of Containers", "")
-            booking_data["requested_cut_off_start_date"] = sales_row.get("Requested Cut off Start Date", "")
-            booking_data["requested_cut_off_end_date"] = sales_row.get("Requested Cut off End Date", "")
+            booking_data["requested_cut_off_start_date"] = sales_row.get("Requested Deadline Start Date", "")
+            booking_data["requested_cut_off_end_date"] = sales_row.get("Requested Deadline End Date", "")
             booking_data["booking_port_of_loading_pol"] = sales_row.get("Port of Loading POL", "")
             booking_data["booking_port_of_delivery_pod"] = sales_row.get("Port of Delivery POD", "")
             booking_data["final_destination"] = sales_row.get("Final Destination", "")
@@ -100,9 +100,9 @@ def show_booking_management_form():
         with col1:
             st.text_input("Quantity of Containers", value=booking_data.get("sales_quantity_of_containers", ""), disabled=True)
         with col2:
-            st.text_input("Requested Cut off Start Date", value=str(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
+            st.text_input("Requested Deadline Start Date", value=str(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
         with col3:
-            st.text_input("Requested Cut off End Date", value=str(booking_data.get("requested_cut_off_end_date", "")), disabled=True)
+            st.text_input("Requested Deadline End Date", value=str(booking_data.get("requested_cut_off_end_date", "")), disabled=True)
 
         # Terceira linha: POL, POD, Final Destination
         col4, col5, col6 = st.columns(3)

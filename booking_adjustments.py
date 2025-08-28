@@ -70,8 +70,8 @@ def apply_adjustments_to_data(original_data, adjustments_df):
         "Place of Receipt": "s_place_of_receipt",
         "Final Destination": "s_final_destination",
         "Voyage Carrier": "s_carrier",
-        "Requested Cut off Start Date": "s_requested_deadlines_start_date",
-        "Requested Cut off End Date": "s_requested_deadlines_end_date",
+        "Requested Deadline Start Date": "s_requested_deadlines_start_date",
+        "Requested Deadline End Date": "s_requested_deadlines_end_date",
         "Required Arrival Date": "s_required_arrival_date"
     }
     
@@ -177,8 +177,8 @@ def get_adjusted_sales_data(farol_references, adjustments_df):
                             "Place of Receipt": adjusted_data["s_place_of_receipt"],
                             "Final Destination": adjusted_data["s_final_destination"],
                             "Voyage Carrier": adjusted_data["s_carrier"],
-                            "Requested Cut off Start Date": adjusted_data["s_requested_deadlines_start_date"],
-                            "Requested Cut off End Date": adjusted_data["s_requested_deadlines_end_date"],
+                            "Requested Deadline Start Date": adjusted_data["s_requested_deadlines_start_date"],
+                            "Requested Deadline End Date": adjusted_data["s_requested_deadlines_end_date"],
                             "Required Arrival Date": adjusted_data["s_required_arrival_date"],
                             "Changes Made": changes_summary,
                             "Comments": comments,
@@ -196,8 +196,8 @@ def get_adjusted_sales_data(farol_references, adjustments_df):
                         "Place of Receipt": adjusted_data["s_place_of_receipt"],
                         "Final Destination": adjusted_data["s_final_destination"],
                         "Voyage Carrier": adjusted_data["s_carrier"],
-                        "Requested Cut off Start Date": adjusted_data["s_requested_deadlines_start_date"],
-                        "Requested Cut off End Date": adjusted_data["s_requested_deadlines_end_date"],
+                        "Requested Deadline Start Date": adjusted_data["s_requested_deadlines_start_date"],
+                        "Requested Deadline End Date": adjusted_data["s_requested_deadlines_end_date"],
                         "Required Arrival Date": adjusted_data["s_required_arrival_date"],
                         "Changes Made": changes_summary,
                         "Comments": comments,
@@ -217,8 +217,8 @@ def format_column_name(col_name):
         "Final Destination": "Destino Final",
         "Split": "Split de Embarque",
         "Voyage Carrier": "Transportadora",
-        "Requested Cut off Start Date": "Data Inicial de Cut-off",
-        "Requested Cut off End Date": "Data Final de Cut-off",
+        "Requested Deadline Start Date": "Data Inicial de Deadline",
+        "Requested Deadline End Date": "Data Final de Deadline",
         "Required Arrival Date": "Data de Chegada Requerida"
     }
     return column_map.get(col_name, col_name)
@@ -951,8 +951,8 @@ def exibir_adjustments():
                 "Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),
                 "Final Destination": st.column_config.TextColumn("Final Destination", width="medium", disabled=True),
                 "Voyage Carrier": st.column_config.TextColumn("Voyage Carrier", width="medium", disabled=True),
-                "Requested Cut off Start Date": st.column_config.DateColumn("Requested Cut off Start Date", disabled=True),
-                "Requested Cut off End Date": st.column_config.DateColumn("Requested Cut off End Date", disabled=True),
+                "Requested Deadline Start Date": st.column_config.DateColumn("Requested Deadline Start Date", disabled=True),
+                "Requested Deadline End Date": st.column_config.DateColumn("Requested Deadline End Date", disabled=True),
                 "Required Arrival Date": st.column_config.DateColumn("Required Arrival Date", disabled=True),
                 "Changes Made": st.column_config.TextColumn("Changes Made", width="large", disabled=True),
                 "Attachments": st.column_config.NumberColumn("Attachments", format="%d", disabled=True),

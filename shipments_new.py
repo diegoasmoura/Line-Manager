@@ -27,8 +27,8 @@ form_fields = {
     "Port of Delivery POD": "s_port_of_delivery_pod",
     "Final Destination": "s_final_destination",
     "Requested Shipment Week": "s_requested_shipment_week",
-    "Requested Cut off Start Date": "s_requested_deadlines_start_date",
-    "Requested Cut off End Date": "s_requested_deadlines_end_date",
+            "Requested Deadline Start Date": "s_requested_deadlines_start_date",
+        "Requested Deadline End Date": "s_requested_deadlines_end_date",
     "DTHC Prepaid": "s_dthc_prepaid",
     "Afloat": "s_afloat",
     "Required Arrival Date": "s_required_arrival_date",
@@ -91,9 +91,9 @@ def show_add_form():
 
             col1, col2 = st.columns(2)
             with col1:
-                values["s_requested_deadlines_start_date"] = st.date_input("Requested Cut off Start Date", value=None)
+                values["s_requested_deadlines_start_date"] = st.date_input("Requested Deadline Start Date", value=None)
             with col2:
-                values["s_requested_deadlines_end_date"] = st.date_input("Requested Cut off End Date", value=None)
+                values["s_requested_deadlines_end_date"] = st.date_input("Requested Deadline End Date", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
