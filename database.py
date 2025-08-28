@@ -190,7 +190,7 @@ def get_data_bookingData():
             "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
             "Document Cut Off DOCCUT", "Port Cut Off PORTCUT", "Estimated Time Of Departure ETD", "Estimated Time Of Arrival ETA",
             # Armador/viagem
-            "Voyage Carrier", "Vessel Name", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
             # Administração
