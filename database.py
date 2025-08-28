@@ -147,16 +147,11 @@ def get_data_bookingData():
         B_POD_COUNTRY                        AS b_pod_country,
         B_POD_COUNTRY_ACRONYM                AS b_pod_country_acronym,
         B_DESTINATION_TRADE_REGION           AS b_destination_trade_region,
-        /* A unificada possui apenas um conjunto de cut-offs/ETAs/ETDs: replicar para first/current */
-        B_DOCUMENT_CUT_OFF_DOCCUT            AS b_first_document_cut_off_doccut,
-        B_PORT_CUT_OFF_PORTCUT               AS b_first_port_cut_off_portcut,
-        B_ESTIMATED_TIME_OF_DEPARTURE_ETD    AS b_first_estimated_time_of_departure_etd,
-        B_ESTIMATED_TIME_OF_ARRIVAL_ETA      AS b_first_estimated_time_of_arrival_eta,
-        /* current (replicado) */
-        B_DOCUMENT_CUT_OFF_DOCCUT            AS b_current_document_cut_off_doccut,
-        B_PORT_CUT_OFF_PORTCUT               AS b_current_port_cut_off_portcut,
-        B_ESTIMATED_TIME_OF_DEPARTURE_ETD    AS b_current_estimated_time_of_departure_etd,
-        B_ESTIMATED_TIME_OF_ARRIVAL_ETA      AS b_current_estimated_time_of_arrival_eta,
+        /* Campos de cut-offs/ETAs/ETDs */
+        B_DOCUMENT_CUT_OFF_DOCCUT            AS b_document_cut_off_doccut,
+        B_PORT_CUT_OFF_PORTCUT               AS b_port_cut_off_portcut,
+        B_ESTIMATED_TIME_OF_DEPARTURE_ETD    AS b_estimated_time_of_departure_etd,
+        B_ESTIMATED_TIME_OF_ARRIVAL_ETA      AS b_estimated_time_of_arrival_eta,
         /* demais valores */
         B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
         B_BOGEY_SALE_PRICE_USD               AS b_bogey_sale_price_usd,
@@ -193,8 +188,7 @@ def get_data_bookingData():
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
             "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
-            "First Document Cut Off DOCCUT", "First Port Cut Off PORTCUT", "First Estimated Time Of Departure ETD", "First Estimated Time Of Arrival ETA",
-            "Current Document Cut Off DOCCUT", "Current Port Cut Off PORTCUT", "Current Estimated Time Of Departure ETD", "Current Estimated Time Of Arrival ETA",
+            "Document Cut Off DOCCUT", "Port Cut Off PORTCUT", "Estimated Time Of Departure ETD", "Estimated Time Of Arrival ETA",
             # Armador/viagem
             "Voyage Carrier", "Vessel Name", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro

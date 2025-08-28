@@ -210,24 +210,6 @@ def exibir_shipments():
 
     # Reordena colunas
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
-    
-    # Debug: verificar duplicações
-    if len(colunas_ordenadas) != len(set(colunas_ordenadas)):
-        st.error("DEBUG: Colunas duplicadas detectadas!")
-        st.write("Colunas ordenadas:", colunas_ordenadas)
-        duplicated_cols = [col for col in set(colunas_ordenadas) if colunas_ordenadas.count(col) > 1]
-        st.write("Colunas duplicadas:", duplicated_cols)
-        st.write("DataFrame columns:", df.columns.tolist())
-        st.stop()
-        
-    # Debug: verificar duplicações no DataFrame final
-    df_final = df[colunas_ordenadas]
-    if len(df_final.columns) != len(df_final.columns.unique()):
-        st.error("DEBUG: Colunas duplicadas no DataFrame final!")
-        st.write("DataFrame final columns:", df_final.columns.tolist())
-        duplicated = df_final.columns[df_final.columns.duplicated()]
-        st.write("Colunas duplicadas:", duplicated.tolist())
-        st.stop()
 
     # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
     editable_cols = []
