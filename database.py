@@ -982,7 +982,9 @@ def get_split_data_by_farol_reference(farol_reference):
             S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
             S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
             S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
-            B_VOYAGE_CARRIER                   AS s_carrier
+            B_VOYAGE_CARRIER                   AS s_carrier,
+            B_TRANSHIPMENT_PORT                AS b_transhipment_port,
+            B_PORT_TERMINAL_CITY               AS b_port_terminal_city
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
         WHERE FAROL_REFERENCE = :ref
         """

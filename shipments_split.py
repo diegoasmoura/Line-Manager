@@ -129,6 +129,8 @@ def show_split_form():
             st.stop()
            
         # Criar DataFrame inicial com os dados obtidos
+        # Converte para dict para uso de .get com segurança
+        split_dict = dict(split_data)
         df_selected = pd.DataFrame([{
             "Farol Reference": split_data["s_farol_reference"],
             "Sales Quantity of Containers": split_data["s_quantity_of_containers"],
@@ -136,6 +138,8 @@ def show_split_form():
             "Port of Delivery POD": split_data["s_port_of_delivery_pod"],
             "Place of Receipt": split_data["s_place_of_receipt"],
             "Final Destination": split_data["s_final_destination"],
+            "Transhipment Port": split_dict.get("b_transhipment_port"),
+            "Port Terminal City": split_dict.get("b_port_terminal_city"),
             "Voyage Carrier": split_data["s_carrier"],
                     "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
         "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
@@ -164,6 +168,8 @@ def show_split_form():
             "Port of Delivery POD",
             "Place of Receipt",
             "Final Destination",
+            "Transhipment Port",
+            "Port Terminal City",
             "Voyage Carrier",
                     "Requested Deadline Start Date",
         "Requested Deadline End Date",
