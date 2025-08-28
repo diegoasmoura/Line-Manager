@@ -4,7 +4,7 @@
  
 # ---------- 1. Importações ----------
 import streamlit as st
-from database import load_df_udc, get_booking_data_by_farol_reference, update_booking_data_by_farol_reference, get_data_bookingData
+from database import load_df_udc, get_booking_data_by_farol_reference, update_booking_data_by_farol_reference, get_data_bookingData, upsert_return_carrier_from_unified
 from datetime import datetime, date
 import time
  
@@ -176,6 +176,8 @@ def show_booking_management_form():
                     values["booking_port_of_loading_pol"] = values.get("booking_port_of_loading_pol", "")
                     values["booking_port_of_delivery_pod"] = values.get("booking_port_of_delivery_pod", "")
                     update_booking_data_by_farol_reference(farol_reference, values)
+                    # Upsert na tabela de retorno de carriers com base nos dados da unificada
+                    upsert_return_carrier_from_unified(farol_reference, user_insert=st.session_state.get('current_user', 'system'))
                     st.success("✅ Dados atualizados com sucesso!")
                     time.sleep(2)  # Aguarda 2 segundos
                     # Limpa os estados antes de redirecionar

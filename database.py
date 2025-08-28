@@ -977,6 +977,142 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         conn.close()
  
  
+# Insere ou atualiza linha em F_CON_RETURN_CARRIERS com base na tabela unificada
+def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
+    conn = get_database_connection()
+    try:
+        # Busca os dados atuais na tabela unificada
+        fetch_sql = text(
+            """
+            SELECT 
+                FAROL_REFERENCE,
+                B_BOOKING_REFERENCE,
+                'Booking Requested' AS B_BOOKING_STATUS,
+                NULL AS P_STATUS,
+                NULL AS P_PDF_NAME,
+                S_SPLITTED_BOOKING_REFERENCE,
+                S_PLACE_OF_RECEIPT,
+                S_QUANTITY_OF_CONTAINERS,
+                S_PORT_OF_LOADING_POL,
+                S_PORT_OF_DELIVERY_POD,
+                S_FINAL_DESTINATION,
+                B_TRANSHIPMENT_PORT,
+                B_PORT_TERMINAL_CITY,
+                B_VESSEL_NAME,
+                B_VOYAGE_CARRIER,
+                B_DOCUMENT_CUT_OFF_DOCCUT,
+                B_PORT_CUT_OFF_PORTCUT,
+                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
+                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
+                B_GATE_OPENING
+            FROM LogTransp.F_CON_SALES_BOOKING_DATA
+            WHERE FAROL_REFERENCE = :ref
+            """
+        )
+        row = conn.execute(fetch_sql, {"ref": farol_reference}).mappings().fetchone()
+        if not row:
+            return
+
+        # Verifica se já existe na tabela de retorno
+        exists = conn.execute(
+            text("SELECT COUNT(*) AS ct FROM LogTransp.F_CON_RETURN_CARRIERS WHERE FAROL_REFERENCE = :ref"),
+            {"ref": farol_reference},
+        ).fetchone()
+        # Converte resultado para dicionário e normaliza chaves para MAIÚSCULAS
+        row_dict = dict(row)
+        data = {k.upper(): v for k, v in row_dict.items()}
+        data["USER_INSERT"] = user_insert
+        data["USER_UPDATE"] = None
+        data["DATE_UPDATE"] = None
+
+        if exists and int(exists[0]) > 0:
+            # Atualiza
+            update_sql = text(
+                """
+                UPDATE LogTransp.F_CON_RETURN_CARRIERS
+                SET 
+                    B_BOOKING_REFERENCE = :B_BOOKING_REFERENCE,
+                    B_BOOKING_STATUS = :B_BOOKING_STATUS,
+                    P_STATUS = :P_STATUS,
+                    P_PDF_NAME = :P_PDF_NAME,
+                    S_SPLITTED_BOOKING_REFERENCE = :S_SPLITTED_BOOKING_REFERENCE,
+                    S_PLACE_OF_RECEIPT = :S_PLACE_OF_RECEIPT,
+                    S_QUANTITY_OF_CONTAINERS = :S_QUANTITY_OF_CONTAINERS,
+                    S_PORT_OF_LOADING_POL = :S_PORT_OF_LOADING_POL,
+                    S_PORT_OF_DELIVERY_POD = :S_PORT_OF_DELIVERY_POD,
+                    S_FINAL_DESTINATION = :S_FINAL_DESTINATION,
+                    B_TRANSHIPMENT_PORT = :B_TRANSHIPMENT_PORT,
+                    B_PORT_TERMINAL_CITY = :B_PORT_TERMINAL_CITY,
+                    B_VESSEL_NAME = :B_VESSEL_NAME,
+                    B_VOYAGE_CARRIER = :B_VOYAGE_CARRIER,
+                    B_DOCUMENT_CUT_OFF_DOCCUT = :B_DOCUMENT_CUT_OFF_DOCCUT,
+                    B_PORT_CUT_OFF_PORTCUT = :B_PORT_CUT_OFF_PORTCUT,
+                    B_ESTIMATED_TIME_OF_DEPARTURE_ETD = :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
+                    B_ESTIMATED_TIME_OF_ARRIVAL_ETA = :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
+                    B_GATE_OPENING = :B_GATE_OPENING,
+                    USER_UPDATE = :USER_INSERT,
+                    DATE_UPDATE = SYSDATE
+                WHERE FAROL_REFERENCE = :FAROL_REFERENCE
+                """
+            )
+            # Nada a corrigir aqui além de garantir chaves MAIÚSCULAS
+            conn.execute(update_sql, data)
+        else:
+            # Insere
+            insert_sql = text(
+                """
+                INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
+                    FAROL_REFERENCE,
+                    B_BOOKING_REFERENCE,
+                    B_BOOKING_STATUS,
+                    P_STATUS,
+                    P_PDF_NAME,
+                    S_SPLITTED_BOOKING_REFERENCE,
+                    S_PLACE_OF_RECEIPT,
+                    S_QUANTITY_OF_CONTAINERS,
+                    S_PORT_OF_LOADING_POL,
+                    S_PORT_OF_DELIVERY_POD,
+                    S_FINAL_DESTINATION,
+                    B_TRANSHIPMENT_PORT,
+                    B_PORT_TERMINAL_CITY,
+                    B_VESSEL_NAME,
+                    B_VOYAGE_CARRIER,
+                    B_DOCUMENT_CUT_OFF_DOCCUT,
+                    B_PORT_CUT_OFF_PORTCUT,
+                    B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
+                    B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
+                    B_GATE_OPENING,
+                    USER_INSERT
+                ) VALUES (
+                    :FAROL_REFERENCE,
+                    :B_BOOKING_REFERENCE,
+                    :B_BOOKING_STATUS,
+                    :P_STATUS,
+                    :P_PDF_NAME,
+                    :S_SPLITTED_BOOKING_REFERENCE,
+                    :S_PLACE_OF_RECEIPT,
+                    :S_QUANTITY_OF_CONTAINERS,
+                    :S_PORT_OF_LOADING_POL,
+                    :S_PORT_OF_DELIVERY_POD,
+                    :S_FINAL_DESTINATION,
+                    :B_TRANSHIPMENT_PORT,
+                    :B_PORT_TERMINAL_CITY,
+                    :B_VESSEL_NAME,
+                    :B_VOYAGE_CARRIER,
+                    :B_DOCUMENT_CUT_OFF_DOCCUT,
+                    :B_PORT_CUT_OFF_PORTCUT,
+                    :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
+                    :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
+                    :B_GATE_OPENING,
+                    :USER_INSERT
+                )
+                """
+            )
+            conn.execute(insert_sql, data)
+        conn.commit()
+    finally:
+        conn.close()
+
 #Função utilizada para preencher os dados no formulário para a referência selecionada
 def get_split_data_by_farol_reference(farol_reference):
     """Executa a consulta SQL para obter dados específicos para splits."""
