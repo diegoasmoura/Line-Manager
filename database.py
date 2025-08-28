@@ -135,12 +135,11 @@ def get_data_bookingData():
         B_BOOKING_REFERENCE                  AS b_booking_reference,
         B_BOOKING_STATUS                     AS b_booking_status,
         B_BOOKING_OWNER                      AS b_booking_owner,
-        B_VOYAGE_CARRIER                     AS b_carrier,
+        B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
         B_BOOKING_REQUEST_DATE               AS b_booking_request_date,
         B_BOOKING_CONFIRMATION_DATE          AS b_booking_confirmation_date,
         B_VESSEL_NAME                        AS b_vessel_name,
-        B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_PORT_TERMINAL_CITY                 AS b_port_terminal_city,
         S_PLACE_OF_RECEIPT                   AS b_place_of_receipt,
         S_FINAL_DESTINATION                  AS b_final_destination,
@@ -275,7 +274,6 @@ def fetch_shipments_data_sales():
         S_INCOTERM                         AS s_incoterm,
         S_SKU                              AS s_sku,
         S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
-        S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
         S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
         S_VOLUME_IN_TONS                   AS s_volume_in_tons,
         S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
@@ -831,7 +829,7 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
         query = """
         SELECT 
             B_BOOKING_STATUS      AS b_booking_status,
-            B_VOYAGE_CARRIER      AS b_carrier,
+            B_VOYAGE_CARRIER      AS b_voyage_carrier,
             B_FREIGHT_FORWARDER   AS b_freight_forwarder,
             B_BOOKING_REQUEST_DATE AS b_booking_request_date,
             B_COMMENTS            AS b_comments,
@@ -864,7 +862,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
         query = """
         UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
         SET FAROL_STATUS = :farol_status,
-            B_VOYAGE_CARRIER = :b_carrier,
+            B_VOYAGE_CARRIER = :b_voyage_carrier,
             B_CREATION_OF_BOOKING = :b_creation_of_booking,
             B_FREIGHT_FORWARDER = :b_freight_forwarder,
             B_BOOKING_REQUEST_DATE = :b_booking_request_date,
@@ -885,7 +883,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             {
                 "farol_status": "Booking Requested", #values.get("b_booking_status", "Booking Requested")
                 "b_creation_of_booking": datetime.now(),
-                "b_carrier": values["b_carrier"],
+                "b_voyage_carrier": values["b_voyage_carrier"],
                 "b_freight_forwarder": values["b_freight_forwarder"],
                 "b_booking_request_date": values["b_booking_request_date"],
                 "b_comments": values["b_comments"],
@@ -927,7 +925,7 @@ def get_split_data_by_farol_reference(farol_reference):
             S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
             S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
             S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
-            B_CARRIER                          AS s_carrier
+            B_VOYAGE_CARRIER                   AS s_carrier
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
         WHERE FAROL_REFERENCE = :ref
         """

@@ -50,6 +50,7 @@ def get_column_mapping():
         "s_comments": "Comments Sales",
         # s_stage não existe mais na unificada; usamos coluna unificada STAGE
         "s_place_of_receipt":"Place of Receipt",
+        "s_carrier": "Sales Voyage Carrier",  # Diferente de b_voyage_carrier para evitar duplicação
  
  
         # Booking Management
@@ -61,12 +62,11 @@ def get_column_mapping():
         "b_farol_status" : "Farol Status",
 
         "b_booking_owner": "Booking Owner",
-        "b_carrier": "Voyage Carrier",
+        "b_voyage_carrier": "Voyage Carrier",
         "b_freight_forwarder": "Freight Forwarder",
         "b_booking_request_date": "Booking Request Date",
         "b_booking_confirmation_date": "Booking Confirmation Date",
         "b_vessel_name": "Vessel Name",
-        "b_voyage_carrier": "Voyage Carrier",
         "b_container_type": "Booking Container Type",
         "b_quantity_of_containers": "Booking Quantity of Containers",
         "b_port_terminal_city": "Port Terminal City",

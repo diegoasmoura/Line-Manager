@@ -16,7 +16,7 @@ ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().
  
 # ---------- 3. Constantes ----------
 required_fields = {
-            "b_carrier": "**:green[Voyage Carrier]***",
+            "b_voyage_carrier": "**:green[Voyage Carrier]***",
     "b_booking_request_date": "**:green[Booking Request Date]***"
 }
  
@@ -47,7 +47,7 @@ def show_booking_management_form():
         df_sales = fetch_shipments_data_sales()
         sales_row = df_sales[df_sales["Sales Farol Reference"] == farol_reference]
         booking_data = {
-            "b_carrier": "",
+            "b_voyage_carrier": "",
             "b_freight_forwarder": "",
             "b_booking_request_date": None,
             "b_comments": ""
@@ -123,10 +123,10 @@ def show_booking_management_form():
 
         col1, col2 = st.columns(2)
         with col1:
-            current_carrier = booking_data.get("b_carrier", "")
+            current_carrier = booking_data.get("b_voyage_carrier", "")
             carriers_with_blank = [""] + carriers
             selected_index = carriers_with_blank.index(current_carrier) if current_carrier in carriers_with_blank else 0
-            values["b_carrier"] = st.selectbox("**:green[Voyage Carrier]***", carriers_with_blank, index=selected_index)
+            values["b_voyage_carrier"] = st.selectbox("**:green[Voyage Carrier]***", carriers_with_blank, index=selected_index)
  
         with col2:
             values["b_freight_forwarder"] = st.text_input("Freight Forwarder", value=booking_data.get("b_freight_forwarder", ""))
