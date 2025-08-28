@@ -689,7 +689,7 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         if i == 0:
             continue  # pular linha original
  
-        new_ref = row["Sales Farol Reference"]
+        new_ref = row["Farol Reference"]
         new_farol_references.append(new_ref)
  
         # Copiar e modificar os dados
@@ -709,21 +709,36 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
  
         # Usa o UUID compartilhado se fornecido, caso contrário gera um novo
         adjustment_id = request_uuid if request_uuid else str(uuid.uuid4())
-        unified_copy.at[0, "ADJUSTMENT_ID"] = adjustment_id
-        loading_copy.at[0, "adjustment_id"] = adjustment_id
+        # Atualiza apenas se a coluna existir
+        if "ADJUSTMENT_ID" in unified_copy.columns:
+            unified_copy.at[0, "ADJUSTMENT_ID"] = adjustment_id
+        if "adjustment_id" in loading_copy.columns:
+            loading_copy.at[0, "adjustment_id"] = adjustment_id
  
-        unified_copy.at[0, "S_CREATION_OF_SHIPMENT"] = datetime.now()
-        unified_copy.at[0, "S_TYPE_OF_SHIPMENT"] = "Split"
+        # Atualiza apenas se as colunas existirem
+        if "S_CREATION_OF_SHIPMENT" in unified_copy.columns:
+            unified_copy.at[0, "S_CREATION_OF_SHIPMENT"] = datetime.now()
+        if "S_TYPE_OF_SHIPMENT" in unified_copy.columns:
+            unified_copy.at[0, "S_TYPE_OF_SHIPMENT"] = "Split"
         
         # Define o Farol Status como "Adjustment Requested" para os splits
-        unified_copy.at[0, "FAROL_STATUS"] = "Adjustment Requested"
-        loading_copy.at[0, "l_farol_status"] = "Adjustment Requested"
+        if "FAROL_STATUS" in unified_copy.columns:
+            unified_copy.at[0, "FAROL_STATUS"] = "Adjustment Requested"
+        if "l_farol_status" in loading_copy.columns:
+            loading_copy.at[0, "l_farol_status"] = "Adjustment Requested"
  
-        unified_dict = unified_copy.iloc[0].to_dict()
-        loading_dict = loading_copy.iloc[0].to_dict()
- 
-        unified_dict.pop("ID", None)
-        loading_dict.pop("l_id", None)
+        # Cria dicionários limpos apenas com as colunas necessárias
+        unified_dict = {}
+        loading_dict = {}
+        
+        # Copia apenas as colunas necessárias para evitar duplicações
+        for col in unified_copy.columns:
+            if col not in ['ID']:  # Remove coluna ID
+                unified_dict[col] = unified_copy.iloc[0][col]
+        
+        for col in loading_copy.columns:
+            if col not in ['l_id']:  # Remove coluna l_id
+                loading_dict[col] = loading_copy.iloc[0][col]
  
         insert_sales = []  # não usamos mais, mantido para compatibilidade do fluxo
         insert_booking = []
@@ -779,10 +794,58 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
  
  
 def insert_table(full_table_name, row_dict, conn):
-    cols = ", ".join(row_dict.keys())
-    vals = ", ".join([f":{key}" for key in row_dict])
+    """Insere um dicionário em uma tabela, normalizando nomes de colunas e tipos.
+
+    - Remove chaves duplicadas por nome (case-insensitive), mantendo a última ocorrência em MAIÚSCULAS
+    - Converte tipos não suportados pelo driver Oracle:
+      * numpy.int64/float64/bool_ -> int/float/bool
+      * pandas.Timestamp -> datetime
+      * NaN/NaT -> None
+    """
+    cleaned = {}
+    # Tenta importar numpy para checagem de tipos; segue sem np se não disponível
+    try:
+        import numpy as np  # type: ignore
+    except Exception:  # pragma: no cover
+        np = None  # type: ignore
+
+    for k, v in row_dict.items():
+        key = k.upper()
+        val = v
+
+        # Normaliza valores nulos do pandas (NaN/NaT)
+        try:
+            if not isinstance(val, (str, bytes)) and pd.isna(val):
+                val = None
+        except Exception:
+            pass
+
+        # Converte pandas.Timestamp -> datetime
+        if isinstance(val, pd.Timestamp):
+            val = val.to_pydatetime()
+
+        # Converte numpy escalares para tipos nativos
+        if 'np' in locals() and np is not None:
+            if isinstance(val, (np.integer,)):
+                val = int(val)
+            elif isinstance(val, (np.floating,)):
+                val = float(val)
+            elif isinstance(val, (np.bool_,)):
+                val = bool(val)
+        # Fallback genérico para objetos com .item()
+        if hasattr(val, "item") and not isinstance(val, (bytes, bytearray)):
+            try:
+                val = val.item()
+            except Exception:
+                pass
+
+        # Mantém apenas uma ocorrência por coluna (em maiúsculas)
+        cleaned[key] = val
+
+    cols = ", ".join(cleaned.keys())
+    vals = ", ".join([f":{key}" for key in cleaned.keys()])
     sql = f"INSERT INTO {full_table_name} ({cols}) VALUES ({vals})"
-    conn.execute(text(sql), row_dict)
+    conn.execute(text(sql), cleaned)
  
  
  
