@@ -704,8 +704,16 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
             for ui_label, value in row.items():
                 label = ui_label.replace("Sales", prefix)
                 col = reverse_map.get(label)
-                if col and col in df.columns:
-                    df.at[0, col] = value
+                if col:
+                    # Mapeia colunas de forma case-insensitive para corresponder aos nomes reais do DataFrame
+                    actual_col = None
+                    lower_target = col.lower()
+                    for existing_col in df.columns:
+                        if existing_col.lower() == lower_target:
+                            actual_col = existing_col
+                            break
+                    if actual_col is not None:
+                        df.at[0, actual_col] = value
  
         # Usa o UUID compartilhado se fornecido, caso contrário gera um novo
         adjustment_id = request_uuid if request_uuid else str(uuid.uuid4())

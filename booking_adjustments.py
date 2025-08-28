@@ -23,6 +23,7 @@
 import streamlit as st
 import pandas as pd
 from database import get_merged_data, get_database_connection, load_df_udc
+from shipments_mapping import get_reverse_mapping
 from sqlalchemy import text
 from datetime import datetime, timedelta
 import os
@@ -983,12 +984,14 @@ def exibir_adjustments():
                 original_status = df_adjusted.iloc[i]['Status']
                 new_status = edited_df.iloc[i]['Status']
                 farol_ref = df_adjusted.iloc[i]['Farol Reference']
+                adjustment_id = df_adjusted.iloc[i].get('Adjustment ID')
                 
                 if original_status != new_status:
                     status_changes.append({
                         'farol_reference': farol_ref,
                         'old_status': original_status,
-                        'new_status': new_status
+                        'new_status': new_status,
+                        'adjustment_id': adjustment_id
                     })
             
             # Aplica as mudanças de status se houver
@@ -1043,6 +1046,44 @@ def exibir_adjustments():
                                     "creation_date": datetime.now(),
                                     "farol_reference": change['farol_reference']
                                 })
+
+                                # Se aprovado, aplicar os valores dos ajustes nas colunas reais
+                                if change['new_status'] == 'Booking Approved' and change.get('adjustment_id'):
+                                    reverse_map = get_reverse_mapping()
+                                    # Busca as alterações para este adjustment_id
+                                    fetch_changes = text("""
+                                        SELECT column_name, new_value
+                                        FROM LogTransp.F_CON_Adjustments_Log
+                                        WHERE adjustment_id = :adjustment_id
+                                    """)
+                                    rows = conn.execute(fetch_changes, {
+                                        "adjustment_id": change['adjustment_id']
+                                    }).mappings().fetchall()
+
+                                    # Mapeia para colunas da tabela unificada
+                                    set_clauses = []
+                                    params = {"farol_reference": change['farol_reference']}
+                                    col_index = 0
+                                    for r in rows:
+                                        ui_label = r['column_name']
+                                        db_col_key = reverse_map.get(ui_label)
+                                        if not db_col_key:
+                                            continue
+                                        # Converte nome para a convenção da tabela (maiúsculas)
+                                        col_name = db_col_key.upper()
+                                        col_param = f"val_{col_index}"
+                                        set_clauses.append(f"{col_name} = :{col_param}")
+                                        params[col_param] = r['new_value']
+                                        col_index += 1
+
+                                    if set_clauses:
+                                        update_cols_sql = " , ".join(set_clauses)
+                                        update_values_query = text(f"""
+                                            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                                            SET {update_cols_sql}
+                                            WHERE FAROL_REFERENCE = :farol_reference
+                                        """)
+                                        conn.execute(update_values_query, params)
                                 transaction.commit()
                                 success_count += 1
                                 
