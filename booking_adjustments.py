@@ -946,7 +946,7 @@ def exibir_adjustments():
                 'Selecionar': st.column_config.CheckboxColumn('Select', help='Selecione apenas uma linha', pinned="left"),
                 "Farol Reference": st.column_config.TextColumn("Farol Reference", width="medium", disabled=True, pinned="left"),
                 "Status": st.column_config.SelectboxColumn("Farol Status", width="medium", options=available_options, default="Adjustment Requested"),
-                "Sales Quantity of Containers": st.column_config.NumberColumn("Sales Quantity of Containers", format="%d", disabled=True),
+                "Sales Quantity of Containers": st.column_config.NumberColumn("Quantity of Containers", format="%d", disabled=True),
                 "Port of Loading POL": st.column_config.TextColumn("Port of Loading POL", width="medium", disabled=True),
                 "Port of Delivery POD": st.column_config.TextColumn("Port of Delivery POD", width="medium", disabled=True),
                 "Place of Receipt": st.column_config.TextColumn("Place of Receipt", width="medium", disabled=True),

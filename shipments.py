@@ -210,6 +210,11 @@ def exibir_shipments():
     column_config["Splitted Booking Reference"] = st.column_config.TextColumn(
         "Splitted Booking Reference", width="medium", disabled=True
     )
+    # Alias de exibição para Quantity of Containers mantendo a coluna original
+    if "Sales Quantity of Containers" in df.columns:
+        column_config["Sales Quantity of Containers"] = st.column_config.NumberColumn(
+            "Quantity of Containers", format="%d"
+        )
  
     #  Adiciona coluna de seleção
     df["Select"] = False

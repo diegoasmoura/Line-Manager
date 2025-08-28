@@ -186,6 +186,9 @@ def show_split_form():
 
         # Configuração de dropdowns para o data_editor
         column_config = {
+            "Sales Quantity of Containers": st.column_config.NumberColumn(
+                "Quantity of Containers"
+            ),
             "Port of Loading POL": st.column_config.SelectboxColumn(
                 "Port of Loading POL",
                 options=pol_options,
