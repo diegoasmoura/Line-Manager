@@ -132,11 +132,11 @@ def show_split_form():
         df_selected = pd.DataFrame([{
             "Farol Reference": split_data["s_farol_reference"],
             "Sales Quantity of Containers": split_data["s_quantity_of_containers"],
-            "Sales Port of Loading POL": split_data["s_port_of_loading_pol"],
-            "Sales Port of Delivery POD": split_data["s_port_of_delivery_pod"],
-            "Sales Place of Receipt": split_data["s_place_of_receipt"],
-            "Sales Final Destination": split_data["s_final_destination"],
-            "Carrier": split_data["s_carrier"],
+            "Port of Loading POL": split_data["s_port_of_loading_pol"],
+            "Port of Delivery POD": split_data["s_port_of_delivery_pod"],
+            "Place of Receipt": split_data["s_place_of_receipt"],
+            "Final Destination": split_data["s_final_destination"],
+            "Voyage Carrier": split_data["s_carrier"],
             "Requested Cut off Start Date": split_data["s_requested_deadlines_start_date"],
             "Requested Cut off End Date": split_data["s_requested_deadlines_end_date"],
             "Required Arrival Date": split_data["s_required_arrival_date"]
@@ -160,11 +160,11 @@ def show_split_form():
         editable_columns = [
             "Farol Reference",
             "Sales Quantity of Containers",
-            "Sales Port of Loading POL",
-            "Sales Port of Delivery POD",
-            "Sales Place of Receipt",
-            "Sales Final Destination",
-            "Carrier",
+            "Port of Loading POL",
+            "Port of Delivery POD",
+            "Place of Receipt",
+            "Final Destination",
+            "Voyage Carrier",
             "Requested Cut off Start Date",
             "Requested Cut off End Date",
             "Required Arrival Date"
@@ -180,23 +180,23 @@ def show_split_form():
 
         # Configuração de dropdowns para o data_editor
         column_config = {
-            "Sales Port of Loading POL": st.column_config.SelectboxColumn(
-                "Sales Port of Loading POL",
+            "Port of Loading POL": st.column_config.SelectboxColumn(
+                "Port of Loading POL",
                 options=pol_options,
                 required=False,
                 help="Selecione o porto de origem"
             ),
-            "Sales Port of Delivery POD": st.column_config.SelectboxColumn(
-                "Sales Port of Delivery POD",
+            "Port of Delivery POD": st.column_config.SelectboxColumn(
+                "Port of Delivery POD",
                 options=pod_options,
                 required=False,
                 help="Selecione o porto de destino"
             ),
-            "Carrier": st.column_config.SelectboxColumn(
-                "Carrier",
+            "Voyage Carrier": st.column_config.SelectboxColumn(
+                "Voyage Carrier",
                 options=carrier_options,
                 required=False,
-                help="Selecione o carrier"
+                help="Selecione o voyage carrier"
             ),
         }
 

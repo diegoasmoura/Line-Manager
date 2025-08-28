@@ -87,13 +87,13 @@ def show_add_form():
             with col1:
                 values["s_requested_shipment_week"] = st.number_input("**:green[Requested Shipment Week]***", min_value=1, max_value=52, step=1)
             with col2:
-                values["s_required_arrival_date"] = st.date_input("**Required Arrival Date**", value=None)
+                values["s_required_arrival_date"] = st.date_input("Required Arrival Date", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
                 values["s_requested_deadlines_start_date"] = st.date_input("Requested Cut off Start Date", value=None)
             with col2:
-                values["s_requested_deadlines_end_date"] = st.date_input("**Requested Cut off End Date**", value=None)
+                values["s_requested_deadlines_end_date"] = st.date_input("Requested Cut off End Date", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
@@ -109,11 +109,11 @@ def show_add_form():
 
             col1, col2 = st.columns(2)
             with col1:
-                values["s_final_destination"] = st.text_input("**Final Destination**")
+                values["s_final_destination"] = st.text_input("Final Destination")
             with col2:
-                values["s_vip_pnl_risk"] = st.selectbox("**Restriction Type**", [""] + vip_pnl_risk_options)
+                values["s_vip_pnl_risk"] = st.selectbox("Restriction Type", [""] + vip_pnl_risk_options)
 
-            values["s_comments"] = st.text_area("**Sales Comments**")
+            values["s_comments"] = st.text_area("Sales Comments")
 
             for field, label in required_fields.items():
                 if not values.get(field):
@@ -139,16 +139,17 @@ def show_add_form():
                     # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
                     values["s_pnl_destination"] = "Yes" if values.get("s_vip_pnl_risk") == "PNL" else "No"
                     
-                    # Mapeamento do s_final_destination baseado no s_vip_pnl_risk
-                    vip_pnl_risk_val = values.get("s_vip_pnl_risk", "")
-                    if vip_pnl_risk_val == "PNL":
-                        values["s_final_destination"] = "PNL"
-                    elif vip_pnl_risk_val == "VIP":
-                        values["s_final_destination"] = "VIP"
-                    elif vip_pnl_risk_val == "RISK":
-                        values["s_final_destination"] = "RISK"
-                    else:
-                        values["s_final_destination"] = ""
+                    # Mapeamento do s_final_destination baseado no s_vip_pnl_risk (apenas se não foi preenchido manualmente)
+                    if not values.get("s_final_destination"):
+                        vip_pnl_risk_val = values.get("s_vip_pnl_risk", "")
+                        if vip_pnl_risk_val == "PNL":
+                            values["s_final_destination"] = "PNL"
+                        elif vip_pnl_risk_val == "VIP":
+                            values["s_final_destination"] = "VIP"
+                        elif vip_pnl_risk_val == "RISK":
+                            values["s_final_destination"] = "RISK"
+                        else:
+                            values["s_final_destination"] = ""
                     
                     # Tratamento da data s_required_arrival_date no formulário manual
                     if values.get("s_required_arrival_date"):

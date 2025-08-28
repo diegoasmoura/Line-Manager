@@ -28,9 +28,9 @@ def get_column_mapping():
         "s_volume_in_tons": "Volume in Tons",
         "s_quantity_of_containers": "Sales Quantity of Containers",
         "s_container_type": "Container Type",
-        "s_port_of_loading_pol": "Sales Port of Loading POL",
-        "s_port_of_delivery_pod": "Sales Port of Delivery POD",
-        "s_final_destination": "Sales Final Destination",
+        "s_port_of_loading_pol": "Port of Loading POL",
+        "s_port_of_delivery_pod": "Port of Delivery POD",
+        "s_final_destination": "Final Destination",
         "s_requested_shipment_week": "Requested Shipment Week",
         "s_requested_deadlines_start_date":"Requested Cut off Start Date",
         "s_requested_deadlines_end_date":"Requested Cut off End Date",
@@ -49,7 +49,7 @@ def get_column_mapping():
         "s_sales_owner": "Sales Owner",
         "s_comments": "Comments Sales",
         # s_stage não existe mais na unificada; usamos coluna unificada STAGE
-        "s_place_of_receipt":"Sales Place of Receipt",
+        "s_place_of_receipt":"Place of Receipt",
  
  
         # Booking Management
@@ -61,7 +61,7 @@ def get_column_mapping():
         "b_farol_status" : "Farol Status",
 
         "b_booking_owner": "Booking Owner",
-        "b_carrier": "Carrier",
+        "b_carrier": "Voyage Carrier",
         "b_freight_forwarder": "Freight Forwarder",
         "b_booking_request_date": "Booking Request Date",
         "b_booking_confirmation_date": "Booking Confirmation Date",
@@ -70,9 +70,9 @@ def get_column_mapping():
         "b_container_type": "Booking Container Type",
         "b_quantity_of_containers": "Booking Quantity of Containers",
         "b_port_terminal_city": "Port Terminal City",
-        "b_port_of_loading_pol": "Booking Port of Loading POL",
-        "b_port_of_delivery_pod": "Booking Port of Delivery POD",
-        "b_final_destination": "Booking Final Destination",
+        "b_port_of_loading_pol": "Port of Loading POL",
+        "b_port_of_delivery_pod": "Port of Delivery POD",
+        "b_final_destination": "Final Destination",
         "b_transhipment_port": "Transhipment Port",
         "b_pod_country": "POD Country",
         "b_pod_country_acronym": "POD Country Acronym",
@@ -90,9 +90,8 @@ def get_column_mapping():
         "b_bogey_sale_price_usd": "Bogey Sale Price USD",
         "b_freightppnl": "Freight PNL",
         "b_award_status": "Award Status",
-        "b_place_of_receipt":"Booking Place of Receipt",
+        "b_place_of_receipt":"Place of Receipt",
         "b_comments": "Comments Booking",
-        "b_place_of_receipt":"Booking Place of Receipt",
  
         # Loading Container
         "l_id": "ID Loading",
@@ -129,9 +128,9 @@ def non_editable_columns(stage):
     if stage == "Sales Data":
         non_editable = ["Sales Farol Reference", "Creation Of Shipment", "Adjusts Basic", "Adjusts Critic"]
     elif stage == "Booking Management":
-        non_editable = ["Booking Farol Reference", "Creation Of Booking", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Booking Port of Loading POL", "Booking Port of Delivery POD"]
+        non_editable = ["Booking Farol Reference", "Creation Of Booking", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD"]
     elif stage == "Container Delivery at Port":
-        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Sales Port of Loading POL", "Sales Port of Delivery POD"]
+        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD"]
     else:
         non_editable = []
  
@@ -148,8 +147,8 @@ def drop_downs(data_show, df_udc):
         "Shipment Status": df_udc[df_udc["grupo"] == "Origin Status"]["dado"].dropna().unique().tolist(),
         "Type of Shipment": df_udc[df_udc["grupo"] == "Type of Shipment"]["dado"].dropna().unique().tolist(),
         "Container Type": df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().unique().tolist(),
-        "Sales Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist(),
-        "Sales Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
+        "Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist(),
+        "Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
         "Business": df_udc[df_udc["grupo"] == "Business"]["dado"].dropna().unique().tolist(),
         "Mode": df_udc[df_udc["grupo"] == "Mode"]["dado"].dropna().unique().tolist(),
         "SKU": df_udc[df_udc["grupo"] == "Sku"]["dado"].dropna().unique().tolist(),
@@ -159,9 +158,9 @@ def drop_downs(data_show, df_udc):
         # Booking Management
         "Booking Status": df_udc[df_udc["grupo"] == "Booking Status"]["dado"].dropna().unique().tolist(),
         "Booking Container Type": df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().unique().tolist(),
-        "Booking Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist(),
-        "Booking Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
-        "Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
+        "Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
+        "Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
+        "Voyage Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
         
         # Container Delivery at Port
         "Truck Loading Status": df_udc[df_udc["grupo"] == "Truck Loading Status"]["dado"].dropna().unique().tolist(),
@@ -173,8 +172,8 @@ def drop_downs(data_show, df_udc):
         # Sales Data (mantido como está)
         "Shipment Status": "select",
         "Business": "select",
-        "Sales Port of Loading POL": "select",
-        "Sales Port of Delivery POD": "select",
+        "Port of Loading POL": "select",
+        "Port of Delivery POD": "select",
         "Mode": "select",
         "SKU": "select",
         "VIP PNL Risk": "select",
@@ -202,9 +201,9 @@ def drop_downs(data_show, df_udc):
         # Booking Management
         "Booking Status": "select",
         "Booking Container Type": "select",
-        "Booking Port of Loading POL": "select",
-        "Booking Port of Delivery POD": "select",
-        "Carrier": "select",
+        "Port of Loading POL": "select",
+        "Port of Delivery POD": "select",
+        "Voyage Carrier": "select",
         "Booking Request Date": "date",
         "Booking Confirmation Date": "date",
         "First Document Cut Off DOCCUT": "date",
@@ -243,7 +242,7 @@ def drop_downs(data_show, df_udc):
         "Farol Status": True,
         "Type of Shipment": True,
         "Container Type": True,
-        "Sales Port of Delivery POD": True,
+        "Port of Delivery POD": True,
         "Business": True,
         "Mode": True,
         "SKU": True,
@@ -252,8 +251,8 @@ def drop_downs(data_show, df_udc):
         # Booking Management
         #"Booking Status": True,
         "Booking Container Type": True,
-        "Booking Port of Loading POL": True,
-        "Booking Port of Delivery POD": True,
+        "Port of Loading POL": True,
+        "Port of Delivery POD": True,
 
         # Container Delivery at Port
         #"Truck Loading Status": True,

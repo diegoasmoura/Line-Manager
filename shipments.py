@@ -187,7 +187,7 @@ def exibir_shipments():
     with k1:
         st.metric("📋 Booking Requested", booking_requested)
     with k2:
-        st.metric("📨 Received from Carrier", received_from_carrier)
+        st.metric("📨 Received from Voyage Carrier", received_from_carrier)
     with k3:
         st.metric("📦 Total (grid)", total_visible)
     with k4:

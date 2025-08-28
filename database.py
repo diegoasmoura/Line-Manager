@@ -93,14 +93,26 @@ def get_data_salesData():
 
         print(df)
         
-        #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Sales Farol Reference","Farol Status","Shipment Status","Type of Shipment","Creation Of Shipment","Business","Customer", "Customer PO", "Sales Order Reference",
-            "Sales Order Date", "Mode", "Sales Incoterm", "SKU", "Plant of Origin", "Splitted Booking Reference",
-            "Volume in Tons", "Sales Quantity of Containers",
-            "Container Type", "Sales Port of Loading POL", "Sales Port of Delivery POD", "Sales Place of Receipt", "Sales Final Destination",
-            "Requested Shipment Week","Requested Cut off Start Date", "Requested Cut off End Date", "DTHC", "Afloat", "Shipment Period Start Date", "Shipment Period End Date",
-            "Partial Allowed", "VIP PNL Risk", "PNL Destination", "Required Arrival Date", "LC Received",
-            "Allocation Date", "Producer Nomination Date", "Comments Sales","Sales Owner"]]
+        #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
+        df = df[[
+            # Identificação
+            "Sales Farol Reference", "Farol Status", "Type of Shipment", "Shipment Status",
+            # Capacidade
+            "Sales Quantity of Containers", "Container Type",
+            # Rotas (unificado)
+            "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+            # Datas
+            "Creation Of Shipment", "Requested Shipment Week", "Requested Cut off Start Date", "Requested Cut off End Date",
+            "Shipment Period Start Date", "Shipment Period End Date", "Required Arrival Date",
+            # Pedido e cliente
+            "Sales Order Reference", "Sales Order Date", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
+            # Condições
+            "Sales Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
+            # Administração
+            "Allocation Date", "Producer Nomination Date", "LC Received", "Sales Owner",
+            # Observações
+            "Comments Sales"
+        ]]
  
         return df
     finally:
@@ -172,17 +184,27 @@ def get_data_bookingData():
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
  
-        #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Booking Farol Reference","Farol Status", "Booking Status", "Type of Shipment", "Sales Quantity of Containers","Creation Of Booking", "Booking Reference", "Booking Owner",
-            "Carrier", "Freight Forwarder", "Booking Request Date", "Booking Confirmation Date",
-            "Booking Port of Loading POL","Booking Port of Delivery POD","Booking Place of Receipt","Booking Final Destination",
-            "Container Type", "Vessel Name", "Voyage Carrier", "Port Terminal City", "Transhipment Port", "POD Country",
-            "POD Country Acronym", "Destination Trade Region", "First Document Cut Off DOCCUT",
-            "First Port Cut Off PORTCUT", "First Estimated Time Of Departure ETD",
-            "First Estimated Time Of Arrival ETA", "Current Document Cut Off DOCCUT",
-            "Current Port Cut Off PORTCUT", "Current Estimated Time Of Departure ETD",
-            "Current Estimated Time Of Arrival ETA", "Freight Rate USD", "Bogey Sale Price USD",
-            "Freight PNL", "Award Status", "Comments Booking"]]
+        #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
+        df = df[[
+            # Identificação
+            "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status",
+            # Capacidade
+            "Sales Quantity of Containers", "Container Type",
+            # Rotas (unificado)
+            "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+            # Datas de planejamento
+            "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
+            "First Document Cut Off DOCCUT", "First Port Cut Off PORTCUT", "First Estimated Time Of Departure ETD", "First Estimated Time Of Arrival ETA",
+            "Current Document Cut Off DOCCUT", "Current Port Cut Off PORTCUT", "Current Estimated Time Of Departure ETD", "Current Estimated Time Of Arrival ETA",
+            # Armador/viagem
+            "Voyage Carrier", "Vessel Name", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            # Financeiro
+            "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+            # Administração
+            "Booking Owner",
+            # Observações
+            "Comments Booking"
+        ]]
  
         return df
     finally:
@@ -217,7 +239,7 @@ def get_data_loadingData():
  
         #Filtrando as colunas e definindo a ordem de exibição
         df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
-            "Sales Port of Loading POL", "Sales Port of Delivery POD", "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
+            "Port of Loading POL", "Port of Delivery POD", "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
             "Expected Truck Load Start Date", "Expected Truck Load End Date",
             "Quantity Tons Loaded Origin", "Actual Truck Load Date", "Container Release Farol",
             "Expected Container Release Start Date", "Expected Container Release End Date",
@@ -297,7 +319,7 @@ def fetch_shipments_data_sales():
  
            
 ### Obtendo os dados da UDC
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)  # Reduzir TTL para 5 minutos para debug
 def load_df_udc():
     """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
     conn = None

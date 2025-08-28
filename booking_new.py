@@ -16,7 +16,7 @@ ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().
  
 # ---------- 3. Constantes ----------
 required_fields = {
-    "b_carrier": "**:green[Carrier]***",
+            "b_carrier": "**:green[Voyage Carrier]***",
     "b_booking_request_date": "**:green[Booking Request Date]***"
 }
  
@@ -58,9 +58,9 @@ def show_booking_management_form():
             booking_data["sales_quantity_of_containers"] = sales_row.get("Sales Quantity of Containers", "")
             booking_data["requested_cut_off_start_date"] = sales_row.get("Requested Cut off Start Date", "")
             booking_data["requested_cut_off_end_date"] = sales_row.get("Requested Cut off End Date", "")
-            booking_data["booking_port_of_loading_pol"] = sales_row.get("Sales Port of Loading POL", "")
-            booking_data["booking_port_of_delivery_pod"] = sales_row.get("Sales Port of Delivery POD", "")
-            booking_data["final_destination"] = sales_row.get("Sales Final Destination", "")
+            booking_data["booking_port_of_loading_pol"] = sales_row.get("Port of Loading POL", "")
+            booking_data["booking_port_of_delivery_pod"] = sales_row.get("Port of Delivery POD", "")
+            booking_data["final_destination"] = sales_row.get("Final Destination", "")
             booking_data["dthc"] = sales_row.get("DTHC", "")
             booking_data["requested_shipment_week"] = sales_row.get("Requested Shipment Week", "")
  
@@ -108,13 +108,13 @@ def show_booking_management_form():
         col4, col5, col6 = st.columns(3)
         with col4:
             values["booking_port_of_loading_pol"] = st.selectbox(
-                "Booking Port of Loading POL",
+                "Port of Loading POL",
                 [booking_data.get("booking_port_of_loading_pol", "")] + [opt for opt in ports_pol_options if opt != booking_data.get("booking_port_of_loading_pol", "")],
                 index=0 if booking_data.get("booking_port_of_loading_pol", "") else 0
             )
         with col5:
             values["booking_port_of_delivery_pod"] = st.selectbox(
-                "Booking Port of Delivery POD",
+                "Port of Delivery POD",
                 [booking_data.get("booking_port_of_delivery_pod", "")] + [opt for opt in ports_pod_options if opt != booking_data.get("booking_port_of_delivery_pod", "")],
                 index=0 if booking_data.get("booking_port_of_delivery_pod", "") else 0
             )
@@ -126,7 +126,7 @@ def show_booking_management_form():
             current_carrier = booking_data.get("b_carrier", "")
             carriers_with_blank = [""] + carriers
             selected_index = carriers_with_blank.index(current_carrier) if current_carrier in carriers_with_blank else 0
-            values["b_carrier"] = st.selectbox("**:green[Carrier]***", carriers_with_blank, index=selected_index)
+            values["b_carrier"] = st.selectbox("**:green[Voyage Carrier]***", carriers_with_blank, index=selected_index)
  
         with col2:
             values["b_freight_forwarder"] = st.text_input("Freight Forwarder", value=booking_data.get("b_freight_forwarder", ""))
