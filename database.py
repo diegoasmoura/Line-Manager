@@ -96,7 +96,7 @@ def get_data_salesData():
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
             # Identificação
-            "Sales Farol Reference", "Farol Status", "Type of Shipment", "Shipment Status",
+            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Shipment Status",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -728,6 +728,9 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
             unified_copy.at[0, "S_CREATION_OF_SHIPMENT"] = datetime.now()
         if "S_TYPE_OF_SHIPMENT" in unified_copy.columns:
             unified_copy.at[0, "S_TYPE_OF_SHIPMENT"] = "Split"
+        # Preenche referência da linha base usada para o split
+        if "S_SPLITTED_BOOKING_REFERENCE" in unified_copy.columns:
+            unified_copy.at[0, "S_SPLITTED_BOOKING_REFERENCE"] = farol_ref_original
         
         # Define o Farol Status como "Adjustment Requested" para os splits
         if "FAROL_STATUS" in unified_copy.columns:
@@ -747,6 +750,10 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         for col in loading_copy.columns:
             if col not in ['l_id']:  # Remove coluna l_id
                 loading_dict[col] = loading_copy.iloc[0][col]
+
+        # Garantia extra: define explicitamente o campo de referência do split
+        # para evitar qualquer perda durante o mapeamento
+        unified_dict["S_SPLITTED_BOOKING_REFERENCE"] = farol_ref_original
  
         insert_sales = []  # não usamos mais, mantido para compatibilidade do fluxo
         insert_booking = []

@@ -198,8 +198,15 @@ def exibir_shipments():
     # Ajusta nomes das colunas desabilitadas considerando renomeações para "Farol Reference"
     if rename_map:
         disabled_columns = [rename_map.get(col, col) for col in disabled_columns]
+    # Garante que Splitted Booking Reference esteja visível porém somente leitura
+    if "Splitted Booking Reference" not in disabled_columns:
+        disabled_columns.append("Splitted Booking Reference")
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
+    # Configuração explícita para exibir como texto somente leitura
+    column_config["Splitted Booking Reference"] = st.column_config.TextColumn(
+        "Splitted Booking Reference", width="medium", disabled=True
+    )
  
     #  Adiciona coluna de seleção
     df["Select"] = False
@@ -208,8 +215,13 @@ def exibir_shipments():
     # Garante que a coluna Farol Reference está pinada à esquerda
     column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
 
-    # Reordena colunas
+    # Reordena colunas e posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
+    if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
+        # Remove e reinsere antes de Comments Sales (lado esquerdo)
+        colunas_ordenadas.remove("Splitted Booking Reference")
+        idx_comments = colunas_ordenadas.index("Comments Sales")
+        colunas_ordenadas.insert(idx_comments, "Splitted Booking Reference")
 
     # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
     editable_cols = []
