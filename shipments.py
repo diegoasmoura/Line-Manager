@@ -20,6 +20,7 @@ from shipments_mapping import  non_editable_columns, drop_downs
 from shipments_new import show_add_form
 from shipments_split import show_split_form
 from booking_new import show_booking_management_form
+from history import exibir_history
  
  
 # Função para aplicar filtros avançados interativos no DataFrame
@@ -103,6 +104,8 @@ def main():
         show_split_form()
     elif st.session_state["current_page"] == "booking":
         show_booking_management_form()
+    elif st.session_state["current_page"] == "history":
+        exibir_history()
  
  
 # Função para limpar o estado da sessão (usado ao descartar alterações)
@@ -386,7 +389,7 @@ def exibir_shipments():
             original_status = df_filtered_original.loc[selected_index, "Farol Status"]
     
     st.markdown("---")
-    col_new, col_booking, col_split, _ = st.columns([1, 1, 1, 4])
+    col_new, col_booking, col_history, col_split, _ = st.columns([1, 1, 1, 1, 4])
     with col_new:
         if st.button("🚢 New Shipment"):
             st.session_state["current_page"] = "add"
@@ -402,6 +405,17 @@ def exibir_shipments():
         st.button("📦 New Booking", disabled=new_booking_disabled, key="new_booking_btn")
         if st.session_state.get("new_booking_btn") and not new_booking_disabled:
             st.session_state["current_page"] = "booking"
+            st.rerun()
+    with col_history:
+        history_disabled = True
+        if selected_farol_ref and original_status is not None:
+            history_disabled = not (str(original_status).strip().lower() != "new request".lower())
+        if len(selected_rows) != 1:
+            history_disabled = True
+        st.button("📜 Histórico", disabled=history_disabled, key="history_btn")
+        if st.session_state.get("history_btn") and not history_disabled:
+            st.session_state["selected_reference"] = selected_farol_ref
+            st.session_state["current_page"] = "history"
             st.rerun()
     with col_split:
         adjustments_disabled = True

@@ -30,6 +30,91 @@ ENGINE = create_engine(
 def get_database_connection():
     """Cria e retorna a conexão com o banco de dados (conn deve ser fechado pelo chamador)."""
     return ENGINE.connect()
+
+# --- RETURN CARRIERS ---
+def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
+    """Busca dados da F_CON_RETURN_CARRIERS por Farol Reference."""
+    conn = get_database_connection()
+    try:
+        query = text(
+            """
+            SELECT 
+                FAROL_REFERENCE,
+                B_BOOKING_STATUS,
+                P_STATUS,
+                P_PDF_NAME,
+                S_SPLITTED_BOOKING_REFERENCE,
+                S_PLACE_OF_RECEIPT,
+                S_QUANTITY_OF_CONTAINERS,
+                S_PORT_OF_LOADING_POL,
+                S_PORT_OF_DELIVERY_POD,
+                S_FINAL_DESTINATION,
+                B_TRANSHIPMENT_PORT,
+                B_PORT_TERMINAL_CITY,
+                B_VESSEL_NAME,
+                B_VOYAGE_CARRIER,
+                B_DOCUMENT_CUT_OFF_DOCCUT,
+                B_PORT_CUT_OFF_PORTCUT,
+                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
+                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
+                B_GATE_OPENING,
+                USER_INSERT,
+                USER_UPDATE,
+                DATE_UPDATE,
+                ROW_INSERTED_DATE
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
+            ORDER BY ROW_INSERTED_DATE DESC
+            """
+        )
+        rows = conn.execute(query, {"ref": farol_reference}).mappings().fetchall()
+        df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+        if not df.empty:
+            df.columns = [str(c).upper() for c in df.columns]
+        return df
+    finally:
+        conn.close()
+
+def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
+    """Busca os últimos registros inseridos em F_CON_RETURN_CARRIERS."""
+    conn = get_database_connection()
+    try:
+        query = f"""
+            SELECT 
+                FAROL_REFERENCE,
+                B_BOOKING_STATUS,
+                P_STATUS,
+                P_PDF_NAME,
+                S_SPLITTED_BOOKING_REFERENCE,
+                S_PLACE_OF_RECEIPT,
+                S_QUANTITY_OF_CONTAINERS,
+                S_PORT_OF_LOADING_POL,
+                S_PORT_OF_DELIVERY_POD,
+                S_FINAL_DESTINATION,
+                B_TRANSHIPMENT_PORT,
+                B_PORT_TERMINAL_CITY,
+                B_VESSEL_NAME,
+                B_VOYAGE_CARRIER,
+                B_DOCUMENT_CUT_OFF_DOCCUT,
+                B_PORT_CUT_OFF_PORTCUT,
+                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
+                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
+                B_GATE_OPENING,
+                USER_INSERT,
+                USER_UPDATE,
+                DATE_UPDATE,
+                ROW_INSERTED_DATE
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            ORDER BY ROW_INSERTED_DATE DESC
+            FETCH FIRST {int(limit)} ROWS ONLY
+        """
+        rows = conn.execute(text(query)).mappings().fetchall()
+        df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+        if not df.empty:
+            df.columns = [str(c).upper() for c in df.columns]
+        return df
+    finally:
+        conn.close()
  
 #Obter os dados das tabelas principais Sales
 #@st.cache_data(ttl=300)
@@ -986,7 +1071,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             """
             SELECT 
                 FAROL_REFERENCE,
-                B_BOOKING_REFERENCE,
                 'Booking Requested' AS B_BOOKING_STATUS,
                 NULL AS P_STATUS,
                 NULL AS P_PDF_NAME,
@@ -1031,7 +1115,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                 """
                 UPDATE LogTransp.F_CON_RETURN_CARRIERS
                 SET 
-                    B_BOOKING_REFERENCE = :B_BOOKING_REFERENCE,
                     B_BOOKING_STATUS = :B_BOOKING_STATUS,
                     P_STATUS = :P_STATUS,
                     P_PDF_NAME = :P_PDF_NAME,
@@ -1063,7 +1146,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                 """
                 INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
                     FAROL_REFERENCE,
-                    B_BOOKING_REFERENCE,
                     B_BOOKING_STATUS,
                     P_STATUS,
                     P_PDF_NAME,
@@ -1085,7 +1167,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     USER_INSERT
                 ) VALUES (
                     :FAROL_REFERENCE,
-                    :B_BOOKING_REFERENCE,
                     :B_BOOKING_STATUS,
                     :P_STATUS,
                     :P_PDF_NAME,
