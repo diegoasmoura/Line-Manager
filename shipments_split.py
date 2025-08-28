@@ -257,13 +257,13 @@ def show_split_form():
                     if not changes and num_splits == 0:
                         st.warning("⚠️ Nenhuma alteração detectada no item principal.")
                     elif not area or not reason or not responsibility:
-                        st.error("Erro: Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
+                        st.warning("⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
                     else:
                         # Obter as quantidades dos splits antes da verificação
                         split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
                         
                         if num_splits > 0 and (split_quantities <= 0).any():
-                            st.error("Erro: Todos os splits devem ter quantidade maior que 0.")
+                            st.warning("⚠️ Todos os splits devem ter quantidade maior que 0.")
                         else:
                             # Desabilita o botão imediatamente
                             st.session_state.button_disabled = True
