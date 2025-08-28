@@ -253,15 +253,15 @@ def show_split_form():
                 disabled=st.session_state.get("button_disabled", False)
             ):
                 if not st.session_state.get("button_disabled", False):
-                    # Verifica se houve alterações na linha principal
-                    if not changes and num_splits == 0:
+                    # Validação 1: sempre exigir alteração na linha principal (com ou sem splits)
+                    if not changes:
                         st.warning("⚠️ Nenhuma alteração detectada no item principal.")
+                    # Validação 2: justificativas obrigatórias
                     elif not area or not reason or not responsibility:
                         st.warning("⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
                     else:
-                        # Obter as quantidades dos splits antes da verificação
+                        # Validação 3 (quando houver splits): quantidades dos splits devem ser > 0
                         split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
-                        
                         if num_splits > 0 and (split_quantities <= 0).any():
                             st.warning("⚠️ Todos os splits devem ter quantidade maior que 0.")
                         else:
