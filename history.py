@@ -37,7 +37,8 @@ def exibir_history():
     # Métricas rápidas
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("Farol Status", str(df.iloc[0].get("B_BOOKING_STATUS", "-")))
+        main_status = get_current_status_from_main_table(farol_reference) or "-"
+        st.metric("Farol Status", str(main_status))
     with c2:
         st.metric("Voyage Carrier", str(df.iloc[0].get("B_VOYAGE_CARRIER", "-")))
     with c3:
@@ -207,6 +208,54 @@ def exibir_history():
         key="history_return_carriers_editor"
     )
 
+    # Função para aplicar mudanças de status (declarada antes do uso)
+    def apply_status_change(farol_ref, adjustment_id, new_status):
+        try:
+            conn = get_database_connection()
+            tx = conn.begin()
+            
+            # Se o status foi alterado para "Booking Approved", executa a lógica de aprovação
+            if new_status == "Booking Approved" and adjustment_id:
+                # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
+                if update_sales_booking_from_return_carriers(adjustment_id):
+                    st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
+                else:
+                    st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
+
+            # Atualiza o status na tabela F_CON_RETURN_CARRIERS SEMPRE
+            if update_return_carrier_status(adjustment_id, new_status):
+                st.success(f"✅ Status atualizado na tabela F_CON_RETURN_CARRIERS para {farol_ref}")
+
+            # Regras específicas por status
+            if new_status == "Booking Rejected":
+                # Atualiza SOMENTE a coluna FAROL_STATUS na tabela principal
+                conn.execute(text("""
+                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                       SET FAROL_STATUS = :farol_status
+                     WHERE FAROL_REFERENCE = :farol_reference
+                """), {"farol_status": new_status, "farol_reference": farol_ref})
+                st.success(f"✅ FAROL_STATUS atualizado em F_CON_SALES_BOOKING_DATA para {farol_ref}")
+            else:
+                # Demais status (Approved/Cancelled/Adjustment Requested)
+                # Para Approved já atualizamos dados acima; ainda assim garantimos FAROL_STATUS
+                conn.execute(text("""
+                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                       SET FAROL_STATUS = :farol_status
+                     WHERE FAROL_REFERENCE = :farol_reference
+                """), {"farol_status": new_status, "farol_reference": farol_ref})
+
+            tx.commit()
+            st.success(f"✅ Status atualizado com sucesso para {farol_ref}!")
+            st.rerun()
+            
+        except Exception as e:
+            if 'tx' in locals():
+                tx.rollback()
+            st.error(f"❌ Erro ao atualizar status: {str(e)}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
     # Interface de botões de status para linha selecionada
     selected = edited_df[edited_df["Selecionar"] == True]
     if len(selected) > 1:
@@ -291,62 +340,7 @@ def exibir_history():
         st.info("📋 **Selecione uma linha na grade acima para gerenciar o status**")
         st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis")
     
-    # Função para aplicar mudanças de status
-    def apply_status_change(farol_ref, adjustment_id, new_status):
-        try:
-            conn = get_database_connection()
-            tx = conn.begin()
-            
-            # Se o status foi alterado para "Booking Approved", executa a lógica de aprovação
-            if new_status == "Booking Approved" and adjustment_id:
-                # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
-                if update_sales_booking_from_return_carriers(adjustment_id):
-                    st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
-                else:
-                    st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
-            
-            # Atualiza o status na tabela F_CON_RETURN_CARRIERS
-            if update_return_carrier_status(adjustment_id, new_status):
-                st.success(f"✅ Status atualizado na tabela F_CON_RETURN_CARRIERS para {farol_ref}")
-            
-            # Atualiza status no log (se existir)
-            update_log_query = text("""
-                UPDATE LogTransp.F_CON_Adjustments_Log
-                   SET status = :new_status,
-                       confirmation_date = :confirmation_date
-                 WHERE farol_reference = :farol_reference
-            """)
-            conn.execute(update_log_query, {
-                "new_status": new_status,
-                "confirmation_date": datetime.now() if new_status in ["Booking Approved", "Booking Rejected", "Booking Cancelled"] else None,
-                "farol_reference": farol_ref
-            })
-
-            # Atualiza status nas tabelas principais
-            conn.execute(text("""
-                UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-                   SET FAROL_STATUS = :farol_status
-                 WHERE FAROL_REFERENCE = :farol_reference
-            """), {"farol_status": new_status, "farol_reference": farol_ref})
-
-            conn.execute(text("""
-                UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-                   SET l_farol_status = :farol_status,
-                       l_creation_of_cargo_loading = :creation_date
-                 WHERE l_farol_reference = :farol_reference
-            """), {"farol_status": new_status, "creation_date": datetime.now(), "farol_reference": farol_ref})
-
-            tx.commit()
-            st.success(f"✅ Status atualizado com sucesso para {farol_ref}!")
-            st.rerun()
-            
-        except Exception as e:
-            if 'tx' in locals():
-                tx.rollback()
-            st.error(f"❌ Erro ao atualizar status: {str(e)}")
-        finally:
-            if 'conn' in locals():
-                conn.close()
+    # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
