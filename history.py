@@ -209,38 +209,50 @@ def exibir_history():
     )
 
     # Função para aplicar mudanças de status (declarada antes do uso)
-    def apply_status_change(farol_ref, adjustment_id, new_status):
+    def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None):
         try:
             conn = get_database_connection()
             tx = conn.begin()
             
+            # Resolve ADJUSTMENT_ID (usa o passado ou busca por fallback)
+            adj_id = (str(adjustment_id).strip() if adjustment_id is not None else None)
+            if not adj_id or adj_id.lower() in ("none", "nan", "null", ""):
+                # Fallback: tenta pelo FAROL_REFERENCE e, se informado, pelo status da linha selecionada
+                try:
+                    if selected_row_status:
+                        sql_adj = text("""
+                            SELECT ADJUSTMENT_ID
+                              FROM LogTransp.F_CON_RETURN_CARRIERS
+                             WHERE FAROL_REFERENCE = :farol_reference
+                               AND B_BOOKING_STATUS = :status_atual
+                          ORDER BY ROW_INSERTED_DATE DESC
+                          FETCH FIRST 1 ROWS ONLY
+                        """)
+                        adj_id = conn.execute(sql_adj, {"farol_reference": farol_ref, "status_atual": selected_row_status}).scalar()
+                    if not adj_id:
+                        sql_adj_any = text("""
+                            SELECT ADJUSTMENT_ID
+                              FROM LogTransp.F_CON_RETURN_CARRIERS
+                             WHERE FAROL_REFERENCE = :farol_reference
+                          ORDER BY ROW_INSERTED_DATE DESC
+                          FETCH FIRST 1 ROWS ONLY
+                        """)
+                        adj_id = conn.execute(sql_adj_any, {"farol_reference": farol_ref}).scalar()
+                    if adj_id:
+                        adj_id = str(adj_id).strip()
+                        st.caption(f"DEBUG: ADJUSTMENT_ID usado={adj_id}")
+                except Exception:
+                    pass
+            
             # Se o status foi alterado para "Booking Approved", executa a lógica de aprovação
-            if new_status == "Booking Approved" and adjustment_id:
+            if new_status == "Booking Approved" and adj_id:
                 # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
-                if update_sales_booking_from_return_carriers(adjustment_id):
+                if update_sales_booking_from_return_carriers(adj_id):
                     st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
                 else:
                     st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
 
             # Atualiza o status na tabela F_CON_RETURN_CARRIERS SEMPRE (na mesma transação)
-            adj_id = (str(adjustment_id).strip() if adjustment_id is not None else None)
-            # Fallback: se não veio ADJUSTMENT_ID na grid, tenta buscar pelo FAROL_REFERENCE + status da linha
-            if not adj_id or adj_id.lower() in ("none", "nan", "null", ""):
-                try:
-                    fallback_adj = conn.execute(text("""
-                        SELECT ADJUSTMENT_ID
-                          FROM LogTransp.F_CON_RETURN_CARRIERS
-                         WHERE FAROL_REFERENCE = :farol_reference
-                           AND B_BOOKING_STATUS = :status_atual
-                      ORDER BY ROW_INSERTED_DATE DESC
-                      FETCH FIRST 1 ROWS ONLY
-                    """), {"farol_reference": farol_ref, "status_atual": selected_row_status}).scalar()
-                    if fallback_adj:
-                        adj_id = str(fallback_adj).strip()
-                        st.info(f"🔎 ADJUSTMENT_ID obtido por fallback: {adj_id}")
-                except Exception as _:
-                    pass
-
             # Sanity check: existe linha com esse ADJUSTMENT_ID?
             try:
                 exists_cnt = conn.execute(text("""
@@ -282,6 +294,36 @@ def exibir_history():
                        SET FAROL_STATUS = :farol_status
                      WHERE FAROL_REFERENCE = :farol_reference
                 """), {"farol_status": new_status, "farol_reference": farol_ref})
+
+            # Verificação pós-aprovação: comparar campos entre as duas tabelas
+            if new_status == "Booking Approved":
+                try:
+                    fields = [
+                        "S_SPLITTED_BOOKING_REFERENCE","S_PLACE_OF_RECEIPT","S_QUANTITY_OF_CONTAINERS",
+                        "S_PORT_OF_LOADING_POL","S_PORT_OF_DELIVERY_POD","S_FINAL_DESTINATION",
+                        "B_TRANSHIPMENT_PORT","B_PORT_TERMINAL_CITY","B_VESSEL_NAME","B_VOYAGE_CARRIER",
+                        "B_DOCUMENT_CUT_OFF_DOCCUT","B_PORT_CUT_OFF_PORTCUT","B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
+                        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA","B_GATE_OPENING"
+                    ]
+                    cols = ", ".join(fields)
+                    # Retorno: pela linha aprovada
+                    rc_row = conn.execute(text(f"""
+                        SELECT {cols}
+                          FROM LogTransp.F_CON_RETURN_CARRIERS
+                         WHERE ADJUSTMENT_ID = :adj
+                    """), {"adj": adj_id}).mappings().fetchone()
+                    # Principal: pela referência
+                    sb_row = conn.execute(text(f"""
+                        SELECT {cols}
+                          FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                         WHERE FAROL_REFERENCE = :ref
+                    """), {"ref": farol_ref}).mappings().fetchone()
+                    if rc_row and sb_row:
+                        st.markdown("#### 🔎 Pós-aprovação (comparação de campos)")
+                        for f in fields:
+                            st.caption(f"{f}: RC='{rc_row.get(f)}' → SB='{sb_row.get(f)}'")
+                except Exception as _:
+                    pass
 
             tx.commit()
             st.success(f"✅ Status atualizado com sucesso para {farol_ref}!")
@@ -344,7 +386,9 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Booking Approved" else "primary"):
                     if current_status != "Booking Approved":
-                        apply_status_change(farol_ref, adjustment_id, "Booking Approved")
+                        # Mostra confirmação antes de aprovar
+                        st.session_state["show_approval_confirmation"] = True
+                        st.rerun()
             
             with col2:
                 if st.button("🔴 Booking Rejected", 
@@ -352,7 +396,7 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Booking Rejected" else "primary"):
                     if current_status != "Booking Rejected":
-                        apply_status_change(farol_ref, adjustment_id, "Booking Rejected")
+                        apply_status_change(farol_ref, adjustment_id, "Booking Rejected", selected_row_status)
             
             with col3:
                 if st.button("⚫ Booking Cancelled", 
@@ -360,7 +404,7 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Booking Cancelled" else "primary"):
                     if current_status != "Booking Cancelled":
-                        apply_status_change(farol_ref, adjustment_id, "Booking Cancelled")
+                        apply_status_change(farol_ref, adjustment_id, "Booking Cancelled", selected_row_status)
             
             with col4:
                 if st.button("🟡 Adjustment Requested", 
@@ -368,11 +412,35 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Adjustment Requested" else "primary"):
                     if current_status != "Adjustment Requested":
-                        apply_status_change(farol_ref, adjustment_id, "Adjustment Requested")
+                        apply_status_change(farol_ref, adjustment_id, "Adjustment Requested", selected_row_status)
             
             # Botão de reset
             if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):
                 st.rerun()
+        
+        # Interface de confirmação para aprovação
+        if st.session_state.get("show_approval_confirmation", False):
+            st.markdown("---")
+            st.markdown("### ✅ Confirmação de Aprovação")
+            st.info("**Deseja realmente aprovar este ajuste?**")
+            
+            # Botões de confirmação
+            col_confirm, col_cancel = st.columns(2)
+            with col_confirm:
+                if st.button("✅ Confirmar Aprovação", 
+                            key="confirm_approval",
+                            use_container_width=True,
+                            type="primary"):
+                    st.session_state["show_approval_confirmation"] = False
+                    apply_status_change(farol_ref, adjustment_id, "Booking Approved", selected_row_status)
+            
+            with col_cancel:
+                if st.button("❌ Cancelar", 
+                            key="cancel_approval",
+                            use_container_width=True,
+                            type="secondary"):
+                    st.session_state["show_approval_confirmation"] = False
+                    st.rerun()
     else:
         # Mensagem quando nenhuma linha está selecionada
         st.markdown("---")

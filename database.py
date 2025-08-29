@@ -1579,51 +1579,64 @@ def update_sales_booking_from_return_carriers(adjustment_id: str) -> bool:
     try:
         # Busca os dados da linha aprovada
         return_carrier_data = get_return_carriers_by_adjustment_id(adjustment_id)
+        print(f"DEBUG: get_return_carriers_by_adjustment_id({adjustment_id}) returned {len(return_carrier_data)} rows")
         if return_carrier_data.empty:
+            print("DEBUG: return_carrier_data is empty")
             return False
         
         row = return_carrier_data.iloc[0]
         farol_reference = row.get("FAROL_REFERENCE")
+        print(f"DEBUG: farol_reference={farol_reference}")
+        print(f"DEBUG: row data keys: {list(row.keys())}")
+        print(f"DEBUG: S_QUANTITY_OF_CONTAINERS value: '{row.get('S_QUANTITY_OF_CONTAINERS')}' (type: {type(row.get('S_QUANTITY_OF_CONTAINERS'))})")
         
         if not farol_reference:
+            print("DEBUG: farol_reference is empty")
             return False
         
-        # Prepara os campos para atualização (apenas campos não nulos)
+        # Prepara os campos para atualização (apenas valores não nulos/nem vazios)
         update_fields = {}
-        
+
+        def add_if_present(field_name):
+            val = row.get(field_name)
+            try:
+                import pandas as _pd
+                import numpy as np
+                if val is None or (_pd.isna(val)):
+                    return
+                # Converte tipos numpy para tipos Python nativos para compatibilidade com Oracle
+                if isinstance(val, np.integer):
+                    val = int(val)
+                elif isinstance(val, np.floating):
+                    val = float(val)
+                elif isinstance(val, np.bool_):
+                    val = bool(val)
+            except Exception:
+                if val is None:
+                    return
+            # Normaliza strings vazias
+            if isinstance(val, str) and val.strip() == "":
+                return
+            update_fields[field_name] = val
+
         # Campos S_ (Sales)
-        if row.get("S_SPLITTED_BOOKING_REFERENCE") is not None:
-            update_fields["S_SPLITTED_BOOKING_REFERENCE"] = row.get("S_SPLITTED_BOOKING_REFERENCE")
-        if row.get("S_PLACE_OF_RECEIPT") is not None:
-            update_fields["S_PLACE_OF_RECEIPT"] = row.get("S_PLACE_OF_RECEIPT")
-        if row.get("S_QUANTITY_OF_CONTAINERS") is not None:
-            update_fields["S_QUANTITY_OF_CONTAINERS"] = row.get("S_QUANTITY_OF_CONTAINERS")
-        if row.get("S_PORT_OF_LOADING_POL") is not None:
-            update_fields["S_PORT_OF_LOADING_POL"] = row.get("S_PORT_OF_LOADING_POL")
-        if row.get("S_PORT_OF_DELIVERY_POD") is not None:
-            update_fields["S_PORT_OF_DELIVERY_POD"] = row.get("S_PORT_OF_DELIVERY_POD")
-        if row.get("S_FINAL_DESTINATION") is not None:
-            update_fields["S_FINAL_DESTINATION"] = row.get("S_FINAL_DESTINATION")
+        add_if_present("S_SPLITTED_BOOKING_REFERENCE")
+        add_if_present("S_PLACE_OF_RECEIPT")
+        add_if_present("S_QUANTITY_OF_CONTAINERS")
+        add_if_present("S_PORT_OF_LOADING_POL")
+        add_if_present("S_PORT_OF_DELIVERY_POD")
+        add_if_present("S_FINAL_DESTINATION")
         
         # Campos B_ (Booking)
-        if row.get("B_TRANSHIPMENT_PORT") is not None:
-            update_fields["B_TRANSHIPMENT_PORT"] = row.get("B_TRANSHIPMENT_PORT")
-        if row.get("B_PORT_TERMINAL_CITY") is not None:
-            update_fields["B_PORT_TERMINAL_CITY"] = row.get("B_PORT_TERMINAL_CITY")
-        if row.get("B_VESSEL_NAME") is not None:
-            update_fields["B_VESSEL_NAME"] = row.get("B_VESSEL_NAME")
-        if row.get("B_VOYAGE_CARRIER") is not None:
-            update_fields["B_VOYAGE_CARRIER"] = row.get("B_VOYAGE_CARRIER")
-        if row.get("B_DOCUMENT_CUT_OFF_DOCCUT") is not None:
-            update_fields["B_DOCUMENT_CUT_OFF_DOCCUT"] = row.get("B_DOCUMENT_CUT_OFF_DOCCUT")
-        if row.get("B_PORT_CUT_OFF_PORTCUT") is not None:
-            update_fields["B_PORT_CUT_OFF_PORTCUT"] = row.get("B_PORT_CUT_OFF_PORTCUT")
-        if row.get("B_ESTIMATED_TIME_OF_DEPARTURE_ETD") is not None:
-            update_fields["B_ESTIMATED_TIME_OF_DEPARTURE_ETD"] = row.get("B_ESTIMATED_TIME_OF_DEPARTURE_ETD")
-        if row.get("B_ESTIMATED_TIME_OF_ARRIVAL_ETA") is not None:
-            update_fields["B_ESTIMATED_TIME_OF_ARRIVAL_ETA"] = row.get("B_ESTIMATED_TIME_OF_ARRIVAL_ETA")
-        if row.get("B_GATE_OPENING") is not None:
-            update_fields["B_GATE_OPENING"] = row.get("B_GATE_OPENING")
+        add_if_present("B_TRANSHIPMENT_PORT")
+        add_if_present("B_PORT_TERMINAL_CITY")
+        add_if_present("B_VESSEL_NAME")
+        add_if_present("B_VOYAGE_CARRIER")
+        add_if_present("B_DOCUMENT_CUT_OFF_DOCCUT")
+        add_if_present("B_PORT_CUT_OFF_PORTCUT")
+        add_if_present("B_ESTIMATED_TIME_OF_DEPARTURE_ETD")
+        add_if_present("B_ESTIMATED_TIME_OF_ARRIVAL_ETA")
+        add_if_present("B_GATE_OPENING")
         
         # Se não há campos para atualizar, retorna True (não é erro)
         if not update_fields:
@@ -1641,10 +1654,12 @@ def update_sales_booking_from_return_carriers(adjustment_id: str) -> bool:
         update_fields["farol_reference"] = farol_reference
         
         # Executa a atualização
-        conn.execute(update_query, update_fields)
+        result = conn.execute(update_query, update_fields)
         conn.commit()
+        # Log leve em console para depuração
+        print(f"update_sales_booking_from_return_carriers: fields={list(update_fields.keys())}, rowcount={getattr(result,'rowcount',None)}, farol={farol_reference}")
         
-        return True
+        return getattr(result, "rowcount", 0) > 0
         
     except Exception as e:
         if 'conn' in locals():
