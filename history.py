@@ -145,21 +145,20 @@ def exibir_history():
     df_udc = load_df_udc()
     farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
     relevant_status = [
-        "Adjustment Requested",
-        "Booking Requested",
         "Booking Approved",
         "Booking Rejected",
         "Booking Cancelled",
+        "Adjustment Requested",
     ]
     available_options = [s for s in relevant_status if s in farol_status_options]
     if not available_options:
         available_options = relevant_status
-    # Garante "Adjustment Requested" no início
+    # Garante "Adjustment Requested" no final
     if "Adjustment Requested" not in available_options:
-        available_options.insert(0, "Adjustment Requested")
-    elif available_options and available_options[0] != "Adjustment Requested":
+        available_options.append("Adjustment Requested")
+    elif available_options and available_options[-1] != "Adjustment Requested":
         available_options.remove("Adjustment Requested")
-        available_options.insert(0, "Adjustment Requested")
+        available_options.append("Adjustment Requested")
     # Remove vazios/nulos
     available_options = [opt for opt in available_options if opt and str(opt).strip()]
 
@@ -218,10 +217,13 @@ def exibir_history():
         st.markdown("---")
         st.markdown("### 🔄 Status Management")
         
-        # Obtém informações da linha selecionada
-        idx = selected.index[0]
-        farol_ref = original_df.iloc[idx].get("Farol Reference") or original_df.iloc[idx].get("FAROL_REFERENCE")
-        adjustment_id = original_df.iloc[idx].get("Adjustment ID")
+        # Obtém informações da linha selecionada (usar diretamente a série selecionada para evitar divergência de índice)
+        selected_row = selected.iloc[0]
+        farol_ref = selected_row.get("Farol Reference") or selected_row.get("FAROL_REFERENCE")
+        adjustment_id = selected_row.get("Adjustment ID")
+        
+        # Obtém o status da linha selecionada na tabela F_CON_RETURN_CARRIERS
+        selected_row_status = selected_row.get("Farol Status", "")
         
         # Obtém o status atual da tabela principal F_CON_SALES_BOOKING_DATA
         current_status = get_current_status_from_main_table(farol_ref)
@@ -233,47 +235,56 @@ def exibir_history():
         with col2:
             st.info(f"**Farol Reference:** {farol_ref}")
         
-        # Botões de status com layout elegante
-        st.markdown("#### Select New Status:")
-        
-        # Todos os botões em uma linha
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("🟡 Adjustment Requested", 
-                        key="status_adjustment_requested",
-                        use_container_width=True,
-                        type="secondary" if current_status == "Adjustment Requested" else "primary"):
-                if current_status != "Adjustment Requested":
-                    apply_status_change(farol_ref, adjustment_id, "Adjustment Requested")
-        
-        with col2:
-            if st.button("🟢 Booking Approved", 
-                        key="status_booking_approved",
-                        use_container_width=True,
-                        type="secondary" if current_status == "Booking Approved" else "primary"):
-                if current_status != "Booking Approved":
-                    apply_status_change(farol_ref, adjustment_id, "Booking Approved")
-        
-        with col3:
-            if st.button("🔴 Booking Rejected", 
-                        key="status_booking_rejected",
-                        use_container_width=True,
-                        type="secondary" if current_status == "Booking Rejected" else "primary"):
-                if current_status != "Booking Rejected":
-                    apply_status_change(farol_ref, adjustment_id, "Booking Rejected")
-        
-        with col4:
-            if st.button("⚫ Booking Cancelled", 
-                        key="status_booking_cancelled",
-                        use_container_width=True,
-                        type="secondary" if current_status == "Booking Cancelled" else "primary"):
-                if current_status != "Booking Cancelled":
-                    apply_status_change(farol_ref, adjustment_id, "Booking Cancelled")
-        
-        # Botão de reset
-        if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):
-            st.rerun()
+        # Verifica se o status da linha selecionada é "Booking Requested" - se for, não permite alterações
+        if selected_row_status == "Booking Requested":
+            st.warning("⚠️ **Esta etapa não pode ser alterada pelo usuário**")
+            st.info(f"📋 O status '{selected_row_status}' é uma etapa protegida do sistema")
+            
+            # Botão de reset apenas
+            if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):
+                st.rerun()
+        else:
+            # Botões de status com layout elegante
+            st.markdown("#### Select New Status:")
+            
+            # Todos os botões em uma linha
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                if st.button("🟢 Booking Approved", 
+                            key="status_booking_approved",
+                            use_container_width=True,
+                            type="secondary" if current_status == "Booking Approved" else "primary"):
+                    if current_status != "Booking Approved":
+                        apply_status_change(farol_ref, adjustment_id, "Booking Approved")
+            
+            with col2:
+                if st.button("🔴 Booking Rejected", 
+                            key="status_booking_rejected",
+                            use_container_width=True,
+                            type="secondary" if current_status == "Booking Rejected" else "primary"):
+                    if current_status != "Booking Rejected":
+                        apply_status_change(farol_ref, adjustment_id, "Booking Rejected")
+            
+            with col3:
+                if st.button("⚫ Booking Cancelled", 
+                            key="status_booking_cancelled",
+                            use_container_width=True,
+                            type="secondary" if current_status == "Booking Cancelled" else "primary"):
+                    if current_status != "Booking Cancelled":
+                        apply_status_change(farol_ref, adjustment_id, "Booking Cancelled")
+            
+            with col4:
+                if st.button("🟡 Adjustment Requested", 
+                            key="status_adjustment_requested",
+                            use_container_width=True,
+                            type="secondary" if current_status == "Adjustment Requested" else "primary"):
+                    if current_status != "Adjustment Requested":
+                        apply_status_change(farol_ref, adjustment_id, "Adjustment Requested")
+            
+            # Botão de reset
+            if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):
+                st.rerun()
     else:
         # Mensagem quando nenhuma linha está selecionada
         st.markdown("---")
