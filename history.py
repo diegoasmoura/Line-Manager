@@ -8,6 +8,9 @@ from datetime import datetime
 
 def exibir_history():
     st.header("📜 Return Carriers History")
+    
+    # Espaçamento após o título
+    st.markdown("<br>", unsafe_allow_html=True)
 
     farol_reference = st.session_state.get("selected_reference")
     if not farol_reference:
@@ -460,10 +463,6 @@ def exibir_history():
         if selected_row_status == "Booking Requested":
             st.warning("⚠️ **Esta etapa não pode ser alterada pelo usuário**")
             st.info(f"📋 O status '{selected_row_status}' é uma etapa protegida do sistema")
-            
-            # Botão de reset apenas
-            if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):
-                st.rerun()
         else:
             # Botões de status com layout elegante
             st.markdown("#### 🔄 Select New Status:")
