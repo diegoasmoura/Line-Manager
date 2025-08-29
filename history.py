@@ -165,8 +165,8 @@ def exibir_history():
     available_options = [opt for opt in available_options if opt and str(opt).strip()]
 
     column_config = {
-        "Farol Status": st.column_config.SelectboxColumn(
-            "Farol Status", options=available_options, default="Adjustment Requested"
+        "Farol Status": st.column_config.TextColumn(
+            "Farol Status", disabled=True
         )
     }
     # Demais colunas somente leitura
@@ -235,8 +235,8 @@ def exibir_history():
         # Botões de status com layout elegante
         st.markdown("#### Select New Status:")
         
-        # Primeira linha de botões
-        col1, col2 = st.columns(2)
+        # Todos os botões em uma linha
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             if st.button("🟡 Adjustment Requested", 
@@ -254,10 +254,7 @@ def exibir_history():
                 if current_status != "Booking Approved":
                     apply_status_change(farol_ref, adjustment_id, "Booking Approved")
         
-        # Segunda linha de botões
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
+        with col3:
             if st.button("🔴 Booking Rejected", 
                         key="status_booking_rejected",
                         use_container_width=True,
@@ -265,7 +262,7 @@ def exibir_history():
                 if current_status != "Booking Rejected":
                     apply_status_change(farol_ref, adjustment_id, "Booking Rejected")
         
-        with col2:
+        with col4:
             if st.button("⚫ Booking Cancelled", 
                         key="status_booking_cancelled",
                         use_container_width=True,
@@ -273,7 +270,7 @@ def exibir_history():
                 if current_status != "Booking Cancelled":
                     apply_status_change(farol_ref, adjustment_id, "Booking Cancelled")
         
-        with col3:
+        with col5:
             if st.button("🟣 Received from Carrier", 
                         key="status_received_carrier",
                         use_container_width=True,
