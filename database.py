@@ -1372,13 +1372,30 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
         except Exception:
             qty = None
 
+        # Determina se é um split ou linha original
+        # Split tem formato: FR_25.08_0001.1, FR_25.08_0001.2, etc.
+        # Referência base tem formato: FR_25.08_0001
+        is_split = farol_reference.count('.') > 1  # Mais de 1 ponto = split
+        
+        # Para splits, S_SPLITTED_BOOKING_REFERENCE deve conter a referência original
+        # Para linha original, S_SPLITTED_BOOKING_REFERENCE deve ser NULL
+        if is_split:
+            # Extrai a referência base (remove o número do split após o último ponto)
+            # Ex: FR_25.08_0001.1 -> FR_25.08_0001
+            last_dot_index = farol_reference.rfind('.')
+            base_reference = farol_reference[:last_dot_index]
+            splitted_booking_ref = base_reference
+        else:
+            # Linha original - não tem referência de split
+            splitted_booking_ref = None
+        
         params = {
             "FAROL_REFERENCE": farol_reference,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
             "B_BOOKING_STATUS": "Adjustment Requested",
             "P_STATUS": None,
             "P_PDF_NAME": None,
-            "S_SPLITTED_BOOKING_REFERENCE": norm(ui_row.get("Splitted Booking Reference")),
+            "S_SPLITTED_BOOKING_REFERENCE": splitted_booking_ref,
             "S_PLACE_OF_RECEIPT": norm(ui_row.get("Place of Receipt")),
             "S_QUANTITY_OF_CONTAINERS": qty,
             "S_PORT_OF_LOADING_POL": norm(ui_row.get("Port of Loading POL")),
