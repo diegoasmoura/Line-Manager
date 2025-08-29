@@ -467,40 +467,44 @@ def exibir_history():
             # Botões de status com layout elegante
             st.markdown("#### 🔄 Select New Status:")
             
-            # Botões de status com espaçamento reduzido
-            col1, col2, col3, col4 = st.columns([1, 1, 1, 1], gap="small")
+            # Botões de status alinhados à esquerda
+            col1, col2 = st.columns([2, 3])
             
             with col1:
-                if st.button("Booking Approved", 
-                            key="status_booking_approved",
-                            type="secondary"):
-                    if current_status != "Booking Approved":
-                        st.session_state["pending_status_change"] = "Booking Approved"
-                        st.rerun()
-            
-            with col2:
-                if st.button("Booking Rejected", 
-                            key="status_booking_rejected",
-                            type="secondary"):
-                    if current_status != "Booking Rejected":
-                        st.session_state["pending_status_change"] = "Booking Rejected"
-                        st.rerun()
-            
-            with col3:
-                if st.button("Booking Cancelled", 
-                            key="status_booking_cancelled",
-                            type="secondary"):
-                    if current_status != "Booking Cancelled":
-                        st.session_state["pending_status_change"] = "Booking Cancelled"
-                        st.rerun()
-            
-            with col4:
-                if st.button("Adjustment Requested", 
-                            key="status_adjustment_requested",
-                            type="secondary"):
-                    if current_status != "Adjustment Requested":
-                        st.session_state["pending_status_change"] = "Adjustment Requested"
-                        st.rerun()
+                # Botões de status com espaçamento reduzido
+                subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
+                
+                with subcol1:
+                    if st.button("Booking Approved", 
+                                key="status_booking_approved",
+                                type="secondary"):
+                        if current_status != "Booking Approved":
+                            st.session_state["pending_status_change"] = "Booking Approved"
+                            st.rerun()
+                
+                with subcol2:
+                    if st.button("Booking Rejected", 
+                                key="status_booking_rejected",
+                                type="secondary"):
+                        if current_status != "Booking Rejected":
+                            st.session_state["pending_status_change"] = "Booking Rejected"
+                            st.rerun()
+                
+                with subcol3:
+                    if st.button("Booking Cancelled", 
+                                key="status_booking_cancelled",
+                                type="secondary"):
+                        if current_status != "Booking Cancelled":
+                            st.session_state["pending_status_change"] = "Booking Cancelled"
+                            st.rerun()
+                
+                with subcol4:
+                    if st.button("Adjustment Requested", 
+                                key="status_adjustment_requested",
+                                type="secondary"):
+                        if current_status != "Adjustment Requested":
+                            st.session_state["pending_status_change"] = "Adjustment Requested"
+                            st.rerun()
             
             # Confirmação quando há status pendente
             pending_status = st.session_state.get("pending_status_change")
