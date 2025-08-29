@@ -550,17 +550,17 @@ def exibir_history():
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("🔙 Back to Shipments"):
-            st.session_state["current_page"] = "main"
-            st.rerun()
-    with col2:
         # Toggle de anexos
         view_open = st.session_state.get("history_show_attachments", False)
         if st.button("📎 View Attachments", key="history_view_attachments"):
             st.session_state["history_show_attachments"] = not view_open
             st.rerun()
-    with col3:
+    with col2:
         st.download_button("⬇️ Export CSV", data=df_show.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
+    with col3:
+        if st.button("🔙 Back to Shipments"):
+            st.session_state["current_page"] = "main"
+            st.rerun()
 
     # Seção de anexos (toggle)
     if st.session_state.get("history_show_attachments", False):
