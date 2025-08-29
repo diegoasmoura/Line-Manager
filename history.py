@@ -66,12 +66,12 @@ def exibir_history():
             background: white;
             padding: 1rem;
             border-radius: 12px;
-            border-left: 4px solid #E91E63;
+            border-left: 4px solid #00843D;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             text-align: center;
         ">
-            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL REFERENCE</div>
-            <div style="color: #333; font-size: 1rem; font-weight: 600;">{farol_reference}</div>
+            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL REFERENCE</div>
+            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{farol_reference}</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -81,12 +81,12 @@ def exibir_history():
             background: white;
             padding: 1rem;
             border-radius: 12px;
-            border-left: 4px solid #4CAF50;
+            border-left: 4px solid #3599B8;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             text-align: center;
         ">
-            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL STATUS</div>
-            <div style="color: #333; font-size: 1rem; font-weight: 600;">{main_status}</div>
+            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL STATUS</div>
+            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{main_status}</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -96,12 +96,12 @@ def exibir_history():
             background: white;
             padding: 1rem;
             border-radius: 12px;
-            border-left: 4px solid #FF9800;
+            border-left: 4px solid #4AC5BB;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             text-align: center;
         ">
-            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">QUANTITY OF CONTAINERS</div>
-            <div style="color: #333; font-size: 1rem; font-weight: 600;">{qty}</div>
+            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">QUANTITY OF CONTAINERS</div>
+            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{qty}</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -111,12 +111,12 @@ def exibir_history():
             background: white;
             padding: 1rem;
             border-radius: 12px;
-            border-left: 4px solid #2196F3;
+            border-left: 4px solid #168980;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             text-align: center;
         ">
-            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">VOYAGE CARRIER</div>
-            <div style="color: #333; font-size: 1rem; font-weight: 600;">{voyage_carrier}</div>
+            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">VOYAGE CARRIER</div>
+            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{voyage_carrier}</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -126,12 +126,12 @@ def exibir_history():
             background: white;
             padding: 1rem;
             border-radius: 12px;
-            border-left: 4px solid #9C27B0;
+            border-left: 4px solid #28738A;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             text-align: center;
         ">
-            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">INSERTED</div>
-            <div style="color: #333; font-size: 1rem; font-weight: 600;">{ins}</div>
+            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">INSERTED</div>
+            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{ins}</div>
         </div>
         """, unsafe_allow_html=True)
 
