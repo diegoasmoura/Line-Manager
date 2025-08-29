@@ -222,12 +222,52 @@ def exibir_history():
                 else:
                     st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
 
-            # Atualiza o status na tabela F_CON_RETURN_CARRIERS SEMPRE
-            if update_return_carrier_status(adjustment_id, new_status):
-                st.success(f"✅ Status atualizado na tabela F_CON_RETURN_CARRIERS para {farol_ref}")
+            # Atualiza o status na tabela F_CON_RETURN_CARRIERS SEMPRE (na mesma transação)
+            adj_id = (str(adjustment_id).strip() if adjustment_id is not None else None)
+            # Fallback: se não veio ADJUSTMENT_ID na grid, tenta buscar pelo FAROL_REFERENCE + status da linha
+            if not adj_id or adj_id.lower() in ("none", "nan", "null", ""):
+                try:
+                    fallback_adj = conn.execute(text("""
+                        SELECT ADJUSTMENT_ID
+                          FROM LogTransp.F_CON_RETURN_CARRIERS
+                         WHERE FAROL_REFERENCE = :farol_reference
+                           AND B_BOOKING_STATUS = :status_atual
+                      ORDER BY ROW_INSERTED_DATE DESC
+                      FETCH FIRST 1 ROWS ONLY
+                    """), {"farol_reference": farol_ref, "status_atual": selected_row_status}).scalar()
+                    if fallback_adj:
+                        adj_id = str(fallback_adj).strip()
+                        st.info(f"🔎 ADJUSTMENT_ID obtido por fallback: {adj_id}")
+                except Exception as _:
+                    pass
+
+            # Sanity check: existe linha com esse ADJUSTMENT_ID?
+            try:
+                exists_cnt = conn.execute(text("""
+                    SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adjustment_id
+                """), {"adjustment_id": adj_id}).scalar()
+                st.caption(f"DEBUG: adjustment_id={adj_id}, rows_encontradas={exists_cnt}")
+            except Exception:
+                exists_cnt = None
+
+            res_rc = conn.execute(text("""
+                UPDATE LogTransp.F_CON_RETURN_CARRIERS
+                   SET B_BOOKING_STATUS = :new_status,
+                       USER_UPDATE = :user_update,
+                       DATE_UPDATE = SYSDATE
+                 WHERE ADJUSTMENT_ID = :adjustment_id
+            """), {
+                "new_status": new_status,
+                "user_update": "System",
+                "adjustment_id": adj_id,
+            })
+            if getattr(res_rc, "rowcount", 0) > 0:
+                st.success(f"✅ Status atualizado em F_CON_RETURN_CARRIERS para {farol_ref}")
+            else:
+                st.warning("⚠️ Nenhuma linha foi atualizada em F_CON_RETURN_CARRIERS (verifique o ADJUSTMENT_ID)")
 
             # Regras específicas por status
-            if new_status == "Booking Rejected":
+            if new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
                 # Atualiza SOMENTE a coluna FAROL_STATUS na tabela principal
                 conn.execute(text("""
                     UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
@@ -236,8 +276,7 @@ def exibir_history():
                 """), {"farol_status": new_status, "farol_reference": farol_ref})
                 st.success(f"✅ FAROL_STATUS atualizado em F_CON_SALES_BOOKING_DATA para {farol_ref}")
             else:
-                # Demais status (Approved/Cancelled/Adjustment Requested)
-                # Para Approved já atualizamos dados acima; ainda assim garantimos FAROL_STATUS
+                # Demais status (Approved)
                 conn.execute(text("""
                     UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
                        SET FAROL_STATUS = :farol_status

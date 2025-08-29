@@ -1673,14 +1673,14 @@ def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
             WHERE ADJUSTMENT_ID = :adjustment_id
         """)
         
-        conn.execute(update_query, {
+        result = conn.execute(update_query, {
             "new_status": new_status,
             "user_update": "System",  # Pode ser parametrizado se necessário
             "adjustment_id": adjustment_id
         })
         
         conn.commit()
-        return True
+        return (getattr(result, "rowcount", 0) > 0)
         
     except Exception as e:
         if 'conn' in locals():
