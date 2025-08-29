@@ -168,6 +168,21 @@ def exibir_history():
             df_show["ROW_INSERTED_DATE"] = pd.to_datetime(df_show["ROW_INSERTED_DATE"], unit="ms", errors="coerce")
         except Exception:
             pass
+    
+    # Converte campos de data específicos de epoch (ms) para datetime
+    date_fields = [
+        "B_DOCUMENT_CUT_OFF_DOCCUT",
+        "B_PORT_CUT_OFF_PORTCUT", 
+        "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
+        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
+    ]
+    
+    for field in date_fields:
+        if field in df_show.columns:
+            try:
+                df_show[field] = pd.to_datetime(df_show[field], unit="ms", errors="coerce")
+            except Exception:
+                pass
 
     # Aplica aliases iguais aos da grade principal quando disponíveis
     mapping_main = get_column_mapping()
@@ -200,6 +215,11 @@ def exibir_history():
         "P_STATUS": "Status",
         "P_PDF_NAME": "PDF Name",
         "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
+        # Aliases para campos de data
+        "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
+        "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
+        "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
+        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": "ETA",
     }
 
     rename_map = {}
@@ -269,6 +289,8 @@ def exibir_history():
             continue
         if col == "Inserted Date":
             column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+        elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+            column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
         else:
             column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
@@ -419,7 +441,7 @@ def exibir_history():
     # Interface de botões de status para linha selecionada
     if len(selected) == 1:
         st.markdown("---")
-        st.markdown("### 🔄 Status Management")
+
         
         # Obtém informações da linha selecionada (usar diretamente a série selecionada para evitar divergência de índice)
         selected_row = selected.iloc[0]
@@ -432,12 +454,7 @@ def exibir_history():
         # Obtém o status atual da tabela principal F_CON_SALES_BOOKING_DATA
         current_status = get_current_status_from_main_table(farol_ref)
         
-        # Mostra status atual
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.info(f"**Current Status:** {current_status}")
-        with col2:
-            st.info(f"**Farol Reference:** {farol_ref}")
+
         
         # Verifica se o status da linha selecionada é "Booking Requested" - se for, não permite alterações
         if selected_row_status == "Booking Requested":
@@ -449,7 +466,7 @@ def exibir_history():
                 st.rerun()
         else:
             # Botões de status com layout elegante
-            st.markdown("#### Select New Status:")
+            st.markdown("#### 🔄 Select New Status:")
             
             # Botões de status com espaçamento reduzido
             col1, col2, col3, col4 = st.columns([1, 1, 1, 1], gap="small")
