@@ -1708,3 +1708,20 @@ def get_current_status_from_main_table(farol_reference: str) -> str:
         return result if result else "Adjustment Requested"
     finally:
         conn.close()
+
+
+def get_return_carrier_status_by_adjustment_id(adjustment_id: str):
+    """Retorna o B_BOOKING_STATUS da F_CON_RETURN_CARRIERS para o ADJUSTMENT_ID dado."""
+    conn = get_database_connection()
+    try:
+        query = text(
+            """
+            SELECT B_BOOKING_STATUS
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE ADJUSTMENT_ID = :adjustment_id
+            """
+        )
+        result = conn.execute(query, {"adjustment_id": adjustment_id}).scalar()
+        return result
+    finally:
+        conn.close()

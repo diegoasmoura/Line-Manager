@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table
+from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table, get_return_carrier_status_by_adjustment_id
 from booking_adjustments import display_attachments_section
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
@@ -222,8 +222,8 @@ def exibir_history():
         farol_ref = selected_row.get("Farol Reference") or selected_row.get("FAROL_REFERENCE")
         adjustment_id = selected_row.get("Adjustment ID")
         
-        # Obtém o status da linha selecionada na tabela F_CON_RETURN_CARRIERS
-        selected_row_status = selected_row.get("Farol Status", "")
+        # Obtém o status da linha selecionada na tabela F_CON_RETURN_CARRIERS (prioriza leitura por UUID)
+        selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
         
         # Obtém o status atual da tabela principal F_CON_SALES_BOOKING_DATA
         current_status = get_current_status_from_main_table(farol_ref)
