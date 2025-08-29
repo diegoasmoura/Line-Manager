@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status
+from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table
 from booking_adjustments import display_attachments_section
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
@@ -150,7 +150,6 @@ def exibir_history():
         "Booking Approved",
         "Booking Rejected",
         "Booking Cancelled",
-        "Received from Carrier",
     ]
     available_options = [s for s in relevant_status if s in farol_status_options]
     if not available_options:
@@ -221,9 +220,11 @@ def exibir_history():
         
         # Obtém informações da linha selecionada
         idx = selected.index[0]
-        current_status = original_df.iloc[idx].get("Farol Status", "")
         farol_ref = original_df.iloc[idx].get("Farol Reference") or original_df.iloc[idx].get("FAROL_REFERENCE")
         adjustment_id = original_df.iloc[idx].get("Adjustment ID")
+        
+        # Obtém o status atual da tabela principal F_CON_SALES_BOOKING_DATA
+        current_status = get_current_status_from_main_table(farol_ref)
         
         # Mostra status atual
         col1, col2 = st.columns([2, 1])
@@ -236,7 +237,7 @@ def exibir_history():
         st.markdown("#### Select New Status:")
         
         # Todos os botões em uma linha
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             if st.button("🟡 Adjustment Requested", 
@@ -269,14 +270,6 @@ def exibir_history():
                         type="secondary" if current_status == "Booking Cancelled" else "primary"):
                 if current_status != "Booking Cancelled":
                     apply_status_change(farol_ref, adjustment_id, "Booking Cancelled")
-        
-        with col5:
-            if st.button("🟣 Received from Carrier", 
-                        key="status_received_carrier",
-                        use_container_width=True,
-                        type="secondary" if current_status == "Received from Carrier" else "primary"):
-                if current_status != "Received from Carrier":
-                    apply_status_change(farol_ref, adjustment_id, "Received from Carrier")
         
         # Botão de reset
         if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):

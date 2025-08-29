@@ -1690,4 +1690,21 @@ def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
     finally:
         if 'conn' in locals():
             conn.close()
- 
+
+
+def get_current_status_from_main_table(farol_reference: str) -> str:
+    """
+    Busca o status atual da tabela principal F_CON_SALES_BOOKING_DATA
+    usando o FAROL_REFERENCE
+    """
+    conn = get_database_connection()
+    try:
+        query = """
+        SELECT FAROL_STATUS
+        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+        WHERE FAROL_REFERENCE = :farol_reference
+        """
+        result = conn.execute(text(query), {"farol_reference": farol_reference}).scalar()
+        return result if result else "Adjustment Requested"
+    finally:
+        conn.close()
