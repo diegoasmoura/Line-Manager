@@ -377,41 +377,37 @@ def exibir_history():
             # Botões de status com layout elegante
             st.markdown("#### Select New Status:")
             
-            # Todos os botões em uma linha
-            col1, col2, col3, col4 = st.columns(4)
+            # Botões de status com espaçamento reduzido
+            col1, col2, col3, col4 = st.columns([1, 1, 1, 1], gap="small")
             
             with col1:
-                if st.button("🟢 Booking Approved", 
+                if st.button("Booking Approved", 
                             key="status_booking_approved",
-                            use_container_width=True,
-                            type="secondary" if current_status == "Booking Approved" else "primary"):
+                            type="secondary"):
                     if current_status != "Booking Approved":
                         st.session_state["pending_status_change"] = "Booking Approved"
                         st.rerun()
             
             with col2:
-                if st.button("🔴 Booking Rejected", 
+                if st.button("Booking Rejected", 
                             key="status_booking_rejected",
-                            use_container_width=True,
-                            type="secondary" if current_status == "Booking Rejected" else "primary"):
+                            type="secondary"):
                     if current_status != "Booking Rejected":
                         st.session_state["pending_status_change"] = "Booking Rejected"
                         st.rerun()
             
             with col3:
-                if st.button("⚫ Booking Cancelled", 
+                if st.button("Booking Cancelled", 
                             key="status_booking_cancelled",
-                            use_container_width=True,
-                            type="secondary" if current_status == "Booking Cancelled" else "primary"):
+                            type="secondary"):
                     if current_status != "Booking Cancelled":
                         st.session_state["pending_status_change"] = "Booking Cancelled"
                         st.rerun()
             
             with col4:
-                if st.button("🟡 Adjustment Requested", 
+                if st.button("Adjustment Requested", 
                             key="status_adjustment_requested",
-                            use_container_width=True,
-                            type="secondary" if current_status == "Adjustment Requested" else "primary"):
+                            type="secondary"):
                     if current_status != "Adjustment Requested":
                         st.session_state["pending_status_change"] = "Adjustment Requested"
                         st.rerun()
