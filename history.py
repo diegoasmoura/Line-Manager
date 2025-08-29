@@ -19,7 +19,7 @@ def exibir_history():
                 st.rerun()
         return
 
-    st.subheader(f"Farol Reference: {farol_reference}")
+
 
     df = get_return_carriers_by_farol(farol_reference)
     if df.empty:
@@ -34,29 +34,114 @@ def exibir_history():
                     st.rerun()
             return
 
-    # Métricas rápidas
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        main_status = get_current_status_from_main_table(farol_reference) or "-"
-        st.metric("Farol Status", str(main_status))
-    with c2:
-        st.metric("Voyage Carrier", str(df.iloc[0].get("B_VOYAGE_CARRIER", "-")))
-    with c3:
-        qty = df.iloc[0].get("S_QUANTITY_OF_CONTAINERS", 0)
-        try:
-            qty = int(qty) if qty is not None and pd.notna(qty) else 0
-        except (ValueError, TypeError):
-            qty = 0
-        st.metric("Quantity of Containers", qty)
-    with c4:
-        ins = df.iloc[0].get("ROW_INSERTED_DATE", "-")
-        try:
-            # Converte epoch ms para datetime legível, se for numérico
-            if isinstance(ins, (int, float)):
-                ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M')
-        except Exception:
-            pass
-        st.metric("Inserted", str(ins))
+    # Card de informações principal
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    ">
+        <h3 style="color: white; margin: 0 0 1rem 0; font-weight: 600;">📋 Booking Information</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Informações organizadas em cards elegantes
+    main_status = get_current_status_from_main_table(farol_reference) or "-"
+    voyage_carrier = str(df.iloc[0].get("B_VOYAGE_CARRIER", "-"))
+    
+    qty = df.iloc[0].get("S_QUANTITY_OF_CONTAINERS", 0)
+    try:
+        qty = int(qty) if qty is not None and pd.notna(qty) else 0
+    except (ValueError, TypeError):
+        qty = 0
+    
+    ins = df.iloc[0].get("ROW_INSERTED_DATE", "-")
+    try:
+        # Converte epoch ms para datetime legível, se for numérico
+        if isinstance(ins, (int, float)):
+            ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        pass
+    
+    # Layout em uma linha com 5 colunas
+    col1, col2, col3, col4, col5 = st.columns(5, gap="small")
+    
+    with col1:
+        st.markdown(f"""
+        <div style="
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border-left: 4px solid #E91E63;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+        ">
+            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL REFERENCE</div>
+            <div style="color: #333; font-size: 1rem; font-weight: 600;">{farol_reference}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border-left: 4px solid #4CAF50;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+        ">
+            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL STATUS</div>
+            <div style="color: #333; font-size: 1rem; font-weight: 600;">{main_status}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div style="
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border-left: 4px solid #FF9800;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+        ">
+            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">QUANTITY OF CONTAINERS</div>
+            <div style="color: #333; font-size: 1rem; font-weight: 600;">{qty}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(f"""
+        <div style="
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border-left: 4px solid #2196F3;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+        ">
+            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">VOYAGE CARRIER</div>
+            <div style="color: #333; font-size: 1rem; font-weight: 600;">{voyage_carrier}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col5:
+        st.markdown(f"""
+        <div style="
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border-left: 4px solid #9C27B0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+        ">
+            <div style="color: #666; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">INSERTED</div>
+            <div style="color: #333; font-size: 1rem; font-weight: 600;">{ins}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
 
