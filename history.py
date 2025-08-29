@@ -386,8 +386,7 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Booking Approved" else "primary"):
                     if current_status != "Booking Approved":
-                        # Mostra confirmação antes de aprovar
-                        st.session_state["show_approval_confirmation"] = True
+                        st.session_state["pending_status_change"] = "Booking Approved"
                         st.rerun()
             
             with col2:
@@ -396,7 +395,8 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Booking Rejected" else "primary"):
                     if current_status != "Booking Rejected":
-                        apply_status_change(farol_ref, adjustment_id, "Booking Rejected", selected_row_status)
+                        st.session_state["pending_status_change"] = "Booking Rejected"
+                        st.rerun()
             
             with col3:
                 if st.button("⚫ Booking Cancelled", 
@@ -404,7 +404,8 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Booking Cancelled" else "primary"):
                     if current_status != "Booking Cancelled":
-                        apply_status_change(farol_ref, adjustment_id, "Booking Cancelled", selected_row_status)
+                        st.session_state["pending_status_change"] = "Booking Cancelled"
+                        st.rerun()
             
             with col4:
                 if st.button("🟡 Adjustment Requested", 
@@ -412,35 +413,43 @@ def exibir_history():
                             use_container_width=True,
                             type="secondary" if current_status == "Adjustment Requested" else "primary"):
                     if current_status != "Adjustment Requested":
-                        apply_status_change(farol_ref, adjustment_id, "Adjustment Requested", selected_row_status)
+                        st.session_state["pending_status_change"] = "Adjustment Requested"
+                        st.rerun()
             
-            # Botão de reset
-            if st.button("🔄 Reset Selection", key="reset_selection", use_container_width=True):
-                st.rerun()
-        
-        # Interface de confirmação para aprovação
-        if st.session_state.get("show_approval_confirmation", False):
+            # Confirmação abaixo dos botões
             st.markdown("---")
-            st.markdown("### ✅ Confirmação de Aprovação")
-            st.info("**Deseja realmente aprovar este ajuste?**")
+            st.info("**Deseja realmente alterar o status?**")
             
             # Botões de confirmação
-            col_confirm, col_cancel = st.columns(2)
-            with col_confirm:
-                if st.button("✅ Confirmar Aprovação", 
-                            key="confirm_approval",
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Confirmar", 
+                            key="confirm_status_change",
                             use_container_width=True,
                             type="primary"):
-                    st.session_state["show_approval_confirmation"] = False
-                    apply_status_change(farol_ref, adjustment_id, "Booking Approved", selected_row_status)
+                    # Executa a mudança de status
+                    if st.session_state.get("pending_status_change"):
+                        new_status = st.session_state["pending_status_change"]
+                        apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status)
+                        # Limpa o status pendente
+                        st.session_state.pop("pending_status_change", None)
+                        st.rerun()
             
-            with col_cancel:
+            with col2:
                 if st.button("❌ Cancelar", 
-                            key="cancel_approval",
+                            key="cancel_status_change",
                             use_container_width=True,
                             type="secondary"):
-                    st.session_state["show_approval_confirmation"] = False
+                    # Limpa o status pendente
+                    st.session_state.pop("pending_status_change", None)
                     st.rerun()
+            
+            # Mostra status pendente se houver
+            if st.session_state.get("pending_status_change"):
+                st.success(f"🔄 **Status pendente:** {st.session_state['pending_status_change']}")
+                st.caption("Clique em 'Confirmar' para aplicar ou 'Cancelar' para desistir.")
+            else:
+                st.caption("Selecione um status acima para iniciar o processo de confirmação.")
     else:
         # Mensagem quando nenhuma linha está selecionada
         st.markdown("---")
