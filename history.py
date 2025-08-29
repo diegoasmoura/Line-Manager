@@ -412,40 +412,39 @@ def exibir_history():
                         st.session_state["pending_status_change"] = "Adjustment Requested"
                         st.rerun()
             
-            # Confirmação abaixo dos botões
-            st.markdown("---")
-            st.info("**Deseja realmente alterar o status?**")
-            
-            # Botões de confirmação
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✅ Confirmar", 
-                            key="confirm_status_change",
-                            use_container_width=True,
-                            type="primary"):
-                    # Executa a mudança de status
-                    if st.session_state.get("pending_status_change"):
-                        new_status = st.session_state["pending_status_change"]
-                        apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status)
-                        # Limpa o status pendente
-                        st.session_state.pop("pending_status_change", None)
-                        st.rerun()
-            
-            with col2:
-                if st.button("❌ Cancelar", 
-                            key="cancel_status_change",
-                            use_container_width=True,
-                            type="secondary"):
-                    # Limpa o status pendente
+            # Confirmação quando há status pendente
+            pending_status = st.session_state.get("pending_status_change")
+            if pending_status:
+                # Se o status pendente é igual ao status atual, limpa automaticamente
+                if pending_status == current_status:
                     st.session_state.pop("pending_status_change", None)
                     st.rerun()
+                else:
+                    st.markdown("---")
+                    st.warning(f"**Confirmar alteração para:** {pending_status}")
+                    
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        subcol1, subcol2 = st.columns(2, gap="small")
+                        with subcol1:
+                            if st.button("✅ Confirmar", 
+                                        key="confirm_status_change",
+                                        type="primary"):
+                                # Executa a mudança de status
+                                apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status)
+                                # Limpa o status pendente
+                                st.session_state.pop("pending_status_change", None)
+                                st.rerun()
+                        
+                        with subcol2:
+                            if st.button("❌ Cancelar", 
+                                        key="cancel_status_change",
+                                        type="secondary"):
+                                # Limpa o status pendente
+                                st.session_state.pop("pending_status_change", None)
+                                st.rerun()
             
-            # Mostra status pendente se houver
-            if st.session_state.get("pending_status_change"):
-                st.success(f"🔄 **Status pendente:** {st.session_state['pending_status_change']}")
-                st.caption("Clique em 'Confirmar' para aplicar ou 'Cancelar' para desistir.")
-            else:
-                st.caption("Selecione um status acima para iniciar o processo de confirmação.")
+
     else:
         # Mensagem quando nenhuma linha está selecionada
         st.markdown("---")
