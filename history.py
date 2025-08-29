@@ -7,7 +7,7 @@ from sqlalchemy import text
 from datetime import datetime
 
 def exibir_history():
-    st.title("📜 Return Carriers History")
+    st.header("📜 Return Carriers History")
 
     farol_reference = st.session_state.get("selected_reference")
     if not farol_reference:
@@ -34,18 +34,7 @@ def exibir_history():
                     st.rerun()
             return
 
-    # Card de informações principal
-    st.markdown("""
-    <div style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 15px;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    ">
-        <h3 style="color: white; margin: 0 0 1rem 0; font-weight: 600;">📋 Booking Information</h3>
-    </div>
-    """, unsafe_allow_html=True)
+
     
     # Informações organizadas em cards elegantes
     main_status = get_current_status_from_main_table(farol_reference) or "-"
