@@ -1363,18 +1363,21 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
                     pass
             return val
 
-        qty = ui_row.get("Sales Quantity of Containers")
+        qty_raw = ui_row.get("Quantity of Containers")
+        if qty_raw is None:
+            qty_raw = ui_row.get("Sales Quantity of Containers")
         try:
-            qty = int(qty) if qty is not None and str(qty) != "" else None
+            qty = int(qty_raw) if qty_raw is not None and str(qty_raw) != "" else None
         except Exception:
             qty = None
 
         params = {
             "FAROL_REFERENCE": farol_reference,
+            "ADJUSTMENT_ID": str(uuid.uuid4()),
             "B_BOOKING_STATUS": "Adjustment Requested",
             "P_STATUS": None,
             "P_PDF_NAME": None,
-            "S_SPLITTED_BOOKING_REFERENCE": None,
+            "S_SPLITTED_BOOKING_REFERENCE": norm(ui_row.get("Splitted Booking Reference")),
             "S_PLACE_OF_RECEIPT": norm(ui_row.get("Place of Receipt")),
             "S_QUANTITY_OF_CONTAINERS": qty,
             "S_PORT_OF_LOADING_POL": norm(ui_row.get("Port of Loading POL")),
@@ -1384,10 +1387,10 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
             "B_PORT_TERMINAL_CITY": norm(ui_row.get("Port Terminal City")),
             "B_VESSEL_NAME": None,
             "B_VOYAGE_CARRIER": norm(ui_row.get("Voyage Carrier")),
-            "B_DOCUMENT_CUT_OFF_DOCCUT": None,
-            "B_PORT_CUT_OFF_PORTCUT": None,
+            "B_DOCUMENT_CUT_OFF_DOCCUT": norm(ui_row.get("Requested Deadline Start Date")),
+            "B_PORT_CUT_OFF_PORTCUT": norm(ui_row.get("Requested Deadline End Date")),
             "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": None,
-            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": None,
+            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": norm(ui_row.get("Required Arrival Date")),
             "B_GATE_OPENING": None,
             "USER_INSERT": user_insert,
         }
@@ -1396,6 +1399,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
             """
             INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
                 FAROL_REFERENCE,
+                ADJUSTMENT_ID,
                 B_BOOKING_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
@@ -1417,6 +1421,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
                 USER_INSERT
             ) VALUES (
                 :FAROL_REFERENCE,
+                :ADJUSTMENT_ID,
                 :B_BOOKING_STATUS,
                 :P_STATUS,
                 :P_PDF_NAME,

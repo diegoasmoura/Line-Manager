@@ -41,7 +41,12 @@ def exibir_history():
     with c2:
         st.metric("Voyage Carrier", str(df.iloc[0].get("B_VOYAGE_CARRIER", "-")))
     with c3:
-        st.metric("Quantity of Containers", int(df.iloc[0].get("S_QUANTITY_OF_CONTAINERS", 0) or 0))
+        qty = df.iloc[0].get("S_QUANTITY_OF_CONTAINERS", 0)
+        try:
+            qty = int(qty) if qty is not None and pd.notna(qty) else 0
+        except (ValueError, TypeError):
+            qty = 0
+        st.metric("Quantity of Containers", qty)
     with c4:
         ins = df.iloc[0].get("ROW_INSERTED_DATE", "-")
         try:
