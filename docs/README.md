@@ -109,7 +109,8 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 
 ## ⚠️ Observações Importantes
 
-- Os módulos `Operation Control`, `Performance Control`, `Tracking` e `History` estão como placeholders.
+- Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.
+- A tela `History` está totalmente funcional, permitindo visualização do ciclo de vida dos tickets e aprovação de alterações.
 - Na tela `Shipments`, o status "Adjustment Requested" não pode ser alterado diretamente; use `Adjustments`.
 - Em `Adjustments`, a atualização de status reflete nas três tabelas principais (Sales, Booking, Loading).
 
@@ -119,6 +120,7 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - `Projeto/database.py`: Conexão Oracle (SQLAlchemy + python-oracledb) e operações SQL.
 - `Projeto/shipments*.py`: Tela principal, criação e ajustes/splits.
 - `Projeto/booking_adjustments.py`: Revisão/aprovação de ajustes e anexos.
+- `Projeto/history.py`: Visualização do ciclo de vida dos tickets e aprovação de alterações.
 - `Projeto/docs/`: Este README e guias.
 - `Tabelas Oracle 0.2/`: Scripts de criação das tabelas/objetos.
 
@@ -131,6 +133,7 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - Frontend em Streamlit (`app.py`) com um menu lateral que navega entre módulos.
 - Camada de dados em `database.py` usando SQLAlchemy + `python-oracledb` para acessar Oracle.
 - As telas `shipments.py`, `shipments_new.py`, `shipments_split.py` e `booking_new.py` compõem o fluxo operacional principal; `booking_adjustments.py` orquestra a aprovação dos ajustes e gerencia anexos.
+- A tela `history.py` fornece visualização completa do ciclo de vida dos tickets e permite aprovação de alterações com atualização automática das tabelas principais.
 - O arquivo `shipments_mapping.py` centraliza o mapeamento entre nomes de colunas do banco e rótulos exibidos na UI, além de configurar colunas editáveis e dropdowns com dados da UDC.
 
 ### Tabelas principais
@@ -138,6 +141,7 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - `F_CON_SALES_DATA` (Sales Data): entrada e base dos embarques.
 - `F_CON_BOOKING_MANAGEMENT` (Booking): dados de solicitação/gestão de booking.
 - `F_CON_CARGO_LOADING_CONTAINER_RELEASE` (Loading): controle de carregamento/entrega em porto.
+- `F_CON_RETURN_CARRIERS` (Return Carriers): histórico de alterações e dados retornados pelos carriers, com campo `ADJUSTMENT_ID` para rastreabilidade.
 - `F_CON_ADJUSTMENTS_LOG` (Log): trilha de ajustes básicos e críticos (inclui splits).
 - `F_CON_GLOBAL_VARIABLES` (UDC): listas de opções para dropdowns.
 - `F_CON_ANEXOS` (Attachments): armazenamento de arquivos por `farol_reference`.
@@ -163,8 +167,14 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - `booking_adjustments.py` exibe uma visão ajustada (simulada) da `F_CON_SALES_DATA` aplicando as mudanças pendentes e exibindo os splits como linhas separadas.
 - O aprovador altera o campo "Status" para cada referência e aplica em lote. O sistema atualiza o status nas três tabelas e registra `confirmation_date` no log quando aplicável.
 
-5) Anexos
-- A seção de anexos está disponível como toggle em `Shipments` e `Adjustments`.
+5) Aprovação de Alterações no Histórico
+- A tela `History` permite visualizar o ciclo de vida completo dos tickets após a criação do booking.
+- Quando uma linha é aprovada (status alterado para "Booking Approved"), o sistema busca automaticamente o `ADJUSTMENT_ID` da linha selecionada.
+- Os dados da linha aprovada são utilizados para atualizar a tabela `F_CON_SALES_BOOKING_DATA`, aplicando apenas campos não nulos.
+- O vínculo entre as tabelas é feito através do campo `FAROL_REFERENCE`, garantindo consistência dos dados.
+
+6) Anexos
+- A seção de anexos está disponível como toggle em `Shipments`, `Adjustments` e `History`.
 - Uploads são persistidos em `F_CON_ANEXOS`, com metadados e conteúdo binário. Exclusão é soft delete (marca `process_stage = 'Attachment Deleted'`).
 
 ### Regras de negócio essenciais
@@ -172,6 +182,9 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - "Adjustment Requested" não pode ser editado diretamente em `Shipments`.
 - Splits permanecem ocultos até aprovação; a listagem filtra `(Type of Shipment == 'Split' and Farol Status == 'Adjustment Requested')`.
 - Aprovação altera o status em Sales, Booking e Loading, independentemente do stage do ajuste.
+- Na tela `History`, apenas uma linha pode ser selecionada por vez para evitar inconsistências na aplicação de mudanças.
+- Quando uma linha é aprovada no `History` (status "Booking Approved"), apenas campos não nulos são atualizados na tabela `F_CON_SALES_BOOKING_DATA`.
+- O campo `ADJUSTMENT_ID` é utilizado para identificar a linha específica que será usada para atualizar os dados, garantindo rastreabilidade completa.
 - UDC abastece dropdowns; falta de dados na UDC impacta opções da UI.
 
 ### Estado e experiência do usuário
@@ -203,7 +216,8 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 - O campo **Inserted Date** agora é exibido corretamente, com conversão explícita para datetime.
 - O formulário de novo embarque (`shipments_new.py`) exibe corretamente todas as opções de DTHC.
 - O sistema de anexos está documentado em detalhes no `ANEXOS_README.md`.
-- Os módulos `Operation Control`, `Performance Control`, `Tracking` e `History` atualmente exibem apenas um print/placeholder.
+- A tela **History** está totalmente funcional, permitindo visualização do ciclo de vida dos tickets e aprovação de alterações com atualização automática da tabela `F_CON_SALES_BOOKING_DATA`.
+- Os módulos `Operation Control`, `Performance Control` e `Tracking` atualmente exibem apenas um print/placeholder.
 
 ---
 
@@ -212,7 +226,8 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 - **Shipments**: Cadastro, edição, ajustes, splits, anexos.
 - **Adjustments**: Aprovação/rejeição de ajustes críticos, atualização em lote de status, gestão de anexos.
 - **Booking Management**: Solicitação e edição de bookings.
-- **Operation Control, Performance, Tracking, History, Setup**: (Placeholders para futuras implementações)
+- **History**: Visualização do ciclo de vida dos tickets, aprovação de alterações e rastreabilidade completa via ADJUSTMENT_ID.
+- **Operation Control, Performance, Tracking, Setup**: (Placeholders para futuras implementações)
 
 ---
 
@@ -222,7 +237,8 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 2. **Solicitar Booking**: Shipments > Selecionar embarque com status "New Request" > New Booking > Preencher > Confirmar.
 3. **Ajuste Crítico/Split**: Shipments > Selecionar embarque > Adjustments > Preencher > Confirmar.
 4. **Aprovação de Ajustes**: Adjustments > Filtrar/Selecionar > Editar status > Apply Changes.
-5. **Gestão de Anexos**: Em qualquer tela, selecionar embarque > View Attachments > Upload/Download/Excluir.
+5. **Aprovação de Alterações no Histórico**: History > Selecionar linha específica > Alterar Farol Status > Apply Changes > Sistema atualiza automaticamente `F_CON_SALES_BOOKING_DATA`.
+6. **Gestão de Anexos**: Em qualquer tela, selecionar embarque > View Attachments > Upload/Download/Excluir.
 
 ---
 
@@ -468,6 +484,168 @@ Para cada Farol Reference, o sistema exibe:
 - **Total Adjustments**: Número total de ajustes no filtro atual
 - **Farol References**: Quantidade de referências únicas afetadas
 - **Pending Adjustments**: Ajustes aguardando aprovação
+
+---
+
+## 📜 Tela de Histórico (Return Carriers History)
+
+A tela de **Histórico** (`history.py`) exibe o ciclo de vida completo dos tickets após a criação do booking, permitindo visualizar e aprovar alterações feitas ao longo do processo. Esta funcionalidade é essencial para o controle de qualidade e rastreabilidade das operações.
+
+### 🎯 **Funcionalidades Principais**
+
+#### 🔍 **Visualização do Ciclo de Vida**
+- **Primeira linha**: Registro original do booking
+- **Linhas subsequentes**: Alterações e ajustes feitos ao longo do processo
+- **Ordenação cronológica**: Registros ordenados por data de inserção (crescente)
+- **Rastreabilidade completa**: Cada alteração mantém seu contexto histórico
+
+#### 📊 **Interface da Grade**
+- **Coluna de seleção**: Checkbox para selecionar linhas específicas (máximo uma por vez)
+- **Campo oculto**: `ADJUSTMENT_ID` disponível para processamento mas não exibido ao usuário
+- **Colunas editáveis**: Apenas o campo "Farol Status" pode ser alterado
+- **Demais campos**: Somente leitura para preservar integridade dos dados
+
+#### 🎮 **Controle de Status**
+- **Dropdown de status**: Opções vindas da UDC (Global Variables)
+- **Status disponíveis**:
+  - Adjustment Requested
+  - Booking Requested
+  - Booking Approved
+  - Booking Rejected
+  - Booking Cancelled
+  - Received from Carrier
+
+### ⚙️ **Sistema de Aprovação**
+
+#### 🔄 **Processo de Aprovação**
+1. **Seleção**: Usuário seleciona uma linha específica na grade
+2. **Alteração de Status**: Modifica o "Farol Status" para o valor desejado
+3. **Aplicação**: Clica em "Apply Changes" para confirmar as alterações
+4. **Processamento**: Sistema executa a lógica de aprovação automaticamente
+
+#### ✅ **Lógica de Aprovação Especial**
+Quando o status é alterado para **"Booking Approved"**, o sistema executa automaticamente:
+
+**1. Atualização da Tabela Principal**
+- Busca os dados da linha aprovada na tabela `F_CON_RETURN_CARRIERS` usando o `ADJUSTMENT_ID`
+- Atualiza a tabela `F_CON_SALES_BOOKING_DATA` com os campos não nulos:
+  - **Campos S_ (Sales)**: `S_SPLITTED_BOOKING_REFERENCE`, `S_PLACE_OF_RECEIPT`, `S_QUANTITY_OF_CONTAINERS`, `S_PORT_OF_LOADING_POL`, `S_PORT_OF_DELIVERY_POD`, `S_FINAL_DESTINATION`
+  - **Campos B_ (Booking)**: `B_TRANSHIPMENT_PORT`, `B_PORT_TERMINAL_CITY`, `B_VESSEL_NAME`, `B_VOYAGE_CARRIER`, `B_DOCUMENT_CUT_OFF_DOCCUT`, `B_PORT_CUT_OFF_PORTCUT`, `B_ESTIMATED_TIME_OF_DEPARTURE_ETD`, `B_ESTIMATED_TIME_OF_ARRIVAL_ETA`, `B_GATE_OPENING`
+
+**2. Atualização de Status**
+- Atualiza o status na tabela `F_CON_RETURN_CARRIERS`
+- Atualiza o status nas demais tabelas principais (`F_CON_SALES_BOOKING_DATA`, `F_CON_CARGO_LOADING_CONTAINER_RELEASE`)
+- Registra a confirmação no log de ajustes
+
+#### 🔗 **Vínculo entre Tabelas**
+- **Ligação principal**: Campo `FAROL_REFERENCE` para conectar as tabelas
+- **Identificação específica**: `ADJUSTMENT_ID` para identificar a linha exata aprovada
+- **Consistência**: Todas as atualizações são feitas em transação única
+
+### 📋 **Campos Exibidos na Grade**
+
+| Campo | Descrição | Editável |
+|-------|-----------|----------|
+| **Selecionar** | Checkbox para seleção | ✅ |
+| **Inserted Date** | Data de inserção do registro | ❌ |
+| **Farol Reference** | Referência única do embarque | ❌ |
+| **Farol Status** | Status atual (dropdown) | ✅ |
+| **Splitted Booking Reference** | Referência do booking dividido | ❌ |
+| **Place of Receipt** | Local de recebimento | ❌ |
+| **Quantity of Containers** | Quantidade de containers | ❌ |
+| **Port of Loading POL** | Porto de carregamento | ❌ |
+| **Port of Delivery POD** | Porto de destino | ❌ |
+| **Final Destination** | Destino final | ❌ |
+| **Transhipment Port** | Porto de transbordo | ❌ |
+| **Port Terminal City** | Cidade do terminal portuário | ❌ |
+| **Vessel Name** | Nome da embarcação | ❌ |
+| **Voyage Carrier** | Transportador da viagem | ❌ |
+| **Document Cut Off** | Data limite para documentos | ❌ |
+| **Port Cut Off** | Data limite para porto | ❌ |
+| **ETD** | Tempo estimado de partida | ❌ |
+| **ETA** | Tempo estimado de chegada | ❌ |
+| **Gate Opening** | Abertura do portão | ❌ |
+| **Status** | Status do processo | ❌ |
+| **PDF Name** | Nome do arquivo PDF | ❌ |
+| **Inserted By** | Usuário que inseriu | ❌ |
+
+### ⚠️ **Regras de Funcionamento**
+
+#### 🚫 **Restrições de Seleção**
+- **Máximo uma linha**: Apenas uma linha pode ser selecionada por vez
+- **Validação**: Sistema exibe aviso se múltiplas linhas forem selecionadas
+- **Prevenção de erros**: Evita inconsistências na aplicação de mudanças
+
+#### 🔒 **Proteção de Dados**
+- **Campos protegidos**: Apenas o "Farol Status" pode ser alterado
+- **Integridade**: Demais campos permanecem somente leitura
+- **Validação UDC**: Status válidos apenas da tabela UDC
+
+#### 📊 **Tratamento de Campos Vazios**
+- **Atualização seletiva**: Apenas campos com valores não nulos são atualizados
+- **Preservação de dados**: Campos vazios não sobrescrevem dados existentes
+- **Feedback ao usuário**: Sistema informa quantos campos foram atualizados
+
+### 🔧 **Funcionalidades Adicionais**
+
+#### 📎 **Gestão de Anexos**
+- **Toggle de anexos**: Botão para mostrar/ocultar seção de anexos
+- **Upload/Download**: Gerenciamento completo de arquivos
+- **Integração**: Mesma funcionalidade disponível em outras telas
+
+#### 📤 **Exportação de Dados**
+- **Download CSV**: Exporta dados da grade para análise externa
+- **Formato padronizado**: Arquivo nomeado com a referência Farol
+- **Codificação UTF-8**: Suporte completo a caracteres especiais
+
+#### 🔙 **Navegação**
+- **Botão de retorno**: Volta para a tela principal de Shipments
+- **Estado persistente**: Mantém contexto da referência selecionada
+
+### 📈 **Métricas e Indicadores**
+
+#### 📊 **Métricas Rápidas**
+- **Farol Status**: Status atual do booking
+- **Voyage Carrier**: Transportador responsável
+- **Quantity of Containers**: Quantidade de containers
+- **Inserted Date**: Data de inserção do registro
+
+#### 📋 **Informações de Processamento**
+- **Total de registros**: Quantidade de linhas no histórico
+- **Status distribuídos**: Contagem por tipo de status
+- **Timeline visual**: Ordenação cronológica dos eventos
+
+### 🎯 **Casos de Uso**
+
+#### ✅ **Aprovação de Ajustes**
+1. Usuário identifica linha com ajustes pendentes
+2. Seleciona a linha específica
+3. Altera status para "Booking Approved"
+4. Sistema aplica automaticamente os dados da linha aprovada
+
+#### 🔍 **Auditoria e Rastreabilidade**
+1. Visualização completa do histórico de mudanças
+2. Identificação de responsáveis por cada alteração
+3. Timeline de eventos para análise de processos
+4. Rastreabilidade completa via `ADJUSTMENT_ID`
+
+#### 📊 **Análise de Performance**
+1. Identificação de gargalos no processo
+2. Tempo médio entre etapas
+3. Distribuição de status por período
+4. Análise de tendências operacionais
+
+### 🔄 **Integração com Outras Telas**
+
+#### 🔗 **Conexão com Shipments**
+- **Navegação bidirecional**: Histórico acessível a partir de Shipments
+- **Contexto compartilhado**: Mesma referência Farol em ambas as telas
+- **Sincronização**: Mudanças refletem automaticamente em todas as telas
+
+#### 🔗 **Conexão com Adjustments**
+- **Complementaridade**: Histórico mostra resultado dos ajustes aprovados
+- **Rastreabilidade**: `ADJUSTMENT_ID` conecta ajustes com histórico
+- **Fluxo completo**: Do ajuste solicitado à aprovação e implementação
 
 ---
 

@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection
+from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status
 from booking_adjustments import display_attachments_section
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
@@ -59,9 +59,10 @@ def exibir_history():
 
     st.markdown("---")
 
-    # Grade principal com colunas relevantes
+    # Grade principal com colunas relevantes (incluindo ADJUSTMENT_ID)
     display_cols = [
         "FAROL_REFERENCE",
+        "ADJUSTMENT_ID",  # Campo oculto para identificação
         "B_BOOKING_STATUS",
         "S_SPLITTED_BOOKING_REFERENCE",
         "S_PLACE_OF_RECEIPT",
@@ -115,6 +116,7 @@ def exibir_history():
 
     custom_overrides = {
         "FAROL_REFERENCE": "Farol Reference",
+        "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
         "B_BOOKING_STATUS": "Farol Status",
         "ROW_INSERTED_DATE": "Inserted Date",
         "USER_INSERT": "Inserted By",
@@ -138,9 +140,6 @@ def exibir_history():
             df_show = df_show.sort_values("Inserted Date", ascending=True)
         except Exception:
             pass
-        # Reordena colunas
-        ordered_cols = ["Inserted Date"] + [c for c in df_show.columns if c != "Inserted Date"]
-        df_show = df_show[ordered_cols]
 
     # Opções para Farol Status vindas da UDC (mesma lógica da Adjustment Request Management)
     df_udc = load_df_udc()
@@ -176,9 +175,24 @@ def exibir_history():
     column_config["Selecionar"] = st.column_config.CheckboxColumn(
         "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
     )
+    
+    # Reordena colunas - mantém "Selecionar" como primeira coluna
+    if "Inserted Date" in df_show.columns:
+        other_cols = [c for c in df_show.columns if c not in ["Selecionar", "Inserted Date"]]
+        ordered_cols = ["Selecionar", "Inserted Date"] + other_cols
+        # Filtra apenas as colunas que existem no DataFrame
+        existing_cols = [c for c in ordered_cols if c in df_show.columns]
+        df_show = df_show[existing_cols]
 
+    # Configura colunas - ADJUSTMENT_ID fica oculto
     for col in df_show.columns:
         if col == "Farol Status":
+            continue
+        if col == "Adjustment ID":
+            # Campo oculto - não exibido na grade
+            continue
+        if col == "Selecionar":
+            # Coluna de seleção já configurada
             continue
         if col == "Inserted Date":
             column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
@@ -205,11 +219,13 @@ def exibir_history():
         old_status = str(original_df.iloc[i].get("Farol Status", ""))
         new_status = str(edited_df.iloc[i].get("Farol Status", ""))
         farol_ref = original_df.iloc[i].get("Farol Reference") or original_df.iloc[i].get("FAROL_REFERENCE")
+        adjustment_id = original_df.iloc[i].get("Adjustment ID")
         if old_status != new_status:
             status_changes.append({
                 "farol_reference": farol_ref,
                 "old_status": old_status,
-                "new_status": new_status
+                "new_status": new_status,
+                "adjustment_id": adjustment_id
             })
 
     if status_changes:
@@ -227,6 +243,19 @@ def exibir_history():
                     try:
                         conn = get_database_connection()
                         tx = conn.begin()
+                        
+                        # Se o status foi alterado para "Booking Approved", executa a lógica de aprovação
+                        if change['new_status'] == "Booking Approved" and change.get('adjustment_id'):
+                            # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
+                            if update_sales_booking_from_return_carriers(change['adjustment_id']):
+                                st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {change['farol_reference']}")
+                            else:
+                                st.warning(f"⚠️ Nenhum dado foi atualizado para {change['farol_reference']} (todos os campos estavam vazios)")
+                        
+                        # Atualiza o status na tabela F_CON_RETURN_CARRIERS
+                        if update_return_carrier_status(change['adjustment_id'], change['new_status']):
+                            st.success(f"✅ Status atualizado na tabela F_CON_RETURN_CARRIERS para {change['farol_reference']}")
+                        
                         # Atualiza status no log (se existir)
                         update_log_query = text("""
                             UPDATE LogTransp.F_CON_Adjustments_Log
@@ -253,13 +282,6 @@ def exibir_history():
                                    l_creation_of_cargo_loading = :creation_date
                              WHERE l_farol_reference = :farol_reference
                         """), {"farol_status": change['new_status'], "creation_date": datetime.now(), "farol_reference": change['farol_reference']})
-
-                        # Reflete também na tabela de retorno de carriers
-                        conn.execute(text("""
-                            UPDATE LogTransp.F_CON_RETURN_CARRIERS
-                               SET B_BOOKING_STATUS = :farol_status
-                             WHERE FAROL_REFERENCE = :farol_reference
-                        """), {"farol_status": change['new_status'], "farol_reference": change['farol_reference']})
 
                         tx.commit()
                         success_count += 1
