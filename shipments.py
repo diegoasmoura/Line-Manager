@@ -417,7 +417,7 @@ def exibir_shipments():
             history_disabled = not (str(original_status).strip().lower() != "new request".lower())
         if len(selected_rows) != 1:
             history_disabled = True
-        st.button("📜 Histórico", disabled=history_disabled, key="history_btn")
+        st.button("🎫 Ticket Journey", disabled=history_disabled, key="history_btn")
         if st.session_state.get("history_btn") and not history_disabled:
             st.session_state["selected_reference"] = selected_farol_ref
             st.session_state["current_page"] = "history"

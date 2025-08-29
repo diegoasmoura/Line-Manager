@@ -11,7 +11,7 @@ def exibir_history():
 
     farol_reference = st.session_state.get("selected_reference")
     if not farol_reference:
-        st.info("Selecione uma linha em Shipments para visualizar o histórico.")
+        st.info("Selecione uma linha em Shipments para visualizar o Ticket Journey.")
         col = st.columns(1)[0]
         with col:
             if st.button("🔙 Back to Shipments"):
