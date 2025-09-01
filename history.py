@@ -328,6 +328,39 @@ def display_attachments_section(farol_reference):
         margin: 15px 0;
         text-align: center;
     }
+    
+    /* Reduz flickering entre abas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: transparent;
+        border-radius: 4px 4px 0px 0px;
+        color: #262730;
+        padding: 10px 16px;
+        font-weight: 400;
+        border: none;
+        transition: none;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #ffffff;
+        color: #262730;
+        border-bottom: 2px solid #00acb5;
+        font-weight: 600;
+    }
+    
+    /* Estabiliza elementos da interface */
+    .stExpander {
+        transition: none;
+    }
+    
+    .stButton > button {
+        transition: none;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -337,8 +370,23 @@ def display_attachments_section(farol_reference):
         st.session_state[uploader_version_key] = 0
     current_uploader_version = st.session_state[uploader_version_key]
 
+    # Cache para reduzir re-renderização
+    cache_key = f"attachment_cache_{farol_reference}"
+    if cache_key not in st.session_state:
+        st.session_state[cache_key] = {"last_update": 0}
+
+    # Controle de estado do expander para manter aberto após processamento
+    expander_key = f"expander_state_{farol_reference}"
+    if expander_key not in st.session_state:
+        st.session_state[expander_key] = False
+    
+    # Se há dados processados, mantém o expander aberto
+    processed_data_key = f"processed_pdf_data_{farol_reference}"
+    if processed_data_key in st.session_state:
+        st.session_state[expander_key] = True
+
     # Seção de Upload com Sub-abas Integradas
-    with st.expander("📤 Add New Attachment", expanded=False):
+    with st.expander("📤 Add New Attachment", expanded=st.session_state[expander_key]):
         # Sub-abas para diferentes tipos de anexos
         tab1, tab2 = st.tabs(["📎 Regular Attachments", "📄 Booking PDF Processing"])
         
@@ -378,6 +426,10 @@ def display_attachments_section(farol_reference):
                     # Incrementa a versão do uploader para resetar a seleção na próxima execução
                     st.session_state[uploader_version_key] += 1
 
+                    # Atualiza cache para evitar re-renderização desnecessária
+                    if cache_key in st.session_state:
+                        st.session_state[cache_key]["last_update"] = st.session_state[uploader_version_key]
+
                     # Força atualização da lista (com uploader recriado)
                     st.rerun()
         
@@ -409,6 +461,11 @@ def display_attachments_section(farol_reference):
                                 # Armazena os dados processados no session_state para validação
                                 st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
                                 st.session_state[f"booking_pdf_file_{farol_reference}"] = file
+                                
+                                # Atualiza cache para estabilizar a interface
+                                if cache_key in st.session_state:
+                                    st.session_state[cache_key]["last_update"] = st.session_state[uploader_version_key]
+                                
                                 st.success("✅ Dados extraídos com sucesso! Valide as informações abaixo:")
                                 st.rerun()
                             else:
@@ -434,6 +491,8 @@ def display_attachments_section(farol_reference):
                     del st.session_state[processed_data_key]
                     if f"booking_pdf_file_{farol_reference}" in st.session_state:
                         del st.session_state[f"booking_pdf_file_{farol_reference}"]
+                    # Fecha o expander após cancelar
+                    st.session_state[expander_key] = False
                     st.rerun()
                 elif validated_data:
                     # Salva os dados validados
@@ -442,6 +501,8 @@ def display_attachments_section(farol_reference):
                         del st.session_state[processed_data_key]
                         if f"booking_pdf_file_{farol_reference}" in st.session_state:
                             del st.session_state[f"booking_pdf_file_{farol_reference}"]
+                        # Fecha o expander após salvar com sucesso
+                        st.session_state[expander_key] = False
                         
                         st.balloons()  # Celebração visual
                         st.rerun()
