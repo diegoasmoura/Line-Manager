@@ -255,12 +255,18 @@ def exibir_shipments():
         idx_status = colunas_ordenadas.index("Farol Status")
         colunas_ordenadas.insert(idx_status + 1, "Actions Count")
     
-    # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
-    if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
-        # Remove e reinsere antes de Comments Sales (lado esquerdo)
-        colunas_ordenadas.remove("Splitted Booking Reference")
-        idx_comments = colunas_ordenadas.index("Comments Sales")
-        colunas_ordenadas.insert(idx_comments, "Splitted Booking Reference")
+            # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
+        if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
+            # Remove e reinsere antes de Comments Sales (lado esquerdo)
+            colunas_ordenadas.remove("Splitted Booking Reference")
+            idx_comments = colunas_ordenadas.index("Comments Sales")
+            colunas_ordenadas.insert(idx_comments, "Splitted Booking Reference")
+        
+        # Posiciona "Voyage Code" após "Voyage Carrier" (Booking Management)
+        if "Voyage Code" in colunas_ordenadas and "Voyage Carrier" in colunas_ordenadas:
+            colunas_ordenadas.remove("Voyage Code")
+            idx_carrier = colunas_ordenadas.index("Voyage Carrier")
+            colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
 
     # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
     editable_cols = []

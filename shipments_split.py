@@ -128,7 +128,7 @@ def show_split_form():
             st.error("Erro: Dados não encontrados para o Farol Reference selecionado.")
             st.stop()
            
-        # Criar DataFrame inicial com os dados obtidos
+                # Criar DataFrame inicial com os dados obtidos
         # Converte para dict para uso de .get com segurança
         split_dict = dict(split_data)
         df_selected = pd.DataFrame([{
@@ -141,8 +141,9 @@ def show_split_form():
             "Transhipment Port": split_dict.get("b_transhipment_port"),
             "Port Terminal City": split_dict.get("b_port_terminal_city"),
             "Voyage Carrier": split_data["s_carrier"],
-                    "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
-        "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
+            "Voyage Code": split_dict.get("b_voyage_code"),
+            "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
+            "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
             "Required Arrival Date": split_data["s_required_arrival_date"]
         }])
        
@@ -171,8 +172,9 @@ def show_split_form():
             "Transhipment Port",
             "Port Terminal City",
             "Voyage Carrier",
-                    "Requested Deadline Start Date",
-        "Requested Deadline End Date",
+            "Voyage Code",
+            "Requested Deadline Start Date",
+            "Requested Deadline End Date",
             "Required Arrival Date"
         ]
  

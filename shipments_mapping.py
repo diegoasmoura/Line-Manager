@@ -67,6 +67,7 @@ def get_column_mapping():
         "b_booking_request_date": "Booking Request Date",
         "b_booking_confirmation_date": "Booking Confirmation Date",
         "b_vessel_name": "Vessel Name",
+        "b_voyage_code": "Voyage Code",
         "b_container_type": "Booking Container Type",
         "b_quantity_of_containers": "Booking Quantity of Containers",
         "b_port_terminal_city": "Port Terminal City",

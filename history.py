@@ -137,10 +137,9 @@ def exibir_history():
 
     st.markdown("---")
 
-    # Grade principal com colunas relevantes (incluindo ADJUSTMENT_ID)
+    # Grade principal com colunas relevantes (ADJUSTMENT_ID oculto mas usado internamente)
     display_cols = [
         "FAROL_REFERENCE",
-        "ADJUSTMENT_ID",  # Campo oculto para identificação
         "B_BOOKING_STATUS",
         "S_SPLITTED_BOOKING_REFERENCE",
         "S_PLACE_OF_RECEIPT",
@@ -152,6 +151,7 @@ def exibir_history():
         "B_PORT_TERMINAL_CITY",
         "B_VESSEL_NAME",
         "B_VOYAGE_CARRIER",
+        "B_VOYAGE_CODE",
         "B_DOCUMENT_CUT_OFF_DOCCUT",
         "B_PORT_CUT_OFF_PORTCUT",
         "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
@@ -163,29 +163,15 @@ def exibir_history():
         "USER_INSERT",
     ]
 
-    df_show = df[[c for c in display_cols if c in df.columns]].copy()
-
-    # Converte epoch (ms) para datetime para exibição correta na grade
-    if "ROW_INSERTED_DATE" in df_show.columns:
-        try:
-            df_show["ROW_INSERTED_DATE"] = pd.to_datetime(df_show["ROW_INSERTED_DATE"], unit="ms", errors="coerce")
-        except Exception:
-            pass
+    # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna, mas não na exibição
+    internal_cols = display_cols + ["ADJUSTMENT_ID"]
+    df_show = df[[c for c in internal_cols if c in df.columns]].copy()
     
-    # Converte campos de data específicos de epoch (ms) para datetime
-    date_fields = [
-        "B_DOCUMENT_CUT_OFF_DOCCUT",
-        "B_PORT_CUT_OFF_PORTCUT", 
-        "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
-    ]
+    # Cria uma cópia para exibição sem ADJUSTMENT_ID
+    df_display = df_show.drop(columns=["ADJUSTMENT_ID"], errors="ignore")
     
-    for field in date_fields:
-        if field in df_show.columns:
-            try:
-                df_show[field] = pd.to_datetime(df_show[field], unit="ms", errors="coerce")
-            except Exception:
-                pass
+    # Adiciona coluna de seleção ao df_display
+    df_display.insert(0, "Selecionar", False)
 
     # Aplica aliases iguais aos da grade principal quando disponíveis
     mapping_main = get_column_mapping()
@@ -221,21 +207,49 @@ def exibir_history():
         # Aliases para campos de data
         "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
         "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
-        "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
+                "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
         "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": "ETA",
+        # Alias para Voyage Code
+        "B_VOYAGE_CODE": "Voyage Code",
+
     }
 
+    # Aplica aliases ao df_display (não ao df_show)
     rename_map = {}
-    for col in df_show.columns:
+    for col in df_display.columns:
         rename_map[col] = custom_overrides.get(col, mapping_upper.get(col, prettify(col)))
 
-    df_show.rename(columns=rename_map, inplace=True)
+    df_display.rename(columns=rename_map, inplace=True)
+
+    # Converte epoch (ms) para datetime para exibição correta na grade (APÓS os aliases)
+    if "Inserted Date" in df_display.columns:
+        try:
+            df_display["Inserted Date"] = pd.to_datetime(df_display["Inserted Date"], unit="ms", errors="coerce")
+        except Exception:
+            pass
+    
+    # Converte campos de data específicos de epoch (ms) para datetime (APÓS os aliases)
+    date_fields_mapped = {
+        "Document Cut Off": "B_DOCUMENT_CUT_OFF_DOCCUT",
+        "Port Cut Off": "B_PORT_CUT_OFF_PORTCUT", 
+        "ETD": "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
+        "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
+    }
+    
+    for mapped_name, original_name in date_fields_mapped.items():
+        if mapped_name in df_display.columns:
+            try:
+                # Busca o valor original antes do rename
+                original_values = df_show[original_name]
+                df_display[mapped_name] = pd.to_datetime(original_values, unit="ms", errors="coerce")
+            except Exception:
+                pass
 
     # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
-    if "Inserted Date" in df_show.columns:
+    if "Inserted Date" in df_display.columns:
         # Ordena pela data (crescente)
         try:
-            df_show = df_show.sort_values("Inserted Date", ascending=True)
+            df_display = df_display.sort_values("Inserted Date", ascending=True)
         except Exception:
             pass
 
@@ -266,26 +280,22 @@ def exibir_history():
         )
     }
     # Demais colunas somente leitura
-    # Adiciona coluna de seleção e configura
-    df_show.insert(0, "Selecionar", False)
+    # Configura coluna de seleção
     column_config["Selecionar"] = st.column_config.CheckboxColumn(
         "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
     )
     
     # Reordena colunas - mantém "Selecionar" como primeira coluna
-    if "Inserted Date" in df_show.columns:
-        other_cols = [c for c in df_show.columns if c not in ["Selecionar", "Inserted Date"]]
+    if "Inserted Date" in df_display.columns:
+        other_cols = [c for c in df_display.columns if c not in ["Selecionar", "Inserted Date"]]
         ordered_cols = ["Selecionar", "Inserted Date"] + other_cols
         # Filtra apenas as colunas que existem no DataFrame
-        existing_cols = [c for c in ordered_cols if c in df_show.columns]
-        df_show = df_show[existing_cols]
+        existing_cols = [c for c in ordered_cols if c in df_display.columns]
+        df_display = df_display[existing_cols]
 
-    # Configura colunas - ADJUSTMENT_ID fica oculto
-    for col in df_show.columns:
+    # Configura colunas para exibição (df_display não contém ADJUSTMENT_ID)
+    for col in df_display.columns:
         if col == "Farol Status":
-            continue
-        if col == "Adjustment ID":
-            # Campo oculto - não exibido na grade
             continue
         if col == "Selecionar":
             # Coluna de seleção já configurada
@@ -297,9 +307,9 @@ def exibir_history():
         else:
             column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
-    original_df = df_show.copy()
+    original_df = df_display.copy()
     edited_df = st.data_editor(
-        df_show,
+        df_display,
         use_container_width=True,
         hide_index=True,
         column_config=column_config,
@@ -556,7 +566,7 @@ def exibir_history():
             st.session_state["history_show_attachments"] = not view_open
             st.rerun()
     with col2:
-        st.download_button("⬇️ Export CSV", data=df_show.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
+        st.download_button("⬇️ Export CSV", data=df_display.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
     with col3:
         if st.button("🔙 Back to Shipments"):
             st.session_state["current_page"] = "main"

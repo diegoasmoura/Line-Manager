@@ -40,6 +40,7 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
             """
             SELECT 
                 FAROL_REFERENCE,
+                ADJUSTMENT_ID,
                 B_BOOKING_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
@@ -53,6 +54,7 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                 B_PORT_TERMINAL_CITY,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
+                B_VOYAGE_CODE,
                 B_DOCUMENT_CUT_OFF_DOCCUT,
                 B_PORT_CUT_OFF_PORTCUT,
                 B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
@@ -97,6 +99,7 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 B_PORT_TERMINAL_CITY,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
+                B_VOYAGE_CODE,
                 B_DOCUMENT_CUT_OFF_DOCCUT,
                 B_PORT_CUT_OFF_PORTCUT,
                 B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
@@ -227,6 +230,7 @@ def get_data_bookingData():
         B_BOOKING_REQUEST_DATE               AS b_booking_request_date,
         B_BOOKING_CONFIRMATION_DATE          AS b_booking_confirmation_date,
         B_VESSEL_NAME                        AS b_vessel_name,
+        B_VOYAGE_CODE                        AS b_voyage_code,
         B_PORT_TERMINAL_CITY                 AS b_port_terminal_city,
         S_PLACE_OF_RECEIPT                   AS b_place_of_receipt,
         S_FINAL_DESTINATION                  AS b_final_destination,
@@ -277,7 +281,7 @@ def get_data_bookingData():
             "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
             "Document Cut Off DOCCUT", "Port Cut Off PORTCUT", "Estimated Time Of Departure ETD", "Estimated Time Of Arrival ETA",
             # Armador/viagem
-            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
             # Administração
@@ -1405,6 +1409,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
             "B_TRANSHIPMENT_PORT": norm(ui_row.get("Transhipment Port")),
             "B_PORT_TERMINAL_CITY": norm(ui_row.get("Port Terminal City")),
             "B_VESSEL_NAME": None,
+            "B_VOYAGE_CODE": norm(ui_row.get("Voyage Code")),
             "B_VOYAGE_CARRIER": norm(ui_row.get("Voyage Carrier")),
             "B_DOCUMENT_CUT_OFF_DOCCUT": norm(ui_row.get("Requested Deadline Start Date")),
             "B_PORT_CUT_OFF_PORTCUT": norm(ui_row.get("Requested Deadline End Date")),
@@ -1431,6 +1436,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
                 B_TRANSHIPMENT_PORT,
                 B_PORT_TERMINAL_CITY,
                 B_VESSEL_NAME,
+                B_VOYAGE_CODE,
                 B_VOYAGE_CARRIER,
                 B_DOCUMENT_CUT_OFF_DOCCUT,
                 B_PORT_CUT_OFF_PORTCUT,
@@ -1453,6 +1459,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
                 :B_TRANSHIPMENT_PORT,
                 :B_PORT_TERMINAL_CITY,
                 :B_VESSEL_NAME,
+                :B_VOYAGE_CODE,
                 :B_VOYAGE_CARRIER,
                 :B_DOCUMENT_CUT_OFF_DOCCUT,
                 :B_PORT_CUT_OFF_PORTCUT,
@@ -1515,6 +1522,7 @@ def get_split_data_by_farol_reference(farol_reference):
             S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
             S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
             B_VOYAGE_CARRIER                   AS s_carrier,
+            B_VOYAGE_CODE                      AS b_voyage_code,
             B_TRANSHIPMENT_PORT                AS b_transhipment_port,
             B_PORT_TERMINAL_CITY               AS b_port_terminal_city
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
@@ -1591,6 +1599,7 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
                 B_PORT_TERMINAL_CITY,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
+                B_VOYAGE_CODE,
                 B_DOCUMENT_CUT_OFF_DOCCUT,
                 B_PORT_CUT_OFF_PORTCUT,
                 B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
@@ -1676,6 +1685,7 @@ def update_sales_booking_from_return_carriers(adjustment_id: str) -> bool:
         add_if_present("B_TRANSHIPMENT_PORT")
         add_if_present("B_PORT_TERMINAL_CITY")
         add_if_present("B_VESSEL_NAME")
+        add_if_present("B_VOYAGE_CODE")
         add_if_present("B_VOYAGE_CARRIER")
         add_if_present("B_DOCUMENT_CUT_OFF_DOCCUT")
         add_if_present("B_PORT_CUT_OFF_PORTCUT")
