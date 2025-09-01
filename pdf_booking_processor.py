@@ -854,19 +854,14 @@ def process_pdf_booking(pdf_content, farol_reference):
             st.error("⚠️ PyPDF2 não está disponível para processamento de PDF")
             return None
         
-        st.info("📄 Iniciando processamento do PDF...")
-        
         # Extrai texto do PDF
         text = extract_text_from_pdf(pdf_content)
         if not text:
             st.error("❌ Não foi possível extrair texto do PDF")
             return None
         
-        st.success(f"📝 Texto extraído com sucesso! ({len(text)} caracteres)")
-        
         # Identifica o carrier
         carrier = identify_carrier(text)
-        st.info(f"🚢 Carrier identificado: **{carrier}**")
         
     except Exception as e:
         st.error(f"❌ Erro durante o processamento inicial: {str(e)}")
@@ -892,7 +887,6 @@ def process_pdf_booking(pdf_content, farol_reference):
     
     try:
         # Normaliza os dados
-        st.info("🔄 Normalizando dados extraídos...")
         normalized_data = normalize_extracted_data(extracted_data)
         
         # Prepara dados para exibição/validação
@@ -913,9 +907,6 @@ def process_pdf_booking(pdf_content, farol_reference):
             "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
         }
         
-        st.success("✅ Processamento concluído com sucesso!")
-        st.info(f"📊 Dados extraídos: Booking {processed_data.get('booking_reference')}, Vessel {processed_data.get('vessel_name')}")
-        
         return processed_data
         
     except Exception as e:
@@ -932,15 +923,35 @@ def display_pdf_validation_interface(processed_data):
     Returns:
         dict: Dados validados pelo usuário ou None se cancelado
     """
-    st.markdown("### 📋 Validação dos Dados Extraídos")
-    st.markdown("Verifique e ajuste os dados extraídos do PDF antes de salvar:")
+    # Interface de validação dos dados extraídos do PDF
     
     # Cria formulário de validação
     with st.form("pdf_validation_form"):
-        col1, col2 = st.columns(2)
-        
+        # Primeira linha: Booking Reference e Quantidade de Containers
+        col1, col2, col_spacer1 = st.columns([1, 1, 2])
         with col1:
-            st.markdown("#### 🚢 Informações do Navio")
+            booking_reference = st.text_input(
+                "Booking Reference",
+                value=processed_data.get("booking_reference", ""),
+                help="Referência do booking do armador"
+            )
+        with col2:
+            quantity = st.number_input(
+                "Quantidade de Containers",
+                min_value=1,
+                value=int(processed_data.get("quantity", 1)),
+                help="Número de containers"
+            )
+        
+        # Segunda linha: Nome do Navio, Carrier/Armador e Voyage
+        col3, col4, col5, col_spacer2 = st.columns([1, 1, 1, 1])
+        with col3:
+            vessel_name = st.text_input(
+                "Nome do Navio",
+                value=processed_data.get("vessel_name", ""),
+                help="Nome da embarcação"
+            )
+        with col4:
             carrier = st.selectbox(
                 "Carrier/Armador",
                 ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OTHER"],
@@ -948,90 +959,69 @@ def display_pdf_validation_interface(processed_data):
                       ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN"].index(processed_data["carrier"]) 
                       if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN"] else 6
             )
-            
-            vessel_name = st.text_input(
-                "Nome do Navio",
-                value=processed_data.get("vessel_name", ""),
-                help="Nome da embarcação"
-            )
-            
+        with col5:
             voyage = st.text_input(
                 "Voyage",
                 value=processed_data.get("voyage", ""),
                 help="Código da viagem"
             )
-            
-            booking_reference = st.text_input(
-                "Booking Reference",
-                value=processed_data.get("booking_reference", ""),
-                help="Referência do booking do armador"
-            )
         
-        with col2:
-            st.markdown("#### 📦 Informações da Carga")
-            quantity = st.number_input(
-                "Quantidade de Containers",
-                min_value=1,
-                value=int(processed_data.get("quantity", 1)),
-                help="Número de containers"
-            )
-            
+        # Terceira linha: Porto de Origem (POL) e Porto de Destino (POD)
+        col6, col7, col_spacer3 = st.columns([1, 1, 2])
+        with col6:
             pol = st.text_input(
                 "Porto de Origem (POL)",
                 value=processed_data.get("pol", ""),
                 help="Port of Loading"
             )
-            
+        with col7:
             pod = st.text_input(
                 "Porto de Destino (POD)",
                 value=processed_data.get("pod", ""),
                 help="Port of Discharge"
             )
-            
-            st.markdown("#### 📅 Datas")
-            # Converte datas do formato DD/MM/YYYY para datetime
-            def parse_brazilian_date(date_str):
-                if not date_str or date_str == "":
+        
+        # Converte datas do formato DD/MM/YYYY para datetime
+        def parse_brazilian_date(date_str):
+            if not date_str or date_str == "":
+                return None
+            try:
+                # Tenta converter do formato DD/MM/YYYY
+                if "/" in date_str:
+                    return datetime.strptime(date_str, "%d/%m/%Y").date()
+                # Fallback para formato YYYY-MM-DD
+                elif "-" in date_str:
+                    return datetime.strptime(date_str, "%Y-%m-%d").date()
+                else:
                     return None
-                try:
-                    # Tenta converter do formato DD/MM/YYYY
-                    if "/" in date_str:
-                        return datetime.strptime(date_str, "%d/%m/%Y").date()
-                    # Fallback para formato YYYY-MM-DD
-                    elif "-" in date_str:
-                        return datetime.strptime(date_str, "%Y-%m-%d").date()
-                    else:
-                        return None
-                except:
-                    return None
-            
+            except:
+                return None
+        
+        # Quarta linha: ETD e ETA
+        col8, col9, col_spacer4 = st.columns([1, 1, 2])
+        with col8:
             etd = st.date_input(
                 "ETD (Estimated Time of Departure)",
                 value=parse_brazilian_date(processed_data.get("etd")),
                 help="Data estimada de partida"
             )
-            
+        with col9:
             eta = st.date_input(
                 "ETA (Estimated Time of Arrival)",
                 value=parse_brazilian_date(processed_data.get("eta")),
                 help="Data estimada de chegada"
             )
         
-        # Área de texto extraído (para debug/verificação)
-        with st.expander("🔍 Texto Extraído (para verificação)", expanded=False):
-            st.text_area(
-                "Primeiros 500 caracteres do PDF:",
-                value=processed_data.get("extracted_text", ""),
-                height=150,
-                disabled=True
-            )
+        # Campos ETD e ETA movidos para a quarta linha acima
+        
+        # Área de texto extraído removida para interface mais limpa
         
         # Botões de ação
-        col1, col2 = st.columns([1, 1])
+        col1, col2, col_spacer_btn = st.columns([1, 1, 2])
         with col1:
-            submitted = st.form_submit_button("✅ Validar e Salvar", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("✅ Validar e Salvar", type="primary", use_container_width=False)
         with col2:
-            cancelled = st.form_submit_button("❌ Cancelar", use_container_width=True)
+            cancelled = st.form_submit_button("❌ Cancelar", use_container_width=False)
         
         if submitted:
             # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
@@ -1039,20 +1029,26 @@ def display_pdf_validation_interface(processed_data):
                 "Farol Reference": processed_data["farol_reference"],
                 "Voyage Carrier": carrier,
                 "Voyage Code": voyage,
-                "Vessel Name": vessel_name,  # Será ignorado pela função, mas incluímos
+                "Vessel Name": vessel_name,
                 "Splitted Booking Reference": booking_reference,
-                "Quantity of Containers": quantity,
+                "Quantity of Containers": int(quantity),
                 "Port of Loading POL": pol,
                 "Port of Delivery POD": pod,
-                "Place of Receipt": pol,  # Usa POL como Place of Receipt
-                "Final Destination": pod,  # Usa POD como Final Destination
-                "Transhipment Port": "",  # Campo opcional
-                "Port Terminal City": "",  # Campo opcional
-                "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",  # ETD
-                "Requested Deadline End Date": etd.strftime("%Y-%m-%d") if etd else "",   # ETD (mesmo valor)
-                "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",  # ETA
-                "Status": "Received from Carrier"  # Status específico para PDFs processados
+                "Place of Receipt": pol,
+                "Final Destination": pod,
+                "Transhipment Port": "",
+                "Port Terminal City": "",
+                "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",
+                "Requested Deadline End Date": etd.strftime("%Y-%m-%d") if etd else "",
+                "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else ""
             }
+            
+            # Debug simples para verificar se chegou aqui
+            st.info("🔍 Dados preparados para salvamento")
+            st.write("Farol Reference:", validated_data["Farol Reference"])
+            st.write("Voyage Carrier:", validated_data["Voyage Carrier"])
+            st.write("Quantity:", validated_data["Quantity of Containers"])
+            
             return validated_data
         
         if cancelled:
@@ -1071,16 +1067,12 @@ def save_pdf_booking_data(validated_data):
         bool: True se salvou com sucesso, False caso contrário
     """
     try:
-        st.info("🔄 Salvando dados do PDF no banco de dados...")
-        
         # Tenta capturar o nome do arquivo PDF do session_state
         farol_reference = validated_data.get("Farol Reference")
         pdf_file = st.session_state.get(f"booking_pdf_file_{farol_reference}")
-        pdf_name = None
         
         if pdf_file and hasattr(pdf_file, 'name'):
             pdf_name = pdf_file.name
-            st.info(f"📄 Nome do arquivo PDF: **{pdf_name}**")
             # Adiciona o nome do PDF aos dados validados
             validated_data["PDF Name"] = pdf_name
         
@@ -1090,11 +1082,31 @@ def save_pdf_booking_data(validated_data):
         if success:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
             st.info("📋 Status definido como: **Received from Carrier**")
-            if pdf_name:
-                st.info(f"📄 Nome do PDF salvo: **{pdf_name}**")
+            
+            # Salva também o PDF como anexo
+            if pdf_file:
+                try:
+                    # Importa a função de salvamento de anexos do history.py
+                    import sys
+                    import os
+                    sys.path.append(os.path.dirname(__file__))
+                    from history import save_attachment_to_db
+                    
+                    # Reseta o ponteiro do arquivo para leitura
+                    pdf_file.seek(0)
+                    
+                    # Salva o PDF como anexo
+                    if save_attachment_to_db(farol_reference, pdf_file, user_id="PDF_PROCESSOR"):
+                        st.success("📎 PDF salvo com sucesso na lista de anexos!")
+                    else:
+                        st.warning("⚠️ PDF não foi salvo na lista de anexos, mas os dados foram salvos na tabela.")
+                except Exception as e:
+                    st.warning(f"⚠️ Erro ao salvar PDF como anexo: {str(e)}")
+                    st.info("💡 Os dados foram salvos na tabela, mas o PDF não foi adicionado à lista de anexos.")
+            
             return True
         else:
-            st.error("❌ Função de inserção retornou False")
+            st.error("❌ Erro ao salvar dados do PDF")
             return False
     
     except Exception as e:
