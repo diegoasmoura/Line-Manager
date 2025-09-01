@@ -602,19 +602,34 @@ def display_attachments_section(farol_reference):
                         if uploaded_files:
                             file = uploaded_files[0]  # Apenas um arquivo para booking
                             
+                            st.info(f"🔄 Iniciando processamento do arquivo: {file.name}")
+                            
                             with st.spinner("Processing PDF... Extracting data..."):
-                                # Reseta o ponteiro do arquivo
-                                file.seek(0)
-                                pdf_content = file.read()
-                                
-                                # Processa o PDF
-                                processed_data = process_pdf_booking(pdf_content, farol_reference)
-                                
-                                if processed_data:
-                                    # Armazena os dados processados no session_state para validação
-                                    st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
-                                    st.session_state[f"booking_pdf_file_{farol_reference}"] = file
-                                    st.rerun()
+                                try:
+                                    # Reseta o ponteiro do arquivo
+                                    file.seek(0)
+                                    pdf_content = file.read()
+                                    
+                                    st.info(f"📄 Arquivo lido: {len(pdf_content)} bytes")
+                                    
+                                    # Processa o PDF
+                                    processed_data = process_pdf_booking(pdf_content, farol_reference)
+                                    
+                                    if processed_data:
+                                        # Armazena os dados processados no session_state para validação
+                                        st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
+                                        st.session_state[f"booking_pdf_file_{farol_reference}"] = file
+                                        st.success("✅ Dados armazenados no session_state. Recarregando página...")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Processamento retornou dados vazios")
+                                        
+                                except Exception as e:
+                                    st.error(f"❌ Erro durante o processamento: {str(e)}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
+                        else:
+                            st.error("❌ Nenhum arquivo foi selecionado")
                 else:
                     # Botão normal para anexos regulares
                     if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):

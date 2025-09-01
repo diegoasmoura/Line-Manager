@@ -28,6 +28,51 @@ except ImportError:
 
 # Padrões de extração por armador/carrier
 CARRIER_PATTERNS = {
+    "MAERSK": {
+        "booking_reference": [
+            r"Booking No\.?:\s*(\d+)",  # Padrão específico Maersk
+            r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9]{8,12})",
+            r"(\d{9})",  # Padrão genérico para números de 9 dígitos (como 243601857)
+        ],
+        "vessel_name": [
+            r"MVS\s+([^(]+?)(?:\s*\([^)]*\))?\s+(\d+[A-Z]?)",  # Padrão MVS Maersk
+            r"Vessel[\s:]+([A-Z\s]+)",
+            r"Ship[\s:]+([A-Z\s]+)",
+        ],
+        "voyage": [
+            r"MVS\s+[^(]+?\s+(\d+[A-Z]?)",  # Extrai voyage do padrão MVS
+            r"Voyage[\s:]+([A-Z0-9]+)",
+        ],
+        "quantity": [
+            r"(\d+)\s+40\s+DRY",  # Padrão específico Maersk
+            r"(\d+)\s+(?:20|40|45)\s+([A-Z/ ]+?)\b",  # Padrão genérico
+            r"Quantity[\s:]+(\d+)",
+        ],
+        "pol": [
+            r"From:\s*([^,\n]+,[^,\n]+,[^,\n]+)",  # Padrão específico Maersk
+            r"Port\s+of\s+Loading[\s:]+([A-Z\s,]+)",
+            r"POL[\s:]+([A-Z\s,]+)",
+        ],
+        "pod": [
+            r"(?:To|TO)\s*:\s*([^,\n]+(?:,[^,\n]+)?(?:,[^,\n]+)?)",  # Padrão específico Maersk
+            r"Port\s+of\s+Discharge[\s:]+([A-Z\s,]+)",
+            r"POD[\s:]+([A-Z\s,]+)",
+        ],
+        "etd": [
+            r"(\d{4}-\d{2}-\d{2})\s+\d{4}-\d{2}-\d{2}",  # Primeira data do padrão MVS
+            r"ETD[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        ],
+        "eta": [
+            r"\d{4}-\d{2}-\d{2}\s+(\d{4}-\d{2}-\d{2})",  # Segunda data do padrão MVS
+            r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        ],
+        "cargo_type": [
+            r"(?:Customer Cargo|Commodity Description)\s*:\s*(.+?)(?:\n|Service Contract|Price Owner|$)",
+        ],
+        "gross_weight": [
+            r"Gross Weight.*?([\d\.]+)\s*KGS",
+        ],
+    },
     "HAPAG-LLOYD": {
         "booking_reference": [
             r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9]{8,12})",
@@ -65,37 +110,6 @@ CARRIER_PATTERNS = {
         "eta": [
             r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
             r"Arrival[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
-    },
-    "MAERSK": {
-        "booking_reference": [
-            r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9]{8,12})",
-            r"([A-Z]{4}\d{6})",  # Padrão típico Maersk
-        ],
-        "vessel_name": [
-            r"Vessel[\s:]+([A-Z\s]+)",
-            r"Ship[\s:]+([A-Z\s]+)",
-        ],
-        "voyage": [
-            r"Voyage[\s:]+([A-Z0-9]+)",
-        ],
-        "quantity": [
-            r"(\d+)\s*x\s*\d+['\s]*(?:containers?|cntr|ctr)",
-            r"Quantity[\s:]+(\d+)",
-        ],
-        "pol": [
-            r"Port\s+of\s+Loading[\s:]+([A-Z\s,]+)",
-            r"POL[\s:]+([A-Z\s,]+)",
-        ],
-        "pod": [
-            r"Port\s+of\s+Discharge[\s:]+([A-Z\s,]+)",
-            r"POD[\s:]+([A-Z\s,]+)",
-        ],
-        "etd": [
-            r"ETD[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
-        "eta": [
-            r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
         ],
     },
     "MSC": {
@@ -258,6 +272,232 @@ def extract_data_with_patterns(text, patterns):
     
     return extracted_data
 
+def extract_maersk_data(text_content):
+    """Extrai dados específicos para PDFs da Maersk usando padrões MVS"""
+    data = {}
+    
+    # Usar padrões específicos da Maersk
+    patterns = CARRIER_PATTERNS["MAERSK"]
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                if field == "vessel_name":
+                    # Para Maersk, extrair vessel e voyage do padrão MVS
+                    vessel_match = re.search(r"MVS\s+([^(]+?)(?:\s*\([^)]*\))?\s+(\d+[A-Z]?)", text_content)
+                    if vessel_match:
+                        # Limpar quebras de linha e espaços extras do vessel name
+                        vessel_name = vessel_match.group(1).strip()
+                        # Remove quebras de linha primeiro
+                        vessel_name = re.sub(r'\n+', ' ', vessel_name)   # Substitui quebras por espaços
+                        # Normaliza espaços múltiplos em um só
+                        vessel_name = re.sub(r'\s+', ' ', vessel_name)
+                        
+                        # Lógica específica para juntar partes de nomes que foram separadas
+                        # Casos comuns: "MAERSK L ABREA" -> "MAERSK LABREA"
+                        #               "MAERSK L O T A" -> "MAERSK LOTA"
+                        
+                        # Primeiro, junta sequências de letras individuais (ex: "L O T A" -> "LOTA")
+                        vessel_name = re.sub(r'\b([A-Z])\s+([A-Z])\s+([A-Z])\s+([A-Z])\s+([A-Z])\b', r'\1\2\3\4\5', vessel_name)
+                        vessel_name = re.sub(r'\b([A-Z])\s+([A-Z])\s+([A-Z])\s+([A-Z])\b', r'\1\2\3\4', vessel_name)
+                        vessel_name = re.sub(r'\b([A-Z])\s+([A-Z])\s+([A-Z])\b', r'\1\2\3', vessel_name)
+                        vessel_name = re.sub(r'\b([A-Z])\s+([A-Z])\b', r'\1\2', vessel_name)
+                        
+                        # Depois, junta uma letra isolada com uma palavra seguinte
+                        # Ex: "MAERSK L ABREA" -> "MAERSK LABREA"
+                        vessel_name = re.sub(r'\b([A-Z])\s+([A-Z]{2,})\b', r'\1\2', vessel_name)
+                        
+                        data["vessel_name"] = vessel_name.strip()
+                        data["voyage"] = vessel_match.group(2).strip()
+                    else:
+                        data["vessel_name"] = match.group(1).strip()
+                elif field == "quantity":
+                    # Para Maersk, extrair quantidade específica
+                    qty_match = re.search(r"(\d+)\s+40\s+DRY", text_content)
+                    if qty_match:
+                        data["quantity"] = qty_match.group(1).strip()
+                    else:
+                        data["quantity"] = match.group(1).strip()
+                else:
+                    data[field] = match.group(1).strip()
+                break
+    
+    # Extrair ETD e ETA do padrão MVS (antes de processar POL/POD)
+    mvs_pattern = r"(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})"
+    mvs_match = re.search(mvs_pattern, text_content)
+    if mvs_match:
+        data["etd"] = mvs_match.group(1)
+        data["eta"] = mvs_match.group(2).strip()
+    
+    # Extrair POL e POD usando padrões mais específicos da Maersk
+    # POL (From:)
+    pol_match = re.search(r"From:\s*([^,\n]+(?:,[^,\n]+(?:,[^,\n]+)?)?)", text_content, re.IGNORECASE | re.MULTILINE)
+    if pol_match:
+        pol_text = pol_match.group(1).strip()
+        # Limpar quebras de linha e texto extra
+        pol_clean = re.sub(r'\s+', ' ', pol_text)
+        pol_clean = re.sub(r'Contact Name.*$', '', pol_clean, flags=re.IGNORECASE)
+        data["pol"] = pol_clean.strip()
+    
+    # POD (To:)
+    pod_match = re.search(r"(?:To|TO)\s*:\s*([^,\n]+(?:,[^,\n]+(?:,[^,\n]+)?)?)", text_content, re.IGNORECASE | re.MULTILINE)
+    if pod_match:
+        pod_text = pod_match.group(1).strip()
+        # Limpar quebras de linha e texto extra
+        pod_clean = re.sub(r'\s+', ' ', pod_text)
+        data["pod"] = pod_clean.strip()
+    
+    # Extrair dados adicionais específicos da Maersk
+    # Cargo Type
+    cargo_match = re.search(r"(?:Customer Cargo|Commodity Description)\s*:\s*(.+?)(?:\n|Service Contract|Price Owner|$)", text_content, re.IGNORECASE | re.MULTILINE)
+    if cargo_match:
+        cargo_text = cargo_match.group(1).strip()
+        # Limpar quebras de linha
+        cargo_clean = re.sub(r'\s+', ' ', cargo_text)
+        data["cargo_type"] = cargo_clean.strip()
+    
+    # Gross Weight
+    weight_match = re.search(r"Gross Weight.*?([\d\.]+)\s*KGS", text_content, re.IGNORECASE)
+    if weight_match:
+        data["gross_weight"] = weight_match.group(1).strip()
+    
+    # Document Type Detection
+    doc_type_keywords = [
+        ("BOOKING AMENDMENT", "BOOKING AMENDMENT"),
+        ("BOOKING CONFIRMATION", "BOOKING CONFIRMATION"),
+        ("BOOKING CANCELLATION", "BOOKING CANCELLATION"),
+        ("ARCHIVE COPY", "ARCHIVE COPY")
+    ]
+    for keyword, label in doc_type_keywords:
+        if keyword in text_content.upper():
+            data["document_type"] = label
+            break
+    
+    # Limpar campos de porto para formato "Cidade,Estado,País"
+    if "pol" in data:
+        data["pol"] = clean_port_field(data["pol"])
+    
+    if "pod" in data:
+        data["pod"] = clean_port_field(data["pod"])
+    
+    return data
+
+def extract_hapag_lloyd_data(text_content):
+    """Extrai dados específicos para PDFs da Hapag-Lloyd"""
+    data = {}
+    
+    # Usar padrões específicos da Hapag-Lloyd
+    patterns = CARRIER_PATTERNS["HAPAG-LLOYD"]
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+                break
+    
+    return data
+
+def extract_msc_data(text_content):
+    """Extrai dados específicos para PDFs da MSC"""
+    data = {}
+    
+    # Usar padrões específicos da MSC
+    patterns = CARRIER_PATTERNS["MSC"]
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+                break
+    
+    return data
+
+def extract_cma_cgm_data(text_content):
+    """Extrai dados específicos para PDFs da CMA CGM"""
+    data = {}
+    
+    # Usar padrões específicos da CMA CGM
+    patterns = CARRIER_PATTERNS["GENERIC"]  # Usar padrões genéricos por enquanto
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+                break
+    
+    return data
+
+def extract_cosco_data(text_content):
+    """Extrai dados específicos para PDFs da COSCO"""
+    data = {}
+    
+    # Usar padrões específicos da COSCO
+    patterns = CARRIER_PATTERNS["GENERIC"]  # Usar padrões genéricos por enquanto
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+                break
+    
+    return data
+
+def extract_evergreen_data(text_content):
+    """Extrai dados específicos para PDFs da Evergreen"""
+    data = {}
+    
+    # Usar padrões específicos da Evergreen
+    patterns = CARRIER_PATTERNS["GENERIC"]  # Usar padrões genéricos por enquanto
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+                break
+    
+    return data
+
+def extract_generic_data(text_content):
+    """Extrai dados usando padrões genéricos para outros armadores"""
+    data = {}
+    
+    # Usar padrões genéricos
+    patterns = CARRIER_PATTERNS["GENERIC"]
+    
+    # Extrair dados básicos
+    for field, pattern_list in patterns.items():
+        for pattern in pattern_list:
+            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+                break
+    
+    return data
+
+def clean_port_field(value):
+    """Limpa campo de porto para formato 'Cidade,Estado,País'"""
+    if not value:
+        return None
+    # remover códigos ou complementos entre parênteses
+    no_paren = re.sub(r"\s*\([^)]*\)", "", value)
+    # quebrar por vírgula e pegar no máximo 3 partes
+    parts = [p.strip() for p in no_paren.split(",") if p.strip()]
+    if not parts:
+        return None
+    return ",".join(parts[:3])
+
 def normalize_extracted_data(extracted_data):
     """
     Normaliza e valida os dados extraídos.
@@ -332,45 +572,78 @@ def process_pdf_booking(pdf_content, farol_reference):
     Returns:
         dict: Dados extraídos e processados
     """
-    if not PDF_AVAILABLE:
-        st.error("PyPDF2 não está disponível para processamento de PDF")
+    try:
+        if not PDF_AVAILABLE:
+            st.error("⚠️ PyPDF2 não está disponível para processamento de PDF")
+            return None
+        
+        st.info("📄 Iniciando processamento do PDF...")
+        
+        # Extrai texto do PDF
+        text = extract_text_from_pdf(pdf_content)
+        if not text:
+            st.error("❌ Não foi possível extrair texto do PDF")
+            return None
+        
+        st.success(f"📝 Texto extraído com sucesso! ({len(text)} caracteres)")
+        
+        # Identifica o carrier
+        carrier = identify_carrier(text)
+        st.info(f"🚢 Carrier identificado: **{carrier}**")
+        
+    except Exception as e:
+        st.error(f"❌ Erro durante o processamento inicial: {str(e)}")
         return None
     
-    # Extrai texto do PDF
-    text = extract_text_from_pdf(pdf_content)
-    if not text:
-        st.error("Não foi possível extrair texto do PDF")
+    # Extrai dados usando função específica do carrier
+    if carrier == "MAERSK":
+        extracted_data = extract_maersk_data(text)
+    elif carrier == "HAPAG-LLOYD":
+        extracted_data = extract_hapag_lloyd_data(text)
+    elif carrier == "MSC":
+        extracted_data = extract_msc_data(text)
+    elif carrier == "CMA CGM":
+        extracted_data = extract_cma_cgm_data(text)
+    elif carrier == "COSCO":
+        extracted_data = extract_cosco_data(text)
+    elif carrier == "EVERGREEN":
+        extracted_data = extract_evergreen_data(text)
+    else:
+        # Usar padrões genéricos para outros armadores
+        patterns = CARRIER_PATTERNS.get(carrier, CARRIER_PATTERNS["GENERIC"])
+        extracted_data = extract_data_with_patterns(text, patterns)
+    
+    try:
+        # Normaliza os dados
+        st.info("🔄 Normalizando dados extraídos...")
+        normalized_data = normalize_extracted_data(extracted_data)
+        
+        # Prepara dados para exibição/validação
+        processed_data = {
+            "farol_reference": farol_reference,
+            "carrier": carrier,
+            "booking_reference": normalized_data.get("booking_reference", ""),
+            "vessel_name": normalized_data.get("vessel_name", ""),
+            "voyage": normalized_data.get("voyage", ""),
+            "quantity": normalized_data.get("quantity", 1),
+            "pol": normalized_data.get("pol", ""),
+            "pod": normalized_data.get("pod", ""),
+            "etd": normalized_data.get("etd", ""),
+            "eta": normalized_data.get("eta", ""),
+            "cargo_type": extracted_data.get("cargo_type", ""),
+            "gross_weight": extracted_data.get("gross_weight", ""),
+            "document_type": extracted_data.get("document_type", ""),
+            "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
+        }
+        
+        st.success("✅ Processamento concluído com sucesso!")
+        st.info(f"📊 Dados extraídos: Booking {processed_data.get('booking_reference')}, Vessel {processed_data.get('vessel_name')}")
+        
+        return processed_data
+        
+    except Exception as e:
+        st.error(f"❌ Erro durante a normalização: {str(e)}")
         return None
-    
-    # Identifica o carrier
-    carrier = identify_carrier(text)
-    st.info(f"🚢 Carrier identificado: **{carrier}**")
-    
-    # Seleciona os padrões apropriados
-    patterns = CARRIER_PATTERNS.get(carrier, CARRIER_PATTERNS["GENERIC"])
-    
-    # Extrai dados usando os padrões
-    extracted_data = extract_data_with_patterns(text, patterns)
-    
-    # Normaliza os dados
-    normalized_data = normalize_extracted_data(extracted_data)
-    
-    # Prepara dados para exibição/validação
-    processed_data = {
-        "farol_reference": farol_reference,
-        "carrier": carrier,
-        "booking_reference": normalized_data.get("booking_reference", ""),
-        "vessel_name": normalized_data.get("vessel_name", ""),
-        "voyage": normalized_data.get("voyage", ""),
-        "quantity": normalized_data.get("quantity", 1),
-        "pol": normalized_data.get("pol", ""),
-        "pod": normalized_data.get("pod", ""),
-        "etd": normalized_data.get("etd", ""),
-        "eta": normalized_data.get("eta", ""),
-        "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
-    }
-    
-    return processed_data
 
 def display_pdf_validation_interface(processed_data):
     """

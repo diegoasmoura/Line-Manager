@@ -52,16 +52,38 @@ O sistema exibirá uma interface de validação com os dados extraídos:
 ### **Identificação Automática**
 O sistema identifica automaticamente os seguintes armadores:
 
-- **HAPAG-LLOYD**
-- **MAERSK** 
-- **MSC**
-- **CMA CGM**
-- **COSCO**
-- **EVERGREEN**
-- **GENERIC** (para outros armadores)
+#### 🎯 **MAERSK** (Totalmente Implementado)
+- **Booking Reference**: Extrai números de 9 dígitos (ex: 243601857)
+- **Vessel Name**: Extrai do padrão MVS (Marine Vessel Schedule)
+- **Voyage**: Extrai código da viagem (ex: 442E, 435B)
+- **Quantity**: Extrai quantidade de containers (ex: 13, 21, 2)
+- **POL**: Extrai porto de origem do campo "From:"
+- **POD**: Extrai porto de destino do campo "To:"
+- **ETD/ETA**: Extrai datas do padrão MVS (YYYY-MM-DD)
+- **Cargo Type**: Extrai tipo de carga (ex: "Cot")
+- **Document Type**: Identifica tipo do documento (Booking Amendment, Confirmation, etc.)
+- **Gross Weight**: Extrai peso bruto em KGS
+
+#### 🔧 **HAPAG-LLOYD** (Em Desenvolvimento)
+- Padrões específicos para documentos da Hapag-Lloyd
+
+#### 🔧 **MSC** (Em Desenvolvimento)
+- Padrões específicos para documentos da MSC
+
+#### 🔧 **Outros Carriers** (Em Desenvolvimento)
+- **CMA CGM**: Padrões genéricos
+- **COSCO**: Padrões genéricos
+- **EVERGREEN**: Padrões genéricos
+- **GENERIC**: Padrões genéricos para outros armadores
 
 ### **Padrões de Extração**
 Cada armador possui padrões específicos de extração otimizados para seus formatos de PDF.
+
+#### 🎯 **MAERSK - Padrões MVS Implementados**
+- **Regex Patterns**: Padrões específicos para documentos Maersk com formato MVS
+- **Limpeza de Dados**: Remove quebras de linha e texto extra
+- **Normalização**: Formata campos de porto para "Cidade,Estado,País"
+- **Extração Inteligente**: Identifica automaticamente tipo de documento
 
 ## 🔧 Recursos Técnicos
 
