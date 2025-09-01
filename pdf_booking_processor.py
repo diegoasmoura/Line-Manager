@@ -571,10 +571,10 @@ def extract_maersk_data(text_content):
         if not etd_eta_lines:
             return None, None, None, None
         
-        # Extrair informações da primeira linha MVS
+        # Extrair informações da primeira linha MVS (primeiro ETD)
         first_line = etd_eta_lines[0]
         first_dates = re.findall(r'\d{4}-\d{2}-\d{2}', first_line)
-        first_etd = first_dates[0] if first_dates else None
+        first_etd = first_dates[0] if first_dates else None  # Primeira data da primeira linha MVS
         
         # Padrões para Vessel e Voy
         vessel_patterns = [
@@ -597,19 +597,33 @@ def extract_maersk_data(text_content):
                 first_vessel = match.group(1).strip()
                 first_voy = match.group(2)
         
-        # Extrair informações da última linha MVS
+        # Extrair informações da última linha MVS (último ETA)
         last_line = etd_eta_lines[-1]
         last_dates = re.findall(r'\d{4}-\d{2}-\d{2}', last_line)
-        last_eta = last_dates[-1] if last_dates else None
+        last_eta = last_dates[-1] if last_dates else None  # Segunda data da última linha MVS
         
         return first_etd, last_eta, first_vessel, first_voy
     
     # Extrair ETD, ETA, Vessel e Voy
     first_etd, last_eta, first_vessel, first_voy = extract_etd_eta_vessel(text_content)
     if first_etd:
-        data["etd"] = first_etd
+        # Converter formato YYYY-MM-DD para DD/MM/YYYY (padrão da ferramenta)
+        try:
+            from datetime import datetime
+            etd_date = datetime.strptime(first_etd, '%Y-%m-%d')
+            data["etd"] = etd_date.strftime('%d/%m/%Y')
+        except:
+            data["etd"] = first_etd  # Fallback para formato original
+    
     if last_eta:
-        data["eta"] = last_eta
+        # Converter formato YYYY-MM-DD para DD/MM/YYYY (padrão da ferramenta)
+        try:
+            from datetime import datetime
+            eta_date = datetime.strptime(last_eta, '%Y-%m-%d')
+            data["eta"] = eta_date.strftime('%d/%m/%Y')
+        except:
+            data["eta"] = last_eta  # Fallback para formato original
+    
     if first_vessel:
         data["vessel_name"] = first_vessel
     if first_voy:
@@ -975,17 +989,31 @@ def display_pdf_validation_interface(processed_data):
             )
             
             st.markdown("#### 📅 Datas")
+            # Converte datas do formato DD/MM/YYYY para datetime
+            def parse_brazilian_date(date_str):
+                if not date_str or date_str == "":
+                    return None
+                try:
+                    # Tenta converter do formato DD/MM/YYYY
+                    if "/" in date_str:
+                        return datetime.strptime(date_str, "%d/%m/%Y").date()
+                    # Fallback para formato YYYY-MM-DD
+                    elif "-" in date_str:
+                        return datetime.strptime(date_str, "%Y-%m-%d").date()
+                    else:
+                        return None
+                except:
+                    return None
+            
             etd = st.date_input(
                 "ETD (Estimated Time of Departure)",
-                value=datetime.strptime(processed_data.get("etd"), "%Y-%m-%d").date() 
-                      if processed_data.get("etd") and processed_data.get("etd") != "" else None,
+                value=parse_brazilian_date(processed_data.get("etd")),
                 help="Data estimada de partida"
             )
             
             eta = st.date_input(
                 "ETA (Estimated Time of Arrival)",
-                value=datetime.strptime(processed_data.get("eta"), "%Y-%m-%d").date() 
-                      if processed_data.get("eta") and processed_data.get("eta") != "" else None,
+                value=parse_brazilian_date(processed_data.get("eta")),
                 help="Data estimada de chegada"
             )
         
@@ -1006,18 +1034,23 @@ def display_pdf_validation_interface(processed_data):
             cancelled = st.form_submit_button("❌ Cancelar", use_container_width=True)
         
         if submitted:
-            # Prepara dados validados
+            # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
             validated_data = {
                 "Farol Reference": processed_data["farol_reference"],
                 "Voyage Carrier": carrier,
                 "Voyage Code": voyage,
-                "Vessel Name": vessel_name,
+                "Vessel Name": vessel_name,  # Será ignorado pela função, mas incluímos
                 "Splitted Booking Reference": booking_reference,
                 "Quantity of Containers": quantity,
                 "Port of Loading POL": pol,
                 "Port of Delivery POD": pod,
-                "ETD": etd.strftime("%Y-%m-%d") if etd else "",
-                "ETA": eta.strftime("%Y-%m-%d") if eta else "",
+                "Place of Receipt": pol,  # Usa POL como Place of Receipt
+                "Final Destination": pod,  # Usa POD como Final Destination
+                "Transhipment Port": "",  # Campo opcional
+                "Port Terminal City": "",  # Campo opcional
+                "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",  # ETD
+                "Requested Deadline End Date": etd.strftime("%Y-%m-%d") if etd else "",   # ETD (mesmo valor)
+                "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",  # ETA
                 "Status": "Received from Carrier"  # Status específico para PDFs processados
             }
             return validated_data
@@ -1038,19 +1071,37 @@ def save_pdf_booking_data(validated_data):
         bool: True se salvou com sucesso, False caso contrário
     """
     try:
-        # Usa a função existente de inserção, mas com status específico
-        success = insert_return_carrier_from_ui(validated_data, user_insert="PDF_PROCESSOR")
+        st.info("🔄 Salvando dados do PDF no banco de dados...")
+        
+        # Tenta capturar o nome do arquivo PDF do session_state
+        farol_reference = validated_data.get("Farol Reference")
+        pdf_file = st.session_state.get(f"booking_pdf_file_{farol_reference}")
+        pdf_name = None
+        
+        if pdf_file and hasattr(pdf_file, 'name'):
+            pdf_name = pdf_file.name
+            st.info(f"📄 Nome do arquivo PDF: **{pdf_name}**")
+            # Adiciona o nome do PDF aos dados validados
+            validated_data["PDF Name"] = pdf_name
+        
+        # Usa a função existente de inserção com status "Received from Carrier"
+        success = insert_return_carrier_from_ui(validated_data, user_insert="PDF_PROCESSOR", status_override="Received from Carrier")
         
         if success:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
             st.info("📋 Status definido como: **Received from Carrier**")
+            if pdf_name:
+                st.info(f"📄 Nome do PDF salvo: **{pdf_name}**")
             return True
         else:
-            st.error("❌ Erro ao salvar dados do PDF")
+            st.error("❌ Função de inserção retornou False")
             return False
     
     except Exception as e:
         st.error(f"❌ Erro ao salvar dados: {str(e)}")
+        st.error(f"🔍 Tipo do erro: {type(e).__name__}")
+        import traceback
+        st.error(f"📍 Detalhes do erro: {traceback.format_exc()}")
         return False
 
 def display_pdf_booking_section(farol_reference):

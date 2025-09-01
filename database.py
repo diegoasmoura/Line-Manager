@@ -1324,7 +1324,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
 
 
 # Insere uma linha em F_CON_RETURN_CARRIERS a partir dos valores editados na UI (split)
-def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
+def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, status_override: str | None = None):
     conn = get_database_connection()
     try:
         farol_reference = ui_row.get("Farol Reference")
@@ -1370,6 +1370,17 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
                     pass
             return val
 
+        def convert_date_string(date_str):
+            """Converte string de data YYYY-MM-DD para datetime"""
+            if not date_str or date_str == "":
+                return None
+            try:
+                from datetime import datetime
+                # Converte string YYYY-MM-DD para datetime
+                return datetime.strptime(date_str, "%Y-%m-%d")
+            except:
+                return None
+
         qty_raw = ui_row.get("Quantity of Containers")
         if qty_raw is None:
             qty_raw = ui_row.get("Sales Quantity of Containers")
@@ -1394,12 +1405,15 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
             # Linha original - não tem referência de split
             splitted_booking_ref = None
         
+        # Determina o status a ser usado
+        booking_status = status_override if status_override else "Adjustment Requested"
+        
         params = {
             "FAROL_REFERENCE": farol_reference,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
-            "B_BOOKING_STATUS": "Adjustment Requested",
+            "B_BOOKING_STATUS": booking_status,
             "P_STATUS": None,
-            "P_PDF_NAME": None,
+            "P_PDF_NAME": norm(ui_row.get("PDF Name")),
             "S_SPLITTED_BOOKING_REFERENCE": splitted_booking_ref,
             "S_PLACE_OF_RECEIPT": norm(ui_row.get("Place of Receipt")),
             "S_QUANTITY_OF_CONTAINERS": qty,
@@ -1408,13 +1422,13 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
             "S_FINAL_DESTINATION": norm(ui_row.get("Final Destination")),
             "B_TRANSHIPMENT_PORT": norm(ui_row.get("Transhipment Port")),
             "B_PORT_TERMINAL_CITY": norm(ui_row.get("Port Terminal City")),
-            "B_VESSEL_NAME": None,
+            "B_VESSEL_NAME": norm(ui_row.get("Vessel Name")),
             "B_VOYAGE_CODE": norm(ui_row.get("Voyage Code")),
             "B_VOYAGE_CARRIER": norm(ui_row.get("Voyage Carrier")),
-            "B_DOCUMENT_CUT_OFF_DOCCUT": norm(ui_row.get("Requested Deadline Start Date")),
-            "B_PORT_CUT_OFF_PORTCUT": norm(ui_row.get("Requested Deadline End Date")),
-            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": None,
-            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": norm(ui_row.get("Required Arrival Date")),
+            "B_DOCUMENT_CUT_OFF_DOCCUT": convert_date_string(ui_row.get("Requested Deadline Start Date")),
+            "B_PORT_CUT_OFF_PORTCUT": convert_date_string(ui_row.get("Requested Deadline End Date")),
+            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": convert_date_string(ui_row.get("Requested Deadline Start Date")),  # ETD
+            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": convert_date_string(ui_row.get("Required Arrival Date")),
             "B_GATE_OPENING": None,
             "USER_INSERT": user_insert,
         }
@@ -1472,6 +1486,10 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
         )
         conn.execute(insert_sql, params)
         conn.commit()
+        return True  # Retorna True se chegou até aqui sem erro
+    except Exception as e:
+        conn.rollback()
+        raise e  # Re-lança a exceção para ser capturada pela função chamadora
     finally:
         conn.close()
 
