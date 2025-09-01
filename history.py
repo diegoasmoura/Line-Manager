@@ -419,32 +419,32 @@ def display_attachments_section(farol_reference):
                             import traceback
                             st.code(traceback.format_exc())
             else:
-                st.info("📄 Selecione um PDF de Booking para processar")
-        
-        # Interface de validação se há dados processados armazenados
-        processed_data_key = f"processed_pdf_data_{farol_reference}"
-        if processed_data_key in st.session_state:
-            processed_data = st.session_state[processed_data_key]
+                pass
             
-            # Exibe interface de validação
-            validated_data = display_pdf_validation_interface(processed_data)
-            
-            if validated_data == "CANCELLED":
-                # Remove dados processados se cancelado
-                del st.session_state[processed_data_key]
-                if f"booking_pdf_file_{farol_reference}" in st.session_state:
-                    del st.session_state[f"booking_pdf_file_{farol_reference}"]
-                st.rerun()
-            elif validated_data:
-                # Salva os dados validados
-                if save_pdf_booking_data(validated_data):
-                    # Remove dados processados após salvar
+            # Interface de validação se há dados processados armazenados (APENAS na aba de PDF)
+            processed_data_key = f"processed_pdf_data_{farol_reference}"
+            if processed_data_key in st.session_state:
+                processed_data = st.session_state[processed_data_key]
+                
+                # Exibe interface de validação
+                validated_data = display_pdf_validation_interface(processed_data)
+                
+                if validated_data == "CANCELLED":
+                    # Remove dados processados se cancelado
                     del st.session_state[processed_data_key]
                     if f"booking_pdf_file_{farol_reference}" in st.session_state:
                         del st.session_state[f"booking_pdf_file_{farol_reference}"]
-                    
-                    st.balloons()  # Celebração visual
                     st.rerun()
+                elif validated_data:
+                    # Salva os dados validados
+                    if save_pdf_booking_data(validated_data):
+                        # Remove dados processados após salvar
+                        del st.session_state[processed_data_key]
+                        if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                            del st.session_state[f"booking_pdf_file_{farol_reference}"]
+                        
+                        st.balloons()  # Celebração visual
+                        st.rerun()
 
     # Lista de Anexos Existentes
     attachments_df = get_attachments_for_farol(farol_reference)
