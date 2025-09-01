@@ -349,7 +349,7 @@ def display_attachments_section(farol_reference):
         # Ajusta o uploader baseado no flag
         if is_booking_pdf:
             uploaded_files = st.file_uploader(
-                "📄 Selecione o PDF de Booking",
+                "Selecione o PDF de Booking",
                 accept_multiple_files=False,  # Apenas um arquivo para booking
                 type=['pdf'],  # Apenas PDFs
                 key=f"uploader_{farol_reference}_{current_uploader_version}",
@@ -367,9 +367,7 @@ def display_attachments_section(farol_reference):
             )
         
         if uploaded_files:
-            st.success(f"✅ {len(uploaded_files)} file(s) selected:")
-            for file in uploaded_files:
-                st.write(f"📁 **{file.name}** - {format_file_size(len(file.getvalue()))}")
+            # Remove a exibição duplicada - o file_uploader já mostra o nome do arquivo
             
             col1, col2 = st.columns([1, 4])
             with col1:
@@ -581,23 +579,59 @@ def exibir_history():
 
 
     
-    # Informações organizadas em cards elegantes
+    # Informações organizadas em cards elegantes - consultadas da tabela principal
     main_status = get_current_status_from_main_table(farol_reference) or "-"
-    voyage_carrier = str(df.iloc[0].get("B_VOYAGE_CARRIER", "-"))
     
-    qty = df.iloc[0].get("S_QUANTITY_OF_CONTAINERS", 0)
-    try:
-        qty = int(qty) if qty is not None and pd.notna(qty) else 0
-    except (ValueError, TypeError):
+    # Busca dados da tabela principal F_CON_SALES_BOOKING_DATA em vez do último registro
+    def get_main_table_data(farol_ref):
+        """Busca dados específicos da tabela principal F_CON_SALES_BOOKING_DATA"""
+        try:
+            conn = get_database_connection()
+            # Usando os mesmos nomes de coluna das outras funções que funcionam
+            query = text("""
+                SELECT 
+                    S_QUANTITY_OF_CONTAINERS,
+                    B_VOYAGE_CARRIER,
+                    ROW_INSERTED_DATE
+                FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                WHERE FAROL_REFERENCE = :farol_reference
+            """)
+            result = conn.execute(query, {"farol_reference": farol_ref}).mappings().fetchone()
+            conn.close()
+            return result
+        except Exception as e:
+            if 'conn' in locals():
+                conn.close()
+            st.error(f"❌ Erro na consulta: {str(e)}")
+            return None
+    
+    main_data = get_main_table_data(farol_reference)
+    
+    if main_data:
+        # Dados da tabela principal - usando as chaves corretas (minúsculas)
+        voyage_carrier = str(main_data.get("b_voyage_carrier", "-"))
+        
+        qty = main_data.get("s_quantity_of_containers", 0)
+        try:
+            qty = int(qty) if qty is not None and pd.notna(qty) else 0
+        except (ValueError, TypeError):
+            qty = 0
+        
+        ins = main_data.get("row_inserted_date", "-")
+        try:
+            # Se já é datetime object, formata diretamente
+            if isinstance(ins, datetime):
+                ins = ins.strftime('%Y-%m-%d %H:%M:%S')
+            # Se for epoch ms para datetime legível, se for numérico
+            elif isinstance(ins, (int, float)):
+                ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            pass
+    else:
+        # Fallback para valores do último registro se a tabela principal não tiver dados
+        voyage_carrier = str(df.iloc[0].get("B_VOYAGE_CARRIER", "-")) if not df.empty else "-"
         qty = 0
-    
-    ins = df.iloc[0].get("ROW_INSERTED_DATE", "-")
-    try:
-        # Converte epoch ms para datetime legível, se for numérico
-        if isinstance(ins, (int, float)):
-            ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M:%S')
-    except Exception:
-        pass
+        ins = "-"
     
     # Layout em uma linha com 5 colunas
     col1, col2, col3, col4, col5 = st.columns(5, gap="small")
