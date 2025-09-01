@@ -770,6 +770,7 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
     insert_sales = []
     insert_booking = []
     insert_loading = []
+    insert_unified = []
     insert_logs = []
  
     for i, (_, row) in enumerate(edited_display.iterrows()):
@@ -811,13 +812,13 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
             loading_copy.at[0, "adjustment_id"] = adjustment_id
  
         # Atualiza apenas se as colunas existirem
-        if "S_CREATION_OF_SHIPMENT" in unified_copy.columns:
-            unified_copy.at[0, "S_CREATION_OF_SHIPMENT"] = datetime.now()
-        if "S_TYPE_OF_SHIPMENT" in unified_copy.columns:
-            unified_copy.at[0, "S_TYPE_OF_SHIPMENT"] = "Split"
+        if "s_creation_of_shipment" in unified_copy.columns:
+            unified_copy.at[0, "s_creation_of_shipment"] = datetime.now()
+        if "s_type_of_shipment" in unified_copy.columns:
+            unified_copy.at[0, "s_type_of_shipment"] = "Split"
         # Preenche referência da linha base usada para o split
-        if "S_SPLITTED_BOOKING_REFERENCE" in unified_copy.columns:
-            unified_copy.at[0, "S_SPLITTED_BOOKING_REFERENCE"] = farol_ref_original
+        if "s_splitted_booking_reference" in unified_copy.columns:
+            unified_copy.at[0, "s_splitted_booking_reference"] = farol_ref_original
         
         # Define o Farol Status como "Adjustment Requested" para os splits
         if "FAROL_STATUS" in unified_copy.columns:
@@ -834,6 +835,8 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
             if col not in ['ID']:  # Remove coluna ID
                 unified_dict[col] = unified_copy.iloc[0][col]
         
+
+        
         for col in loading_copy.columns:
             if col not in ['l_id']:  # Remove coluna l_id
                 loading_dict[col] = loading_copy.iloc[0][col]
@@ -844,7 +847,6 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
  
         insert_sales = []  # não usamos mais, mantido para compatibilidade do fluxo
         insert_booking = []
-        insert_unified = [] if 'insert_unified' not in locals() else insert_unified
         insert_unified.append(unified_dict)
         insert_loading.append(loading_dict)
  
@@ -1375,15 +1377,14 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
         # Determina se é um split ou linha original
         # Split tem formato: FR_25.08_0001.1, FR_25.08_0001.2, etc.
         # Referência base tem formato: FR_25.08_0001
-        is_split = farol_reference.count('.') > 1  # Mais de 1 ponto = split
+        # Identifica se é split verificando se o último ponto é seguido por números
+        import re
+        split_pattern = r'^(.+)\.(\d+)$'  # Padrão: qualquer coisa + ponto + números
+        match = re.match(split_pattern, farol_reference)
         
-        # Para splits, S_SPLITTED_BOOKING_REFERENCE deve conter a referência original
-        # Para linha original, S_SPLITTED_BOOKING_REFERENCE deve ser NULL
-        if is_split:
-            # Extrai a referência base (remove o número do split após o último ponto)
-            # Ex: FR_25.08_0001.1 -> FR_25.08_0001
-            last_dot_index = farol_reference.rfind('.')
-            base_reference = farol_reference[:last_dot_index]
+        if match:
+            # É um split - extrai a referência base
+            base_reference = match.group(1)  # Primeira parte (antes do último ponto)
             splitted_booking_ref = base_reference
         else:
             # Linha original - não tem referência de split

@@ -151,14 +151,8 @@ def exibir_shipments():
         df.rename(columns=rename_map, inplace=True)
     farol_ref_col = "Farol Reference"
 
-   # Aplica filtro para excluir splits pendentes de aprovação
-    # Agora todas as tabelas têm acesso ao Type of Shipment via JOIN
-    df = df[
-        ~(
-            (df["Type of Shipment"] == "Split") & 
-            (df["Farol Status"] == "Adjustment Requested")
-        )
-    ]
+   # Filtro removido - agora todos os splits são visíveis na grade
+    # Os splits podem ser gerenciados através do histórico
  
     previous_stage = st.session_state.get("previous_stage")
     unsaved_changes = st.session_state.get("changes") is not None and not st.session_state["changes"].empty
