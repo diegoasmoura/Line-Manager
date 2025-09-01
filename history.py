@@ -385,57 +385,21 @@ def display_attachments_section(farol_reference):
     if processed_data_key in st.session_state:
         st.session_state[expander_key] = True
 
-    # Seção de Upload com Sub-abas Integradas
+    # Seção de Upload Unificada
     with st.expander("📤 Add New Attachment", expanded=st.session_state[expander_key]):
-        # Sub-abas para diferentes tipos de anexos
-        tab1, tab2 = st.tabs(["📎 Regular Attachments", "📄 Booking PDF Processing"])
+        # Checkbox para ativar processamento de PDF de Booking
+        process_booking_pdf = st.checkbox(
+            "📄 Processar PDF de Booking recebido por e-mail", 
+            key=f"process_booking_checkbox_{farol_reference}",
+            help="Marque esta opção se o arquivo é um PDF de booking que precisa ser processado e validado"
+        )
         
-        with tab1:
-            st.markdown("**Upload de anexos regulares (PDFs, planilhas, documentos, etc.)**")
-            
-            uploaded_files = st.file_uploader(
-                "Drag and drop files here or click to select",
-                accept_multiple_files=True,
-                type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
-                key=f"uploader_regular_{farol_reference}_{current_uploader_version}",
-                help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
-            )
-            
-            if uploaded_files:
-                if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):
-                    progress_bar = st.progress(0, text="Saving attachments...")
-                    success_count = 0
-                    
-                    for i, file in enumerate(uploaded_files):
-                        # Reseta o ponteiro do arquivo
-                        file.seek(0)
-                        
-                        if save_attachment_to_db(farol_reference, file):
-                            success_count += 1
-                        
-                        progress = (i + 1) / len(uploaded_files)
-                        progress_bar.progress(progress, text=f"Saving attachment {i+1} of {len(uploaded_files)}...")
-                    
-                    progress_bar.empty()
-                    
-                    if success_count == len(uploaded_files):
-                        st.success(f"✅ {success_count} attachment(s) saved successfully!")
-                    else:
-                        st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
-
-                    # Incrementa a versão do uploader para resetar a seleção na próxima execução
-                    st.session_state[uploader_version_key] += 1
-
-                    # Atualiza cache para evitar re-renderização desnecessária
-                    if cache_key in st.session_state:
-                        st.session_state[cache_key]["last_update"] = st.session_state[uploader_version_key]
-
-                    # Força atualização da lista (com uploader recriado)
-                    st.rerun()
+        # Mantém o expander aberto quando o checkbox é alterado
+        if process_booking_pdf:
+            st.session_state[expander_key] = True
         
-        with tab2:
-            st.markdown("**Processamento de PDFs de Booking recebidos por e-mail**")
-            
+        if process_booking_pdf:
+            # Upload específico para PDFs de Booking
             uploaded_file = st.file_uploader(
                 "Selecione o PDF de Booking",
                 accept_multiple_files=False,  # Apenas um arquivo para booking
@@ -443,42 +407,81 @@ def display_attachments_section(farol_reference):
                 key=f"uploader_booking_{farol_reference}_{current_uploader_version}",
                 help="Selecione apenas PDFs de booking recebidos por e-mail • Limit 200MB per file • PDF"
             )
-            
-            if uploaded_file:
-                file = uploaded_file  # Arquivo único para booking
+        else:
+            # Upload de anexos regulares
+            uploaded_files = st.file_uploader(
+                "Drag and drop files here or click to select",
+                accept_multiple_files=True,
+                type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
+                key=f"uploader_regular_{farol_reference}_{current_uploader_version}",
+                help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
+            )
+        
+        # Processamento baseado no tipo de upload
+        if process_booking_pdf and uploaded_file:
+            if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
+                with st.spinner("🔄 Processando PDF e extraindo dados..."):
+                    try:
+                        # Reseta o ponteiro do arquivo
+                        uploaded_file.seek(0)
+                        pdf_content = uploaded_file.read()
+                        
+                        # Processa o PDF
+                        processed_data = process_pdf_booking(pdf_content, farol_reference)
+                        
+                        if processed_data:
+                            # Armazena os dados processados no session_state para validação
+                            st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
+                            st.session_state[f"booking_pdf_file_{farol_reference}"] = uploaded_file
+                            
+                            # Atualiza cache para estabilizar a interface
+                            if cache_key in st.session_state:
+                                st.session_state[cache_key]["last_update"] = st.session_state[uploader_version_key]
+                            
+                            st.success("✅ Dados extraídos com sucesso! Valide as informações abaixo:")
+                            st.rerun()
+                        else:
+                            st.error("❌ Processamento retornou dados vazios")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Erro durante o processamento: {str(e)}")
+                        import traceback
+                        st.code(traceback.format_exc())
+        
+        elif not process_booking_pdf and uploaded_files:
+            if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):
+                progress_bar = st.progress(0, text="Saving attachments...")
+                success_count = 0
                 
-                if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
-                    with st.spinner("🔄 Processando PDF e extraindo dados..."):
-                        try:
-                            # Reseta o ponteiro do arquivo
-                            file.seek(0)
-                            pdf_content = file.read()
-                            
-                            # Processa o PDF
-                            processed_data = process_pdf_booking(pdf_content, farol_reference)
-                            
-                            if processed_data:
-                                # Armazena os dados processados no session_state para validação
-                                st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
-                                st.session_state[f"booking_pdf_file_{farol_reference}"] = file
-                                
-                                # Atualiza cache para estabilizar a interface
-                                if cache_key in st.session_state:
-                                    st.session_state[cache_key]["last_update"] = st.session_state[uploader_version_key]
-                                
-                                st.success("✅ Dados extraídos com sucesso! Valide as informações abaixo:")
-                                st.rerun()
-                            else:
-                                st.error("❌ Processamento retornou dados vazios")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Erro durante o processamento: {str(e)}")
-                            import traceback
-                            st.code(traceback.format_exc())
-            else:
-                pass
-            
-            # Interface de validação se há dados processados armazenados (APENAS na aba de PDF)
+                for i, file in enumerate(uploaded_files):
+                    # Reseta o ponteiro do arquivo
+                    file.seek(0)
+                    
+                    if save_attachment_to_db(farol_reference, file):
+                        success_count += 1
+                    
+                    progress = (i + 1) / len(uploaded_files)
+                    progress_bar.progress(progress, text=f"Saving attachment {i+1} of {len(uploaded_files)}...")
+                
+                progress_bar.empty()
+                
+                if success_count == len(uploaded_files):
+                    st.success(f"✅ {success_count} attachment(s) saved successfully!")
+                else:
+                    st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
+
+                # Incrementa a versão do uploader para resetar a seleção na próxima execução
+                st.session_state[uploader_version_key] += 1
+
+                # Atualiza cache para evitar re-renderização desnecessária
+                if cache_key in st.session_state:
+                    st.session_state[cache_key]["last_update"] = st.session_state[uploader_version_key]
+
+                # Força atualização da lista (com uploader recriado)
+                st.rerun()
+        
+        # Interface de validação se há dados processados armazenados (APENAS quando checkbox está marcado)
+        if process_booking_pdf:
             processed_data_key = f"processed_pdf_data_{farol_reference}"
             if processed_data_key in st.session_state:
                 processed_data = st.session_state[processed_data_key]
