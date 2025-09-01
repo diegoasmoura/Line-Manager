@@ -498,7 +498,7 @@ def exibir_shipments():
         st.markdown("### 📎 Attachment Management")
         farol_ref = st.session_state.get("shipments_attachments_farol_ref")
         if farol_ref:
-            from booking_adjustments import display_attachments_section
+            from history import display_attachments_section
             display_attachments_section(farol_ref)
         else:
             st.info("Select a row to view attachments.")

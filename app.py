@@ -5,7 +5,7 @@ st.set_page_config(page_title="Farol", layout="wide")
  
 from streamlit_option_menu import option_menu 
 import shipments
-import booking_adjustments
+# import booking_adjustments  # Funcionalidade movida para history.py
 import operation_control
 import performance_control
 import tracking
@@ -37,7 +37,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
  
     # Lista de opções
-    options = ["Shipments", "Adjustments", "Op. Control", "Performance", "Tracking", "History", "Setup"]
+    options = ["Shipments", "Op. Control", "Performance", "Tracking", "History", "Setup"]  # Removido "Adjustments" - funcionalidade movida para History
     
     # Encontra o índice da opção atual
     current_index = options.index(st.session_state.menu_choice) if st.session_state.menu_choice in options else 0
@@ -46,7 +46,7 @@ with st.sidebar:
     choice = option_menu(
         None,
         options,
-        icons=["truck", "sliders","clipboard-data", "bar-chart", "geo-alt", "clock-history", "gear"],
+        icons=["truck", "clipboard-data", "bar-chart", "geo-alt", "clock-history", "gear"],  # Removido ícone "sliders" do Adjustments
         menu_icon="menu",
         default_index=current_index,
         key=f"main_menu_{st.session_state.menu_choice}",  # Chave única baseada no estado
@@ -66,8 +66,6 @@ with st.sidebar:
 # Usa o estado do menu para determinar qual página exibir
 if st.session_state.menu_choice == "Shipments":
     shipments.main()
-elif st.session_state.menu_choice == "Adjustments":
-    booking_adjustments.exibir_adjustments()
 elif st.session_state.menu_choice == "Op. Control":
     operation_control.exibir_operation_control()
 elif st.session_state.menu_choice == "Performance":

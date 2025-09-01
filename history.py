@@ -1,10 +1,552 @@
 import streamlit as st
 import pandas as pd
 from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table, get_return_carrier_status_by_adjustment_id
-from booking_adjustments import display_attachments_section
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
 from datetime import datetime
+import os
+import base64
+import mimetypes
+import uuid
+from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
+
+def get_file_type(uploaded_file):
+    ext = uploaded_file.name.split('.')[-1].lower()
+    mapping = {
+        'pdf': 'PDF',
+        'doc': 'Word',
+        'docx': 'Word',
+        'xls': 'Excel',
+        'xlsx': 'Excel',
+        'ppt': 'PowerPoint',
+        'pptx': 'PowerPoint',
+        'txt': 'Texto',
+        'csv': 'CSV',
+        'png': 'Imagem',
+        'jpg': 'Imagem',
+        'jpeg': 'Imagem',
+        'gif': 'Imagem',
+        'zip': 'Compactado',
+        'rar': 'Compactado'
+    }
+    return mapping.get(ext, 'Outro')
+
+def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
+    """
+    Salva um anexo na tabela F_CON_ANEXOS.
+    
+    Args:
+        farol_reference: Referência do Farol
+        uploaded_file: Arquivo enviado pelo Streamlit file_uploader
+        user_id: ID do usuário que enviou o arquivo
+    
+    Returns:
+        bool: True se salvou com sucesso, False caso contrário
+    """
+    try:
+        conn = get_database_connection()
+        
+        # Lê o conteúdo do arquivo
+        file_content = uploaded_file.read()
+        
+        # Obtém informações do arquivo
+        file_name = uploaded_file.name
+        # Obtém apenas o nome sem extensão e a extensão separadamente
+        file_name_without_ext = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+        file_extension = file_name.rsplit('.', 1)[1].upper() if '.' in file_name else ''
+        # file_type = mimetypes.guess_type(file_name)[0] or 'application/octet-stream'
+        file_type = get_file_type(uploaded_file)
+        
+        # SQL com estrutura REAL da tabela (deixe trigger preencher ID)
+        insert_query = text("""
+            INSERT INTO LogTransp.F_CON_ANEXOS (
+                id,
+                farol_reference,
+                adjustment_id,
+                process_stage,
+                type_,
+                file_name,
+                file_extension,
+                upload_timestamp,
+                attachment,
+                user_insert
+            ) VALUES (
+                :id,
+                :farol_reference,
+                :adjustment_id,
+                :process_stage,
+                :type_,
+                :file_name,
+                :file_extension,
+                :upload_timestamp,
+                :attachment,
+                :user_insert
+            )
+        """)
+        
+        conn.execute(insert_query, {
+            "id": None,
+            "farol_reference": farol_reference,
+            "adjustment_id": str(uuid.uuid4()),  # Gera UUID para adjustment_id
+            "process_stage": "Attachment Management",
+            "type_": file_type,
+            "file_name": file_name_without_ext,
+            "file_extension": file_extension,
+            "upload_timestamp": datetime.now(),
+            "attachment": file_content,
+            "user_insert": user_id
+        })
+        
+        conn.commit()
+        conn.close()
+        return True
+        
+    except Exception as e:
+        st.error(f"Erro ao salvar anexo: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return False
+
+def get_attachments_for_farol(farol_reference):
+    """
+    Busca todos os anexos para uma referência específica do Farol.
+    
+    Args:
+        farol_reference: Referência do Farol
+    
+    Returns:
+        DataFrame: DataFrame com os anexos encontrados
+    """
+    try:
+        conn = get_database_connection()
+        
+        # SQL com estrutura REAL da tabela
+        query = text("""
+            SELECT 
+                id,
+                farol_reference,
+                adjustment_id,
+                process_stage,
+                type_ as mime_type,
+                file_name,
+                file_extension,
+                upload_timestamp as upload_date,
+                user_insert as uploaded_by
+            FROM LogTransp.F_CON_ANEXOS 
+            WHERE farol_reference = :farol_reference
+              AND (process_stage IS NULL OR process_stage <> 'Attachment Deleted')
+            ORDER BY upload_timestamp DESC
+        """)
+        
+        result = conn.execute(query, {"farol_reference": farol_reference}).mappings().fetchall()
+        conn.close()
+        
+        if result:
+            df = pd.DataFrame([dict(row) for row in result])
+            # Adiciona colunas compatíveis para o código existente
+            df['description'] = "Anexo para " + farol_reference
+            # Reconstrói nome completo do arquivo
+            df['full_file_name'] = df.apply(lambda row: f"{row['file_name']}.{row['file_extension']}" if row['file_extension'] else row['file_name'], axis=1)
+            return df
+        else:
+            return pd.DataFrame()
+            
+    except Exception as e:
+        st.error(f"Erro ao buscar anexos: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return pd.DataFrame()
+
+def delete_attachment(attachment_id, deleted_by="system"):
+    """
+    Marca um anexo como excluído (soft delete) para respeitar o trigger que bloqueia DELETE.
+    
+    Args:
+        attachment_id: ID numérico do anexo
+        deleted_by: usuário que solicitou a exclusão
+    
+    Returns:
+        bool: True se marcado como excluído com sucesso, False caso contrário
+    """
+    try:
+        conn = get_database_connection()
+        
+        # Atualiza metadados e marca o estágio como deletado
+        query = text("""
+            UPDATE LogTransp.F_CON_ANEXOS
+               SET process_stage = 'Attachment Deleted',
+                   user_update = :user_update,
+                   date_update = SYSDATE
+             WHERE id = :attachment_id
+        """)
+        result = conn.execute(query, {"attachment_id": attachment_id, "user_update": deleted_by})
+        conn.commit()
+        conn.close()
+        return result.rowcount > 0
+    except Exception as e:
+        st.error(f"Erro ao excluir anexo: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return False
+
+def get_attachment_content(attachment_id):
+    """
+    Busca o conteúdo de um anexo específico.
+    
+    Args:
+        attachment_id: ID numérico do anexo
+    
+    Returns:
+        tuple: (file_content, file_name, mime_type) ou (None, None, None) se não encontrado
+    """
+    try:
+        conn = get_database_connection()
+        
+        query = text("""
+            SELECT attachment, file_name, file_extension, type_ as mime_type
+            FROM LogTransp.F_CON_ANEXOS 
+            WHERE id = :attachment_id
+        """)
+        
+        result = conn.execute(query, {"attachment_id": attachment_id}).mappings().fetchone()
+        conn.close()
+        
+        if result:
+            # Reconstrói o nome do arquivo com extensão
+            full_file_name = f"{result['file_name']}.{result['file_extension']}" if result['file_extension'] else result['file_name']
+            return result['attachment'], full_file_name, result['mime_type']
+        else:
+            return None, None, None
+            
+    except Exception as e:
+        st.error(f"Erro ao buscar conteúdo do anexo: {str(e)}")
+        if 'conn' in locals():
+            conn.close()
+        return None, None, None
+
+def format_file_size(size_bytes):
+    """Formata o tamanho do arquivo em uma string legível."""
+    if size_bytes == 0:
+        return "0 B"
+    size_names = ["B", "KB", "MB", "GB"]
+    import math
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return f"{s} {size_names[i]}"
+
+def get_file_icon(mime_type, file_name):
+    """Retorna um ícone apropriado baseado no tipo de arquivo."""
+    if not mime_type:
+        return "📄"
+    
+    if mime_type.startswith('image/'):
+        return "🖼️"
+    elif mime_type.startswith('video/'):
+        return "🎥"
+    elif mime_type.startswith('audio/'):
+        return "🎵"
+    elif mime_type in ['application/pdf']:
+        return "📕"
+    elif mime_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+        return "📊"
+    elif mime_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+        return "📝"
+    elif mime_type in ['application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation']:
+        return "📋"
+    elif mime_type.startswith('text/'):
+        return "📄"
+    else:
+        return "📎"
+
+def display_attachments_section(farol_reference):
+    """
+    Exibe a seção de anexos para um Farol Reference específico.
+    """
+    # CSS personalizado para cards de anexos e métricas (garante visual igual em todas as telas)
+    st.markdown("""
+    <style>
+    .attachment-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 18px;
+        margin: 15px 0;
+        background: linear-gradient(145deg, #ffffff, #f8f9fa);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        text-align: center;
+        border-left: 4px solid #1f77b4;
+    }
+    .attachment-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        border-left-color: #0d47a1;
+    }
+    .file-icon {
+        font-size: 3em;
+        margin-bottom: 15px;
+        display: block;
+    }
+    .file-name {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 10px;
+        color: #333;
+        word-wrap: break-word;
+    }
+    .file-info {
+        font-size: 13px;
+        color: #666;
+        margin: 5px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    .metric-card {
+        background: linear-gradient(145deg, #f0f8ff, #e6f3ff);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        border: 1px solid #b3d9ff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .attachment-section {
+        background-color: #fafafa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        border: 1px solid #e0e0e0;
+    }
+    .upload-area {
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Controle de versão do uploader para permitir reset após salvar
+    uploader_version_key = f"uploader_ver_{farol_reference}"
+    if uploader_version_key not in st.session_state:
+        st.session_state[uploader_version_key] = 0
+    current_uploader_version = st.session_state[uploader_version_key]
+
+    # Seção de Upload com estilo melhorado
+    with st.expander("📤 Add New Attachment", expanded=False):
+        # Flag para indicar se é um PDF de Booking
+        is_booking_pdf = st.checkbox(
+            "📄 Este é um PDF de Booking para processamento automático",
+            key=f"booking_pdf_flag_{farol_reference}_{current_uploader_version}",
+            help="Marque esta opção se você está enviando um PDF de Booking recebido por e-mail para extração automática de dados"
+        )
+        
+        # Ajusta o uploader baseado no flag
+        if is_booking_pdf:
+            uploaded_files = st.file_uploader(
+                "📄 Selecione o PDF de Booking",
+                accept_multiple_files=False,  # Apenas um arquivo para booking
+                type=['pdf'],  # Apenas PDFs
+                key=f"uploader_{farol_reference}_{current_uploader_version}",
+                help="Selecione apenas PDFs de booking recebidos por e-mail • Limit 200MB per file • PDF"
+            )
+            # Converte para lista para manter compatibilidade com o código existente
+            uploaded_files = [uploaded_files] if uploaded_files else []
+        else:
+            uploaded_files = st.file_uploader(
+                "Drag and drop files here or click to select",
+                accept_multiple_files=True,
+                type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
+                key=f"uploader_{farol_reference}_{current_uploader_version}",
+                help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
+            )
+        
+        if uploaded_files:
+            st.success(f"✅ {len(uploaded_files)} file(s) selected:")
+            for file in uploaded_files:
+                st.write(f"📁 **{file.name}** - {format_file_size(len(file.getvalue()))}")
+            
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if is_booking_pdf:
+                    # Botão específico para processamento de PDF de Booking
+                    if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
+                        if uploaded_files:
+                            file = uploaded_files[0]  # Apenas um arquivo para booking
+                            
+                            st.info(f"🔄 Iniciando processamento do arquivo: {file.name}")
+                            
+                            with st.spinner("Processing PDF... Extracting data..."):
+                                try:
+                                    # Reseta o ponteiro do arquivo
+                                    file.seek(0)
+                                    pdf_content = file.read()
+                                    
+                                    st.info(f"📄 Arquivo lido: {len(pdf_content)} bytes")
+                                    
+                                    # Processa o PDF
+                                    processed_data = process_pdf_booking(pdf_content, farol_reference)
+                                    
+                                    if processed_data:
+                                        # Armazena os dados processados no session_state para validação
+                                        st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
+                                        st.session_state[f"booking_pdf_file_{farol_reference}"] = file
+                                        st.success("✅ Dados armazenados no session_state. Recarregando página...")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Processamento retornou dados vazios")
+                                        
+                                except Exception as e:
+                                    st.error(f"❌ Erro durante o processamento: {str(e)}")
+                                    import traceback
+                                    st.code(traceback.format_exc())
+                        else:
+                            st.error("❌ Nenhum arquivo foi selecionado")
+                else:
+                    # Botão normal para anexos regulares
+                    if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):
+                        progress_bar = st.progress(0, text="Saving attachments...")
+                        success_count = 0
+                        
+                        for i, file in enumerate(uploaded_files):
+                            # Reseta o ponteiro do arquivo
+                            file.seek(0)
+                            
+                            if save_attachment_to_db(farol_reference, file):
+                                success_count += 1
+                            
+                            progress = (i + 1) / len(uploaded_files)
+                            progress_bar.progress(progress, text=f"Saving attachment {i+1} of {len(uploaded_files)}...")
+                        
+                        progress_bar.empty()
+                        
+                        if success_count == len(uploaded_files):
+                            st.success(f"✅ {success_count} attachment(s) saved successfully!")
+                        else:
+                            st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
+
+                        # Incrementa a versão do uploader para resetar a seleção na próxima execução
+                        st.session_state[uploader_version_key] += 1
+
+                        # Força atualização da lista (com uploader recriado)
+                        st.rerun()
+
+    # Lista de Anexos Existentes
+    attachments_df = get_attachments_for_farol(farol_reference)
+
+    st.divider()
+    st.subheader("Attachments")
+
+    if not attachments_df.empty:
+        # Ordena por data/hora (mais recente primeiro)
+        dfv = attachments_df.sort_values('upload_date', ascending=False).reset_index(drop=True)
+
+        # Cabeçalho
+        h1, h2, h3, h4, h5, h6 = st.columns([5, 2, 2, 2, 1, 1])
+        h1.markdown("**File**")
+        h2.markdown("**Type/Ext**")
+        h3.markdown("**User**")
+        h4.markdown("**Date**")
+        h5.markdown("**Download**")
+        h6.markdown("**Delete**")
+
+        # Linhas
+        for row_index, (_, att) in enumerate(dfv.iterrows()):
+            row_key = f"{farol_reference}_{att['id']}_{row_index}"
+            confirm_key = f"confirm_del_flat_{row_key}"
+            c1, c2, c3, c4, c5, c6 = st.columns([5, 2, 2, 2, 1, 1])
+            with c1:
+                st.write(att.get('full_file_name', att['file_name']))
+            with c2:
+                ext = (att.get('file_extension') or '').lower()
+                st.write(att.get('mime_type') or ext or 'N/A')
+            with c3:
+                st.write(att.get('uploaded_by', ''))
+            with c4:
+                st.write(att['upload_date'].strftime('%Y-%m-%d %H:%M') if pd.notna(att['upload_date']) else 'N/A')
+            with c5:
+                fc, fn, mt = get_attachment_content(att['id'])
+                st.download_button("⬇️", data=fc or b"", file_name=fn or "file", mime=mt or "application/octet-stream",
+                                   key=f"dl_flat_{row_key}", use_container_width=True, disabled=fc is None)
+            with c6:
+                if not st.session_state.get(confirm_key, False):
+                    if st.button("🗑️", key=f"del_flat_{row_key}", use_container_width=True):
+                        st.session_state[confirm_key] = True
+                        st.rerun()
+
+            # Barra de confirmação em linha separada e largura total
+            if st.session_state.get(confirm_key, False):
+                wc1, wc2, wc3 = st.columns([6, 1, 1])
+                with wc1:
+                    st.warning("⚠️ Are you sure you want to delete?")
+                with wc2:
+                    if st.button("✅ Yes", key=f"yes_flat_{row_key}", use_container_width=True):
+                        if delete_attachment(att['id'], deleted_by=st.session_state.get('current_user', 'system')):
+                            st.success("✅ Attachment deleted successfully!")
+                        else:
+                            st.error("❌ Error deleting attachment!")
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+                with wc3:
+                    if st.button("❌ No", key=f"no_flat_{row_key}", use_container_width=True):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+
+        # Download em lote (zip) - todos
+        from io import BytesIO
+        import zipfile
+        fc_total = []
+        for _, att in dfv.iterrows():
+            fc, fn, mt = get_attachment_content(att['id'])
+            if fc and fn:
+                fc_total.append((fn, fc))
+        if fc_total:
+            buf = BytesIO()
+            with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+                for fn, fc in fc_total:
+                    zf.writestr(fn, fc)
+            st.download_button("⬇️ Download all as .zip", data=buf.getvalue(), file_name="attachments.zip",
+                               mime="application/zip", key=f"dl_zip_all_{farol_reference}")
+    else:
+        st.info("📂 No attachments found for this reference.")
+        st.markdown("💡 **Tip:** Use the 'Add New Attachment' section above to upload files related to this Farol Reference.")
+    
+    # Interface de validação de PDF de Booking se há dados processados
+    processed_data_key = f"processed_pdf_data_{farol_reference}"
+    if processed_data_key in st.session_state:
+        st.markdown("---")
+        processed_data = st.session_state[processed_data_key]
+        
+        # Exibe interface de validação
+        validated_data = display_pdf_validation_interface(processed_data)
+        
+        if validated_data == "CANCELLED":
+            # Remove dados processados se cancelado
+            del st.session_state[processed_data_key]
+            if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                del st.session_state[f"booking_pdf_file_{farol_reference}"]
+            st.rerun()
+        elif validated_data:
+            # Salva os dados validados
+            if save_pdf_booking_data(validated_data):
+                # Salva também o PDF como anexo normal
+                pdf_file = st.session_state.get(f"booking_pdf_file_{farol_reference}")
+                if pdf_file:
+                    pdf_file.seek(0)  # Reseta o ponteiro
+                    save_attachment_to_db(farol_reference, pdf_file, user_id="PDF_PROCESSOR")
+                
+                # Remove dados processados após salvar
+                del st.session_state[processed_data_key]
+                if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                    del st.session_state[f"booking_pdf_file_{farol_reference}"]
+                
+                st.balloons()  # Celebração visual
+                st.rerun()
 
 def exibir_history():
     st.header("📜 Return Carriers History")
