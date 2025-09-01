@@ -12,7 +12,8 @@ from database import (
     get_data_bookingData,         # Carrega os dados dos embarques na tabela Booking management
     get_data_loadingData,         # Carrega os dados dos embarques na tabela Container Loading
     load_df_udc,                  # Carrega as opções de UDC (dropdowns)
-    insert_adjustments_basics     #Função para inserir ajustes básicos na tabela de log
+    insert_adjustments_basics,    #Função para inserir ajustes básicos na tabela de log
+    get_actions_count_by_farol_reference  # Conta ações por Farol Reference
 )
  
 # Importa funções auxiliares de mapeamento e formulários
@@ -151,9 +152,26 @@ def exibir_shipments():
         df.rename(columns=rename_map, inplace=True)
     farol_ref_col = "Farol Reference"
 
-   # Filtro removido - agora todos os splits são visíveis na grade
+      # Filtro removido - agora todos os splits são visíveis na grade
     # Os splits podem ser gerenciados através do histórico
- 
+
+    # Adiciona coluna com contagem de ações do histórico (por ramo)
+    actions_count = get_actions_count_by_farol_reference()  # ref exata -> count
+    import re
+    def branch_count(ref: str) -> int:
+        ref = str(ref)
+        # Conta ações da própria referência
+        total = actions_count.get(ref, 0)
+        # Conta também descendentes diretos/indiretos do ramo
+        prefix = re.escape(ref) + r"\."  # ex.: FR_25.08_0001.  (com ponto)
+        # Varre todas as refs presentes no dicionário e soma as que começam com prefix
+        for r, c in actions_count.items():
+            if r != ref and re.match(rf'^{prefix}', r):
+                total += c
+        return int(total)
+
+    df["Actions Count"] = df[farol_ref_col].apply(branch_count).astype(int)
+
     previous_stage = st.session_state.get("previous_stage")
     unsaved_changes = st.session_state.get("changes") is not None and not st.session_state["changes"].empty
  
@@ -198,6 +216,9 @@ def exibir_shipments():
     # Garante que Splitted Booking Reference esteja visível porém somente leitura
     if "Splitted Booking Reference" not in disabled_columns:
         disabled_columns.append("Splitted Booking Reference")
+    # Garante que Actions Count seja somente leitura
+    if "Actions Count" not in disabled_columns:
+        disabled_columns.append("Actions Count")
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
     # Configuração explícita para exibir como texto somente leitura
@@ -216,9 +237,25 @@ def exibir_shipments():
 
     # Garante que a coluna Farol Reference está pinada à esquerda
     column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
+    
+    # Configuração da coluna Actions Count
+    column_config["Actions Count"] = st.column_config.NumberColumn(
+        "Actions Count", 
+        help="Number of actions/records in the history for this Farol Reference",
+        format="%d",
+        width="small"
+    )
 
-    # Reordena colunas e posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
+    # Reordena colunas e posiciona "Actions Count" após "Farol Status"
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
+    
+    # Posiciona "Actions Count" após "Farol Status"
+    if "Actions Count" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
+        colunas_ordenadas.remove("Actions Count")
+        idx_status = colunas_ordenadas.index("Farol Status")
+        colunas_ordenadas.insert(idx_status + 1, "Actions Count")
+    
+    # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
     if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
         # Remove e reinsere antes de Comments Sales (lado esquerdo)
         colunas_ordenadas.remove("Splitted Booking Reference")

@@ -1467,6 +1467,33 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None):
         conn.commit()
     finally:
         conn.close()
+
+def get_actions_count_by_farol_reference():
+    """
+    Retorna um dicionário com o número de ações (registros) por FAROL_REFERENCE exato
+    na tabela F_CON_RETURN_CARRIERS. A agregação por ramo (base ou split) será feita
+    na camada da aplicação (shipments.py), permitindo:
+      - Se ref é base (ex.: FR_25.08_0001): contar ele + todos os descendentes (FR_25.08_0001.*)
+      - Se ref é split (ex.: FR_25.08_0001.1): contar ele + seus descendentes (FR_25.08_0001.1.*)
+    """
+    conn = get_database_connection()
+    try:
+        query = text("""
+            SELECT FAROL_REFERENCE, COUNT(*) AS ACTION_COUNT
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            GROUP BY FAROL_REFERENCE
+        """)
+        result = conn.execute(query).fetchall()
+
+        # Converte para dicionário: ref exata -> action_count
+        actions_dict = {}
+        for row in result:
+            actions_dict[row[0]] = row[1]
+
+        return actions_dict
+    finally:
+        conn.close()
+
 #Função utilizada para preencher os dados no formulário para a referência selecionada
 def get_split_data_by_farol_reference(farol_reference):
     """Executa a consulta SQL para obter dados específicos para splits."""
