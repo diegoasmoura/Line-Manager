@@ -927,8 +927,11 @@ def display_pdf_validation_interface(processed_data):
     
     # Cria formulário de validação
     with st.form("pdf_validation_form"):
+        # Layout mais compacto e organizado
+        st.markdown("**📋 Validação dos Dados Extraídos**")
+        
         # Primeira linha: Booking Reference e Quantidade de Containers
-        col1, col2, col_spacer1 = st.columns([1, 1, 2])
+        col1, col2 = st.columns(2)
         with col1:
             booking_reference = st.text_input(
                 "Booking Reference",
@@ -944,7 +947,7 @@ def display_pdf_validation_interface(processed_data):
             )
         
         # Segunda linha: Nome do Navio, Carrier/Armador e Voyage
-        col3, col4, col5, col_spacer2 = st.columns([1, 1, 1, 1])
+        col3, col4, col5 = st.columns(3)
         with col3:
             vessel_name = st.text_input(
                 "Nome do Navio",
@@ -967,7 +970,7 @@ def display_pdf_validation_interface(processed_data):
             )
         
         # Terceira linha: Porto de Origem (POL) e Porto de Destino (POD)
-        col6, col7, col_spacer3 = st.columns([1, 1, 2])
+        col6, col7 = st.columns(2)
         with col6:
             pol = st.text_input(
                 "Porto de Origem (POL)",
@@ -998,7 +1001,7 @@ def display_pdf_validation_interface(processed_data):
                 return None
         
         # Quarta linha: ETD e ETA
-        col8, col9, col_spacer4 = st.columns([1, 1, 2])
+        col8, col9 = st.columns(2)
         with col8:
             etd = st.date_input(
                 "ETD (Estimated Time of Departure)",
