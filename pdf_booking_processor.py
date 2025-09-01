@@ -20,11 +20,11 @@ from sqlalchemy import text
 import uuid
 
 try:
-    import PyPDF2
+    import pdfplumber
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
-    st.error("⚠️ PyPDF2 não está instalado. Execute: pip install PyPDF2")
+    st.error("⚠️ pdfplumber não está instalado. Execute: pip install pdfplumber")
 
 # Padrões de extração por armador/carrier
 CARRIER_PATTERNS = {
@@ -206,11 +206,12 @@ def extract_text_from_pdf(pdf_file):
         # Reseta o ponteiro para o início
         pdf_file.seek(0)
         
-        reader = PyPDF2.PdfReader(pdf_file)
         text = ""
-        
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
+        with pdfplumber.open(pdf_file) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
         
         return text.strip()
     
@@ -272,7 +273,7 @@ def extract_data_with_patterns(text, patterns):
     
     return extracted_data
 
-def extract_maersk_data(text_content):
+def extract_maersk_data_old(text_content):
     """Extrai dados específicos para PDFs da Maersk usando padrões MVS"""
     data = {}
     
@@ -332,22 +333,164 @@ def extract_maersk_data(text_content):
         data["eta"] = mvs_match.group(2).strip()
     
     # Extrair POL e POD usando padrões mais específicos da Maersk
-    # POL (From:)
-    pol_match = re.search(r"From:\s*([^,\n]+(?:,[^,\n]+(?:,[^,\n]+)?)?)", text_content, re.IGNORECASE | re.MULTILINE)
-    if pol_match:
-        pol_text = pol_match.group(1).strip()
-        # Limpar quebras de linha e texto extra
-        pol_clean = re.sub(r'\s+', ' ', pol_text)
-        pol_clean = re.sub(r'Contact Name.*$', '', pol_clean, flags=re.IGNORECASE)
-        data["pol"] = pol_clean.strip()
+    # POL (From:) - Função similar ao POD
+    def extract_maersk_pol(text_content):
+        """Extrai POL da Maersk capturando o texto completo após 'From:'"""
+        # Regex que captura tudo até o próximo campo conhecido (deve parar antes de "To:")
+        from_pattern = r"(?:From|FROM)\s*:\s*(.+?)(?=To:|Booking No|$)"
+        from_match = re.search(from_pattern, text_content, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        
+        if from_match:
+            port_text = from_match.group(1).strip()
+            
+            # Remove quebras de linha e normaliza espaços
+            port_clean = re.sub(r'\n+', ' ', port_text)
+            port_clean = re.sub(r'\s+', ' ', port_clean)
+            port_clean = port_clean.strip()
+            
+            # Remove campos que não são parte do porto
+            port_clean = re.sub(r'Contact Name.*$', '', port_clean, flags=re.IGNORECASE)
+            port_clean = re.sub(r'Booked by Ref.*$', '', port_clean, flags=re.IGNORECASE)
+            port_clean = port_clean.strip()
+            
+            # Aplica a mesma lógica de limpeza do POD
+            # Casos específicos conhecidos para POL
+            port_clean = re.sub(r'\bSao\s+P\s+aulo\b', 'Sao Paulo', port_clean, flags=re.IGNORECASE)
+            port_clean = re.sub(r'\bB\s+r\s+azi\s+l\b', 'Brazil', port_clean, flags=re.IGNORECASE)
+            
+            # Junta letras isoladas que foram separadas incorretamente
+            port_clean = re.sub(r'\b([A-Z])\s+([A-Z])\b', r'\1\2', port_clean)
+            port_clean = re.sub(r'\b([A-Z])\s+([a-z]+)\s+([a-z]+)\b', r'\1\2\3', port_clean)
+            
+            # Junta palavras quebradas comuns
+            port_clean = re.sub(r'\b([A-Z][a-z]+)\s+([a-z]+)\b', r'\1\2', port_clean)
+            
+            # Junta letras individuais com palavras seguintes
+            port_clean = re.sub(r'\b([A-Z])\s+([a-z]{2,})\b', r'\1\2', port_clean)
+            
+            return port_clean
+        
+        return None
     
-    # POD (To:)
-    pod_match = re.search(r"(?:To|TO)\s*:\s*([^,\n]+(?:,[^,\n]+(?:,[^,\n]+)?)?)", text_content, re.IGNORECASE | re.MULTILINE)
-    if pod_match:
-        pod_text = pod_match.group(1).strip()
-        # Limpar quebras de linha e texto extra
-        pod_clean = re.sub(r'\s+', ' ', pod_text)
-        data["pod"] = pod_clean.strip()
+    # Extrai POL usando a função melhorada
+    pol_text = extract_maersk_pol(text_content)
+    if pol_text:
+        data["pol"] = pol_text
+    
+    # POD (To:) - Função melhorada para lidar com quebras de linha
+    def extract_maersk_pod(text_content):
+        """Extrai POD da Maersk capturando o texto completo após 'To:'"""
+        # Regex que funciona: captura tudo até o próximo campo conhecido
+        to_pattern = r"(?:To|TO)\s*:\s*(.+?)(?=Contact Name|Booked by Ref|Customer Cargo|Booking No)"
+        to_match = re.search(to_pattern, text_content, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+        
+        if to_match:
+            port_text = to_match.group(1).strip()
+            
+            # Remove quebras de linha e normaliza espaços
+            port_clean = re.sub(r'\n+', ' ', port_text)
+            port_clean = re.sub(r'\s+', ' ', port_clean)
+            port_clean = port_clean.strip()
+            
+            # Lógica inteligente para juntar palavras quebradas preservando nomes de cidades
+            
+            # Casos específicos conhecidos
+            port_clean = re.sub(r'\bI\s+sk\s+enderun\b', 'Iskenderun', port_clean, flags=re.IGNORECASE)
+            port_clean = re.sub(r'\bHo\s+Chi\s+Minh\s+Ci\s+T\s+Y\b', 'Ho Chi Minh City', port_clean, flags=re.IGNORECASE)
+            
+            # Junta letras isoladas que foram separadas incorretamente
+            # Ex: "T Y" -> "TY", "T urk ey" -> "Turkey"
+            port_clean = re.sub(r'\b([A-Z])\s+([A-Z])\b', r'\1\2', port_clean)
+            port_clean = re.sub(r'\b([A-Z])\s+([a-z]+)\s+([a-z]+)\b', r'\1\2\3', port_clean)
+            
+            # Junta palavras quebradas comuns em PDFs
+            # Ex: "Ci ty" -> "City", "Tur key" -> "Turkey"
+            port_clean = re.sub(r'\b([A-Z][a-z]+)\s+([a-z]+)\b', r'\1\2', port_clean)
+            
+            # Junta letras individuais com palavras seguintes
+            # Ex: "I sk" -> "Isk", mas preserva espaços entre palavras completas
+            port_clean = re.sub(r'\b([A-Z])\s+([a-z]{2,})\b', r'\1\2', port_clean)
+            
+            return port_clean
+        
+        # Fallback: método anterior se a regex não funcionar
+        to_match = re.search(r"(?:To|TO)\s*:", text_content, re.IGNORECASE | re.MULTILINE)
+        if not to_match:
+            print("DEBUG: 'To:' não encontrado")
+            return None
+        
+        print(f"DEBUG: 'To:' encontrado na posição {to_match.end()}")
+        
+        # Obtém a posição do "To:"
+        to_pos = to_match.end()
+        
+        # Extrai o texto após "To:" até encontrar o próximo campo
+        remaining_text = text_content[to_pos:]
+        print(f"DEBUG: Texto restante após 'To:': '{remaining_text[:100]}...'")
+        
+        # Procura pelo próximo campo (Contact Name, Booked by Ref, Customer Cargo, etc.)
+        next_field_match = re.search(r'(?:Contact Name|Booked by Ref|Customer Cargo|Booking No|Service Contract|Price Owner)', remaining_text, re.IGNORECASE)
+        
+        if next_field_match:
+            # Extrai apenas o texto do porto
+            port_text = remaining_text[:next_field_match.start()].strip()
+            print(f"DEBUG: Porto extraído (com próximo campo): '{port_text}'")
+        else:
+            # Se não encontrar próximo campo, pega as próximas linhas
+            lines = remaining_text.split('\n')
+            port_lines = []
+            for line in lines[:10]:  # Limita a 10 linhas para evitar capturar muito
+                line = line.strip()
+                if line and not any(keyword in line for keyword in ['Contact Name', 'Booked by Ref', 'Customer Cargo', 'Booking No']):
+                    port_lines.append(line)
+                if len(port_lines) >= 5:  # Limita a 5 linhas para o porto
+                    break
+            port_text = ' '.join(port_lines)
+            print(f"DEBUG: Porto extraído (sem próximo campo): '{port_text}'")
+        
+        # Limpa o texto do porto
+        if port_text:
+            print(f"DEBUG: Porto antes da limpeza: '{port_text}'")
+            
+            # Remove quebras de linha e normaliza espaços
+            port_clean = re.sub(r'\n+', ' ', port_text)  # Remove quebras de linha primeiro
+            port_clean = re.sub(r'\s+', ' ', port_clean)  # Normaliza espaços múltiplos
+            # Remove campos que não são parte do porto
+            port_clean = re.sub(r'Contact Name.*$', '', port_clean, flags=re.IGNORECASE)
+            port_clean = re.sub(r'Booked by Ref.*$', '', port_clean, flags=re.IGNORECASE)
+            port_clean = re.sub(r'Customer Cargo.*$', '', port_clean, flags=re.IGNORECASE)
+            port_clean = port_clean.strip()
+            
+            print(f"DEBUG: Porto após limpeza básica: '{port_clean}'")
+            
+            # Lógica simplificada para juntar palavras quebradas
+            # Caso específico: "I sk enderun,T urk ey" -> "Iskenderun,Turkey"
+            
+            # Abordagem direta: substitui padrões específicos
+            port_clean = re.sub(r'\bI\s+sk\b', 'Isk', port_clean)
+            print(f"DEBUG: Após substituir I+sk: '{port_clean}'")
+            
+            port_clean = re.sub(r'\benderun,T\s+urk\s+ey\b', 'enderun,Turkey', port_clean)
+            print(f"DEBUG: Após substituir enderun,T+urk+ey: '{port_clean}'")
+            
+            # Caso geral: junta palavras que começam com maiúscula seguida de minúscula
+            port_clean = re.sub(r'\b([A-Z])\s+([a-z]{2,})\b', r'\1\2', port_clean)
+            print(f"DEBUG: Após regex geral: '{port_clean}'")
+            
+            # Junta palavras que terminam com minúscula seguidas de minúscula
+            port_clean = re.sub(r'\b([a-z]+)\s+([a-z]{2,})\b', r'\1\2', port_clean)
+            print(f"DEBUG: Após regex minúscula+minúscula: '{port_clean}'")
+            
+            print(f"DEBUG: Porto final: '{port_clean}'")
+            return port_clean
+        
+        print("DEBUG: Nenhum texto de porto encontrado")
+        return None
+    
+    # Extrai POD usando a função melhorada
+    pod_text = extract_maersk_pod(text_content)
+    if pod_text:
+        data["pod"] = pod_text
     
     # Extrair dados adicionais específicos da Maersk
     # Cargo Type
@@ -381,6 +524,126 @@ def extract_maersk_data(text_content):
     
     if "pod" in data:
         data["pod"] = clean_port_field(data["pod"])
+    
+    return data
+
+def extract_maersk_data(text_content):
+    """Extrai dados específicos para PDFs da Maersk usando as regex do código de exemplo e pdfplumber"""
+    data = {}
+    
+    # Regex baseadas no código de exemplo que funciona
+    patterns = {
+        "booking_reference": r"Booking No\.?:\s*(\d+)",
+        "from": r"From:\s*([^,\n]+,[^,\n]+,[^,\n]+)",
+        "to": r"(?:To|TO)\s*:\s*([^,\n]+(?:,[^,\n]+)?(?:,[^,\n]+)?)",
+        "cargo_type": r"(?:Customer Cargo|Commodity Description)\s*:\s*(.+?)(?:\n|Service Contract|Price Owner|$)",
+        "quantity": r"(\d+)\s+40\s+DRY",
+        "gross_weight": r"Gross Weight.*?([\d\.]+)\s*KGS",
+    }
+    
+    # Extrair dados básicos usando as regex do código de exemplo
+    for field, pattern in patterns.items():
+        try:
+            match = re.search(pattern, text_content, re.DOTALL | re.MULTILINE)
+            if match:
+                data[field] = match.group(1).strip()
+        except Exception:
+            data[field] = None
+    
+    # Mapear campos para nomes esperados
+    if "booking_reference" in data:
+        data["booking_reference"] = data["booking_reference"]
+    if "from" in data:
+        data["pol"] = data.pop("from")  # Remove "from" e adiciona "pol"
+    if "to" in data:
+        data["pod"] = data.pop("to")    # Remove "to" e adiciona "pod"
+    
+    # Extrair ETD, ETA, Vessel e Voy No. usando a função do código de exemplo
+    def extract_etd_eta_vessel(text):
+        lines = text.split('\n')
+        etd_eta_lines = []
+        
+        for line in lines:
+            if re.search(r'\d{4}-\d{2}-\d{2}', line):
+                if 'MVS' in line:
+                    etd_eta_lines.append(line.strip())
+        
+        if not etd_eta_lines:
+            return None, None, None, None
+        
+        # Extrair informações da primeira linha MVS
+        first_line = etd_eta_lines[0]
+        first_dates = re.findall(r'\d{4}-\d{2}-\d{2}', first_line)
+        first_etd = first_dates[0] if first_dates else None
+        
+        # Padrões para Vessel e Voy
+        vessel_patterns = [
+            r'MVS\s+PENDING MOTHER VSL\s+FLEX\s+(\d{4}-\d{2}-\d{2})',
+            r'MVS\s+([^(]+?)(?:\s*\([^)]*\))?\s+(\d+[A-Z]?)',
+        ]
+        
+        first_vessel = None
+        first_voy = None
+        
+        # Tentar padrão FLEX primeiro
+        match = re.search(vessel_patterns[0], first_line)
+        if match:
+            first_vessel = "PENDING MOTHER VSL"
+            first_voy = "FLEX"
+        else:
+            # Tentar padrão padrão
+            match = re.search(vessel_patterns[1], first_line)
+            if match:
+                first_vessel = match.group(1).strip()
+                first_voy = match.group(2)
+        
+        # Extrair informações da última linha MVS
+        last_line = etd_eta_lines[-1]
+        last_dates = re.findall(r'\d{4}-\d{2}-\d{2}', last_line)
+        last_eta = last_dates[-1] if last_dates else None
+        
+        return first_etd, last_eta, first_vessel, first_voy
+    
+    # Extrair ETD, ETA, Vessel e Voy
+    first_etd, last_eta, first_vessel, first_voy = extract_etd_eta_vessel(text_content)
+    if first_etd:
+        data["etd"] = first_etd
+    if last_eta:
+        data["eta"] = last_eta
+    if first_vessel:
+        data["vessel_name"] = first_vessel
+    if first_voy:
+        data["voyage"] = first_voy
+    
+    # Document Type Detection
+    doc_type_keywords = [
+        ("BOOKING AMENDMENT", "BOOKING AMENDMENT"),
+        ("BOOKING CONFIRMATION", "BOOKING CONFIRMATION"),
+        ("BOOKING CANCELLATION", "BOOKING CANCELLATION"),
+        ("ARCHIVE COPY", "ARCHIVE COPY")
+    ]
+    for keyword, label in doc_type_keywords:
+        if keyword in text_content.upper():
+            data["document_type"] = label
+            break
+    
+    # Limpar campos de porto usando a função do código de exemplo
+    def clean_port_field_maersk(value):
+        if not value:
+            return None
+        # remover códigos ou complementos entre parênteses
+        no_paren = re.sub(r"\s*\([^)]*\)", "", value)
+        # quebrar por vírgula e pegar no máximo 3 partes
+        parts = [p.strip() for p in no_paren.split(",") if p.strip()]
+        if not parts:
+            return None
+        return ",".join(parts[:3])
+    
+    if "pol" in data and data["pol"]:
+        data["pol"] = clean_port_field_maersk(data["pol"])
+    
+    if "pod" in data and data["pod"]:
+        data["pod"] = clean_port_field_maersk(data["pod"])
     
     return data
 
