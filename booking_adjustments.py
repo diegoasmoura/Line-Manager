@@ -562,8 +562,6 @@ def display_attachments_section(farol_reference):
 
     # Seção de Upload com estilo melhorado
     with st.expander("📤 Add New Attachment", expanded=False):
-        st.markdown('<div class="upload-area">', unsafe_allow_html=True)
-        
         # Flag para indicar se é um PDF de Booking
         is_booking_pdf = st.checkbox(
             "📄 Este é um PDF de Booking para processamento automático",
@@ -590,8 +588,6 @@ def display_attachments_section(farol_reference):
                 key=f"uploader_{farol_reference}_{current_uploader_version}",
                 help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
             )
-        
-        st.markdown('</div>', unsafe_allow_html=True)
         
         if uploaded_files:
             st.success(f"✅ {len(uploaded_files)} file(s) selected:")
