@@ -30,6 +30,7 @@ import os
 import base64
 import mimetypes
 import uuid
+from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
 
 def get_original_sales_data(farol_reference):
     """Busca os dados originais da F_CON_SALES_DATA para um farol reference específico."""
@@ -562,13 +563,34 @@ def display_attachments_section(farol_reference):
     # Seção de Upload com estilo melhorado
     with st.expander("📤 Add New Attachment", expanded=False):
         st.markdown('<div class="upload-area">', unsafe_allow_html=True)
-        uploaded_files = st.file_uploader(
-            "Drag and drop files here or click to select",
-            accept_multiple_files=True,
-            type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
-            key=f"uploader_{farol_reference}_{current_uploader_version}",
-            help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
+        
+        # Flag para indicar se é um PDF de Booking
+        is_booking_pdf = st.checkbox(
+            "📄 Este é um PDF de Booking para processamento automático",
+            key=f"booking_pdf_flag_{farol_reference}_{current_uploader_version}",
+            help="Marque esta opção se você está enviando um PDF de Booking recebido por e-mail para extração automática de dados"
         )
+        
+        # Ajusta o uploader baseado no flag
+        if is_booking_pdf:
+            uploaded_files = st.file_uploader(
+                "📄 Selecione o PDF de Booking",
+                accept_multiple_files=False,  # Apenas um arquivo para booking
+                type=['pdf'],  # Apenas PDFs
+                key=f"uploader_{farol_reference}_{current_uploader_version}",
+                help="Selecione apenas PDFs de booking recebidos por e-mail • Limit 200MB per file • PDF"
+            )
+            # Converte para lista para manter compatibilidade com o código existente
+            uploaded_files = [uploaded_files] if uploaded_files else []
+        else:
+            uploaded_files = st.file_uploader(
+                "Drag and drop files here or click to select",
+                accept_multiple_files=True,
+                type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'],
+                key=f"uploader_{farol_reference}_{current_uploader_version}",
+                help="Supported file types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, PNG, JPG, JPEG, GIF, ZIP, RAR"
+            )
+        
         st.markdown('</div>', unsafe_allow_html=True)
         
         if uploaded_files:
@@ -578,32 +600,53 @@ def display_attachments_section(farol_reference):
             
             col1, col2 = st.columns([1, 4])
             with col1:
-                if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):
-                    progress_bar = st.progress(0, text="Saving attachments...")
-                    success_count = 0
-                    
-                    for i, file in enumerate(uploaded_files):
-                        # Reseta o ponteiro do arquivo
-                        file.seek(0)
+                if is_booking_pdf:
+                    # Botão específico para processamento de PDF de Booking
+                    if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
+                        if uploaded_files:
+                            file = uploaded_files[0]  # Apenas um arquivo para booking
+                            
+                            with st.spinner("Processing PDF... Extracting data..."):
+                                # Reseta o ponteiro do arquivo
+                                file.seek(0)
+                                pdf_content = file.read()
+                                
+                                # Processa o PDF
+                                processed_data = process_pdf_booking(pdf_content, farol_reference)
+                                
+                                if processed_data:
+                                    # Armazena os dados processados no session_state para validação
+                                    st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
+                                    st.session_state[f"booking_pdf_file_{farol_reference}"] = file
+                                    st.rerun()
+                else:
+                    # Botão normal para anexos regulares
+                    if st.button("💾 Save Attachments", key=f"save_attachments_{farol_reference}", type="primary"):
+                        progress_bar = st.progress(0, text="Saving attachments...")
+                        success_count = 0
                         
-                        if save_attachment_to_db(farol_reference, file):
-                            success_count += 1
+                        for i, file in enumerate(uploaded_files):
+                            # Reseta o ponteiro do arquivo
+                            file.seek(0)
+                            
+                            if save_attachment_to_db(farol_reference, file):
+                                success_count += 1
+                            
+                            progress = (i + 1) / len(uploaded_files)
+                            progress_bar.progress(progress, text=f"Saving attachment {i+1} of {len(uploaded_files)}...")
                         
-                        progress = (i + 1) / len(uploaded_files)
-                        progress_bar.progress(progress, text=f"Saving attachment {i+1} of {len(uploaded_files)}...")
-                    
-                    progress_bar.empty()
-                    
-                    if success_count == len(uploaded_files):
-                        st.success(f"✅ {success_count} attachment(s) saved successfully!")
-                    else:
-                        st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
+                        progress_bar.empty()
+                        
+                        if success_count == len(uploaded_files):
+                            st.success(f"✅ {success_count} attachment(s) saved successfully!")
+                        else:
+                            st.warning(f"⚠️ {success_count} of {len(uploaded_files)} attachments were saved.")
 
-                    # Incrementa a versão do uploader para resetar a seleção na próxima execução
-                    st.session_state[uploader_version_key] += 1
+                        # Incrementa a versão do uploader para resetar a seleção na próxima execução
+                        st.session_state[uploader_version_key] += 1
 
-                    # Força atualização da lista (com uploader recriado)
-                    st.rerun()
+                        # Força atualização da lista (com uploader recriado)
+                        st.rerun()
 
     # Lista de Anexos Existentes
     attachments_df = get_attachments_for_farol(farol_reference)
@@ -684,6 +727,38 @@ def display_attachments_section(farol_reference):
     else:
         st.info("📂 No attachments found for this reference.")
         st.markdown("💡 **Tip:** Use the 'Add New Attachment' section above to upload files related to this Farol Reference.")
+    
+    # Interface de validação de PDF de Booking se há dados processados
+    processed_data_key = f"processed_pdf_data_{farol_reference}"
+    if processed_data_key in st.session_state:
+        st.markdown("---")
+        processed_data = st.session_state[processed_data_key]
+        
+        # Exibe interface de validação
+        validated_data = display_pdf_validation_interface(processed_data)
+        
+        if validated_data == "CANCELLED":
+            # Remove dados processados se cancelado
+            del st.session_state[processed_data_key]
+            if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                del st.session_state[f"booking_pdf_file_{farol_reference}"]
+            st.rerun()
+        elif validated_data:
+            # Salva os dados validados
+            if save_pdf_booking_data(validated_data):
+                # Salva também o PDF como anexo normal
+                pdf_file = st.session_state.get(f"booking_pdf_file_{farol_reference}")
+                if pdf_file:
+                    pdf_file.seek(0)  # Reseta o ponteiro
+                    save_attachment_to_db(farol_reference, pdf_file, user_id="PDF_PROCESSOR")
+                
+                # Remove dados processados após salvar
+                del st.session_state[processed_data_key]
+                if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                    del st.session_state[f"booking_pdf_file_{farol_reference}"]
+                
+                st.balloons()  # Celebração visual
+                st.rerun()
 
 def exibir_adjustments():
     st.title("📋 Adjustment Request Management")
