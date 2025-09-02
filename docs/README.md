@@ -216,7 +216,7 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 - O campo **Inserted Date** agora é exibido corretamente, com conversão explícita para datetime.
 - O formulário de novo embarque (`shipments_new.py`) exibe corretamente todas as opções de DTHC.
 - O sistema de anexos está documentado em detalhes no `ANEXOS_README.md`.
-- A tela **History** está totalmente funcional, permitindo visualização do ciclo de vida dos tickets e aprovação de alterações com atualização automática da tabela `F_CON_SALES_BOOKING_DATA`.
+- A tela **History** está totalmente funcional, permitindo visualização do ciclo de vida dos tickets e aprovação de alterações com atualização automática da tabela `F_CON_SALES_BOOKING_DATA`. A interface foi aprimorada com detecção automática de mudanças e feedback visual melhorado.
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` atualmente exibem apenas um print/placeholder.
 
 ---
@@ -226,7 +226,7 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 - **Shipments**: Cadastro, edição, ajustes, splits, anexos.
 - **Adjustments**: Aprovação/rejeição de ajustes críticos, atualização em lote de status, gestão de anexos.
 - **Booking Management**: Solicitação e edição de bookings.
-- **History**: Visualização do ciclo de vida dos tickets, aprovação de alterações e rastreabilidade completa via ADJUSTMENT_ID.
+- **History**: Visualização do ciclo de vida dos tickets, aprovação de alterações e rastreabilidade completa via ADJUSTMENT_ID. Interface aprimorada com detecção automática de mudanças e propagação precisa de dados.
 - **Operation Control, Performance, Tracking, Setup**: (Placeholders para futuras implementações)
 
 ---
@@ -237,7 +237,7 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 2. **Solicitar Booking**: Shipments > Selecionar embarque com status "New Request" > New Booking > Preencher > Confirmar.
 3. **Ajuste Crítico/Split**: Shipments > Selecionar embarque > Adjustments > Preencher > Confirmar.
 4. **Aprovação de Ajustes**: Adjustments > Filtrar/Selecionar > Editar status > Apply Changes.
-5. **Aprovação de Alterações no Histórico**: History > Selecionar linha específica > Alterar Farol Status > Apply Changes > Sistema atualiza automaticamente `F_CON_SALES_BOOKING_DATA`.
+5. **Aprovação de Alterações no Histórico**: History > Alterar Farol Status diretamente na grade > Apply Changes > Sistema atualiza automaticamente `F_CON_SALES_BOOKING_DATA` com dados da linha aprovada.
 6. **Gestão de Anexos**: Em qualquer tela, selecionar embarque > View Attachments > Upload/Download/Excluir.
 
 ---
@@ -500,8 +500,8 @@ A tela de **Histórico** (`history.py`) exibe o ciclo de vida completo dos ticke
 - **Rastreabilidade completa**: Cada alteração mantém seu contexto histórico
 
 #### 📊 **Interface da Grade**
-- **Coluna de seleção**: Checkbox para selecionar linhas específicas (máximo uma por vez)
-- **Campo oculto**: `ADJUSTMENT_ID` disponível para processamento mas não exibido ao usuário
+- **Detecção automática**: Mudanças detectadas diretamente na coluna "Farol Status" (sem coluna de seleção)
+- **Campo visível**: `ADJUSTMENT_ID` exibido para referência e rastreabilidade
 - **Colunas editáveis**: Apenas o campo "Farol Status" pode ser alterado
 - **Demais campos**: Somente leitura para preservar integridade dos dados
 
@@ -518,8 +518,8 @@ A tela de **Histórico** (`history.py`) exibe o ciclo de vida completo dos ticke
 ### ⚙️ **Sistema de Aprovação**
 
 #### 🔄 **Processo de Aprovação**
-1. **Seleção**: Usuário seleciona uma linha específica na grade
-2. **Alteração de Status**: Modifica o "Farol Status" para o valor desejado
+1. **Alteração de Status**: Usuário modifica o "Farol Status" diretamente na grade
+2. **Detecção Automática**: Sistema detecta mudanças comparando valores originais vs editados
 3. **Aplicação**: Clica em "Apply Changes" para confirmar as alterações
 4. **Processamento**: Sistema executa a lógica de aprovação automaticamente
 
@@ -533,7 +533,7 @@ Quando o status é alterado para **"Booking Approved"**, o sistema executa autom
   - **Campos B_ (Booking)**: `B_TRANSHIPMENT_PORT`, `B_PORT_TERMINAL_CITY`, `B_VESSEL_NAME`, `B_VOYAGE_CARRIER`, `B_DOCUMENT_CUT_OFF_DOCCUT`, `B_PORT_CUT_OFF_PORTCUT`, `B_ESTIMATED_TIME_OF_DEPARTURE_ETD`, `B_ESTIMATED_TIME_OF_ARRIVAL_ETA`, `B_GATE_OPENING`
 
 **2. Atualização de Status**
-- Atualiza o status na tabela `F_CON_RETURN_CARRIERS`
+- Atualiza o status na tabela `F_CON_RETURN_CARRIERS` **apenas por ADJUSTMENT_ID** (evita afetar múltiplas linhas)
 - Atualiza o status nas demais tabelas principais (`F_CON_SALES_BOOKING_DATA`, `F_CON_CARGO_LOADING_CONTAINER_RELEASE`)
 - Registra a confirmação no log de ajustes
 
@@ -541,14 +541,15 @@ Quando o status é alterado para **"Booking Approved"**, o sistema executa autom
 - **Ligação principal**: Campo `FAROL_REFERENCE` para conectar as tabelas
 - **Identificação específica**: `ADJUSTMENT_ID` para identificar a linha exata aprovada
 - **Consistência**: Todas as atualizações são feitas em transação única
+- **Precisão**: Atualizações por `ADJUSTMENT_ID` garantem que apenas a linha alterada seja afetada
 
 ### 📋 **Campos Exibidos na Grade**
 
 | Campo | Descrição | Editável |
 |-------|-----------|----------|
-| **Selecionar** | Checkbox para seleção | ✅ |
 | **Inserted Date** | Data de inserção do registro | ❌ |
 | **Farol Reference** | Referência única do embarque | ❌ |
+| **Adjustment ID** | ID único do ajuste para rastreabilidade | ❌ |
 | **Farol Status** | Status atual (dropdown) | ✅ |
 | **Splitted Booking Reference** | Referência do booking dividido | ❌ |
 | **Place of Receipt** | Local de recebimento | ❌ |
@@ -571,10 +572,10 @@ Quando o status é alterado para **"Booking Approved"**, o sistema executa autom
 
 ### ⚠️ **Regras de Funcionamento**
 
-#### 🚫 **Restrições de Seleção**
-- **Máximo uma linha**: Apenas uma linha pode ser selecionada por vez
-- **Validação**: Sistema exibe aviso se múltiplas linhas forem selecionadas
-- **Prevenção de erros**: Evita inconsistências na aplicação de mudanças
+#### 🎯 **Detecção de Mudanças**
+- **Automática**: Sistema detecta alterações comparando DataFrame original vs editado
+- **Precisão**: Apenas linhas com mudanças reais são processadas
+- **Feedback**: Mensagens claras sobre sucesso, falha ou nenhuma mudança detectada
 
 #### 🔒 **Proteção de Dados**
 - **Campos protegidos**: Apenas o "Farol Status" pode ser alterado
@@ -619,9 +620,9 @@ Quando o status é alterado para **"Booking Approved"**, o sistema executa autom
 
 #### ✅ **Aprovação de Ajustes**
 1. Usuário identifica linha com ajustes pendentes
-2. Seleciona a linha específica
-3. Altera status para "Booking Approved"
-4. Sistema aplica automaticamente os dados da linha aprovada
+2. Altera status diretamente na grade para "Booking Approved"
+3. Sistema aplica automaticamente os dados da linha aprovada
+4. Feedback imediato sobre sucesso da operação
 
 #### 🔍 **Auditoria e Rastreabilidade**
 1. Visualização completa do histórico de mudanças
@@ -646,6 +647,57 @@ Quando o status é alterado para **"Booking Approved"**, o sistema executa autom
 - **Complementaridade**: Histórico mostra resultado dos ajustes aprovados
 - **Rastreabilidade**: `ADJUSTMENT_ID` conecta ajustes com histórico
 - **Fluxo completo**: Do ajuste solicitado à aprovação e implementação
+
+---
+
+## 🛠️ Ajustes Críticos e Splits (Melhorias Implementadas)
+
+### 📝 **Validações Aprimoradas**
+
+#### ⚠️ **Mensagens de Validação**
+- **Justificativas obrigatórias**: Mensagem alterada para alerta (`st.warning`) ao invés de erro
+- **Campos obrigatórios**: Area, Reason e Responsibility devem ser preenchidos
+- **Validação de quantidade**: Splits devem ter quantidade maior que 0
+
+#### 🔄 **Lógica de Validação**
+1. **Sempre exigir alteração**: Linha principal deve ter pelo menos uma mudança
+2. **Justificativas obrigatórias**: Area, Reason e Responsibility são obrigatórios
+3. **Quantidades válidas**: Splits devem ter quantidade > 0 quando aplicável
+
+### 📊 **Novos Campos no Editor**
+
+#### 🆕 **Campos Adicionados**
+- **Transhipment Port**: Porto de transbordo (dropdown da UDC)
+- **Port Terminal City**: Cidade do terminal portuário (dropdown da UDC)
+- **Configuração de coluna**: "Sales Quantity of Containers" configurada como NumberColumn
+
+### 💾 **Persistência de Dados Melhorada**
+
+#### 🔧 **Correção na Função `insert_return_carrier_from_ui`**
+- **Mapeamento duplo**: Aceita tanto "Quantity of Containers" quanto "Sales Quantity of Containers"
+- **Prevenção de NULL**: Evita gravar valores nulos na quantidade
+- **Conversão segura**: Converte para inteiro quando possível
+
+#### 📈 **Fluxo de Persistência**
+1. **Confirmação de ajustes**: Processa linha principal e splits
+2. **Inserção de snapshot**: Cria registro em `F_CON_RETURN_CARRIERS` para cada linha
+3. **Mapeamento correto**: Usa valores exatos do editor para persistência
+4. **Tratamento de erros**: Não bloqueia fluxo principal se snapshot falhar
+
+### 🎯 **Casos de Uso Atualizados**
+
+#### ✅ **Ajuste sem Split**
+1. Usuário altera campos da linha principal
+2. Preenche justificativas obrigatórias
+3. Sistema valida alterações e justificativas
+4. Persiste ajustes e cria snapshot de retorno
+
+#### 🔀 **Ajuste com Split**
+1. Usuário define número de splits (> 0)
+2. Altera campos da linha principal e dos splits
+3. Define quantidades válidas para cada split
+4. Sistema recalcula quantidade original automaticamente
+5. Persiste todas as linhas com snapshots individuais
 
 ---
 
