@@ -794,150 +794,218 @@ def exibir_history():
     
     # Adiciona coluna de seleção ao df_display
     df_display.insert(0, "Selecionar", False)
+    
+    # Separa os dados em duas abas baseado no status
+    df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
+    df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
+    
+    # Cria as abas
+    tab1, tab2 = st.tabs([
+        f"📋 Other Status ({len(df_other_status)} records)", 
+        f"📨 Received from Carrier ({len(df_received_carrier)} records)"
+    ])
 
-    # Aplica aliases iguais aos da grade principal quando disponíveis
-    mapping_main = get_column_mapping()
-    mapping_upper = {k.upper(): v for k, v in mapping_main.items()}
+    # Função para processar e configurar DataFrame
+    def process_dataframe(df_to_process, df_show_ref):
+        """Processa um DataFrame aplicando aliases e configurações"""
+        if df_to_process.empty:
+            return df_to_process
+            
+        # Aplica aliases iguais aos da grade principal quando disponíveis
+        mapping_main = get_column_mapping()
+        mapping_upper = {k.upper(): v for k, v in mapping_main.items()}
 
-    def prettify(col: str) -> str:
-        # Fallback: transforma COL_NAME -> Col Name e normaliza acrônimos
-        label = col.replace("_", " ").title()
-        # Normaliza acrônimos comuns
-        replaces = {
-            "Pol": "POL",
-            "Pod": "POD",
-            "Etd": "ETD",
-            "Eta": "ETA",
-            "Pdf": "PDF",
-            "Id": "ID",
+        def prettify(col: str) -> str:
+            # Fallback: transforma COL_NAME -> Col Name e normaliza acrônimos
+            label = col.replace("_", " ").title()
+            # Normaliza acrônimos comuns
+            replaces = {
+                "Pol": "POL",
+                "Pod": "POD",
+                "Etd": "ETD",
+                "Eta": "ETA",
+                "Pdf": "PDF",
+                "Id": "ID",
+            }
+            for k, v in replaces.items():
+                label = label.replace(k, v)
+            return label
+
+        custom_overrides = {
+            "FAROL_REFERENCE": "Farol Reference",
+            "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
+            "B_BOOKING_STATUS": "Farol Status",
+            "ROW_INSERTED_DATE": "Inserted Date",
+            "USER_INSERT": "Inserted By",
+            # Remover prefixos B_/P_ dos rótulos solicitados
+            "B_GATE_OPENING": "Gate Opening",
+            "P_STATUS": "Status",
+            "P_PDF_NAME": "PDF Name",
+            "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
+            # Aliases para campos de data
+            "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
+            "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
+            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
+            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": "ETA",
+            # Alias para Voyage Code
+            "B_VOYAGE_CODE": "Voyage Code",
         }
-        for k, v in replaces.items():
-            label = label.replace(k, v)
-        return label
 
-    custom_overrides = {
-        "FAROL_REFERENCE": "Farol Reference",
-        "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
-        "B_BOOKING_STATUS": "Farol Status",
-        "ROW_INSERTED_DATE": "Inserted Date",
-        "USER_INSERT": "Inserted By",
-        # Remover prefixos B_/P_ dos rótulos solicitados
-        "B_GATE_OPENING": "Gate Opening",
-        "P_STATUS": "Status",
-        "P_PDF_NAME": "PDF Name",
-        "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
-        # Aliases para campos de data
-        "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
-        "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
-                "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
-        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": "ETA",
-        # Alias para Voyage Code
-        "B_VOYAGE_CODE": "Voyage Code",
+        # Aplica aliases ao DataFrame
+        rename_map = {}
+        for col in df_to_process.columns:
+            rename_map[col] = custom_overrides.get(col, mapping_upper.get(col, prettify(col)))
 
-    }
+        df_processed = df_to_process.copy()
+        df_processed.rename(columns=rename_map, inplace=True)
+        
+        return df_processed, df_show_ref
 
-    # Aplica aliases ao df_display (não ao df_show)
-    rename_map = {}
-    for col in df_display.columns:
-        rename_map[col] = custom_overrides.get(col, mapping_upper.get(col, prettify(col)))
-
-    df_display.rename(columns=rename_map, inplace=True)
-
-    # Converte epoch (ms) para datetime para exibição correta na grade (APÓS os aliases)
-    if "Inserted Date" in df_display.columns:
-        try:
-            df_display["Inserted Date"] = pd.to_datetime(df_display["Inserted Date"], unit="ms", errors="coerce")
-        except Exception:
-            pass
-    
-    # Converte campos de data específicos de epoch (ms) para datetime (APÓS os aliases)
-    date_fields_mapped = {
-        "Document Cut Off": "B_DOCUMENT_CUT_OFF_DOCCUT",
-        "Port Cut Off": "B_PORT_CUT_OFF_PORTCUT", 
-        "ETD": "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-        "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
-    }
-    
-    for mapped_name, original_name in date_fields_mapped.items():
-        if mapped_name in df_display.columns:
+    # Função para exibir grade em uma aba
+    def display_tab_content(df_tab, tab_name):
+        """Exibe o conteúdo de uma aba com a grade de dados"""
+        if df_tab.empty:
+            st.info(f"📋 Nenhum registro encontrado para {tab_name}")
+            return None
+            
+        # Processa o DataFrame da aba
+        df_processed, df_show_ref = process_dataframe(df_tab, df_show)
+        
+        # Converte epoch (ms) para datetime para exibição correta na grade (APÓS os aliases)
+        if "Inserted Date" in df_processed.columns:
             try:
-                # Busca o valor original antes do rename
-                original_values = df_show[original_name]
-                df_display[mapped_name] = pd.to_datetime(original_values, unit="ms", errors="coerce")
+                df_processed["Inserted Date"] = pd.to_datetime(df_processed["Inserted Date"], unit="ms", errors="coerce")
             except Exception:
                 pass
+        
+        # Converte campos de data específicos de epoch (ms) para datetime (APÓS os aliases)
+        date_fields_mapped = {
+            "Document Cut Off": "B_DOCUMENT_CUT_OFF_DOCCUT",
+            "Port Cut Off": "B_PORT_CUT_OFF_PORTCUT", 
+            "ETD": "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
+            "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
+        }
+        
+        for mapped_name, original_name in date_fields_mapped.items():
+            if mapped_name in df_processed.columns:
+                try:
+                    # Busca o valor original antes do rename
+                    original_values = df_show_ref[original_name]
+                    df_processed[mapped_name] = pd.to_datetime(original_values, unit="ms", errors="coerce")
+                except Exception:
+                    pass
 
-    # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
-    if "Inserted Date" in df_display.columns:
-        # Ordena pela data (crescente)
-        try:
-            df_display = df_display.sort_values("Inserted Date", ascending=True)
-        except Exception:
-            pass
+        # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
+        if "Inserted Date" in df_processed.columns:
+            # Ordena pela data (crescente)
+            try:
+                df_processed = df_processed.sort_values("Inserted Date", ascending=True)
+            except Exception:
+                pass
+                
+        return df_processed
 
-    # Opções para Farol Status vindas da UDC (mesma lógica da Adjustment Request Management)
-    df_udc = load_df_udc()
-    farol_status_options = df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()
-    relevant_status = [
-        "Booking Approved",
-        "Booking Rejected",
-        "Booking Cancelled",
-        "Adjustment Requested",
-    ]
-    available_options = [s for s in relevant_status if s in farol_status_options]
-    if not available_options:
-        available_options = relevant_status
-    # Garante "Adjustment Requested" no final
-    if "Adjustment Requested" not in available_options:
-        available_options.append("Adjustment Requested")
-    elif available_options and available_options[-1] != "Adjustment Requested":
-        available_options.remove("Adjustment Requested")
-        available_options.append("Adjustment Requested")
-    # Remove vazios/nulos
-    available_options = [opt for opt in available_options if opt and str(opt).strip()]
+    # Conteúdo da primeira aba - Other Status
+    with tab1:
+        df_other_processed = display_tab_content(df_other_status, "Other Status")
+        
+        if df_other_processed is not None:
+            # Configuração das colunas
+            column_config = {
+                "Farol Status": st.column_config.TextColumn(
+                    "Farol Status", disabled=True
+                )
+            }
+            column_config["Selecionar"] = st.column_config.CheckboxColumn(
+                "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+            )
+            
+            # Reordena colunas - mantém "Selecionar" como primeira coluna
+            if "Inserted Date" in df_other_processed.columns:
+                other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "Inserted Date"]]
+                ordered_cols = ["Selecionar", "Inserted Date"] + other_cols
+                existing_cols = [c for c in ordered_cols if c in df_other_processed.columns]
+                df_other_processed = df_other_processed[existing_cols]
 
-    column_config = {
-        "Farol Status": st.column_config.TextColumn(
-            "Farol Status", disabled=True
-        )
-    }
-    # Demais colunas somente leitura
-    # Configura coluna de seleção
-    column_config["Selecionar"] = st.column_config.CheckboxColumn(
-        "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
-    )
-    
-    # Reordena colunas - mantém "Selecionar" como primeira coluna
-    if "Inserted Date" in df_display.columns:
-        other_cols = [c for c in df_display.columns if c not in ["Selecionar", "Inserted Date"]]
-        ordered_cols = ["Selecionar", "Inserted Date"] + other_cols
-        # Filtra apenas as colunas que existem no DataFrame
-        existing_cols = [c for c in ordered_cols if c in df_display.columns]
-        df_display = df_display[existing_cols]
+            # Configura colunas para exibição
+            for col in df_other_processed.columns:
+                if col == "Farol Status":
+                    continue
+                if col == "Selecionar":
+                    continue
+                if col == "Inserted Date":
+                    column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+                elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+                    column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+                else:
+                    column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
-    # Configura colunas para exibição (df_display não contém ADJUSTMENT_ID)
-    for col in df_display.columns:
-        if col == "Farol Status":
-            continue
-        if col == "Selecionar":
-            # Coluna de seleção já configurada
-            continue
-        if col == "Inserted Date":
-            column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
-        elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
-            column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+            edited_df_other = st.data_editor(
+                df_other_processed,
+                use_container_width=True,
+                hide_index=True,
+                column_config=column_config,
+                disabled=False,
+                key="history_other_status_editor"
+            )
         else:
-            column_config[col] = st.column_config.TextColumn(col, disabled=True)
+            edited_df_other = None
 
-    original_df = df_display.copy()
-    edited_df = st.data_editor(
-        df_display,
-        use_container_width=True,
-        hide_index=True,
-        column_config=column_config,
-        disabled=False,
-        key="history_return_carriers_editor"
-    )
+    # Conteúdo da segunda aba - Received from Carrier
+    with tab2:
+        df_received_processed = display_tab_content(df_received_carrier, "Received from Carrier")
+        
+        if df_received_processed is not None:
+            # Configuração das colunas
+            column_config = {
+                "Farol Status": st.column_config.TextColumn(
+                    "Farol Status", disabled=True
+                )
+            }
+            column_config["Selecionar"] = st.column_config.CheckboxColumn(
+                "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+            )
+            
+            # Reordena colunas - mantém "Selecionar" como primeira coluna
+            if "Inserted Date" in df_received_processed.columns:
+                other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "Inserted Date"]]
+                ordered_cols = ["Selecionar", "Inserted Date"] + other_cols
+                existing_cols = [c for c in ordered_cols if c in df_received_processed.columns]
+                df_received_processed = df_received_processed[existing_cols]
+
+            # Configura colunas para exibição
+            for col in df_received_processed.columns:
+                if col == "Farol Status":
+                    continue
+                if col == "Selecionar":
+                    continue
+                if col == "Inserted Date":
+                    column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+                elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+                    column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+                else:
+                    column_config[col] = st.column_config.TextColumn(col, disabled=True)
+
+            edited_df_received = st.data_editor(
+                df_received_processed,
+                use_container_width=True,
+                hide_index=True,
+                column_config=column_config,
+                disabled=False,
+                key="history_received_carrier_editor"
+            )
+        else:
+            edited_df_received = None
+
+    # Determina qual DataFrame usar baseado na aba ativa
+    # Por padrão, usa o primeiro DataFrame disponível
+    if edited_df_other is not None:
+        edited_df = edited_df_other
+    elif edited_df_received is not None:
+        edited_df = edited_df_received
+    else:
+        # Fallback para DataFrame vazio
+        edited_df = pd.DataFrame()
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None):
@@ -1069,8 +1137,17 @@ def exibir_history():
                 conn.close()
 
     # Interface de botões de status para linha selecionada
-    selected = edited_df[edited_df["Selecionar"] == True]
-    if len(selected) > 1:
+    # Verifica seleções em ambas as abas
+    selected_other = edited_df_other[edited_df_other["Selecionar"] == True] if edited_df_other is not None else pd.DataFrame()
+    selected_received = edited_df_received[edited_df_received["Selecionar"] == True] if edited_df_received is not None else pd.DataFrame()
+    
+    # Determina qual seleção usar (prioriza a primeira com seleção)
+    selected = selected_other if not selected_other.empty else selected_received
+    selected_df = edited_df_other if not selected_other.empty else edited_df_received
+    
+    if len(selected_other) > 0 and len(selected_received) > 0:
+        st.warning("⚠️ Selecione apenas uma linha em uma das abas para aplicar mudanças.")
+    elif len(selected) > 1:
         st.warning("⚠️ Selecione apenas uma linha para aplicar mudanças.")
     
     # Interface de botões de status para linha selecionada
@@ -1188,7 +1265,21 @@ def exibir_history():
             st.session_state["history_show_attachments"] = not view_open
             st.rerun()
     with col2:
-        st.download_button("⬇️ Export CSV", data=df_display.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
+        # Export CSV - combina dados de ambas as abas
+        if edited_df_other is not None and edited_df_received is not None:
+            # Combina ambos os DataFrames
+            combined_df = pd.concat([edited_df_other, edited_df_received], ignore_index=True)
+        elif edited_df_other is not None:
+            combined_df = edited_df_other
+        elif edited_df_received is not None:
+            combined_df = edited_df_received
+        else:
+            combined_df = pd.DataFrame()
+            
+        if not combined_df.empty:
+            st.download_button("⬇️ Export CSV", data=combined_df.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
+        else:
+            st.download_button("⬇️ Export CSV", data="".encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv", disabled=True)
     with col3:
         if st.button("🔙 Back to Shipments"):
             st.session_state["current_page"] = "main"
