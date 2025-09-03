@@ -39,8 +39,10 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
         query = text(
             """
             SELECT 
+                ID,
                 FAROL_REFERENCE,
                 ADJUSTMENT_ID,
+                Linked_Reference,
                 B_BOOKING_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
@@ -84,8 +86,10 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
     try:
         query = f"""
             SELECT 
+                ID,
                 FAROL_REFERENCE,
                 ADJUSTMENT_ID,
+                Linked_Reference,
                 B_BOOKING_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
@@ -1602,8 +1606,10 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
         query = text(
             """
             SELECT 
+                ID,
                 FAROL_REFERENCE,
                 ADJUSTMENT_ID,
+                Linked_Reference,
                 B_BOOKING_STATUS,
                 P_STATUS,
                 P_PDF_NAME,

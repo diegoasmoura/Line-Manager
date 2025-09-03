@@ -10,40 +10,6 @@ import mimetypes
 import uuid
 from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
 
-def get_next_linked_reference_number():
-    """Obtém o próximo número sequencial para Linked_Reference"""
-    try:
-        conn = get_database_connection()
-        query = text("""
-            SELECT NVL(MAX(Linked_Reference), 0) + 1 as next_number
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE Linked_Reference IS NOT NULL
-        """)
-        result = conn.execute(query).scalar()
-        conn.close()
-        return result if result else 1
-    except Exception as e:
-        st.error(f"❌ Erro ao obter próximo número sequencial: {str(e)}")
-        return 1
-
-def get_available_references_for_relation():
-    """Busca referências disponíveis na aba 'Other Status' para relacionamento"""
-    try:
-        conn = get_database_connection()
-        query = text("""
-            SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE B_BOOKING_STATUS != 'Received from Carrier'
-            ORDER BY ROW_INSERTED_DATE DESC
-        """)
-        result = conn.execute(query).mappings().fetchall()
-        conn.close()
-        # Converte as chaves para maiúsculas para consistência
-        return [{k.upper(): v for k, v in dict(row).items()} for row in result] if result else []
-    except Exception as e:
-        st.error(f"❌ Erro ao buscar referências disponíveis: {str(e)}")
-        return []
-
 def get_file_type(uploaded_file):
     ext = uploaded_file.name.split('.')[-1].lower()
     mapping = {
@@ -795,9 +761,9 @@ def exibir_history():
 
     # Grade principal com colunas relevantes (ADJUSTMENT_ID oculto mas usado internamente)
     display_cols = [
-        "ID",
+        "ID",  # Adiciona ID para exibição
         "FAROL_REFERENCE",
-        "Linked_Reference",
+        "Linked_Reference",  # Adiciona Linked_Reference após Farol Reference
         "B_BOOKING_STATUS",
         "S_SPLITTED_BOOKING_REFERENCE",
         "S_PLACE_OF_RECEIPT",
@@ -821,11 +787,11 @@ def exibir_history():
         "USER_INSERT",
     ]
 
-    # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna, mas não na exibição
+    # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna, mas mantém Linked_Reference na exibição
     internal_cols = display_cols + ["ADJUSTMENT_ID"]
     df_show = df[[c for c in internal_cols if c in df.columns]].copy()
     
-    # Cria uma cópia para exibição sem ADJUSTMENT_ID
+    # Cria uma cópia para exibição sem ADJUSTMENT_ID (mantém Linked_Reference)
     df_display = df_show.drop(columns=["ADJUSTMENT_ID"], errors="ignore")
     
     # Adiciona coluna de seleção ao df_display
@@ -835,51 +801,64 @@ def exibir_history():
     df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
     df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
     
-    # Cria as abas
+    # Cria as abas com informações sobre o processo
     tab1, tab2 = st.tabs([
         f"📋 Pedidos da Empresa ({len(df_other_status)} records)", 
         f"📨 Retornos do Armador ({len(df_received_carrier)} records)"
     ])
+    
+    # Adiciona informações sobre o processo nas abas
+    with tab1:
+        if not df_other_status.empty:
+            st.info("💡 **Esta aba contém os pedidos de alteração realizados pela empresa. Após o registro, aguarde o retorno do armador.**")
+        else:
+            st.info("📋 Nenhum pedido de alteração da empresa encontrado.")
+    
+    with tab2:
+        if not df_received_carrier.empty:
+            st.info("💡 **Esta aba contém os retornos do armador com status 'Received from Carrier'. Para aprovar, será necessário informar a referência relacionada da aba 'Pedidos da Empresa'.**")
+        else:
+            st.info("📨 Nenhum retorno do armador encontrado.")
 
     # Função para processar e configurar DataFrame
     def process_dataframe(df_to_process, df_show_ref):
         """Processa um DataFrame aplicando aliases e configurações"""
         if df_to_process.empty:
             return df_to_process
-            
-        # Aplica aliases iguais aos da grade principal quando disponíveis
-        mapping_main = get_column_mapping()
-        mapping_upper = {k.upper(): v for k, v in mapping_main.items()}
 
-        def prettify(col: str) -> str:
-            # Fallback: transforma COL_NAME -> Col Name e normaliza acrônimos
-            label = col.replace("_", " ").title()
-            # Normaliza acrônimos comuns
-            replaces = {
-                "Pol": "POL",
-                "Pod": "POD",
-                "Etd": "ETD",
-                "Eta": "ETA",
-                "Pdf": "PDF",
-                "Id": "ID",
-            }
-            for k, v in replaces.items():
-                label = label.replace(k, v)
-            return label
+    # Aplica aliases iguais aos da grade principal quando disponíveis
+    mapping_main = get_column_mapping()
+    mapping_upper = {k.upper(): v for k, v in mapping_main.items()}
 
-        custom_overrides = {
+    def prettify(col: str) -> str:
+        # Fallback: transforma COL_NAME -> Col Name e normaliza acrônimos
+        label = col.replace("_", " ").title()
+        # Normaliza acrônimos comuns
+        replaces = {
+            "Pol": "POL",
+            "Pod": "POD",
+            "Etd": "ETD",
+            "Eta": "ETA",
+            "Pdf": "PDF",
+            "Id": "ID",
+        }
+        for k, v in replaces.items():
+            label = label.replace(k, v)
+        return label
+
+    custom_overrides = {
             "ID": "ID",  # Campo ID visível
-            "FAROL_REFERENCE": "Farol Reference",
+        "FAROL_REFERENCE": "Farol Reference",
             "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
             "Linked_Reference": "Linked Reference",  # Campo para referência relacionada
-            "B_BOOKING_STATUS": "Farol Status",
-            "ROW_INSERTED_DATE": "Inserted Date",
-            "USER_INSERT": "Inserted By",
-            # Remover prefixos B_/P_ dos rótulos solicitados
-            "B_GATE_OPENING": "Gate Opening",
-            "P_STATUS": "Status",
-            "P_PDF_NAME": "PDF Name",
-            "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
+        "B_BOOKING_STATUS": "Farol Status",
+        "ROW_INSERTED_DATE": "Inserted Date",
+        "USER_INSERT": "Inserted By",
+        # Remover prefixos B_/P_ dos rótulos solicitados
+        "B_GATE_OPENING": "Gate Opening",
+        "P_STATUS": "Status",
+        "P_PDF_NAME": "PDF Name",
+        "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             # Aliases para campos de data
             "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
             "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
@@ -933,35 +912,32 @@ def exibir_history():
                 except Exception:
                     pass
 
-        # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
+    # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
         if "Inserted Date" in df_processed.columns:
-            # Ordena pela data (crescente)
-            try:
+        # Ordena pela data (crescente)
+        try:
                 df_processed = df_processed.sort_values("Inserted Date", ascending=True)
-            except Exception:
-                pass
+        except Exception:
+            pass
                 
         return df_processed
 
     # Conteúdo da primeira aba - Other Status
     with tab1:
-        st.info("💼 **Esta aba contém os pedidos de alteração realizados pela empresa. Após o registro, aguarde o retorno do armador.**")
-        df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
+        df_other_processed = display_tab_content(df_other_status, "Other Status")
         
         if df_other_processed is not None:
             # Configuração das colunas
-            column_config = {
+    column_config = {
                 "Farol Status": st.column_config.TextColumn(
                     "Farol Status", disabled=True
-                )
-            }
-            column_config["Selecionar"] = st.column_config.CheckboxColumn(
-                "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
-            )
-            column_config["ID"] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
-            column_config["Linked Reference"] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
-            
-            # Reordena colunas - mantém "Selecionar" como primeira coluna
+        )
+    }
+    column_config["Selecionar"] = st.column_config.CheckboxColumn(
+        "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+    )
+
+            # Reordena colunas - mantém "Selecionar" como primeira coluna, seguido de ID, Farol Reference, Linked Reference e Inserted Date
             if "Inserted Date" in df_other_processed.columns:
                 other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
                 ordered_cols = ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"] + other_cols
@@ -970,23 +946,27 @@ def exibir_history():
 
             # Configura colunas para exibição
             for col in df_other_processed.columns:
-                if col == "Farol Status":
-                    continue
+        if col == "Farol Status":
+            continue
                 if col == "Selecionar":
                     continue
-                if col == "Inserted Date":
-                    column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+                if col == "ID":
+                    column_config[col] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
+                elif col == "Linked Reference":
+                    column_config[col] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
+                elif col == "Inserted Date":
+            column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
                 elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
                     column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
-                else:
-                    column_config[col] = st.column_config.TextColumn(col, disabled=True)
+        else:
+            column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
             edited_df_other = st.data_editor(
                 df_other_processed,
-                use_container_width=True,
-                hide_index=True,
-                column_config=column_config,
-                disabled=False,
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
+        disabled=False,
                 key="history_other_status_editor"
             )
         else:
@@ -994,8 +974,7 @@ def exibir_history():
 
     # Conteúdo da segunda aba - Received from Carrier
     with tab2:
-        st.info("📨 **Esta aba contém os retornos do armador com status 'Received from Carrier'. Para aprovar, será necessário informar a referência relacionada da aba 'Pedidos da Empresa'.**")
-        df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
+        df_received_processed = display_tab_content(df_received_carrier, "Received from Carrier")
         
         if df_received_processed is not None:
             # Configuração das colunas
@@ -1007,10 +986,8 @@ def exibir_history():
             column_config["Selecionar"] = st.column_config.CheckboxColumn(
                 "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
             )
-            column_config["ID"] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
-            column_config["Linked Reference"] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
             
-            # Reordena colunas - mantém "Selecionar" como primeira coluna
+            # Reordena colunas - mantém "Selecionar" como primeira coluna, seguido de ID, Farol Reference, Linked Reference e Inserted Date
             if "Inserted Date" in df_received_processed.columns:
                 other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
                 ordered_cols = ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"] + other_cols
@@ -1023,7 +1000,11 @@ def exibir_history():
                     continue
                 if col == "Selecionar":
                     continue
-                if col == "Inserted Date":
+                if col == "ID":
+                    column_config[col] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
+                elif col == "Linked Reference":
+                    column_config[col] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
+                elif col == "Inserted Date":
                     column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
                 elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
                     column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
@@ -1051,11 +1032,47 @@ def exibir_history():
         # Fallback para DataFrame vazio
         edited_df = pd.DataFrame()
 
-    # Função para aplicar mudanças de status (declarada antes do uso)
-    def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None):
+    # Função para obter o próximo número sequencial para Linked_Reference
+    def get_next_linked_reference_number():
+        """Obtém o próximo número sequencial para Linked_Reference"""
         try:
             conn = get_database_connection()
-            tx = conn.begin()
+            query = text("""
+                SELECT NVL(MAX(Linked_Reference), 0) + 1 as next_number
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE Linked_Reference IS NOT NULL
+            """)
+            result = conn.execute(query).scalar()
+            conn.close()
+            return result if result else 1
+        except Exception as e:
+            st.error(f"❌ Erro ao obter próximo número sequencial: {str(e)}")
+            return 1
+
+    # Função para buscar referências disponíveis na aba "Other Status"
+    def get_available_references_for_relation():
+        """Busca referências disponíveis na aba 'Other Status' para relacionamento"""
+        try:
+            conn = get_database_connection()
+            query = text("""
+                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE B_BOOKING_STATUS != 'Received from Carrier'
+                ORDER BY ROW_INSERTED_DATE DESC
+            """)
+            result = conn.execute(query).mappings().fetchall()
+            conn.close()
+            # Converte as chaves para maiúsculas para consistência
+            return [{k.upper(): v for k, v in dict(row).items()} for row in result] if result else []
+        except Exception as e:
+            st.error(f"❌ Erro ao buscar referências disponíveis: {str(e)}")
+            return []
+
+    # Função para aplicar mudanças de status (declarada antes do uso)
+    def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None):
+                    try:
+                        conn = get_database_connection()
+                        tx = conn.begin()
             
             # Resolve ADJUSTMENT_ID (usa o passado ou busca por fallback)
             adj_id = (str(adjustment_id).strip() if adjustment_id is not None else None)
@@ -1089,18 +1106,19 @@ def exibir_history():
             
             # Se o status foi alterado para "Booking Approved", executa a lógica de aprovação
             if new_status == "Booking Approved" and adj_id:
-                # Validação especial para itens "Received from Carrier"
+                # Se é um item "Received from Carrier" e foi fornecida uma referência relacionada
                 if selected_row_status == "Received from Carrier" and related_reference:
-                    # Valida se o ID relacionado existe na aba 'Other Status'
+                    # Valida se o ID relacionado existe na outra aba
                     related_exists = conn.execute(text("""
-                        SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS
-                        WHERE ID = :related_id
+                        SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS 
+                        WHERE ID = :related_id 
                         AND B_BOOKING_STATUS != 'Received from Carrier'
                     """), {"related_id": related_reference}).scalar()
                     
                     if related_exists > 0:
                         st.success(f"✅ ID relacionado '{related_reference}' validado com sucesso!")
-                        # Atualiza o Linked_Reference na linha atual
+                        
+                        # Atualiza o Linked_Reference na linha atual com o ID relacionado
                         conn.execute(text("""
                             UPDATE LogTransp.F_CON_RETURN_CARRIERS
                             SET Linked_Reference = :linked_ref,
@@ -1113,17 +1131,24 @@ def exibir_history():
                             "adjustment_id": adj_id
                         })
                         st.success(f"✅ Linked_Reference atualizado para ID {related_reference}")
+                        
+                        # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
+                        if update_sales_booking_from_return_carriers(adj_id):
+                            st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
+                        else:
+                            st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
                     else:
                         st.error(f"❌ ID relacionado '{related_reference}' não encontrado na aba 'Other Status'")
                         tx.rollback()
                         conn.close()
                         return
-                
-                # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
-                if update_sales_booking_from_return_carriers(adj_id):
-                    st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
                 else:
-                    st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
+                    # Processo normal para outros status ou quando não é "Received from Carrier"
+                    # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
+                    if update_sales_booking_from_return_carriers(adj_id):
+                        st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
+                    else:
+                        st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
 
             # Atualiza o status na tabela F_CON_RETURN_CARRIERS SEMPRE (na mesma transação)
             # Sanity check: existe linha com esse ADJUSTMENT_ID?
@@ -1154,18 +1179,18 @@ def exibir_history():
             # Regras específicas por status
             if new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
                 # Atualiza SOMENTE a coluna FAROL_STATUS na tabela principal
-                conn.execute(text("""
-                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-                       SET FAROL_STATUS = :farol_status
-                     WHERE FAROL_REFERENCE = :farol_reference
+                        conn.execute(text("""
+                            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                               SET FAROL_STATUS = :farol_status
+                             WHERE FAROL_REFERENCE = :farol_reference
                 """), {"farol_status": new_status, "farol_reference": farol_ref})
                 st.success(f"✅ FAROL_STATUS atualizado em F_CON_SALES_BOOKING_DATA para {farol_ref}")
             else:
                 # Demais status (Approved)
-                conn.execute(text("""
+                        conn.execute(text("""
                     UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
                        SET FAROL_STATUS = :farol_status
-                     WHERE FAROL_REFERENCE = :farol_reference
+                             WHERE FAROL_REFERENCE = :farol_reference
                 """), {"farol_status": new_status, "farol_reference": farol_ref})
 
             # Verificação pós-aprovação: comparar campos entre as duas tabelas
@@ -1198,17 +1223,17 @@ def exibir_history():
                 except Exception as _:
                     pass
 
-            tx.commit()
+                        tx.commit()
             st.success(f"✅ Status atualizado com sucesso para {farol_ref}!")
             st.rerun()
             
-        except Exception as e:
-            if 'tx' in locals():
-                tx.rollback()
+                    except Exception as e:
+                        if 'tx' in locals():
+                            tx.rollback()
             st.error(f"❌ Erro ao atualizar status: {str(e)}")
-        finally:
-            if 'conn' in locals():
-                conn.close()
+                    finally:
+                        if 'conn' in locals():
+                            conn.close()
 
     # Interface de botões de status para linha selecionada
     # Verifica seleções em ambas as abas
@@ -1263,7 +1288,7 @@ def exibir_history():
                                 type="secondary"):
                         if current_status != "Booking Approved":
                             st.session_state["pending_status_change"] = "Booking Approved"
-                            st.rerun()
+                    st.rerun()
                 
                 with subcol2:
                     if st.button("Booking Rejected", 
@@ -1271,8 +1296,8 @@ def exibir_history():
                                 type="secondary"):
                         if current_status != "Booking Rejected":
                             st.session_state["pending_status_change"] = "Booking Rejected"
-                            st.rerun()
-                
+                st.rerun()
+
                 with subcol3:
                     if st.button("Booking Cancelled", 
                                 key="status_booking_cancelled",
@@ -1297,45 +1322,59 @@ def exibir_history():
                     st.session_state.pop("pending_status_change", None)
                     st.rerun()
                 else:
-                    st.markdown("---")
+    st.markdown("---")
                     st.warning(f"**Confirmar alteração para:** {pending_status}")
                     
-                    # Validação especial para itens "Received from Carrier" sendo aprovados
+                    # Se é "Received from Carrier" sendo aprovado, solicita referência relacionada
                     related_reference = None
                     if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
                         st.info("📋 **Este item é um retorno do armador. Antes de aprovar, informe a referência da aba relacionada:**")
                         
-                        # Busca referências disponíveis na aba 'Other Status'
+                        # Busca referências disponíveis na aba "Other Status"
                         available_refs = get_available_references_for_relation()
                         
                         if available_refs:
-                            # Cria opções para o selectbox
-                            ref_options = [f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}" for ref in available_refs]
-                            ref_options.insert(0, "Selecione uma referência...")
+                            # Cria opções formatadas para o selectbox
+                            options = [""]  # Opção vazia
+                            option_labels = ["Selecione uma linha..."]
                             
-                            selected_ref = st.selectbox(
+                            for ref in available_refs:
+                                # Formata a opção com ID, Farol Reference e Status
+                                label = f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}"
+                                options.append(ref['ID'])  # Valor é o ID
+                                option_labels.append(label)
+                            
+                            # Cria um dicionário para mapear labels para valores
+                            option_dict = dict(zip(option_labels, options))
+                            
+                            selected_label = st.selectbox(
                                 "Selecione a linha relacionada da aba 'Other Status':",
-                                options=ref_options,
-                                key="related_reference_select"
+                                options=option_labels,
+                                key="related_reference_select",
+                                help="Esta linha deve corresponder ao pedido de alteração original da empresa"
                             )
                             
-                            if selected_ref and selected_ref != "Selecione uma referência...":
-                                # Extrai o ID da opção selecionada
-                                related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
-                                
-                                # Mostra detalhes da linha selecionada
-                                selected_ref_data = next((ref for ref in available_refs if str(ref['ID']) == related_reference), None)
-                                if selected_ref_data:
-                                    st.info(f"📋 **Linha selecionada:** ID {selected_ref_data['ID']} | {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']}")
+                            # Obtém o ID selecionado
+                            related_reference = option_dict.get(selected_label, None)
+                            
+                            # Exibe informações da linha selecionada
+                            if related_reference and related_reference != "":
+                                selected_ref = next((r for r in available_refs if r['ID'] == related_reference), None)
+                                if selected_ref:
+                                    st.info(f"📋 **Linha selecionada:** ID {selected_ref['ID']} | {selected_ref['FAROL_REFERENCE']} | {selected_ref['B_BOOKING_STATUS']}")
                         else:
-                            st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
-                            related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
+                            st.warning("⚠️ Nenhuma linha encontrada na aba 'Other Status' para relacionar.")
+                            related_reference = st.text_input(
+                                "Digite o ID da linha relacionada:",
+                                key="related_reference_input",
+                                help="Digite o ID numérico da linha do pedido de alteração original"
+                            )
                     
                     col1, col2 = st.columns([1, 3])
-                    with col1:
+    with col1:
                         subcol1, subcol2 = st.columns(2, gap="small")
                         with subcol1:
-                            # Desabilita o botão se for "Received from Carrier" e não tiver referência
+                            # Valida se pode confirmar
                             can_confirm = True
                             if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
                                 can_confirm = related_reference is not None and str(related_reference).strip() != ""
@@ -1348,7 +1387,7 @@ def exibir_history():
                                 apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference)
                                 # Limpa o status pendente
                                 st.session_state.pop("pending_status_change", None)
-                                st.rerun()
+            st.rerun()
                         
                         with subcol2:
                             if st.button("❌ Cancelar", 
