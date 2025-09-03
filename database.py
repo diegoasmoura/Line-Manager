@@ -278,7 +278,7 @@ def get_data_bookingData():
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
             # Identificação
-            "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status",
+            "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -1712,6 +1712,7 @@ def update_sales_booking_from_return_carriers(adjustment_id: str) -> bool:
         add_if_present("S_FINAL_DESTINATION")
         
         # Campos B_ (Booking)
+        add_if_present("B_BOOKING_REFERENCE")
         add_if_present("B_TRANSHIPMENT_PORT")
         add_if_present("B_PORT_TERMINAL_CITY")
         add_if_present("B_VESSEL_NAME")

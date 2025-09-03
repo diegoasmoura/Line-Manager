@@ -225,6 +225,15 @@ def exibir_shipments():
     column_config["Splitted Booking Reference"] = st.column_config.TextColumn(
         "Splitted Farol Reference", width="medium", disabled=True
     )
+    # Configuração para Booking Reference (verifica ambos os nomes possíveis)
+    if "Booking Reference" in df.columns:
+        column_config["Booking Reference"] = st.column_config.TextColumn(
+            "Booking", width="medium", disabled=False
+        )
+    elif "b_booking_reference" in df.columns:
+        column_config["b_booking_reference"] = st.column_config.TextColumn(
+            "Booking", width="medium", disabled=False
+        )
     # Alias de exibição para Quantity of Containers mantendo a coluna original
     if "Sales Quantity of Containers" in df.columns:
         column_config["Sales Quantity of Containers"] = st.column_config.NumberColumn(
