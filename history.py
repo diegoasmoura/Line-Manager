@@ -826,7 +826,7 @@ def exibir_history():
         "P_PDF_NAME",
         "PDF_BOOKING_EMISSION_DATE",
         "ROW_INSERTED_DATE",
-        "USER_INSERT",
+        "ADJUSTMENTS_OWNER",
     ]
 
     # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna, mas não na exibição
@@ -850,8 +850,8 @@ def exibir_history():
         pass
     
     # Rótulos das "abas"
-    other_label = f"📋 Pedidos da Empresa ({len(df_other_status)} records)"
-    received_label = f"📨 Retornos do Armador ({len(df_received_carrier)} records)"
+    other_label = f"📋 History ({len(df_other_status)} records)"
+    received_label = f"📨 Carrier Returns ({len(df_received_carrier)} records)"
 
     # Controle de "aba" ativa (segmented control) para detectar troca e limpar seleções da outra
     active_tab_key = f"history_active_tab_{farol_reference}"
@@ -911,12 +911,11 @@ def exibir_history():
             "LINKED_REFERENCE": "Linked Reference",  # Campo para referência relacionada
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
-            "USER_INSERT": "Inserted By",
+            "ADJUSTMENTS_OWNER": "Adjustments Owner",
             # Remover prefixos B_/P_ dos rótulos solicitados
             "B_GATE_OPENING": "Gate Opening",
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
-            "PDF_BOOKING_EMISSION_DATE": "PDF Print Date",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",  # Nome corrigido
             # Aliases para campos de data
@@ -990,7 +989,7 @@ def exibir_history():
 
 
     # Conteúdo da "aba" Pedidos da Empresa
-    st.info("💼 **Esta aba contém os pedidos de alteração realizados pela empresa. Após o registro, aguarde o retorno do armador.**") if active_tab == other_label else None
+    
     df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
     edited_df_other = None
     if df_other_processed is not None and active_tab == other_label:
@@ -1051,7 +1050,7 @@ def exibir_history():
         )
 
     # Conteúdo da "aba" Retornos do Armador
-    st.info("📨 **Esta aba contém os retornos do armador com status 'Received from Carrier'. Para aprovar, será necessário informar a referência relacionada da aba 'Pedidos da Empresa'.**") if active_tab == received_label else None
+    
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
     edited_df_received = None
     if df_received_processed is not None and active_tab == received_label:
@@ -1540,8 +1539,7 @@ def exibir_history():
     else:
         # Mensagem quando nenhuma linha está selecionada
         st.markdown("---")
-        st.info("📋 **Selecione uma linha na grade acima para gerenciar o status**")
-        st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis")
+        st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis e use 'View Attachments' para adicionar novos arquivos, fazer download individual ou em .zip e excluir anexos do registro selecionado.")
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
