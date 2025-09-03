@@ -1330,7 +1330,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
 
 
 # Insere uma linha em F_CON_RETURN_CARRIERS a partir dos valores editados na UI (split)
-def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, status_override: str | None = None):
+def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, status_override: str | None = None, area: str | None = None, request_reason: str | None = None, adjustments_owner: str | None = None, comments: str | None = None):
     conn = get_database_connection()
     try:
         farol_reference = ui_row.get("Farol Reference")
@@ -1438,6 +1438,10 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
             "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": convert_date_string(ui_row.get("Required Arrival Date")),
             "B_GATE_OPENING": None,
             "USER_INSERT": user_insert,
+            "AREA": area,
+            "REQUEST_REASON": request_reason,
+            "ADJUSTMENTS_OWNER": adjustments_owner,
+            "COMMENTS": comments,
         }
 
         insert_sql = text(
@@ -1465,7 +1469,11 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
                 B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
                 B_GATE_OPENING,
-                USER_INSERT
+                USER_INSERT,
+                AREA,
+                REQUEST_REASON,
+                ADJUSTMENTS_OWNER,
+                COMMENTS
             ) VALUES (
                 :FAROL_REFERENCE,
                 :B_BOOKING_REFERENCE,
@@ -1489,7 +1497,11 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
                 :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
                 :B_GATE_OPENING,
-                :USER_INSERT
+                :USER_INSERT,
+                :AREA,
+                :REQUEST_REASON,
+                :ADJUSTMENTS_OWNER,
+                :COMMENTS
             )
             """
         )

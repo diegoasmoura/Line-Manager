@@ -330,7 +330,14 @@ def show_split_form():
                                         # Para original (índice 0) e splits (1..num_splits), usa o que está no editor
                                         for i in range(0, 1 + (num_splits or 0)):
                                             ui_row = edited_display.iloc[i].to_dict()
-                                            insert_return_carrier_from_ui(ui_row, user_insert=st.session_state.get('current_user', 'system'))
+                                            insert_return_carrier_from_ui(
+                                                ui_row, 
+                                                user_insert=st.session_state.get('current_user', 'system'),
+                                                area=area,
+                                                request_reason=reason,
+                                                adjustments_owner=responsibility,
+                                                comments=comment
+                                            )
                                     except Exception as _e:
                                         # Não bloqueia o fluxo se a criação de retorno falhar; apenas informa
                                         st.warning(f"Aviso: não foi possível registrar retorno de carrier: {str(_e)}")
