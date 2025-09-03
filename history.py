@@ -648,6 +648,20 @@ def exibir_history():
                 st.rerun()
         return
 
+    # Inicialização: ao entrar na tela pela primeira vez (por referência), retrai View Attachments e limpa estados residuais
+    init_key = f"history_initialized_{farol_reference}"
+    if not st.session_state.get(init_key):
+        st.session_state["history_show_attachments"] = False
+        # Limpa possíveis estados de processamento/expansão do módulo de anexos
+        for k in [
+            f"processed_pdf_data_{farol_reference}",
+            f"booking_pdf_file_{farol_reference}",
+            f"expander_state_{farol_reference}",
+            f"attachment_cache_{farol_reference}",
+            f"uploader_ver_{farol_reference}",
+        ]:
+            st.session_state.pop(k, None)
+        st.session_state[init_key] = True
 
 
     df = get_return_carriers_by_farol(farol_reference)
