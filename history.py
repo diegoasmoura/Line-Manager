@@ -10,6 +10,12 @@ import mimetypes
 import uuid
 from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
 
+# Carrega dados da UDC para justificativas
+df_udc = load_df_udc()
+Booking_adj_area = df_udc[df_udc["grupo"] == "Booking Adj Area"]["dado"].dropna().unique().tolist()
+Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["dado"].dropna().unique().tolist()
+Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
+
 def get_next_linked_reference_number():
     """Obtém o próximo número sequencial para Linked_Reference"""
     try:
@@ -1107,7 +1113,7 @@ def exibir_history():
         edited_df = pd.DataFrame()
 
     # Função para aplicar mudanças de status (declarada antes do uso)
-    def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None):
+    def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
         try:
             conn = get_database_connection()
             tx = conn.begin()
@@ -1149,19 +1155,27 @@ def exibir_history():
                     if related_reference == "New Adjustment":
                         # Caso especial: New Adjustment - não precisa validar referência
                         st.success("✅ New Adjustment selecionado - ajuste do carrier sem referência prévia!")
-                        # Atualiza o Linked_Reference com "New Adjustment"
+                        # Atualiza o Linked_Reference e as justificativas
                         conn.execute(text("""
                             UPDATE LogTransp.F_CON_RETURN_CARRIERS
                             SET Linked_Reference = :linked_ref,
+                                AREA = :area,
+                                REQUEST_REASON = :request_reason,
+                                ADJUSTMENTS_OWNER = :adjustments_owner,
+                                COMMENTS = :comments,
                                 USER_UPDATE = :user_update,
                                 DATE_UPDATE = SYSDATE
                             WHERE ADJUSTMENT_ID = :adjustment_id
                         """), {
                             "linked_ref": "New Adjustment",
+                            "area": area,
+                            "request_reason": reason,
+                            "adjustments_owner": responsibility,
+                            "comments": comment,
                             "user_update": "System",
                             "adjustment_id": adj_id
                         })
-                        st.success("✅ Linked_Reference atualizado para 'New Adjustment'")
+                        st.success("✅ Linked_Reference e justificativas atualizados para 'New Adjustment'")
                     else:
                         # Valida se o ID relacionado existe na aba 'Other Status'
                         related_exists = conn.execute(text("""
@@ -1421,6 +1435,24 @@ def exibir_history():
                                 if selected_ref == "New Adjustment":
                                     related_reference = "New Adjustment"
                                     st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                                    
+                                    # Campos de justificativa obrigatórios para New Adjustment
+                                    st.markdown("#### 📋 Justificativas do New Adjustment")
+                                    col_a, col_b, col_c = st.columns([1, 1, 1])
+                                    with col_a:
+                                        area_new_adj = st.selectbox("Booking Adjustment Area", [""] + Booking_adj_area, key="area_new_adjustment")
+                                    with col_b:
+                                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason, key="reason_new_adjustment")
+                                    with col_c:
+                                        responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility, key="responsibility_new_adjustment")
+                                    
+                                    comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
+                                    
+                                    # Armazena os valores no session_state para usar na confirmação
+                                    st.session_state["new_adjustment_area"] = area_new_adj
+                                    st.session_state["new_adjustment_reason"] = reason_new_adj
+                                    st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
+                                    st.session_state["new_adjustment_comment"] = comment_new_adj
                                 else:
                                     # Extrai o ID da opção selecionada
                                     related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
@@ -1439,25 +1471,62 @@ def exibir_history():
                         with subcol1:
                             # Desabilita o botão se for "Received from Carrier" e não tiver referência
                             can_confirm = True
+                            validation_message = ""
                             if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
                                 can_confirm = related_reference is not None and str(related_reference).strip() != ""
+                                
+                                # Validação adicional para New Adjustment
+                                if related_reference == "New Adjustment":
+                                    area_val = st.session_state.get("new_adjustment_area", "")
+                                    reason_val = st.session_state.get("new_adjustment_reason", "")
+                                    responsibility_val = st.session_state.get("new_adjustment_responsibility", "")
+                                    
+                                    if not area_val or not reason_val or not responsibility_val:
+                                        can_confirm = False
+                                        validation_message = "⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar."
+                            
+                            # Exibe mensagem de validação se houver
+                            if validation_message:
+                                st.warning(validation_message)
                             
                             if st.button("✅ Confirmar", 
                                         key="confirm_status_change",
                                         type="primary",
                                         disabled=not can_confirm):
+                                # Prepara os parâmetros de justificativa para New Adjustment
+                                area_param = None
+                                reason_param = None
+                                responsibility_param = None
+                                comment_param = None
+                                
+                                if related_reference == "New Adjustment":
+                                    area_param = st.session_state.get("new_adjustment_area")
+                                    reason_param = st.session_state.get("new_adjustment_reason")
+                                    responsibility_param = st.session_state.get("new_adjustment_responsibility")
+                                    comment_param = st.session_state.get("new_adjustment_comment")
+                                
                                 # Executa a mudança de status
-                                apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference)
-                                # Limpa o status pendente
+                                apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
+                                
+                                # Limpa o status pendente e dados de New Adjustment
                                 st.session_state.pop("pending_status_change", None)
+                                if related_reference == "New Adjustment":
+                                    st.session_state.pop("new_adjustment_area", None)
+                                    st.session_state.pop("new_adjustment_reason", None)
+                                    st.session_state.pop("new_adjustment_responsibility", None)
+                                    st.session_state.pop("new_adjustment_comment", None)
                                 st.rerun()
                         
                         with subcol2:
                             if st.button("❌ Cancelar", 
                                         key="cancel_status_change",
                                         type="secondary"):
-                                # Limpa o status pendente
+                                # Limpa o status pendente e dados de New Adjustment
                                 st.session_state.pop("pending_status_change", None)
+                                st.session_state.pop("new_adjustment_area", None)
+                                st.session_state.pop("new_adjustment_reason", None)
+                                st.session_state.pop("new_adjustment_responsibility", None)
+                                st.session_state.pop("new_adjustment_comment", None)
                                 st.rerun()
             
 
