@@ -797,7 +797,7 @@ def exibir_history():
     display_cols = [
         "ID",
         "FAROL_REFERENCE",
-        "Linked_Reference",
+        "LINKED_REFERENCE",
         "B_BOOKING_STATUS",
         "S_SPLITTED_BOOKING_REFERENCE",
         "S_PLACE_OF_RECEIPT",
@@ -845,7 +845,7 @@ def exibir_history():
     def process_dataframe(df_to_process, df_show_ref):
         """Processa um DataFrame aplicando aliases e configurações"""
         if df_to_process.empty:
-            return df_to_process
+            return df_to_process, df_show_ref
             
         # Aplica aliases iguais aos da grade principal quando disponíveis
         mapping_main = get_column_mapping()
@@ -871,7 +871,7 @@ def exibir_history():
             "ID": "ID",  # Campo ID visível
             "FAROL_REFERENCE": "Farol Reference",
             "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
-            "Linked_Reference": "Linked Reference",  # Campo para referência relacionada
+            "LINKED_REFERENCE": "Linked Reference",  # Campo para referência relacionada
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
             "USER_INSERT": "Inserted By",
@@ -1007,13 +1007,11 @@ def exibir_history():
             column_config["Selecionar"] = st.column_config.CheckboxColumn(
                 "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
             )
-            column_config["ID"] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
-            column_config["Linked Reference"] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
             
-            # Reordena colunas - mantém "Selecionar" como primeira coluna
+            # Reordena colunas - mantém "Selecionar" como primeira coluna (ID e Linked Reference ocultos na aba Retornos do Armador)
             if "Inserted Date" in df_received_processed.columns:
                 other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
-                ordered_cols = ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"] + other_cols
+                ordered_cols = ["Selecionar", "Farol Reference", "Inserted Date"] + other_cols
                 existing_cols = [c for c in ordered_cols if c in df_received_processed.columns]
                 df_received_processed = df_received_processed[existing_cols]
 

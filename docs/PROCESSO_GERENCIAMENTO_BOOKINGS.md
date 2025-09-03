@@ -58,9 +58,9 @@ def get_available_references_for_relation():
 ## 📊 Colunas Visíveis
 
 ### Colunas Principais
-- **ID**: Identificador único (formato numérico)
+- **ID**: Identificador único (formato numérico) - *Visível apenas na aba "Pedidos da Empresa"*
 - **Farol Reference**: Referência do Farol
-- **Linked Reference**: Número sequencial de vínculo (formato numérico)
+- **Linked Reference**: Número sequencial de vínculo (formato numérico) - *Visível apenas na aba "Pedidos da Empresa"*
 - **Farol Status**: Status atual do booking
 - **Inserted Date**: Data de inserção
 
