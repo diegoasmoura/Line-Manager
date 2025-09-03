@@ -1272,6 +1272,8 @@ def exibir_history():
 
             tx.commit()
             st.success(f"✅ Status atualizado com sucesso para {farol_ref}!")
+            # Limpa o cache para refletir as mudanças na interface
+            st.cache_data.clear()
             st.rerun()
             
         except Exception as e:
