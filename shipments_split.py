@@ -142,6 +142,8 @@ def show_split_form():
             "Port Terminal City": split_dict.get("b_port_terminal_city"),
             "Voyage Carrier": split_data["s_carrier"],
             "Voyage Code": split_dict.get("b_voyage_code"),
+            "Booking Reference": split_dict.get("b_booking_reference"),
+            "Vessel Name": split_dict.get("b_vessel_name"),
             "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
             "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
             "Required Arrival Date": split_data["s_required_arrival_date"]
@@ -173,6 +175,8 @@ def show_split_form():
             "Port Terminal City",
             "Voyage Carrier",
             "Voyage Code",
+            "Booking Reference",
+            "Vessel Name",
             "Requested Deadline Start Date",
             "Requested Deadline End Date",
             "Required Arrival Date"

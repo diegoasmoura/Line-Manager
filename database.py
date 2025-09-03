@@ -1551,7 +1551,9 @@ def get_split_data_by_farol_reference(farol_reference):
             B_VOYAGE_CARRIER                   AS s_carrier,
             B_VOYAGE_CODE                      AS b_voyage_code,
             B_TRANSHIPMENT_PORT                AS b_transhipment_port,
-            B_PORT_TERMINAL_CITY               AS b_port_terminal_city
+            B_PORT_TERMINAL_CITY               AS b_port_terminal_city,
+            B_BOOKING_REFERENCE                AS b_booking_reference,
+            B_VESSEL_NAME                      AS b_vessel_name
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
         WHERE FAROL_REFERENCE = :ref
         """
