@@ -66,7 +66,8 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
-                ROW_INSERTED_DATE
+                ROW_INSERTED_DATE,
+                PDF_BOOKING_EMISSION_DATE
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
                OR UPPER(FAROL_REFERENCE) LIKE UPPER(:ref || '.%')
@@ -114,7 +115,8 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
-                ROW_INSERTED_DATE
+                ROW_INSERTED_DATE,
+                PDF_BOOKING_EMISSION_DATE
             FROM LogTransp.F_CON_RETURN_CARRIERS
             ORDER BY ROW_INSERTED_DATE DESC
             FETCH FIRST {int(limit)} ROWS ONLY
@@ -1377,14 +1379,20 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
             return val
 
         def convert_date_string(date_str):
-            """Converte string de data YYYY-MM-DD para datetime"""
-            if not date_str or date_str == "":
+            """Converte string de data (YYYY-MM-DD ou YYYY-MM-DD HH:MM[:SS] [UTC|UT]) para datetime"""
+            if not date_str or str(date_str).strip() == "":
                 return None
             try:
                 from datetime import datetime
-                # Converte string YYYY-MM-DD para datetime
-                return datetime.strptime(date_str, "%Y-%m-%d")
-            except:
+                s = str(date_str).strip().replace(" UTC", "").replace(" UT", "")
+                # Tenta com segundos
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                    try:
+                        return datetime.strptime(s, fmt)
+                    except Exception:
+                        continue
+                return None
+            except Exception:
                 return None
 
         qty_raw = ui_row.get("Quantity of Containers")
@@ -1414,6 +1422,22 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
         # Determina o status a ser usado
         booking_status = status_override if status_override else "Adjustment Requested"
         
+        # Prepara string da data de emissão do PDF (guardar como texto "YYYY-MM-DD HH:MM")
+        pdf_emission_raw = ui_row.get("PDF Booking Emission Date")
+        pdf_emission_str = None
+        try:
+            if pdf_emission_raw:
+                s = str(pdf_emission_raw).replace("UTC", "").replace("UT", "").strip()
+                # Extrai até minutos (YYYY-MM-DD HH:MM)
+                import re as _re
+                m = _re.match(r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})", s)
+                if m:
+                    pdf_emission_str = m.group(1)
+                else:
+                    pdf_emission_str = s[:16] if len(s) >= 16 else s
+        except Exception:
+            pdf_emission_str = None
+        
         params = {
             "FAROL_REFERENCE": farol_reference,
             "B_BOOKING_REFERENCE": norm(ui_row.get("Booking Reference")),
@@ -1442,6 +1466,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
             "REQUEST_REASON": request_reason,
             "ADJUSTMENTS_OWNER": adjustments_owner,
             "COMMENTS": comments,
+            "PDF_BOOKING_EMISSION_DATE": pdf_emission_str,
         }
 
         insert_sql = text(
@@ -1473,7 +1498,8 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 AREA,
                 REQUEST_REASON,
                 ADJUSTMENTS_OWNER,
-                COMMENTS
+                COMMENTS,
+                PDF_BOOKING_EMISSION_DATE
             ) VALUES (
                 :FAROL_REFERENCE,
                 :B_BOOKING_REFERENCE,
@@ -1501,7 +1527,8 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 :AREA,
                 :REQUEST_REASON,
                 :ADJUSTMENTS_OWNER,
-                :COMMENTS
+                :COMMENTS,
+                :PDF_BOOKING_EMISSION_DATE
             )
             """
         )
@@ -1652,7 +1679,8 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
-                ROW_INSERTED_DATE
+                ROW_INSERTED_DATE,
+                PDF_BOOKING_EMISSION_DATE
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE ADJUSTMENT_ID = :adjustment_id
             """

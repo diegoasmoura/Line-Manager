@@ -824,6 +824,7 @@ def exibir_history():
         "B_GATE_OPENING",
         "P_STATUS",
         "P_PDF_NAME",
+        "PDF_BOOKING_EMISSION_DATE",
         "ROW_INSERTED_DATE",
         "USER_INSERT",
     ]
@@ -915,6 +916,7 @@ def exibir_history():
             "B_GATE_OPENING": "Gate Opening",
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
+            "PDF_BOOKING_EMISSION_DATE": "PDF Print Date",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",  # Nome corrigido
             # Aliases para campos de data
@@ -958,15 +960,20 @@ def exibir_history():
             "Document Cut Off": "B_DOCUMENT_CUT_OFF_DOCCUT",
             "Port Cut Off": "B_PORT_CUT_OFF_PORTCUT", 
             "ETD": "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-            "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
+            "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA",
+            "PDF Print Date": "PDF_BOOKING_EMISSION_DATE"
         }
         
         for mapped_name, original_name in date_fields_mapped.items():
             if mapped_name in df_processed.columns:
                 try:
-                    # Busca o valor original antes do rename
                     original_values = df_show_ref[original_name]
-                    df_processed[mapped_name] = pd.to_datetime(original_values, unit="ms", errors="coerce")
+                    if mapped_name == "PDF Print Date":
+                        # Tenta parse direto de string (YYYY-MM-DD HH:MM[:SS])
+                        df_processed[mapped_name] = pd.to_datetime(original_values, errors="coerce")
+                    else:
+                        # Campos que vêm como epoch ms
+                        df_processed[mapped_name] = pd.to_datetime(original_values, unit="ms", errors="coerce")
                 except Exception:
                     pass
 
@@ -1016,7 +1023,7 @@ def exibir_history():
                 column_config[col] = st.column_config.DatetimeColumn(
                     "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
                 )
-            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA", "PDF Print Date"]:
                 column_config[col] = st.column_config.DatetimeColumn(
                     col, format="YYYY-MM-DD HH:mm", disabled=True
                 )
@@ -1075,7 +1082,7 @@ def exibir_history():
                 column_config[col] = st.column_config.DatetimeColumn(
                     "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
                 )
-            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA", "PDF Print Date"]:
                 column_config[col] = st.column_config.DatetimeColumn(
                     col, format="YYYY-MM-DD HH:mm", disabled=True
                 )

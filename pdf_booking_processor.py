@@ -72,6 +72,15 @@ CARRIER_PATTERNS = {
         "gross_weight": [
             r"Gross Weight.*?([\d\.]+)\s*KGS",
         ],
+        "print_date": [
+            # Padrão específico Maersk: data na linha após o título
+            r"(?:BOOKING\s+(?:CONFIRMATION|AMENDMENT)|ARCHIVE\s+COPY)\s*\n\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*UT",  # Formato: 2024-08-19 18:31 UT
+            r"(?:BOOKING\s+(?:CONFIRMATION|AMENDMENT)|ARCHIVE\s+COPY)\s*\n\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*UT",  # Com segundos
+            # Padrões genéricos para outros formatos
+            r"Print Date:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*UTC",  # Formato específico: 2024-09-06 18:23 UTC
+            r"Print Date:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*UTC",  # Com segundos
+            r"Print Date:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2})",  # Formato alternativo
+        ],
     },
     "HAPAG-LLOYD": {
         "booking_reference": [
@@ -180,6 +189,17 @@ CARRIER_PATTERNS = {
         "eta": [
             r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
             r"Arrival[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        ],
+        "print_date": [
+            # Padrão específico Maersk: data na linha após o título
+            r"(?:BOOKING\s+(?:CONFIRMATION|AMENDMENT)|ARCHIVE\s+COPY)\s*\n\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*UT",  # Formato: 2024-08-19 18:31 UT
+            r"(?:BOOKING\s+(?:CONFIRMATION|AMENDMENT)|ARCHIVE\s+COPY)\s*\n\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*UT",  # Com segundos
+            # Padrões genéricos para outros formatos
+            r"Print Date:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*UTC",  # Formato específico: 2024-09-06 18:23 UTC
+            r"Print Date:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*UTC",  # Com segundos
+            r"Print Date:\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2})",  # Formato alternativo
+            r"Printed[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2})",  # Variação "Printed"
+            r"Date[\s:]+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})",  # Padrão mais genérico
         ],
     }
 }
@@ -533,7 +553,7 @@ def extract_maersk_data(text_content):
     
     # Regex baseadas no código de exemplo que funciona
     patterns = {
-        "booking_reference": r"Booking No\.?:\s*(\d+)",
+        "booking_reference": r"Booking No\.?\s*:\s*(\d+)",
         "from": r"From:\s*([^,\n]+,[^,\n]+,[^,\n]+)",
         "to": r"(?:To|TO)\s*:\s*([^,\n]+(?:,[^,\n]+)?(?:,[^,\n]+)?)",
         "cargo_type": r"(?:Customer Cargo|Commodity Description)\s*:\s*(.+?)(?:\n|Service Contract|Price Owner|$)",
@@ -558,6 +578,23 @@ def extract_maersk_data(text_content):
     if "to" in data:
         data["pod"] = data.pop("to")    # Remove "to" e adiciona "pod"
     
+    # Extrair print date (data de emissão) — Maersk coloca na linha após o título
+    try:
+        print_date_patterns = [
+            r"(?:BOOKING\s+(?:CONFIRMATION|AMENDMENT)|ARCHIVE\s+COPY)\s*\n\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*UT",
+            r"(?:BOOKING\s+(?:CONFIRMATION|AMENDMENT)|ARCHIVE\s+COPY)\s*\n\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*UT",
+            # Padrão explícito em duas linhas: 'Print Date:' na linha anterior e a data na próxima
+            r"Print\s*Date\s*:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})(?:\s*(?:UTC|UT))?",
+            r"Print\s*Date\s*:\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})(?:\s*(?:UTC|UT))?",
+        ]
+        for p in print_date_patterns:
+            m = re.search(p, text_content, re.IGNORECASE | re.MULTILINE)
+            if m:
+                data["print_date"] = m.group(1).strip()
+                break
+    except Exception:
+        pass
+    
     # Extrair ETD, ETA, Vessel e Voy No. usando a função do código de exemplo
     def extract_etd_eta_vessel(text):
         lines = text.split('\n')
@@ -579,7 +616,7 @@ def extract_maersk_data(text_content):
         # Padrões para Vessel e Voy
         vessel_patterns = [
             r'MVS\s+PENDING MOTHER VSL\s+FLEX\s+(\d{4}-\d{2}-\d{2})',
-            r'MVS\s+([^(]+?)(?:\s*\([^)]*\))?\s+(\d+[A-Z]?)',
+            r'MVS\s+([^(:]+?)(?:\s*\([^)]*\))?\s+(\d+[A-Z]?)',
         ]
         
         first_vessel = None
@@ -637,27 +674,16 @@ def extract_maersk_data(text_content):
         ("ARCHIVE COPY", "ARCHIVE COPY")
     ]
     for keyword, label in doc_type_keywords:
-        if keyword in text_content.upper():
+        if keyword in text_content:
             data["document_type"] = label
             break
     
-    # Limpar campos de porto usando a função do código de exemplo
-    def clean_port_field_maersk(value):
-        if not value:
-            return None
-        # remover códigos ou complementos entre parênteses
-        no_paren = re.sub(r"\s*\([^)]*\)", "", value)
-        # quebrar por vírgula e pegar no máximo 3 partes
-        parts = [p.strip() for p in no_paren.split(",") if p.strip()]
-        if not parts:
-            return None
-        return ",".join(parts[:3])
+    # Limpar campos de porto para formato "Cidade,Estado,País"
+    if "pol" in data:
+        data["pol"] = clean_port_field(data["pol"])
     
-    if "pol" in data and data["pol"]:
-        data["pol"] = clean_port_field_maersk(data["pol"])
-    
-    if "pod" in data and data["pod"]:
-        data["pod"] = clean_port_field_maersk(data["pod"])
+    if "pod" in data:
+        data["pod"] = clean_port_field(data["pod"])
     
     return data
 
@@ -836,6 +862,22 @@ def normalize_extracted_data(extracted_data):
             except Exception:
                 normalized[date_field] = date_str  # Mantém original se não conseguir converter
     
+    # Normaliza print_date (datetime com hora)
+    if "print_date" in extracted_data:
+        raw = extracted_data["print_date"] or ""
+        cleaned = raw.replace(" UTC", "").replace(" UT", "").strip()
+        parsed = None
+        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"]:
+            try:
+                parsed = datetime.strptime(cleaned, fmt)
+                break
+            except Exception:
+                continue
+        if parsed:
+            normalized["print_date"] = parsed.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            normalized["print_date"] = cleaned
+    
     return normalized
 
 def process_pdf_booking(pdf_content, farol_reference):
@@ -904,6 +946,7 @@ def process_pdf_booking(pdf_content, farol_reference):
             "cargo_type": extracted_data.get("cargo_type", ""),
             "gross_weight": extracted_data.get("gross_weight", ""),
             "document_type": extracted_data.get("document_type", ""),
+            "print_date": normalized_data.get("print_date", ""),
             "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
         }
         
@@ -1000,6 +1043,24 @@ def display_pdf_validation_interface(processed_data):
             except:
                 return None
         
+        # Converte data de emissão do PDF (formato: 2024-09-06 18:23 UTC)
+        def parse_print_date(date_str):
+            if not date_str or date_str == "":
+                return None
+            try:
+                # Remove UTC se presente
+                date_clean = date_str.replace(" UTC", "").strip()
+                # Tenta converter formato YYYY-MM-DD HH:MM
+                if len(date_clean) == 16:  # 2024-09-06 18:23
+                    return datetime.strptime(date_clean, "%Y-%m-%d %H:%M")
+                # Tenta converter formato com segundos YYYY-MM-DD HH:MM:SS
+                elif len(date_clean) == 19:  # 2024-09-06 18:23:45
+                    return datetime.strptime(date_clean, "%Y-%m-%d %H:%M:%S")
+                else:
+                    return None
+            except:
+                return None
+        
         # Quarta linha: ETD e ETA
         col8, col9 = st.columns(2)
         with col8:
@@ -1013,6 +1074,15 @@ def display_pdf_validation_interface(processed_data):
                 "ETA (Estimated Time of Arrival)",
                 value=parse_brazilian_date(processed_data.get("eta")),
                 help="Data estimada de chegada"
+            )
+        
+        # Quinta linha: PDF Print Date
+        col10, col_spacer = st.columns([1, 1])
+        with col10:
+            pdf_print_date = st.text_input(
+                "PDF Print Date",
+                value=processed_data.get("print_date", ""),
+                help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
         # Campos ETD e ETA movidos para a quarta linha acima
@@ -1044,7 +1114,8 @@ def display_pdf_validation_interface(processed_data):
                 "Port Terminal City": "",
                 "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",
                 "Requested Deadline End Date": etd.strftime("%Y-%m-%d") if etd else "",
-                "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else ""
+                "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",
+                "PDF Booking Emission Date": pdf_print_date
             }
             
             # Debug simples para verificar se chegou aqui
