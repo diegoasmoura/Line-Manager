@@ -223,7 +223,7 @@ def exibir_shipments():
     column_config = drop_downs(df, df_udc)
     # Configuração explícita para exibir como texto somente leitura
     column_config["Splitted Booking Reference"] = st.column_config.TextColumn(
-        "Splitted Booking Reference", width="medium", disabled=True
+        "Splitted Farol Reference", width="medium", disabled=True
     )
     # Alias de exibição para Quantity of Containers mantendo a coluna original
     if "Sales Quantity of Containers" in df.columns:
