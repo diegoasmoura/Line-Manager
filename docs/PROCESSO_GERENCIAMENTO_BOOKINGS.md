@@ -18,16 +18,23 @@ Este documento descreve o novo processo implementado para gerenciar pedidos de a
 
 ### 3. Validação e Aprovação
 - **Requisito**: Antes de aprovar item "Received from Carrier" para "Booking Approved"
-- **Validação**: Usuário deve informar a referência da aba relacionada
-- **Controle**: Sistema valida se a referência existe na aba "Pedidos da Empresa"
+- **Opções de Validação**:
+  - **Referência Relacionada**: Usuário seleciona ID da aba "Pedidos da Empresa"
+  - **New Adjustment**: Para ajustes do carrier sem pedido prévio da empresa
+- **Controle**: Sistema valida se a referência existe ou permite "New Adjustment"
 
 ## 🔗 Sistema de Controle por Referência
 
 ### Coluna Linked_Reference
 - **Propósito**: Número sequencial de vínculo entre pedidos e retornos
+- **Tipo**: VARCHAR2(35) - aceita números e strings
+- **Valores Possíveis**:
+  - **Número sequencial**: `1, 2, 3...` para pedidos relacionados
+  - **String especial**: `"New Adjustment"` para ajustes do carrier sem pedido prévio
 - **Sequência**: 
   - Primeiro booking criado: `Linked_Reference = 1`
   - Cada ajuste/split relacionado: `Linked_Reference = x+1`
+  - Ajuste sem referência: `Linked_Reference = "New Adjustment"`
 
 ### Coluna ID
 - **Propósito**: Identificador único para referência cruzada
@@ -78,19 +85,22 @@ def get_available_references_for_relation():
 1. Usuário seleciona linha na aba "Retornos do Armador"
 2. Altera status para "Booking Approved"
 3. Sistema solicita referência relacionada
-4. Usuário seleciona ID da aba "Pedidos da Empresa"
+4. Usuário escolhe entre:
+   - **ID da aba "Pedidos da Empresa"** (para pedidos relacionados)
+   - **"New Adjustment"** (para ajustes sem pedido prévio)
 5. Sistema valida e aprova
 6. Dados são propagados para tabela principal
 
 ### Validações
-- **Existência**: Verifica se ID relacionado existe
+- **Existência**: Verifica se ID relacionado existe (quando não for "New Adjustment")
 - **Status**: Confirma que item relacionado não é "Received from Carrier"
+- **New Adjustment**: Permite aprovação sem validação de referência
 - **Integridade**: Mantém consistência entre abas
 
 ## 💾 Persistência de Dados
 
 ### Tabela F_CON_RETURN_CARRIERS
-- **Linked_Reference**: Atualizado com ID relacionado
+- **Linked_Reference**: Atualizado com ID relacionado ou "New Adjustment"
 - **USER_UPDATE**: Registra usuário que fez a alteração
 - **DATE_UPDATE**: Timestamp da alteração
 

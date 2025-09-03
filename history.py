@@ -846,7 +846,7 @@ def exibir_history():
         """Processa um DataFrame aplicando aliases e configurações"""
         if df_to_process.empty:
             return df_to_process, df_show_ref
-            
+
         # Aplica aliases iguais aos da grade principal quando disponíveis
         mapping_main = get_column_mapping()
         mapping_upper = {k.upper(): v for k, v in mapping_main.items()}
@@ -983,10 +983,10 @@ def exibir_history():
 
             edited_df_other = st.data_editor(
                 df_other_processed,
-                use_container_width=True,
-                hide_index=True,
-                column_config=column_config,
-                disabled=False,
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
+        disabled=False,
                 key="history_other_status_editor"
             )
         else:
@@ -1089,16 +1089,10 @@ def exibir_history():
             if new_status == "Booking Approved" and adj_id:
                 # Validação especial para itens "Received from Carrier"
                 if selected_row_status == "Received from Carrier" and related_reference:
-                    # Valida se o ID relacionado existe na aba 'Other Status'
-                    related_exists = conn.execute(text("""
-                        SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS
-                        WHERE ID = :related_id
-                        AND B_BOOKING_STATUS != 'Received from Carrier'
-                    """), {"related_id": related_reference}).scalar()
-                    
-                    if related_exists > 0:
-                        st.success(f"✅ ID relacionado '{related_reference}' validado com sucesso!")
-                        # Atualiza o Linked_Reference na linha atual
+                    if related_reference == "New Adjustment":
+                        # Caso especial: New Adjustment - não precisa validar referência
+                        st.success("✅ New Adjustment selecionado - ajuste do carrier sem referência prévia!")
+                        # Atualiza o Linked_Reference com "New Adjustment"
                         conn.execute(text("""
                             UPDATE LogTransp.F_CON_RETURN_CARRIERS
                             SET Linked_Reference = :linked_ref,
@@ -1106,16 +1100,39 @@ def exibir_history():
                                 DATE_UPDATE = SYSDATE
                             WHERE ADJUSTMENT_ID = :adjustment_id
                         """), {
-                            "linked_ref": related_reference,
+                            "linked_ref": "New Adjustment",
                             "user_update": "System",
                             "adjustment_id": adj_id
                         })
-                        st.success(f"✅ Linked_Reference atualizado para ID {related_reference}")
+                        st.success("✅ Linked_Reference atualizado para 'New Adjustment'")
                     else:
-                        st.error(f"❌ ID relacionado '{related_reference}' não encontrado na aba 'Other Status'")
-                        tx.rollback()
-                        conn.close()
-                        return
+                        # Valida se o ID relacionado existe na aba 'Other Status'
+                        related_exists = conn.execute(text("""
+                            SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS
+                            WHERE ID = :related_id
+                            AND B_BOOKING_STATUS != 'Received from Carrier'
+                        """), {"related_id": related_reference}).scalar()
+                        
+                        if related_exists > 0:
+                            st.success(f"✅ ID relacionado '{related_reference}' validado com sucesso!")
+                            # Atualiza o Linked_Reference na linha atual
+                            conn.execute(text("""
+                                UPDATE LogTransp.F_CON_RETURN_CARRIERS
+                                SET Linked_Reference = :linked_ref,
+                                    USER_UPDATE = :user_update,
+                                    DATE_UPDATE = SYSDATE
+                                WHERE ADJUSTMENT_ID = :adjustment_id
+                            """), {
+                                "linked_ref": related_reference,
+                                "user_update": "System",
+                                "adjustment_id": adj_id
+                            })
+                            st.success(f"✅ Linked_Reference atualizado para ID {related_reference}")
+                        else:
+                            st.error(f"❌ ID relacionado '{related_reference}' não encontrado na aba 'Other Status'")
+                            tx.rollback()
+                            conn.close()
+                            return
                 
                 # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
                 if update_sales_booking_from_return_carriers(adj_id):
@@ -1261,7 +1278,7 @@ def exibir_history():
                                 type="secondary"):
                         if current_status != "Booking Approved":
                             st.session_state["pending_status_change"] = "Booking Approved"
-                            st.rerun()
+                        st.rerun()
                 
                 with subcol2:
                     if st.button("Booking Rejected", 
@@ -1269,15 +1286,15 @@ def exibir_history():
                                 type="secondary"):
                         if current_status != "Booking Rejected":
                             st.session_state["pending_status_change"] = "Booking Rejected"
-                            st.rerun()
-                
+                        st.rerun()
+
                 with subcol3:
                     if st.button("Booking Cancelled", 
                                 key="status_booking_cancelled",
                                 type="secondary"):
                         if current_status != "Booking Cancelled":
                             st.session_state["pending_status_change"] = "Booking Cancelled"
-                            st.rerun()
+                        st.rerun()
                 
                 with subcol4:
                     if st.button("Adjustment Requested", 
@@ -1285,7 +1302,7 @@ def exibir_history():
                                 type="secondary"):
                         if current_status != "Adjustment Requested":
                             st.session_state["pending_status_change"] = "Adjustment Requested"
-                            st.rerun()
+                        st.rerun()
             
             # Confirmação quando há status pendente
             pending_status = st.session_state.get("pending_status_change")
@@ -1310,21 +1327,26 @@ def exibir_history():
                             # Cria opções para o selectbox
                             ref_options = [f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}" for ref in available_refs]
                             ref_options.insert(0, "Selecione uma referência...")
+                            ref_options.append("New Adjustment")  # Opção para ajuste sem referência prévia
                             
                             selected_ref = st.selectbox(
-                                "Selecione a linha relacionada da aba 'Other Status':",
+                                "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
                                 options=ref_options,
                                 key="related_reference_select"
                             )
                             
                             if selected_ref and selected_ref != "Selecione uma referência...":
-                                # Extrai o ID da opção selecionada
-                                related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
+                                if selected_ref == "New Adjustment":
+                                    related_reference = "New Adjustment"
+                                    st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                                else:
+                                    # Extrai o ID da opção selecionada
+                                    related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
                                 
-                                # Mostra detalhes da linha selecionada
-                                selected_ref_data = next((ref for ref in available_refs if str(ref['ID']) == related_reference), None)
-                                if selected_ref_data:
-                                    st.info(f"📋 **Linha selecionada:** ID {selected_ref_data['ID']} | {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']}")
+                                    # Mostra detalhes da linha selecionada
+                                    selected_ref_data = next((ref for ref in available_refs if str(ref['ID']) == related_reference), None)
+                                    if selected_ref_data:
+                                        st.info(f"📋 **Linha selecionada:** ID {selected_ref_data['ID']} | {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']}")
                         else:
                             st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
                             related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
