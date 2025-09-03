@@ -835,11 +835,39 @@ def exibir_history():
     df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
     df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
     
-    # Cria as abas
-    tab1, tab2 = st.tabs([
-        f"📋 Pedidos da Empresa ({len(df_other_status)} records)", 
-        f"📨 Retornos do Armador ({len(df_received_carrier)} records)"
-    ])
+    # Função para limpar seleções entre abas (não mais usada, mas mantida para compatibilidade)
+    def clear_tab_selections():
+        """Limpa todas as seleções dos data_editors para evitar conflitos entre abas"""
+        # Esta função não é mais usada, mas mantida para compatibilidade
+        pass
+    
+    # Rótulos das "abas"
+    other_label = f"📋 Pedidos da Empresa ({len(df_other_status)} records)"
+    received_label = f"📨 Retornos do Armador ({len(df_received_carrier)} records)"
+
+    # Controle de "aba" ativa (segmented control) para detectar troca e limpar seleções da outra
+    active_tab_key = f"history_active_tab_{farol_reference}"
+    last_active_tab_key = f"history_last_active_tab_{farol_reference}"
+    if active_tab_key not in st.session_state:
+        st.session_state[active_tab_key] = other_label
+        st.session_state[last_active_tab_key] = other_label
+
+    active_tab = st.segmented_control(
+        "",
+        options=[other_label, received_label],
+        key=active_tab_key
+    )
+
+    # Se detectarmos troca de aba, acionamos flags para limpar seleções da outra
+    prev_tab = st.session_state.get(last_active_tab_key)
+    if prev_tab != active_tab:
+        if active_tab == other_label:
+            # Limpamos seleção da aba Received
+            st.session_state[f"clear_received_selection_{farol_reference}"] = True
+        else:
+            # Limpamos seleção da aba Other
+            st.session_state[f"clear_other_selection_{farol_reference}"] = True
+        st.session_state[last_active_tab_key] = active_tab
 
     # Função para processar e configurar DataFrame
     def process_dataframe(df_to_process, df_show_ref):
@@ -943,101 +971,117 @@ def exibir_history():
                 
         return df_processed
 
-    # Conteúdo da primeira aba - Other Status
-    with tab1:
-        st.info("💼 **Esta aba contém os pedidos de alteração realizados pela empresa. Após o registro, aguarde o retorno do armador.**")
-        df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
-        
-        if df_other_processed is not None:
-            # Configuração das colunas
-            column_config = {
-                "Farol Status": st.column_config.TextColumn(
-                    "Farol Status", disabled=True
-                )
-            }
-            column_config["Selecionar"] = st.column_config.CheckboxColumn(
-                "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+    # Conteúdo da "aba" Pedidos da Empresa
+    st.info("💼 **Esta aba contém os pedidos de alteração realizados pela empresa. Após o registro, aguarde o retorno do armador.**") if active_tab == other_label else None
+    df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
+    edited_df_other = None
+    if df_other_processed is not None and active_tab == other_label:
+        # Configuração das colunas
+        column_config = {
+            "Farol Status": st.column_config.TextColumn(
+                "Farol Status", disabled=True
             )
-            column_config["ID"] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
-            column_config["Linked Reference"] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
-            
-            # Reordena colunas - mantém "Selecionar" como primeira coluna
-            if "Inserted Date" in df_other_processed.columns:
-                other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
-                ordered_cols = ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"] + other_cols
-                existing_cols = [c for c in ordered_cols if c in df_other_processed.columns]
-                df_other_processed = df_other_processed[existing_cols]
+        }
+        column_config["Selecionar"] = st.column_config.CheckboxColumn(
+            "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+        )
+        column_config["ID"] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
+        column_config["Linked Reference"] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
 
-            # Configura colunas para exibição
-            for col in df_other_processed.columns:
-                if col == "Farol Status":
-                    continue
-                if col == "Selecionar":
-                    continue
-                if col == "Inserted Date":
-                    column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
-                elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
-                    column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
-                else:
-                    column_config[col] = st.column_config.TextColumn(col, disabled=True)
+        # Reordena colunas - mantém "Selecionar" como primeira coluna
+        if "Inserted Date" in df_other_processed.columns:
+            other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
+            ordered_cols = ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"] + other_cols
+            existing_cols = [c for c in ordered_cols if c in df_other_processed.columns]
+            df_other_processed = df_other_processed[existing_cols]
 
-            edited_df_other = st.data_editor(
-                df_other_processed,
-        use_container_width=True,
-        hide_index=True,
-        column_config=column_config,
-        disabled=False,
-                key="history_other_status_editor"
+        # Configura colunas para exibição
+        for col in df_other_processed.columns:
+            if col == "Farol Status":
+                continue
+            if col == "Selecionar":
+                continue
+            if col == "Inserted Date":
+                column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+                column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+            else:
+                column_config[col] = st.column_config.TextColumn(col, disabled=True)
+
+        # Verifica se precisa limpar seleções desta aba
+        clear_other_key = f"clear_other_selection_{farol_reference}"
+        clear_other_multiple_key = f"clear_other_multiple_{farol_reference}"
+        if clear_other_key in st.session_state or clear_other_multiple_key in st.session_state:
+            df_other_processed = df_other_processed.copy()
+            df_other_processed["Selecionar"] = False
+            if clear_other_key in st.session_state:
+                del st.session_state[clear_other_key]
+            if clear_other_multiple_key in st.session_state:
+                del st.session_state[clear_other_multiple_key]
+
+        edited_df_other = st.data_editor(
+            df_other_processed,
+            use_container_width=True,
+            hide_index=True,
+            column_config=column_config,
+            disabled=False,
+            key=f"history_other_status_editor_{farol_reference}"
+        )
+
+    # Conteúdo da "aba" Retornos do Armador
+    st.info("📨 **Esta aba contém os retornos do armador com status 'Received from Carrier'. Para aprovar, será necessário informar a referência relacionada da aba 'Pedidos da Empresa'.**") if active_tab == received_label else None
+    df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
+    edited_df_received = None
+    if df_received_processed is not None and active_tab == received_label:
+        # Configuração das colunas
+        column_config = {
+            "Farol Status": st.column_config.TextColumn(
+                "Farol Status", disabled=True
             )
-        else:
-            edited_df_other = None
+        }
+        column_config["Selecionar"] = st.column_config.CheckboxColumn(
+            "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
+        )
 
-    # Conteúdo da segunda aba - Received from Carrier
-    with tab2:
-        st.info("📨 **Esta aba contém os retornos do armador com status 'Received from Carrier'. Para aprovar, será necessário informar a referência relacionada da aba 'Pedidos da Empresa'.**")
-        df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
-        
-        if df_received_processed is not None:
-            # Configuração das colunas
-            column_config = {
-                "Farol Status": st.column_config.TextColumn(
-                    "Farol Status", disabled=True
-                )
-            }
-            column_config["Selecionar"] = st.column_config.CheckboxColumn(
-                "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
-            )
-            
-            # Reordena colunas - mantém "Selecionar" como primeira coluna (ID e Linked Reference ocultos na aba Retornos do Armador)
-            if "Inserted Date" in df_received_processed.columns:
-                other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
-                ordered_cols = ["Selecionar", "Farol Reference", "Inserted Date"] + other_cols
-                existing_cols = [c for c in ordered_cols if c in df_received_processed.columns]
-                df_received_processed = df_received_processed[existing_cols]
+        # Reordena colunas - mantém "Selecionar" como primeira coluna (ID e Linked Reference ocultos na aba Retornos do Armador)
+        if "Inserted Date" in df_received_processed.columns:
+            other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
+            ordered_cols = ["Selecionar", "Farol Reference", "Inserted Date"] + other_cols
+            existing_cols = [c for c in ordered_cols if c in df_received_processed.columns]
+            df_received_processed = df_received_processed[existing_cols]
 
-            # Configura colunas para exibição
-            for col in df_received_processed.columns:
-                if col == "Farol Status":
-                    continue
-                if col == "Selecionar":
-                    continue
-                if col == "Inserted Date":
-                    column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
-                elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
-                    column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
-                else:
-                    column_config[col] = st.column_config.TextColumn(col, disabled=True)
+        # Configura colunas para exibição
+        for col in df_received_processed.columns:
+            if col == "Farol Status":
+                continue
+            if col == "Selecionar":
+                continue
+            if col == "Inserted Date":
+                column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
+                column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+            else:
+                column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
-            edited_df_received = st.data_editor(
-                df_received_processed,
-                use_container_width=True,
-                hide_index=True,
-                column_config=column_config,
-                disabled=False,
-                key="history_received_carrier_editor"
-            )
-        else:
-            edited_df_received = None
+        # Verifica se precisa limpar seleções desta aba
+        clear_received_key = f"clear_received_selection_{farol_reference}"
+        clear_received_multiple_key = f"clear_received_multiple_{farol_reference}"
+        if clear_received_key in st.session_state or clear_received_multiple_key in st.session_state:
+            df_received_processed = df_received_processed.copy()
+            df_received_processed["Selecionar"] = False
+            if clear_received_key in st.session_state:
+                del st.session_state[clear_received_key]
+            if clear_received_multiple_key in st.session_state:
+                del st.session_state[clear_received_multiple_key]
+
+        edited_df_received = st.data_editor(
+            df_received_processed,
+            use_container_width=True,
+            hide_index=True,
+            column_config=column_config,
+            disabled=False,
+            key=f"history_received_carrier_editor_{farol_reference}"
+        )
 
     # Determina qual DataFrame usar baseado na aba ativa
     # Por padrão, usa o primeiro DataFrame disponível
@@ -1230,13 +1274,36 @@ def exibir_history():
     selected_other = edited_df_other[edited_df_other["Selecionar"] == True] if edited_df_other is not None else pd.DataFrame()
     selected_received = edited_df_received[edited_df_received["Selecionar"] == True] if edited_df_received is not None else pd.DataFrame()
     
-    # Determina qual seleção usar (prioriza a primeira com seleção)
-    selected = selected_other if not selected_other.empty else selected_received
-    selected_df = edited_df_other if not selected_other.empty else edited_df_received
-    
+    # Se há seleções em ambas as abas, limpa automaticamente a seleção da aba "other" (prioriza "received")
     if len(selected_other) > 0 and len(selected_received) > 0:
-        st.warning("⚠️ Selecione apenas uma linha em uma das abas para aplicar mudanças.")
-    elif len(selected) > 1:
+        # Limpa a seleção da aba "other" automaticamente usando uma chave de controle
+        clear_other_key = f"clear_other_selection_{farol_reference}"
+        if clear_other_key not in st.session_state:
+            st.session_state[clear_other_key] = True
+            st.rerun()
+    
+    # Verificação adicional: se há múltiplas seleções na mesma aba, limpa todas
+    if len(selected_other) > 1:
+        clear_other_multiple_key = f"clear_other_multiple_{farol_reference}"
+        if clear_other_multiple_key not in st.session_state:
+            st.session_state[clear_other_multiple_key] = True
+            st.rerun()
+    
+    if len(selected_received) > 1:
+        clear_received_multiple_key = f"clear_received_multiple_{farol_reference}"
+        if clear_received_multiple_key not in st.session_state:
+            st.session_state[clear_received_multiple_key] = True
+            st.rerun()
+    
+    # Determina qual seleção usar (prioriza "received" se ambas tiverem seleção)
+    if len(selected_other) > 0 and len(selected_received) > 0:
+        selected = selected_received
+        selected_df = edited_df_received
+    else:
+        selected = selected_other if not selected_other.empty else selected_received
+        selected_df = edited_df_other if not selected_other.empty else edited_df_received
+    
+    if len(selected) > 1:
         st.warning("⚠️ Selecione apenas uma linha para aplicar mudanças.")
     
     # Interface de botões de status para linha selecionada
