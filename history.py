@@ -971,6 +971,8 @@ def exibir_history():
                 
         return df_processed
 
+
+
     # Conteúdo da "aba" Pedidos da Empresa
     st.info("💼 **Esta aba contém os pedidos de alteração realizados pela empresa. Após o registro, aguarde o retorno do armador.**") if active_tab == other_label else None
     df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
@@ -1002,9 +1004,13 @@ def exibir_history():
             if col == "Selecionar":
                 continue
             if col == "Inserted Date":
-                column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+                column_config[col] = st.column_config.DatetimeColumn(
+                    "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
+                )
             elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
-                column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+                column_config[col] = st.column_config.DatetimeColumn(
+                    col, format="YYYY-MM-DD HH:mm", disabled=True
+                )
             else:
                 column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
@@ -1057,9 +1063,13 @@ def exibir_history():
             if col == "Selecionar":
                 continue
             if col == "Inserted Date":
-                column_config[col] = st.column_config.DatetimeColumn("Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True)
+                column_config[col] = st.column_config.DatetimeColumn(
+                    "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
+                )
             elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA"]:
-                column_config[col] = st.column_config.DatetimeColumn(col, format="YYYY-MM-DD HH:mm", disabled=True)
+                column_config[col] = st.column_config.DatetimeColumn(
+                    col, format="YYYY-MM-DD HH:mm", disabled=True
+                )
             else:
                 column_config[col] = st.column_config.TextColumn(col, disabled=True)
 
