@@ -251,6 +251,7 @@ Histórico de retornos e alterações
 - REQUEST_REASON
 - ADJUSTMENTS_OWNER
 - COMMENTS
+- PDF_BOOKING_EMISSION_DATE  -- string "YYYY-MM-DD HH:MM"
 ```
 
 #### `F_CON_ANEXOS`
@@ -294,19 +295,9 @@ graph TD
     E --> F[Status: Received from Carrier]
 ```
 
-### 3. Sistema de Aprovação
-
-```mermaid
-graph TD
-    A[Retorno do Armador] --> B[Seleção de Referência]
-    B --> C{Tipo de Ajuste}
-    C -->|Existente| D[Link com Pedido]
-    C -->|Novo| E[New Adjustment]
-    E --> F[Justificativas]
-    D --> G[Aprovação]
-    F --> G
-    G --> H[Status: Booking Approved]
-```
+- Coleta automática de “PDF Print Date” (ex.: "Print Date:\n2024-09-06 18:23 UTC").
+- Salvamento do campo como string no formato "YYYY-MM-DD HH:MM".
+- Validação de duplicidade: bloqueia processamento se já existir registro com mesma combinação (Farol Reference, Booking Reference, Voyage Carrier, Voyage Code, Vessel Name, PDF Print Date).
 
 ## 🔌 API e Integrações
 
@@ -405,6 +396,16 @@ update_sales_booking_from_return_carriers() # Atualiza dados principais
 - [ ] **Security**: Implementação de 2FA
 - [ ] **Backup**: Sistema automatizado de backup
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
+
+## 🆕 Atualizações Recentes
+
+- Captura automática de "PDF Print Date" em PDFs (Maersk e genéricos) e exibição nas abas do histórico.
+- Persistência do campo `PDF_BOOKING_EMISSION_DATE` como string "YYYY-MM-DD HH:MM".
+- Bloqueio de processamento de PDFs duplicados com base em (Farol Reference, Booking Reference, Voyage Carrier, Voyage Code, Vessel Name, PDF Print Date).
+- Justificativas obrigatórias no "New Adjustment" (Area, Reason, Responsibility, Comentários) na aprovação de "Retornos do Armador".
+- Replicação de Booking Reference e Vessel Name no fluxo de ajustes/split para `F_CON_RETURN_CARRIERS`.
+- Limpeza de cache após aprovações no histórico para refletir imediatamente na grade de `shipments.py`.
+- Renomeado "Splitted Booking Reference" para "Splitted Farol Reference" em todas as grades.
 
 ## 🤝 Contribuição
 

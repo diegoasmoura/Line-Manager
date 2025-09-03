@@ -1151,6 +1151,40 @@ def save_pdf_booking_data(validated_data):
             # Adiciona o nome do PDF aos dados validados
             validated_data["PDF Name"] = pdf_name
         
+        # ====== Validação de duplicidade (com base nos dados coletados) ======
+        try:
+            conn = get_database_connection()
+            dup_sql = text(
+                """
+                SELECT COUNT(*) AS ct
+                  FROM LogTransp.F_CON_RETURN_CARRIERS
+                 WHERE FAROL_REFERENCE = :ref
+                   AND NVL(B_BOOKING_REFERENCE,'') = NVL(:booking,'')
+                   AND NVL(B_VOYAGE_CARRIER,'') = NVL(:carrier,'')
+                   AND NVL(B_VOYAGE_CODE,'') = NVL(:voyage,'')
+                   AND NVL(B_VESSEL_NAME,'') = NVL(:vessel,'')
+                   AND NVL(PDF_BOOKING_EMISSION_DATE,'') = NVL(:pdf_date,'')
+                """
+            )
+            dup_params = {
+                "ref": farol_reference,
+                "booking": (validated_data.get("Booking Reference") or "").strip(),
+                "carrier": (validated_data.get("Voyage Carrier") or "").strip(),
+                "voyage": (validated_data.get("Voyage Code") or "").strip(),
+                "vessel": (validated_data.get("Vessel Name") or "").strip(),
+                # Normaliza o campo de emissão para o formato salvo no banco (YYYY-MM-DD HH:MM)
+                "pdf_date": (str(validated_data.get("PDF Booking Emission Date") or "").replace("UTC", "").replace("UT", "").strip()[:16])
+            }
+            ct = conn.execute(dup_sql, dup_params).scalar() or 0
+            conn.close()
+            if ct > 0:
+                st.warning("⚠️ Este PDF já foi processado para esta Farol Reference com os mesmos dados (Booking/Carrier/Voyage/Vessel/Print Date). Operação cancelada.")
+                return False
+        except Exception as _:
+            # Em caso de falha na checagem, prossegue sem bloquear
+            pass
+        # ====== Fim validação duplicidade ======
+        
         # Usa a função existente de inserção com status "Received from Carrier"
         success = insert_return_carrier_from_ui(validated_data, user_insert="PDF_PROCESSOR", status_override="Received from Carrier")
         
