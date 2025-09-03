@@ -1030,6 +1030,7 @@ def display_pdf_validation_interface(processed_data):
             # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
             validated_data = {
                 "Farol Reference": processed_data["farol_reference"],
+                "Booking Reference": booking_reference,
                 "Voyage Carrier": carrier,
                 "Voyage Code": voyage,
                 "Vessel Name": vessel_name,

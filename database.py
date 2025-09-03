@@ -41,6 +41,7 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
             SELECT 
                 ID,
                 FAROL_REFERENCE,
+                B_BOOKING_REFERENCE,
                 ADJUSTMENT_ID,
                 Linked_Reference,
                 B_BOOKING_STATUS,
@@ -88,6 +89,7 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
             SELECT 
                 ID,
                 FAROL_REFERENCE,
+                B_BOOKING_REFERENCE,
                 ADJUSTMENT_ID,
                 Linked_Reference,
                 B_BOOKING_STATUS,
@@ -1414,6 +1416,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
         
         params = {
             "FAROL_REFERENCE": farol_reference,
+            "B_BOOKING_REFERENCE": norm(ui_row.get("Booking Reference")),
             "ADJUSTMENT_ID": str(uuid.uuid4()),
             "B_BOOKING_STATUS": booking_status,
             "P_STATUS": None,
@@ -1441,6 +1444,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
             """
             INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
                 FAROL_REFERENCE,
+                B_BOOKING_REFERENCE,
                 ADJUSTMENT_ID,
                 B_BOOKING_STATUS,
                 P_STATUS,
@@ -1464,6 +1468,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 USER_INSERT
             ) VALUES (
                 :FAROL_REFERENCE,
+                :B_BOOKING_REFERENCE,
                 :ADJUSTMENT_ID,
                 :B_BOOKING_STATUS,
                 :P_STATUS,
@@ -1608,6 +1613,7 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
             SELECT 
                 ID,
                 FAROL_REFERENCE,
+                B_BOOKING_REFERENCE,
                 ADJUSTMENT_ID,
                 Linked_Reference,
                 B_BOOKING_STATUS,

@@ -797,6 +797,7 @@ def exibir_history():
     display_cols = [
         "ID",
         "FAROL_REFERENCE",
+        "B_BOOKING_REFERENCE",
         "LINKED_REFERENCE",
         "B_BOOKING_STATUS",
         "S_SPLITTED_BOOKING_REFERENCE",
@@ -898,6 +899,7 @@ def exibir_history():
         custom_overrides = {
             "ID": "ID",  # Campo ID visível
             "FAROL_REFERENCE": "Farol Reference",
+            "B_BOOKING_REFERENCE": "Booking",  # Nova coluna de Booking Reference
             "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
             "LINKED_REFERENCE": "Linked Reference",  # Campo para referência relacionada
             "B_BOOKING_STATUS": "Farol Status",
@@ -908,6 +910,7 @@ def exibir_history():
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
+            "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",  # Nome corrigido
             # Aliases para campos de data
             "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
             "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
@@ -992,8 +995,8 @@ def exibir_history():
 
         # Reordena colunas - mantém "Selecionar" como primeira coluna
         if "Inserted Date" in df_other_processed.columns:
-            other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
-            ordered_cols = ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"] + other_cols
+            other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Booking", "Linked Reference", "Inserted Date"]]
+            ordered_cols = ["Selecionar", "ID", "Farol Reference", "Booking", "Linked Reference", "Inserted Date"] + other_cols
             existing_cols = [c for c in ordered_cols if c in df_other_processed.columns]
             df_other_processed = df_other_processed[existing_cols]
 
@@ -1051,8 +1054,8 @@ def exibir_history():
 
         # Reordena colunas - mantém "Selecionar" como primeira coluna (ID e Linked Reference ocultos na aba Retornos do Armador)
         if "Inserted Date" in df_received_processed.columns:
-            other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Linked Reference", "Inserted Date"]]
-            ordered_cols = ["Selecionar", "Farol Reference", "Inserted Date"] + other_cols
+            other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Booking", "Linked Reference", "Inserted Date"]]
+            ordered_cols = ["Selecionar", "Farol Reference", "Booking", "Inserted Date"] + other_cols
             existing_cols = [c for c in ordered_cols if c in df_received_processed.columns]
             df_received_processed = df_received_processed[existing_cols]
 
