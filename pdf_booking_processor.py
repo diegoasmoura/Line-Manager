@@ -810,27 +810,41 @@ def extract_cma_cgm_data(text_content):
         return m.group(1) if m else None
 
     def extract_vessel_voyage_info(text: str):
-        # 1) Preferir "Connecting Vessel / Voyage"
-        m = re.search(r"Connecting\s+Vessel\s*/\s*Voyage\s*:?\s*([^\n]+)", text, re.IGNORECASE)
-        if m:
-            tail = m.group(1).strip()
-            parts = [p.strip() for p in tail.split('/') if p.strip()]
-            vessel = parts[0] if parts else None
-            voyage = parts[1] if len(parts) > 1 else None
-        else:
-            # 2) Fallback: "Vessel / Voyage" ou "INTENDED VESSEL/VOYAGE"
-            m = re.search(r"Vessel\s*/\s*Voyage\s*:?\s*([^\n]+)", text, re.IGNORECASE)
-            if not m:
-                m = re.search(r"INTENDED\s+VESSEL/VOYAGE\s*:?\s*([^\n]+)", text, re.IGNORECASE)
-            if not m:
-                return None, None, None
-            tail = m.group(1)
-            tail = tail.split('ETD:')[0]
-            tail = tail.split(' - ')[0]
-            tail = tail.strip()
-            parts = [p.strip() for p in tail.split('/') if p.strip()]
-            vessel = parts[0] if parts else None
-            voyage = parts[1] if len(parts) > 1 else None
+        # 1) Prioriza "Vessel / Voyage" e permite que o valor esteja na próxima linha
+        vessel = None
+        voyage = None
+        m_hdr = re.search(r"Vessel\s*/\s*Voyage\s*:?", text, re.IGNORECASE)
+        if m_hdr:
+            tail = text[m_hdr.end():]
+            lines = tail.split("\n")
+            candidate = None
+            for ln in lines[:3]:
+                t = (ln or "").strip()
+                if not t:
+                    continue
+                # Pular rótulos "Receipt:", "Alternate Base", etc.
+                if re.search(r"^(Receipt|Alternate\s+Base|Feeder\s+Vessel|Connecting\s+Vessel|Port\s+Of|Final\s+Place|ETD|ETA|Transhipment|Shipper)\b", t, re.IGNORECASE):
+                    continue
+                candidate = t
+                # Se a próxima linha tiver '/', preferir (valor completo)
+                if '/' not in candidate and len(lines) > 1 and '/' in lines[1]:
+                    candidate = lines[1].strip()
+                break
+            if candidate:
+                candidate = re.sub(r"\b(ETD|ETA|Connecting\s+Vessel|Receipt)\b.*$", "", candidate, flags=re.IGNORECASE).strip()
+                parts = [p.strip() for p in candidate.split('/') if p.strip()]
+                if parts:
+                    vessel = parts[0]
+                    if len(parts) > 1:
+                        voyage = parts[1]
+        # 2) Fallback: "Connecting Vessel / Voyage" na mesma linha
+        if not vessel:
+            m = re.search(r"Connecting\s+Vessel\s*/\s*Voyage\s*:?\s*([^\n]+)", text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                tail = m.group(1).strip()
+                parts = [p.strip() for p in tail.split('/') if p.strip()]
+                vessel = parts[0] if parts else None
+                voyage = parts[1] if len(parts) > 1 else None
         # 3) ETD em qualquer lugar do texto
         etd_m = re.search(r"ETD\s*:?\s*(\d{2}\s+\w+\s+\d{4}|\d{2}/\d{2}/\d{4})", text, re.IGNORECASE)
         etd = etd_m.group(1) if etd_m else None
