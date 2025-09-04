@@ -1240,6 +1240,26 @@ def normalize_extracted_data(extracted_data):
             normalized["print_date"] = parsed.strftime("%Y-%m-%d %H:%M:%S")
         else:
             normalized["print_date"] = cleaned
+
+    # Normaliza pdf_print_date (datetime com hora)
+    if "pdf_print_date" in extracted_data:
+        raw = extracted_data["pdf_print_date"] or ""
+        cleaned = raw.replace(" UTC", "").replace(" UT", "").strip()
+        parsed = None
+        # Suportar abreviação de mês e ano com 2 dígitos
+        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d-%b-%y %H:%M", "%d-%b-%Y %H:%M", "%d/%m/%Y %H:%M"]:
+            try:
+                parsed = datetime.strptime(cleaned, fmt)
+                # Corrigir século quando usar %y
+                if "%y" in fmt and parsed.year < 1930:
+                    parsed = parsed.replace(year=2000 + parsed.year % 100)
+                break
+            except Exception:
+                continue
+        if parsed:
+            normalized["pdf_print_date"] = parsed.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            normalized["pdf_print_date"] = cleaned
     
     return normalized
 
@@ -1312,6 +1332,7 @@ def process_pdf_booking(pdf_content, farol_reference):
             "gross_weight": extracted_data.get("gross_weight", ""),
             "document_type": extracted_data.get("document_type", ""),
             "print_date": normalized_data.get("print_date", ""),
+            "pdf_print_date": normalized_data.get("pdf_print_date", normalized_data.get("print_date", "")),
             "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
         }
         
@@ -1460,7 +1481,7 @@ def display_pdf_validation_interface(processed_data):
         with col10:
             pdf_print_date = st.text_input(
                 "PDF Print Date",
-                value=processed_data.get("print_date", ""),
+                value=processed_data.get("pdf_print_date", ""),
                 help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
