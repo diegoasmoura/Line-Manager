@@ -3,6 +3,7 @@
 # Imports principais
 import streamlit as st
 import pandas as pd
+from sqlalchemy import text
 import time
 import uuid
  
@@ -13,7 +14,8 @@ from database import (
     get_data_loadingData,         # Carrega os dados dos embarques na tabela Container Loading
     load_df_udc,                  # Carrega as opções de UDC (dropdowns)
     insert_adjustments_basics,    #Função para inserir ajustes básicos na tabela de log
-    get_actions_count_by_farol_reference  # Conta ações por Farol Reference
+    get_actions_count_by_farol_reference,  # Conta ações por Farol Reference
+    get_database_connection       # Conexão direta para consultas auxiliares
 )
  
 # Importa funções auxiliares de mapeamento e formulários
@@ -160,15 +162,8 @@ def exibir_shipments():
     import re
     def branch_count(ref: str) -> int:
         ref = str(ref)
-        # Conta ações da própria referência
-        total = actions_count.get(ref, 0)
-        # Conta também descendentes diretos/indiretos do ramo
-        prefix = re.escape(ref) + r"\."  # ex.: FR_25.08_0001.  (com ponto)
-        # Varre todas as refs presentes no dicionário e soma as que começam com prefix
-        for r, c in actions_count.items():
-            if r != ref and re.match(rf'^{prefix}', r):
-                total += c
-        return int(total)
+        # Conta apenas registros exatamente existentes no Carrier Returns
+        return int(actions_count.get(ref, 0))
 
     df["Actions Count"] = df[farol_ref_col].apply(branch_count).astype(int)
 
@@ -193,16 +188,37 @@ def exibir_shipments():
     if "Farol Status" in df.columns:
         status_series = df["Farol Status"].astype(str).str.strip().str.lower()
         booking_requested = int((status_series == "booking requested").sum())
+        # valor base (fallback) a partir da grade
         received_from_carrier = int((status_series == "received from carrier").sum())
         pending_adjustments = int((status_series == "adjustment requested").sum())
     else:
         booking_requested = received_from_carrier = pending_adjustments = 0
     total_visible = int(len(df))
 
+    # Ajuste: contar "Received from Carrier" apenas na F_CON_RETURN_CARRIERS com Status = 'Received from Carrier'
+    try:
+        refs = df[farol_ref_col].dropna().astype(str).unique().tolist()
+        if refs:
+            conn = get_database_connection()
+            placeholders = ",".join([f":r{i}" for i in range(len(refs))])
+            params = {f"r{i}": r for i, r in enumerate(refs)}
+            params.update({"status": "Received from Carrier"})
+            sql_rc = text(
+                f"SELECT COUNT(*) AS c FROM LogTransp.F_CON_RETURN_CARRIERS \n"
+                f"WHERE UPPER(status) = UPPER(:status) AND farol_reference IN ({placeholders})"
+            )
+            res = conn.execute(sql_rc, params).fetchone()
+            conn.close()
+            if res and res[0] is not None:
+                received_from_carrier = int(res[0])
+    except Exception:
+        # mantém o fallback calculado pela grade
+        pass
+
     with k1:
         st.metric("📋 Booking Requested", booking_requested)
     with k2:
-        st.metric("📨 Received from Voyage Carrier", received_from_carrier)
+        st.metric("📨 Received from Carrier", received_from_carrier)
     with k3:
         st.metric("📦 Total (grid)", total_visible)
     with k4:
@@ -251,8 +267,7 @@ def exibir_shipments():
     column_config["Actions Count"] = st.column_config.NumberColumn(
         "Actions Count", 
         help="Number of actions/records in the history for this Farol Reference",
-        format="%d",
-        width="small"
+        format="%d"
     )
 
     # Reordena colunas e posiciona "Actions Count" após "Farol Status"
@@ -276,6 +291,19 @@ def exibir_shipments():
             colunas_ordenadas.remove("Voyage Code")
             idx_carrier = colunas_ordenadas.index("Voyage Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
+
+    # Fixar largura da coluna Actions Count aproximadamente ao tamanho do título
+    if "Actions Count" in colunas_ordenadas:
+        idx_actions = colunas_ordenadas.index("Actions Count") + 1  # nth-child é 1-based
+        actions_css = (
+            f"[data-testid='stDataEditor'] thead th:nth-child({idx_actions}),"
+            f"[data-testid='stDataEditor'] tbody td:nth-child({idx_actions}),"
+            f"[data-testid='stDataFrame'] thead th:nth-child({idx_actions}),"
+            f"[data-testid='stDataFrame'] tbody td:nth-child({idx_actions}) {{"
+            " width: 14ch !important; min-width: 14ch !important; max-width: 14ch !important;"
+            " }}"
+        )
+        st.markdown(f"<style>{actions_css}</style>", unsafe_allow_html=True)
 
     # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
     editable_cols = []
@@ -301,6 +329,8 @@ def exibir_shipments():
             ]
         css = ", ".join(selectors) + " { background-color: #FFF8E1 !important; }"
         st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+    # Removido seletor de espaçamento para manter padrão
  
     # Guarda cópias sem a coluna "Select" para comparação
     df_filtered_original = df.drop(columns=["Select"], errors="ignore").copy()

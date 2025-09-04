@@ -234,7 +234,7 @@ def drop_downs(data_show, df_udc):
         "Farol Status": True,
         "Type of Shipment": True,
         "Container Type": True,
-        "Port of Delivery POD": True,
+        "Port of Delivery POD": True,  # Obrigatório na grade principal (Sales)
         "Business": True,
         "Mode": True,
         "SKU": True,
@@ -257,6 +257,14 @@ def drop_downs(data_show, df_udc):
 
         if editor_type == "select" and col in dropdown_options:
             required_field = campos_obrigatorios.get(col, False)
+            # Tornar 'Port of Loading POL' obrigatório apenas quando a grade é de Booking
+            if col == "Port of Loading POL":
+                is_booking_view = (
+                    "Booking Status" in data_show.columns
+                    or "Booking Reference" in data_show.columns
+                    or "Voyage Carrier" in data_show.columns
+                )
+                required_field = bool(is_booking_view)
             column_config[col] = st.column_config.SelectboxColumn(
                 label=col,
                 options=dropdown_options[col],
