@@ -152,6 +152,48 @@ CARRIER_PATTERNS = {
             r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
         ],
     },
+    "CMA CGM": {
+        "booking_reference": [
+            r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9\-]{6,20})",
+            r"e[ -]?Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9\-]{6,20})",
+            r"BOOKING\s+CONFIRMATION\s*N[°o]?\s*[:\-]?\s*([A-Z0-9\-]{6,20})",
+            r"Reference\s+No\.?\s*[:\-]?\s*([A-Z0-9\-]{6,20})",
+        ],
+        "vessel_name": [
+            r"Vessel\s*/\s*Voyage\s*[:\-]?\s*([^\n/]+?)\s*/\s*[A-Z0-9\-]+",
+            r"Vessel\s*[:\-]?\s*([A-Z0-9\s\-]+)",
+        ],
+        "voyage": [
+            r"Vessel\s*/\s*Voyage\s*[:\-]?\s*[^\n/]+?\s*/\s*([A-Z0-9\-]+)",
+            r"Voyage\s*[:\-]?\s*([A-Z0-9\-]+)",
+        ],
+        "quantity": [
+            r"(\d+)\s*[xX]\s*(?:20|40|45)[\s']*(?:HC|DV|DRY|GP|REEFER|RF|RH)?",
+            r"Equipment\s*[:\-]?\s*(\d+)\s*[xX]",
+            r"Quantity\s*[:\-]?\s*(\d+)",
+        ],
+        "pol": [
+            r"Port\s+of\s+Loading\s*[:\-]?\s*([A-Z\s,\-]+)",
+            r"Load\s+Port\s*[:\-]?\s*([A-Z\s,\-]+)",
+            r"Place\s+of\s+Receipt\s*[:\-]?\s*([A-Z\s,\-]+)",
+        ],
+        "pod": [
+            r"Port\s+of\s+Discharge\s*[:\-]?\s*([A-Z\s,\-]+)",
+            r"Discharge\s+Port\s*[:\-]?\s*([A-Z\s,\-]+)",
+            r"Final\s+Destination\s*[:\-]?\s*([A-Z\s,\-]+)",
+        ],
+        "etd": [
+            r"ETD\s*[:\-]?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})",
+        ],
+        "eta": [
+            r"ETA\s*[:\-]?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})",
+        ],
+        "print_date": [
+            r"Printed\s+on\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)",
+            r"Date\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)",
+            r"Emission\s+Date\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})",
+        ],
+    },
     "GENERIC": {  # Padrões genéricos para outros armadores
         "booking_reference": [
             r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9]{6,15})",
@@ -215,29 +257,46 @@ def extract_text_from_pdf(pdf_file):
         str: Texto extraído do PDF
     """
     if not PDF_AVAILABLE:
-        return None
-    
+        return ""
+
     try:
-        # Se é bytes, cria um file-like object
+        text = ""
+        # Caso 1: bytes
         if isinstance(pdf_file, bytes):
             from io import BytesIO
-            pdf_file = BytesIO(pdf_file)
-        
-        # Reseta o ponteiro para o início
-        pdf_file.seek(0)
-        
-        text = ""
-        with pdfplumber.open(pdf_file) as pdf:
+            bio = BytesIO(pdf_file)
+            bio.seek(0)
+            with pdfplumber.open(bio) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+            return text.strip()
+
+        # Caso 2: file-like object (tem read/seek)
+        if hasattr(pdf_file, "read"):
+            try:
+                pdf_file.seek(0)
+            except Exception:
+                pass
+            with pdfplumber.open(pdf_file) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+            return text.strip()
+
+        # Caso 3: caminho de arquivo (str ou path-like)
+        with pdfplumber.open(str(pdf_file)) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
-        
         return text.strip()
-    
-    except Exception as e:
-        st.error(f"Erro ao extrair texto do PDF: {str(e)}")
-        return None
+
+    except Exception:
+        # Em modo não-Streamlit, evitar st.error para não poluir logs
+        return ""
 
 def identify_carrier(text):
     """
@@ -724,18 +783,322 @@ def extract_msc_data(text_content):
 def extract_cma_cgm_data(text_content):
     """Extrai dados específicos para PDFs da CMA CGM"""
     data = {}
-    
-    # Usar padrões específicos da CMA CGM
-    patterns = CARRIER_PATTERNS["GENERIC"]  # Usar padrões genéricos por enquanto
-    
-    # Extrair dados básicos
-    for field, pattern_list in patterns.items():
-        for pattern in pattern_list:
-            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
-            if match:
-                data[field] = match.group(1).strip()
+
+    # Helpers baseados no seu CMA.py
+    def extract_city_only(value: str):
+        if not value:
+            return None
+        s = str(value)
+        s = re.split(r"\bET[AD]:", s, maxsplit=1)[0]
+        # Remove caudas de cut-off/fechamento caso venham na mesma linha
+        s = re.sub(r"\b(?:SI|eSI|CY)\s*Cut[- ]?Off.*$", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bCut[- ]?Off.*$", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bClosing\s+Date.*$", "", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bYard.*$", "", s, flags=re.IGNORECASE)
+        if "|" in s:
+            s = s.split("|")[0]
+        s = re.sub(r"^(?:PORT OF|PORTO DE|PORTO|POD|POL|PLACE OF RECEIPT)\s*:?\s*", "", s, flags=re.IGNORECASE)
+        s = s.replace(" / ", ", ").replace("/", ", ")
+        s = re.sub(r"\s+", " ", s).strip(" ,")
+        city = s.split(",")[0].strip()
+        return city.title() if city else None
+
+    def extract_date(value: str):
+        if not value:
+            return None
+        m = re.search(r"(\d{2}/\d{2}/\d{4}|\d{2} \w{3} \d{4})", value)
+        return m.group(1) if m else None
+
+    def extract_vessel_voyage_info(text: str):
+        # 1) Preferir "Connecting Vessel / Voyage"
+        m = re.search(r"Connecting\s+Vessel\s*/\s*Voyage\s*:?\s*([^\n]+)", text, re.IGNORECASE)
+        if m:
+            tail = m.group(1).strip()
+            parts = [p.strip() for p in tail.split('/') if p.strip()]
+            vessel = parts[0] if parts else None
+            voyage = parts[1] if len(parts) > 1 else None
+        else:
+            # 2) Fallback: "Vessel / Voyage" ou "INTENDED VESSEL/VOYAGE"
+            m = re.search(r"Vessel\s*/\s*Voyage\s*:?\s*([^\n]+)", text, re.IGNORECASE)
+            if not m:
+                m = re.search(r"INTENDED\s+VESSEL/VOYAGE\s*:?\s*([^\n]+)", text, re.IGNORECASE)
+            if not m:
+                return None, None, None
+            tail = m.group(1)
+            tail = tail.split('ETD:')[0]
+            tail = tail.split(' - ')[0]
+            tail = tail.strip()
+            parts = [p.strip() for p in tail.split('/') if p.strip()]
+            vessel = parts[0] if parts else None
+            voyage = parts[1] if len(parts) > 1 else None
+        # 3) ETD em qualquer lugar do texto
+        etd_m = re.search(r"ETD\s*:?\s*(\d{2}\s+\w+\s+\d{4}|\d{2}/\d{2}/\d{4})", text, re.IGNORECASE)
+        etd = etd_m.group(1) if etd_m else None
+        return vessel, voyage, etd
+
+    def extract_container_info(text: str):
+        # Captura formatos como: "8 x 40'HC", "8x40 HC", "8 × 40'HC"
+        m = re.search(r"(\d+)\s*[xX×]\s*(20|40|45)\s*['’]?\s*([A-Za-z]{2,})", text)
+        if m:
+            qty = m.group(1)
+            size = m.group(2)
+            ctype = m.group(3)
+            return qty, f"{size}{ctype.upper()}"
+        # Fallback: "8 containers 40HC" ou similares
+        m = re.search(r"(\d+)\s*(?:containers?|cntr|ctr)[^\n]*?(20|40|45)\s*['’]?\s*([A-Za-z]{2,})", text, re.IGNORECASE)
+        if m:
+            qty = m.group(1)
+            size = m.group(2)
+            ctype = m.group(3)
+            return qty, f"{size}{ctype.upper()}"
+        return None, None
+
+    # 1) Booking reference
+    booking_patterns = CARRIER_PATTERNS["CMA CGM"]["booking_reference"] + [
+        r"BOOKING\s+NUMBER\s*:?\s*([\w-]+)",
+        r"Booking\s+No\.?\s*:?\s*([\w-]+)",
+    ]
+    for pat in booking_patterns:
+        m = re.search(pat, text_content, re.IGNORECASE)
+        if m:
+            data["booking_reference"] = m.group(1).strip()
+            break
+
+    # 2) Vessel / Voyage / ETD
+    vessel, voyage, etd = extract_vessel_voyage_info(text_content)
+    if vessel:
+        data["vessel_name"] = vessel
+    if voyage:
+        data["voyage"] = voyage
+    if etd:
+        data["etd"] = etd
+
+    # 3) POL
+    # Preferir capturar a primeira linha útil após "Port Of Loading:", ignorando rótulos como "Loading Terminal:"
+    anchor = re.search(r"Port\s+Of\s+Loading\s*:?", text_content, re.IGNORECASE)
+    if anchor:
+        tail = text_content[anchor.end():]
+        lines = tail.split("\n")
+        for line in lines[:12]:  # procura nas próximas linhas
+            candidate = line.strip()
+            if not candidate:
+                continue
+            if re.search(r"Loading\s+Terminal\s*:?", candidate, re.IGNORECASE):
+                # Coleta as próximas linhas úteis para o terminal (ex.: "SALVADOR" e depois "TECON SALVADOR")
+                # Vamos selecionar a última linha não vazia até encontrar outro rótulo
+                idx = lines.index(line)
+                terminal_candidates = []
+                for ln in lines[idx+1:idx+6]:
+                    t = ln.strip()
+                    if not t:
+                        continue
+                    if t.endswith(":") or re.search(r"(Ramp|Transhipment|Port\s+Of\s+Discharge|Final\s+Place|Earliest|SI\s*Cut|VGM\s*Cut|CY\s*Cut|Port\s*Cut|ETD|ETA|FPD)", t, re.IGNORECASE):
+                        break
+                    terminal_candidates.append(t)
+                if terminal_candidates:
+                    # Escolhe o candidato mais longo (provável terminal + cidade, ex.: TECON SALVADOR)
+                    best = max(terminal_candidates, key=len)
+                    data["port_terminal_city"] = best
+                continue
+            if candidate.endswith(":"):
+                continue
+            pol_city = extract_city_only(candidate)
+            if pol_city:
+                data["pol"] = pol_city
                 break
-    
+    # Fallback para padrões simples em linha única
+    if "pol" not in data:
+        for pat in [r"PORT OF LOADING\s*:?\s*([^\n]+)", r"POL\s*:?\s*([^\n]+)"]:
+            m = re.search(pat, text_content, re.IGNORECASE)
+            if m:
+                pol_city = extract_city_only(m.group(1))
+                if pol_city:
+                    data["pol"] = pol_city
+                    break
+
+    # 4) POD
+    # Caso 1: valor na mesma linha (só se não for outro rótulo)
+    for pat in [r"PORT OF DISCHARGE\s*:?\s*([^\n]+)", r"POD\s*:?\s*([^\n]+)"]:
+        m = re.search(pat, text_content, re.IGNORECASE)
+        if m and m.group(1).strip():
+            candidate = m.group(1).strip()
+            # Ignora se for outro rótulo
+            if not (candidate.endswith(":") or re.search(r"(Final\s+Place|Loading\s+Terminal|Transhipment|Earliest|Cut.*Off)", candidate, re.IGNORECASE)):
+                pod_city = extract_city_only(candidate)
+                if pod_city:
+                    data["pod"] = pod_city
+                    break
+    # Caso 2: valor em linhas subsequentes após "Port Of Discharge:" ou após "Final Place Of Delivery:" (ex.: duas linhas: POD e FINAL)
+    if "pod" not in data:
+        # Procura o padrão onde POD e Final Destination aparecem em sequência
+        # Port Of Discharge:
+        # Final Place Of Delivery:
+        # SANTOS
+        # HAIPHONG
+        pod_anchor = re.search(r"Port\s+Of\s+Discharge\s*:?\s*\n\s*Final\s+Place\s+Of\s+Delivery\s*:?", text_content, re.IGNORECASE)
+        if pod_anchor:
+            tail = text_content[pod_anchor.end():]
+            lines = tail.split("\n")
+            values = []
+            for ln in lines[:10]:
+                t = ln.strip()
+                if not t:
+                    continue
+                if t.endswith(":") or re.search(r"(Earliest|SI\s*Cut|VGM\s*Cut|CY\s*Cut|Port\s*Cut|ETD|ETA|FPD|Remarks)", t, re.IGNORECASE):
+                    break
+                values.append(t)
+                if len(values) >= 2:
+                    break
+            if values:
+                if len(values) >= 1:
+                    pod_city = extract_city_only(values[0])
+                    if pod_city:
+                        data["pod"] = pod_city
+                if len(values) >= 2:
+                    fin_city = extract_city_only(values[1])
+                    if fin_city:
+                        data["final_destination"] = fin_city
+
+    # 5) Transhipment Port (ignora se DIRECT)
+    m = re.search(r"TRANSSHIPMENT PORT\s*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+    if m:
+        raw = m.group(1)
+        if not re.search(r"DIRECT", raw, re.IGNORECASE):
+            trans_city = extract_city_only(raw)
+            if trans_city:
+                data["transhipment_port"] = trans_city
+    else:
+        # Alternativa: rótulo simples "Transhipment:" seguido por valor em linha subsequente ou vazio
+        m2 = re.search(r"Transhipment\s*:\s*([^\n]*)", text_content, re.IGNORECASE)
+        if m2:
+            raw = m2.group(1).strip()
+            # Ignora se for outro rótulo ou vazio
+            if raw and not re.search(r"DIRECT", raw, re.IGNORECASE) and not (raw.endswith(":") or re.search(r"(Port\s+Of\s+Discharge|Final\s+Place|Loading|Cut.*Off)", raw, re.IGNORECASE)):
+                trans_city = extract_city_only(raw)
+                if trans_city:
+                    data["transhipment_port"] = trans_city
+            # Se Transhipment: está vazio, não tenta extrair nada (deixa para fallback)
+    # Sanitiza transhipment: se vazia/indefinida ou igual a Final, usar POD
+    if (not data.get("transhipment_port")) and data.get("pod"):
+        data["transhipment_port"] = data["pod"]
+    if data.get("transhipment_port") and data.get("final_destination") and data["transhipment_port"].lower() == data["final_destination"].lower() and data.get("pod"):
+        data["transhipment_port"] = data["pod"]
+    # Sanitiza transhipment: ignora frases genéricas, usa POD se necessário
+    def _looks_invalid_trans(v: str) -> bool:
+        if not v:
+            return True
+        if "(" in v or ")" in v:
+            return True
+        if re.search(r"Shall\s+Be\s+Clearly\s+Stated", v, re.IGNORECASE):
+            return True
+        # muitas palavras minúsculas indica frase e não porto
+        lw = re.findall(r"\b[a-z]{3,}\b", v)
+        return len(lw) >= 3
+    if ("transhipment_port" not in data or _looks_invalid_trans(str(data.get("transhipment_port", "")))) and data.get("pod"):
+        data["transhipment_port"] = data["pod"]
+    # Se transhipment inválido/ausente e houver POD diferente de Final, usar POD como transhipment
+    def _looks_invalid_trans(v: str) -> bool:
+        if not v:
+            return True
+        if "(" in v or ")" in v:
+            return True
+        lw = re.findall(r"\b[a-z]{3,}\b", v)
+        return len(lw) >= 3
+    if ("transhipment_port" not in data or _looks_invalid_trans(str(data.get("transhipment_port", "")))) and data.get("pod") and data.get("final_destination") and data["pod"].lower() != data["final_destination"].lower():
+        data["transhipment_port"] = data["pod"]
+
+    # 6) Final Destination (ignora se igual a POD ou transhipment)
+    # Suporta também "Final Place Of Delivery"
+    m = re.search(r"FINAL DESTINATION\s*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+    if not m:
+        m = re.search(r"FINAL\s+PLACE\s+OF\s+DELIVERY\s*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+    if m:
+        city = extract_city_only(m.group(1))
+        if city and data.get("pod") and city.lower() == data["pod"].lower():
+            city = None
+        if city and data.get("transhipment_port") and city.lower() == data["transhipment_port"].lower():
+            city = None
+        if city:
+            data["final_destination"] = city
+
+    # 7) Quantidade e tipo de contêiner
+    qty, ctype = extract_container_info(text_content)
+    if qty:
+        data["quantity"] = qty
+    if ctype:
+        data["container_type"] = ctype
+
+    # 8) Port Terminal City (captura em linha)
+    if "port_terminal_city" not in data:
+        m_lt = re.search(r"Loading\s+Terminal\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
+        if m_lt:
+            val = m_lt.group(1)
+            # Remover rótulos subsequentes na mesma linha
+            val = re.sub(r"\s*(?:SI|eSI|CY|VGM|Port)\s*Cut[- ]?Off.*$", "", val, flags=re.IGNORECASE)
+            val = re.split(r"\b(?:ETD|ETA|Transhipment|Port\s+Of\s+Discharge|Final\s+Place|Remarks)\b", val, maxsplit=1, flags=re.IGNORECASE)[0]
+            val = re.sub(r"\s+", " ", val).strip(" ,:")
+            if val:
+                data["port_terminal_city"] = val
+
+    # 9) Deadlines: DocCut e PortCut
+    for pat in [r"SI/?eSI CUT-OFF\s*:?\s*([^\n]+)", r"DOC(?:UMENT)? CUT-?OFF\s*:?\s*([^\n]+)"]:
+        m = re.search(pat, text_content, re.IGNORECASE)
+        if m:
+            dc = extract_date(m.group(1))
+            if dc:
+                data["doc_cut"] = dc
+                break
+
+    for pat in [r"CY CUT-?OFF\s*:?\s*([^\n]+)", r"Closing Date Yard\s*:?\s*([^\n]+)"]:
+        m = re.search(pat, text_content, re.IGNORECASE)
+        if m:
+            pc = extract_date(m.group(1))
+            if pc:
+                data["port_cut"] = pc
+                break
+
+    # 9) ETD/ETA suportando dd-MON-YYYY HH:MM em mesma linha ou na linha seguinte
+    # ETD (primeira ocorrência)
+    etd_matches = re.findall(r"ETD\s*:?\s*([0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?|[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?)", text_content, re.IGNORECASE | re.MULTILINE)
+    if not etd_matches:
+        m_lbl = re.search(r"ETD\s*:\s*\n\s*([^\n]+)", text_content, re.IGNORECASE)
+        if m_lbl:
+            etd_matches = [m_lbl.group(1).strip()]
+    if etd_matches:
+        data["etd"] = etd_matches[0].strip()
+
+    # ETA (última ocorrência)
+    eta_matches = re.findall(r"ETA\s*:?\s*([0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?|[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?)", text_content, re.IGNORECASE | re.MULTILINE)
+    if not eta_matches:
+        m_lbl = re.finditer(r"ETA\s*:\s*\n\s*([^\n]+)", text_content, re.IGNORECASE)
+        eta_matches = [m.group(1).strip() for m in m_lbl]
+    if eta_matches:
+        data["eta"] = eta_matches[-1].strip()
+
+    # 10) Booking/Print date (CMA usa frequentemente a palavra 'Run' com data curta)
+    # Preferir linha com "Run <dd-MON-yy HH:MM>"
+    m = re.search(r"\bRun\b\s*[:\-]?\s*([0-9]{2}-[A-Za-z]{3}-[0-9]{2,4}\s+[0-9]{2}:[0-9]{2})", text_content, re.IGNORECASE)
+    if not m:
+        # Suporta quebra de linha após 'Run:'
+        m = re.search(r"\bRun\b\s*[:\-]?\s*\n\s*([0-9]{2}-[A-Za-z]{3}-[0-9]{2,4}\s+[0-9]{2}:[0-9]{2})", text_content, re.IGNORECASE)
+    if not m:
+        # Fallback: rótulo DATE comum
+        m = re.search(r"\bDATE\s*:?\s*(\d{2}\s+\w+\s+\d{4}|\d{2}/\d{2}/\d{4})", text_content, re.IGNORECASE)
+    if m:
+        data["pdf_print_date"] = m.group(1).strip()
+
+    # Detectar tipo de documento
+    for keyword, label in [("BOOKING CONFIRMATION", "BOOKING CONFIRMATION"), ("BOOKING AMENDMENT", "BOOKING AMENDMENT"), ("BOOKING CANCELLATION", "BOOKING CANCELLATION")]:
+        if keyword in text_content.upper():
+            data["document_type"] = label
+            break
+
+    # Limpar campos de porto para formato consistente
+    if "pol" in data:
+        data["pol"] = clean_port_field(data["pol"]) or data["pol"]
+    if "pod" in data:
+        data["pod"] = clean_port_field(data["pod"]) or data["pod"]
+
     return data
 
 def extract_cosco_data(text_content):
@@ -852,7 +1215,7 @@ def normalize_extracted_data(extracted_data):
             date_str = extracted_data[date_field]
             try:
                 # Tenta diferentes formatos de data
-                for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y", "%d/%m/%y", "%d-%m-%y"]:
+                for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y", "%d/%m/%y", "%d-%m-%y", "%d-%b-%Y", "%d-%b-%Y %H:%M"]:
                     try:
                         date_obj = datetime.strptime(date_str, fmt)
                         normalized[date_field] = date_obj.strftime("%Y-%m-%d")
@@ -867,7 +1230,7 @@ def normalize_extracted_data(extracted_data):
         raw = extracted_data["print_date"] or ""
         cleaned = raw.replace(" UTC", "").replace(" UT", "").strip()
         parsed = None
-        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"]:
+        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d-%b-%y %H:%M", "%d-%b-%Y %H:%M"]:
             try:
                 parsed = datetime.strptime(cleaned, fmt)
                 break
@@ -943,6 +1306,8 @@ def process_pdf_booking(pdf_content, farol_reference):
             "pod": normalized_data.get("pod", ""),
             "etd": normalized_data.get("etd", ""),
             "eta": normalized_data.get("eta", ""),
+            "transhipment_port": extracted_data.get("transhipment_port", ""),
+            "port_terminal_city": extracted_data.get("port_terminal_city", ""),
             "cargo_type": extracted_data.get("cargo_type", ""),
             "gross_weight": extracted_data.get("gross_weight", ""),
             "document_type": extracted_data.get("document_type", ""),
@@ -1025,6 +1390,20 @@ def display_pdf_validation_interface(processed_data):
                 "Porto de Destino (POD)",
                 value=processed_data.get("pod", ""),
                 help="Port of Discharge"
+            )
+        # Linha adicional: Transhipment Port e Port Terminal City
+        col6b, col7b = st.columns(2)
+        with col6b:
+            transhipment_port = st.text_input(
+                "Transhipment Port",
+                value=processed_data.get("transhipment_port", ""),
+                help="Porto de transbordo (se houver)"
+            )
+        with col7b:
+            port_terminal_city = st.text_input(
+                "Port Terminal City",
+                value=processed_data.get("port_terminal_city", ""),
+                help="Cidade do terminal portuário"
             )
         
         # Converte datas do formato DD/MM/YYYY para datetime
@@ -1110,8 +1489,8 @@ def display_pdf_validation_interface(processed_data):
                 "Port of Delivery POD": pod,
                 "Place of Receipt": pol,
                 "Final Destination": pod,
-                "Transhipment Port": "",
-                "Port Terminal City": "",
+                "Transhipment Port": transhipment_port,
+                "Port Terminal City": port_terminal_city,
                 "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",
                 "Requested Deadline End Date": etd.strftime("%Y-%m-%d") if etd else "",
                 "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",
