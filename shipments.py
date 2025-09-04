@@ -157,15 +157,39 @@ def exibir_shipments():
       # Filtro removido - agora todos os splits são visíveis na grade
     # Os splits podem ser gerenciados através do histórico
 
-    # Adiciona coluna com contagem de ações do histórico (por ramo)
-    actions_count = get_actions_count_by_farol_reference()  # ref exata -> count
-    import re
+    # Adiciona coluna com contagem de registros recebidos dos carriers
+    def get_carrier_returns_count(refs):
+        try:
+            conn = get_database_connection()
+            placeholders = ",".join([f":r{i}" for i in range(len(refs))])
+            params = {f"r{i}": r for i, r in enumerate(refs)}
+            params["status"] = "Received from Carrier"
+            
+            sql = text(f"""
+                SELECT farol_reference, COUNT(*) as count
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE UPPER(B_BOOKING_STATUS) = UPPER(:status)
+                AND farol_reference IN ({placeholders})
+                GROUP BY farol_reference
+            """)
+            
+            result = conn.execute(sql, params).fetchall()
+            conn.close()
+            
+            # Monta dicionário {ref: count}
+            return {ref: count for ref, count in result}
+        except Exception:
+            return {}  # fallback seguro
+
+    # Busca contagens para todas as referências visíveis
+    refs = df[farol_ref_col].dropna().astype(str).unique().tolist()
+    actions_count = get_carrier_returns_count(refs) if refs else {}
+
     def branch_count(ref: str) -> int:
         ref = str(ref)
-        # Conta apenas registros exatamente existentes no Carrier Returns
         return int(actions_count.get(ref, 0))
 
-    df["Actions Count"] = df[farol_ref_col].apply(branch_count).astype(int)
+    df["Carrier Returns"] = df[farol_ref_col].apply(branch_count).astype(int)
 
     previous_stage = st.session_state.get("previous_stage")
     unsaved_changes = st.session_state.get("changes") is not None and not st.session_state["changes"].empty
@@ -232,9 +256,9 @@ def exibir_shipments():
     # Garante que Splitted Booking Reference esteja visível porém somente leitura
     if "Splitted Booking Reference" not in disabled_columns:
         disabled_columns.append("Splitted Booking Reference")
-    # Garante que Actions Count seja somente leitura
-    if "Actions Count" not in disabled_columns:
-        disabled_columns.append("Actions Count")
+    # Garante que Carrier Returns seja somente leitura
+    if "Carrier Returns" not in disabled_columns:
+        disabled_columns.append("Carrier Returns")
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
     # Configuração explícita para exibir como texto somente leitura
@@ -263,21 +287,21 @@ def exibir_shipments():
     # Garante que a coluna Farol Reference está pinada à esquerda
     column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
     
-    # Configuração da coluna Actions Count
-    column_config["Actions Count"] = st.column_config.NumberColumn(
-        "Actions Count", 
-        help="Number of actions/records in the history for this Farol Reference",
+    # Configuração da coluna Carrier Returns
+    column_config["Carrier Returns"] = st.column_config.NumberColumn(
+        "Carrier Returns", 
+        help="Number of returns received from carriers (status 'Received from Carrier')",
         format="%d"
     )
 
-    # Reordena colunas e posiciona "Actions Count" após "Farol Status"
+    # Reordena colunas e posiciona "Carrier Returns" após "Farol Status"
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
     
-    # Posiciona "Actions Count" após "Farol Status"
-    if "Actions Count" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
-        colunas_ordenadas.remove("Actions Count")
+    # Posiciona "Carrier Returns" após "Farol Status"
+    if "Carrier Returns" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
+        colunas_ordenadas.remove("Carrier Returns")
         idx_status = colunas_ordenadas.index("Farol Status")
-        colunas_ordenadas.insert(idx_status + 1, "Actions Count")
+        colunas_ordenadas.insert(idx_status + 1, "Carrier Returns")
     
             # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
         if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
@@ -292,18 +316,18 @@ def exibir_shipments():
             idx_carrier = colunas_ordenadas.index("Voyage Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
 
-    # Fixar largura da coluna Actions Count aproximadamente ao tamanho do título
-    if "Actions Count" in colunas_ordenadas:
-        idx_actions = colunas_ordenadas.index("Actions Count") + 1  # nth-child é 1-based
-        actions_css = (
-            f"[data-testid='stDataEditor'] thead th:nth-child({idx_actions}),"
-            f"[data-testid='stDataEditor'] tbody td:nth-child({idx_actions}),"
-            f"[data-testid='stDataFrame'] thead th:nth-child({idx_actions}),"
-            f"[data-testid='stDataFrame'] tbody td:nth-child({idx_actions}) {{"
+    # Fixar largura da coluna Carrier Returns aproximadamente ao tamanho do título
+    if "Carrier Returns" in colunas_ordenadas:
+        idx_returns = colunas_ordenadas.index("Carrier Returns") + 1  # nth-child é 1-based
+        returns_css = (
+            f"[data-testid='stDataEditor'] thead th:nth-child({idx_returns}),"
+            f"[data-testid='stDataEditor'] tbody td:nth-child({idx_returns}),"
+            f"[data-testid='stDataFrame'] thead th:nth-child({idx_returns}),"
+            f"[data-testid='stDataFrame'] tbody td:nth-child({idx_returns}) {{"
             " width: 14ch !important; min-width: 14ch !important; max-width: 14ch !important;"
             " }}"
         )
-        st.markdown(f"<style>{actions_css}</style>", unsafe_allow_html=True)
+        st.markdown(f"<style>{returns_css}</style>", unsafe_allow_html=True)
 
     # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
     editable_cols = []
