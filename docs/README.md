@@ -229,6 +229,19 @@ O fluxo principal é controlado pelo arquivo `app.py`, que direciona para os mó
 - **History**: Visualização do ciclo de vida dos tickets, aprovação de alterações e rastreabilidade completa via ADJUSTMENT_ID. Interface aprimorada com detecção automática de mudanças e propagação precisa de dados.
 - **Operation Control, Performance, Tracking, Setup**: (Placeholders para futuras implementações)
 
+## 📊 Performance Control (estado atual)
+
+O módulo de Performance está em desenvolvimento (placeholder) e, no momento, não possui gráficos nem métricas ativas na interface.
+
+Planejamento (sujeito a mudanças, ainda não implementado):
+- Visão de Status (distribuição por Farol Status)
+- Timeline de volumes (mensal/semanal, comparação ano a ano)
+- Tempo médio entre etapas (KPIs por status)
+- Análise por localização (Top POL/POD)
+- Performance por Business/SKU
+
+Observação: ao entrar na aba Performance atualmente, será exibida apenas uma indicação de que o módulo está em desenvolvimento.
+
 ---
 
 ## 🔄 Principais Fluxos

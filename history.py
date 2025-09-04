@@ -33,13 +33,15 @@ def get_next_linked_reference_number():
         return 1
 
 def get_available_references_for_relation():
-    """Busca referências disponíveis na aba 'Other Status' para relacionamento"""
+    """Busca referências originais (não-split) na aba 'Other Status' para relacionamento"""
     try:
         conn = get_database_connection()
         query = text("""
             SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE B_BOOKING_STATUS != 'Received from Carrier'
+              AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
+              AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
             ORDER BY ROW_INSERTED_DATE DESC
         """)
         result = conn.execute(query).mappings().fetchall()
