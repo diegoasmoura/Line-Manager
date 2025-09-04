@@ -636,6 +636,78 @@ def extract_maersk_data(text_content):
         data["pol"] = data.pop("from")  # Remove "from" e adiciona "pol"
     if "to" in data:
         data["pod"] = data.pop("to")    # Remove "to" e adiciona "pod"
+
+    # Extrair Port Terminal City (Maersk)
+    def extract_maersk_port_terminal(text: str):
+        # Caso 1: padrão linear "From <TERMINAL> To ..." onde o terminal pode quebrar em 2 linhas
+        m = re.search(r"From\s+([A-Z][A-Z\s\-\.'&/]+?)(?:\n([A-Z][A-Z\s\-\.'&/]+))?\s+To\b", text, re.IGNORECASE)
+        if m:
+            part1 = (m.group(1) or "").strip()
+            part2 = (m.group(2) or "").strip()
+            joined = (part1 + (" " + part2 if part2 else "")).strip()
+            # Evitar capturar cidades com mistura de minúsculas como destino
+            if re.fullmatch(r"[A-Z][A-Z\s\-\.'&/]+", joined):
+                return re.sub(r"\s+", " ", joined)
+
+        # Caso 2: tabela "From To Mode Vessel Voy No. ETD ETA" seguida por linhas
+        lines = text.split("\n")
+        header_idx = None
+        for i, ln in enumerate(lines):
+            if re.search(r"From\s+To\s+Mode\s+Vessel\s+Voy\s+No\.?\s+ETD\s+ETA", ln, re.IGNORECASE):
+                header_idx = i
+                break
+        if header_idx is not None:
+            # Pegar o prefixo em MAIÚSCULAS do início da primeira linha após o cabeçalho
+            after = lines[header_idx+1:header_idx+12]
+            if after:
+                first = after[0].strip()
+                # Heurística 0: pegar o ÚLTIMO trecho em maiúsculas que termina com TERMINAL dentro da primeira linha
+                caps_terms = re.findall(r"([A-Z][A-Z\s\-\.'&/]*?TERMINAL)\b", first)
+                if caps_terms:
+                    base = re.sub(r"\s+", " ", caps_terms[-1]).strip()
+                    parts = [base]
+                    if len(after) > 1 and after[1].strip() == "PORTUARIO":
+                        parts.append("PORTUARIO")
+                    return " ".join(parts)
+                # Heurística 1: capturar do início até a palavra TERMINAL (inclusive)
+                m_term = re.match(r"^\s*([A-Z][A-Z\s\-\.'&/]*?TERMINAL)\b", first)
+                if m_term:
+                    parts = [re.sub(r"\s+", " ", m_term.group(1)).strip()]
+                    # Se a próxima linha for exatamente PORTUARIO (maiusc), concatena
+                    if len(after) > 1 and after[1].strip() == "PORTUARIO":
+                        parts.append("PORTUARIO")
+                    return " ".join(parts)
+                # Heurística 2: aceitar nomes em Title Case no início da linha até um marcador (PSA, MVS, ETD/ETA, datas)
+                m_title = re.match(r"^\s*([A-Za-z][A-Za-z\s\-\.'&/]+?)(?=\s+(?:PSA\b|MVS\b|Vessel\b|Voy\b|ETD\b|ETA\b|\d{4}-\d{2}-\d{2})|\s*$)", first)
+                if m_title:
+                    base = re.sub(r"\s+", " ", m_title.group(1)).strip()
+                    parts = [base]
+                    # Se a próxima linha for uma palavra/linha curta que completa o nome (ex.: "Brasileira"), concatena
+                    if len(after) > 1:
+                        next_line = after[1].strip()
+                        if re.fullmatch(r"[A-Za-z][A-Za-z\s\-\.'&/]+", next_line) and len(next_line.split()) <= 3 and not re.search(r"\d", next_line):
+                            parts.append(next_line)
+                    return " ".join(parts).strip()
+                m_pref = re.match(r"^\s*([A-Z][A-Z\s\-\.'&/]*[A-Z])\b", first)
+                parts = []
+                if m_pref:
+                    parts.append(re.sub(r"\s+", " ", m_pref.group(1)).strip())
+                    # Se a próxima linha for toda MAIÚSCULA, concatena (ex.: "PORTUARIO")
+                    if len(after) > 1 and re.fullmatch(r"[A-Z][A-Z\s\-\.'&/]+", after[1].strip()):
+                        parts.append(re.sub(r"\s+", " ", after[1].strip()))
+                # Se não encontrou no prefixo da primeira, tenta segunda linha como MAIÚSCULA inteira
+                if not parts and len(after) > 0 and re.fullmatch(r"[A-Z][A-Z\s\-\.'&/]+", after[0].strip()):
+                    parts.append(re.sub(r"\s+", " ", after[0].strip()))
+                    if len(after) > 1 and re.fullmatch(r"[A-Z][A-Z\s\-\.'&/]+", after[1].strip()):
+                        parts.append(re.sub(r"\s+", " ", after[1].strip()))
+                if parts:
+                    return " ".join(parts).strip()
+
+        return None
+
+    ptc = extract_maersk_port_terminal(text_content)
+    if ptc:
+        data["port_terminal_city"] = ptc
     
     # Extrair print date (data de emissão) — Maersk coloca na linha após o título
     try:
