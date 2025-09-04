@@ -861,6 +861,9 @@ def extract_cma_cgm_data(text_content):
         if not value:
             return None
         s = str(value)
+        # Remove data prefixada (ex.: 19-Oct-25 Qingdao -> Qingdao)
+        s = re.sub(r"^[0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{2,4}\s+", "", s)
+        s = re.sub(r"^[0-9]{2}/[0-9]{2}/[0-9]{4}\s+", "", s)
         s = re.split(r"\bET[AD]:", s, maxsplit=1)[0]
         # Remove caudas de cut-off/fechamento caso venham na mesma linha
         s = re.sub(r"\b(?:SI|eSI|CY)\s*Cut[- ]?Off.*$", "", s, flags=re.IGNORECASE)
@@ -1050,9 +1053,11 @@ def extract_cma_cgm_data(text_content):
     if m:
         raw = m.group(1)
         if not re.search(r"DIRECT", raw, re.IGNORECASE):
-            trans_city = extract_city_only(raw)
-            if trans_city:
-                data["transhipment_port"] = trans_city
+            # Ignorar frases genéricas
+            if not re.search(r"Shall\s+Be\s+Clearly\s+Stated|Draft\s+Carriage\s+Document", raw, re.IGNORECASE):
+                trans_city = extract_city_only(raw)
+                if trans_city:
+                    data["transhipment_port"] = trans_city
     else:
         # Alternativa: rótulo simples "Transhipment:" seguido por valor em linha subsequente ou vazio
         m2 = re.search(r"Transhipment\s*:\s*([^\n]*)", text_content, re.IGNORECASE)
@@ -1060,16 +1065,15 @@ def extract_cma_cgm_data(text_content):
             raw = m2.group(1).strip()
             # Ignora se for outro rótulo ou vazio
             if raw and not re.search(r"DIRECT", raw, re.IGNORECASE) and not (raw.endswith(":") or re.search(r"(Port\s+Of\s+Discharge|Final\s+Place|Loading|Cut.*Off)", raw, re.IGNORECASE)):
-                trans_city = extract_city_only(raw)
-                if trans_city:
-                    data["transhipment_port"] = trans_city
+                if not re.search(r"Shall\s+Be\s+Clearly\s+Stated|Draft\s+Carriage\s+Document", raw, re.IGNORECASE):
+                    trans_city = extract_city_only(raw)
+                    if trans_city:
+                        data["transhipment_port"] = trans_city
             # Se Transhipment: está vazio, não tenta extrair nada (deixa para fallback)
-    # Sanitiza transhipment: se vazia/indefinida ou igual a Final, usar POD
-    if (not data.get("transhipment_port")) and data.get("pod"):
-        data["transhipment_port"] = data["pod"]
+    # Sanitiza transhipment: não forçar fallback para POD quando rótulo ausente; se igual a Final, usar POD
     if data.get("transhipment_port") and data.get("final_destination") and data["transhipment_port"].lower() == data["final_destination"].lower() and data.get("pod"):
         data["transhipment_port"] = data["pod"]
-    # Sanitiza transhipment: ignora frases genéricas, usa POD se necessário
+    # Sanitiza transhipment: ignora frases genéricas; não preencher se inválido
     def _looks_invalid_trans(v: str) -> bool:
         if not v:
             return True
@@ -1080,9 +1084,7 @@ def extract_cma_cgm_data(text_content):
         # muitas palavras minúsculas indica frase e não porto
         lw = re.findall(r"\b[a-z]{3,}\b", v)
         return len(lw) >= 3
-    if ("transhipment_port" not in data or _looks_invalid_trans(str(data.get("transhipment_port", "")))) and data.get("pod"):
-        data["transhipment_port"] = data["pod"]
-    # Se transhipment inválido/ausente e houver POD diferente de Final, usar POD como transhipment
+    # Se transhipment inválido/ausente, não preencher automaticamente com POD
     def _looks_invalid_trans(v: str) -> bool:
         if not v:
             return True
@@ -1090,8 +1092,7 @@ def extract_cma_cgm_data(text_content):
             return True
         lw = re.findall(r"\b[a-z]{3,}\b", v)
         return len(lw) >= 3
-    if ("transhipment_port" not in data or _looks_invalid_trans(str(data.get("transhipment_port", "")))) and data.get("pod") and data.get("final_destination") and data["pod"].lower() != data["final_destination"].lower():
-        data["transhipment_port"] = data["pod"]
+    # Removido fallback para POD quando diferente de Final
 
     # 6) Final Destination (ignora se igual a POD ou transhipment)
     # Suporta também "Final Place Of Delivery"
@@ -1125,6 +1126,154 @@ def extract_cma_cgm_data(text_content):
             val = re.sub(r"\s+", " ", val).strip(" ,:")
             if val:
                 data["port_terminal_city"] = val
+
+    # 8a) Extrair Transhipment usando regex simples
+    if not data.get("transhipment_port"):
+        # Lista de portos comuns de transbordo
+        common_ports = [
+            "COLOMBO", "SANTOS", "SINGAPORE", "TANGER", "TANGIER", "SALALAH",
+            "PORT KLANG", "HONG KONG", "BUSAN", "JEBEL ALI", "VALENCIA", "ALGECIRAS",
+            "DUBAI", "KOPER", "GIOIA TAURO", "PIRAEUS", "BARCELONA", "ROTTERDAM"
+        ]
+        # Procurar texto entre "Transhipment:" e o próximo rótulo
+        match = re.search(r'Transhipment\s*:\s*([^:\n]*?)(?:\s+(?:ETD|ETA|Port Of|Final Place|Remarks|Payable)\s*:|$)', text_content, re.IGNORECASE)
+        if match:
+            value = match.group(1).strip()
+            if not value:  # Se não houver texto entre os rótulos
+                return data
+            # Se houver texto, procurar portos conhecidos
+            value_up = value.upper()
+            for port in common_ports:
+                # Procurar palavra exata (com limites de palavra)
+                if re.search(r'\b' + re.escape(port) + r'\b', value_up):
+                    data["transhipment_port"] = port.title()
+                    break
+
+    # 8b) Inferir Transhipment entre Loading Terminal e 'Transhipment:' quando não houver rótulo com valor
+    if not data.get("transhipment_port"):
+        seg_m = re.search(r"Loading\s+Terminal\s*:([\s\S]*?)Transhipment\s*:", text_content, re.IGNORECASE)
+        if seg_m:
+            seg = seg_m.group(1)
+            lines = [ln.strip() for ln in seg.split("\n") if ln.strip()]
+            pol_up = (data.get("pol") or "").upper()
+            ptc_up = (data.get("port_terminal_city") or "").upper()
+            pod_up = (data.get("pod") or "").upper()
+            candidates = []
+            for ln in lines:
+                if ":" in ln or any(ch.isdigit() for ch in ln):
+                    continue
+                u = ln.upper()
+                # Ignorar rótulos/terminais
+                if re.search(r"TERMINAL|TECON|LOADING|PORT OF|FINAL PLACE|REMARKS", u):
+                    continue
+                # Aceitar somente palavras/letras e espaços
+                if re.fullmatch(r"[A-Za-z][A-Za-z\s\-'&/]*", ln.strip()):
+                    # Filtros de qualidade: evitar siglas/linhas muito longas/ruído
+                    words = [w for w in u.split() if w]
+                    if len(words) > 2:
+                        continue
+                    if len(u.replace(" ", "")) < 4:
+                        continue
+                    if not re.search(r"[AEIOU]", u):
+                        continue
+                    if any(bad in words for bad in ["EMPRESA","ZONA","RURAL","LA","B"]):
+                        continue
+                    # Excluir se igual a POL ou ao Terminal
+                    if u == pol_up or u == ptc_up:
+                        continue
+                    # Evitar escolher igual ao POD se já conhecido
+                    if pod_up and u == pod_up:
+                        continue
+                    candidates.append(u)
+            if candidates:
+                # Usa o primeiro candidato válido encontrado (ex.: 'SANTOS')
+                data["transhipment_port"] = candidates[0].title()
+
+    # 8c) Fallback: procurar candidato logo APÓS o rótulo 'Transhipment:' em uma janela ampla (preferência)
+    if not data.get("transhipment_port"):
+        anchor = re.search(r"Transhipment\s*:\s*\n?", text_content, re.IGNORECASE)
+        if anchor:
+            tail = text_content[anchor.end():]
+            lines = [ln.strip() for ln in tail.split("\n") if ln.strip()]
+            pol_up = (data.get("pol") or "").upper()
+            ptc_up = (data.get("port_terminal_city") or "").upper()
+            pod_up = (data.get("pod") or "").upper()
+            candidates = []
+            for ln in lines[:120]:
+                u = ln.upper()
+                if ":" in ln or any(ch.isdigit() for ch in ln):
+                    continue
+                if re.search(r"TERMINAL|TECON|LOADING|PORT OF|FINAL PLACE|REMARKS|CUT-?OFF|DATE/Time", u, re.IGNORECASE):
+                    continue
+                if not re.fullmatch(r"[A-Za-z][A-Za-z\s\-'&/]*", ln.strip()):
+                    continue
+                # Filtros de qualidade
+                words = [w for w in u.split() if w]
+                if len(words) > 2:
+                    continue
+                if len(u.replace(" ", "")) < 4:
+                    continue
+                if not re.search(r"[AEIOU]", u):
+                    continue
+                if any(bad in words for bad in ["EMPRESA","ZONA","RURAL","LA","B","APARECIDA"]):
+                    continue
+                if u in (pol_up, ptc_up, pod_up):
+                    continue
+                candidates.append(u)
+            if candidates:
+                data["transhipment_port"] = candidates[0].title()
+
+    # 8d) Fallback: procurar candidato imediatamente antes do rótulo 'Transhipment:' olhando algumas linhas acima (menos preferido)
+    if not data.get("transhipment_port"):
+        anchor = re.search(r"Transhipment\s*:", text_content, re.IGNORECASE)
+        if anchor:
+            prev_lines = text_content[:anchor.start()].split("\n")
+            window = [ln.strip() for ln in prev_lines[-80:] if ln.strip()]
+            pol_up = (data.get("pol") or "").upper()
+            ptc_up = (data.get("port_terminal_city") or "").upper()
+            pod_up = (data.get("pod") or "").upper()
+            for ln in reversed(window):
+                u = ln.upper()
+                if ":" in ln or any(ch.isdigit() for ch in ln):
+                    continue
+                if re.search(r"TERMINAL|TECON|LOADING|PORT OF|FINAL PLACE|REMARKS|CUT-?OFF|DATE/Time", u, re.IGNORECASE):
+                    continue
+                if not re.fullmatch(r"[A-Za-z][A-Za-z\s\-'&/]*", ln.strip()):
+                    continue
+                # Rejeitar candidatos muito curtos/siglas e sem vogais
+                words = [w for w in u.split() if w]
+                if len(words) > 2:
+                    continue
+                if len(u.replace(" ", "")) < 4:
+                    continue
+                if not re.search(r"[AEIOU]", u):
+                    continue
+                if any(bad in words for bad in ["EMPRESA","ZONA","RURAL","LA","B","APARECIDA"]):
+                    continue
+                if u in (pol_up, ptc_up, pod_up):
+                    continue
+                # encontrado candidato (ex.: SANTOS)
+                data["transhipment_port"] = u.title()
+                break
+
+    # 8e) Fallback final: hubs conhecidos aparecendo após 'Transhipment:'
+    if not data.get("transhipment_port"):
+        anchor = re.search(r"Transhipment\s*:\s*\n?", text_content, re.IGNORECASE)
+        if anchor:
+            tail_up = text_content[anchor.end():].upper()
+            pol_up = (data.get("pol") or "").upper()
+            pod_up = (data.get("pod") or "").upper()
+            ptc_up = (data.get("port_terminal_city") or "").upper()
+            known_hubs = [
+                "COLOMBO","SANTOS","SINGAPORE","TANGER","TANGIER","SALALAH",
+                "PORT KLANG","HONG KONG","BUSAN","JEBEL ALI","VALENCIA","ALGECIRAS",
+                "DUBAI","KOPER","GIOIA TAURO","PIRAEUS","BARCELONA","ROTTERDAM"
+            ]
+            for hub in known_hubs:
+                if re.search(r"\b"+re.escape(hub)+r"\b", tail_up):
+                    if hub not in (pol_up, pod_up, ptc_up):
+                        data["transhipment_port"] = hub.title()
+                        break
 
     # 9) Deadlines: DocCut e PortCut
     for pat in [r"SI/?eSI CUT-OFF\s*:?\s*([^\n]+)", r"DOC(?:UMENT)? CUT-?OFF\s*:?\s*([^\n]+)"]:
