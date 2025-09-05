@@ -1296,7 +1296,219 @@ def extract_msc_data(text_content):
             if match:
                 data[field] = match.group(1).strip()
                 break
-    
+    # Heurísticas para rótulos em português típicos da MSC Brasil
+    try:
+        # NAVIO E VIAGEM: exemplo "NAVIO E VIAGEM MSC GISELLE NA535R , ou substituto"
+        m_nv = re.search(r"NAVIO\s+E\s+VIAGEM\s+([^\n,]+)", text_content, re.IGNORECASE)
+        if m_nv:
+            raw = re.sub(r"\s*,\s*ou\s+substituto.*$", "", m_nv.group(1).strip(), flags=re.IGNORECASE)
+            # Separar vessel e voyage assumindo que o último token é a viagem quando alfanumérico
+            parts = raw.split()
+            if len(parts) >= 2 and re.search(r"[A-Za-z]\d|\d[A-Za-z]", parts[-1]):
+                data["vessel_name"] = " ".join(parts[:-1])
+                data["voyage"] = parts[-1]
+            else:
+                data["vessel_name"] = raw
+
+        # Helpers locais para limpar cidades (remove país e códigos)
+        def city_only(value: str) -> str:
+            if not value:
+                return None
+            s = str(value)
+            # corta em vírgula (pais) ou parênteses (código)
+            s = re.split(r"[,\(]", s)[0]
+            s = re.sub(r"\s+", " ", s).strip()
+            return s.title() if s else None
+
+        # PORTO DE EMBARQUE -> pol
+        m_pol = re.search(r"PORTO\s+DE\s+EMBARQUE\s*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+        if m_pol and not data.get("pol"):
+            pol_city = city_only(m_pol.group(1))
+            if pol_city:
+                data["pol"] = pol_city
+
+        # PORTO DE TRANSBORDO -> transhipment_port
+        m_trans = re.search(r"PORTO\s+DE\s+TRANSBORDO\s*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+        if m_trans and not data.get("transhipment_port"):
+            trans_city = city_only(m_trans.group(1))
+            if trans_city:
+                data["transhipment_port"] = trans_city
+
+        # PORTO DE DESCARGA -> pod
+        m_pod = re.search(r"PORTO\s+DE\s+DESCARGA\s*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+        if m_pod and not data.get("pod"):
+            pod_city = city_only(m_pod.group(1))
+            if pod_city:
+                data["pod"] = pod_city
+
+        # DESTINO FINAL -> final_destination (não sobrescreve POD)
+        m_final = re.search(r"DESTINO\s+FINAL[^\n:]*:?\s*([^\n]+)", text_content, re.IGNORECASE)
+        if m_final:
+            # Pode vir como frase: "Para entrega ... considerar porto de destino : ANTWERP"
+            tail = m_final.group(1)
+            m_cons = re.search(r"destino\s*:\s*([A-Z\s\-]+)", tail, re.IGNORECASE)
+            if m_cons:
+                data["final_destination"] = re.sub(r"\s+", " ", m_cons.group(1).strip()).upper()
+            else:
+                fd_city = city_only(tail)
+                if fd_city:
+                    data["final_destination"] = fd_city
+
+        # Port Terminal City (MSC)
+        if not data.get("port_terminal_city"):
+            # Priorizar ocorrência explícita de BRASIL TERMINAL PORTUARIO S/A
+            m_btp = re.search(r"(BRASIL\s+TERMINAL\s+PORTU[ÁA]RIO\s*(?:S\s*/?\s*A)?)", text_content, re.IGNORECASE)
+            if m_btp:
+                data["port_terminal_city"] = re.sub(r"\s+", " ", m_btp.group(1)).upper()
+
+        if not data.get("port_terminal_city"):
+            # 1) Linha que começa com "Terminal ..." e não é genérica (ex.: "Terminal de Embarque", "Terminal Handling Charge")
+            m_term = re.search(r"^\s*Terminal\s+([^\n]+)", text_content, re.IGNORECASE | re.MULTILINE)
+            if m_term:
+                term = re.sub(r"\s+", " ", m_term.group(1)).strip()
+                if not re.search(r"\b(de\s+Embarque|Handling\s+Charge)\b", term, re.IGNORECASE):
+                    data["port_terminal_city"] = term.upper()
+
+        if not data.get("port_terminal_city"):
+            # 2) Bloco em maiúsculas contendo TERMINAL/PORTUARIO em até 3 linhas seguidas
+            lines = [ln.strip() for ln in text_content.split("\n")]
+            i = 0
+            while i < len(lines):
+                ln = lines[i]
+                if re.search(r"\b(TERMINAL|PORTUARIO|PORTUÁRIO)\b", ln, re.IGNORECASE):
+                    # Ignorar genéricos
+                    if re.search(r"\b(de\s+Embarque|Handling\s+Charge)\b", ln, re.IGNORECASE):
+                        i += 1
+                        continue
+                    block = [ln]
+                    # incluir até 2 próximas linhas se forem maiúsculas/parte do nome
+                    for j in range(1, 3):
+                        if i + j < len(lines):
+                            nxt = lines[i + j].strip()
+                            if re.fullmatch(r"[A-ZÀ-ÿ0-9/\s\.'-]+", nxt):
+                                block.append(nxt)
+                            else:
+                                break
+                    term = " ".join(p.strip(" .,") for p in block)
+                    term = re.sub(r"\s+", " ", term)
+                    # Remover sufixo ", Cidade"
+                    term = re.sub(r",\s*[A-Za-zÀ-ÿ\-\s]+$", "", term)
+                    data["port_terminal_city"] = term.upper()
+                    break
+                i += 1
+    except Exception:
+        pass
+
+    # Quantidade e tipo (MSC) — cobrir formatos comuns
+    try:
+        # 1) Equipment Type/Q’ty: 40HC-5
+        if not data.get("quantity"):
+            m_eq = re.search(r"Equipment\s+Type\s*/\s*Q[’']?ty\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
+            if m_eq:
+                tail = m_eq.group(1)
+                m_qty = re.search(r"-(\d{1,4})\b", tail)
+                if m_qty:
+                    data["quantity"] = m_qty.group(1)
+                m_typ = re.search(r"\b(20|40|45)\s*['’]?\s*(HC|HIGH\s*CUBE|GP|DV)\b", tail, re.IGNORECASE)
+                if m_typ:
+                    size = m_typ.group(1)
+                    kind = m_typ.group(2)
+                    kind_norm = "HC" if re.search(r"HIGH\s*CUBE|HC", kind, re.IGNORECASE) else "GP"
+                    data["container_type"] = f"{size}{kind_norm}"
+
+        # 2) Linha solta: 14 40' HIGH CUBE 350,000.00 Kgs
+        if not data.get("quantity"):
+            m_line = re.search(r"\b(\d{1,4})\s+(20|40|45)\s*['’]?\s*(HIGH\s*CUBE|HC|GP|DV)\b", text_content, re.IGNORECASE)
+            if m_line:
+                data["quantity"] = m_line.group(1)
+                size = m_line.group(2)
+                kind = m_line.group(3)
+                kind_norm = "HC" if re.search(r"HIGH\s*CUBE|HC", kind, re.IGNORECASE) else "GP"
+                data["container_type"] = f"{size}{kind_norm}"
+
+        # 3) Multiplicador: 14 x 40 HC
+        if not data.get("quantity"):
+            m_mul = re.search(r"\b(\d{1,4})\s*[xX×]\s*(20|40|45)\s*['’]?\s*(HC|HIGH\s*CUBE|GP|DV)\b", text_content, re.IGNORECASE)
+            if m_mul:
+                data["quantity"] = m_mul.group(1)
+                size = m_mul.group(2)
+                kind = m_mul.group(3)
+                kind_norm = "HC" if re.search(r"HIGH\s*CUBE|HC", kind, re.IGNORECASE) else "GP"
+                data["container_type"] = f"{size}{kind_norm}"
+
+        # 4) Fallback simples: número antes de 20/40/45
+        if not data.get("quantity"):
+            m_simple = re.search(r"\b(\d{1,4})\s+(?=20|40|45)\b", text_content)
+            if m_simple:
+                data["quantity"] = m_simple.group(1)
+    except Exception:
+        pass
+
+    # ETA (MSC) via "DATA PREVISTA DE CHEGADA" em PT
+    try:
+        if not data.get("eta"):
+            m_anchor = re.search(r"DATA\s+PREVISTA\s+DE\s+CHEGADA", text_content, re.IGNORECASE)
+            if m_anchor:
+                tail = text_content[m_anchor.end():]
+                lines = [ln.strip() for ln in tail.split("\n") if ln.strip()][:10]
+                # coletar todas as datas dd/mm/yyyy nas próximas linhas e escolher a última (mais provável ETA)
+                dates = []
+                times = []
+                for ln in lines:
+                    for d in re.findall(r"\b(\d{2}/\d{2}/\d{4})\b", ln):
+                        dates.append(d)
+                    for t in re.findall(r"\b(\d{1,2}:\d{2}(?::\d{2})?\s*[APap]M)\b", ln):
+                        times.append(t)
+                if dates:
+                    data["eta"] = dates[-1]  # última data encontrada
+    except Exception:
+        pass
+
+    # PDF Print Date (MSC) — header com data e hora em linhas separadas
+    try:
+        if not data.get("pdf_print_date"):
+            # Padrão A: Booking Confirmation abaixo de data/hora
+            m_hdr = re.search(r"Booking\s+Confirmation[\s\S]{0,40}?\n?\s*Page\s+\d+\s+of\s+\d+", text_content, re.IGNORECASE)
+            if m_hdr:
+                # procurar até 3 linhas acima por data/hora
+                head = text_content[:m_hdr.start()].split("\n")
+                for back in range(1, 6):
+                    if len(head) - back >= 0:
+                        ln = head[-back].strip()
+                        m_d = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", ln)
+                        m_t = re.search(r"\b(\d{1,2}:\d{2}(?::\d{2})?\s*[APap]M)\b", ln)
+                        if m_d and m_t:
+                            data["pdf_print_date"] = f"{m_d.group(1)} {m_t.group(1)}"
+                            break
+                # Se não encontrou juntos, olhar duas linhas consecutivas acima (data em uma, hora na outra)
+                if not data.get("pdf_print_date") and len(head) >= 2:
+                    last2 = head[-3:]
+                    d = None; t = None
+                    for ln in last2:
+                        if not d:
+                            m_d = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", ln)
+                            if m_d:
+                                d = m_d.group(1)
+                        if not t:
+                            m_t = re.search(r"\b(\d{1,2}:\d{2}(?::\d{2})?\s*[APap]M)\b", ln)
+                            if m_t:
+                                t = m_t.group(1)
+                    if d and t:
+                        data["pdf_print_date"] = f"{d} {t}"
+            # Padrão B: Companhia + data na mesma linha, hora na linha seguinte (antes do Booking)
+            if not data.get("pdf_print_date"):
+                m_company = re.search(r"MEDITERRANEAN\s+SHIPPING\s+COMPANY\s*(\d{2}/\d{2}/\d{4})\s*\n\s*([0-9:]{3,8}\s*[APap]M)", text_content, re.IGNORECASE)
+                if m_company:
+                    data["pdf_print_date"] = f"{m_company.group(1)} {m_company.group(2)}"
+    except Exception:
+        pass
+
+    # Requisito: ETD não deve ser preenchido para MSC
+    if "etd" in data:
+        try:
+            del data["etd"]
+        except Exception:
+            data["etd"] = ""
     return data
 
 def extract_cma_cgm_data(text_content):
@@ -1783,6 +1995,82 @@ def extract_cma_cgm_data(text_content):
 
     return data
 
+
+def extract_pil_data(text_content: str):
+    """Extrai dados específicos para PDFs da PIL (Pacific International Lines)."""
+    data = {}
+
+    # Helpers
+    def clean_city(value: str):
+        if not value:
+            return None
+        s = str(value)
+        # Corta conteúdo dentro de parênteses e após vírgula (país/terminal)
+        s = s.split("(")[0]
+        s = s.split(",")[0]
+        s = s.replace("  ", " ")
+        return s.strip().title() if s.strip() else None
+
+    # Booking reference
+    m_bkg = re.search(r"\bBooking\s+No\s*:\s*([\w-]+)", text_content, re.IGNORECASE)
+    if m_bkg:
+        data["booking_reference"] = m_bkg.group(1).strip()
+
+    # Vessel/Voyage (Trunk Vessel line)
+    m_vsl = re.search(r"\bTrunk\s+Vessel\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
+    if m_vsl:
+        tail = m_vsl.group(1).strip()
+        # Ex.: "CMA CGM BELEM 0BDLNE1MA ETA/ETD : 09Aug25/11Aug25"
+        # Separar antes de ETA/ETD
+        tail = re.split(r"ETA/ETD\s*:\s*", tail, maxsplit=1)[0].strip()
+        # Tentar separar voyage: último token alfanumérico
+        parts = tail.split()
+        if len(parts) >= 2 and re.search(r"[A-Za-z]\d|\d[A-Za-z]", parts[-1]):
+            data["vessel_name"] = " ".join(parts[:-1])
+            data["voyage"] = parts[-1]
+        else:
+            data["vessel_name"] = tail
+
+    # POL
+    m_pol = re.search(r"\bPort\s+of\s+Loading\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
+    if m_pol:
+        pol = clean_city(m_pol.group(1))
+        if pol:
+            data["pol"] = pol
+
+    # POD
+    m_pod = re.search(r"\bPort\s+of\s+Discharging\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
+    if m_pod:
+        pod_raw = m_pod.group(1).strip()
+        pod = clean_city(pod_raw)
+        if pod:
+            data["pod"] = pod
+
+    # Port Terminal City (linha iniciando com "Terminal ...")
+    m_term = re.search(r"^\s*Terminal\s+([^\n]+)", text_content, re.IGNORECASE | re.MULTILINE)
+    if m_term:
+        term = re.sub(r"\s+", " ", m_term.group(1)).strip()
+        data["port_terminal_city"] = term
+
+    # Transhipment Port (T/S Port dentro do Ocean Route Type)
+    m_ts = re.search(r"\bT/S\s*Port\s*:\s*([^)]+)\)", text_content, re.IGNORECASE)
+    if m_ts:
+        data["transhipment_port"] = clean_city(m_ts.group(1))
+
+    # ETA/ETD (Trunk Vessel): capturar apenas ETA e NÃO preencher ETD (deixar em branco para MSC)
+    m_et = re.search(r"ETA/ETD\s*:\s*([0-9A-Za-z]{5,}\/[0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
+    if m_et:
+        try:
+            parts = m_et.group(1).split("/")
+            if len(parts) == 2:
+                data["eta"] = parts[0].strip()
+            elif len(parts) == 1:
+                data["eta"] = parts[0].strip()
+        except Exception:
+            pass
+
+    return data
+
 def extract_cosco_data(text_content):
     """Extrai dados específicos para PDFs da COSCO"""
     data = {}
@@ -2173,7 +2461,12 @@ def display_pdf_validation_interface(processed_data):
         # Quarta linha: ETD e ETA
         col8, col9 = st.columns(2)
         with col8:
-            _etd_default = parse_brazilian_date(processed_data.get("etd")) or datetime.today().date()
+            # Para MSC, não usar default se ETD não foi extraído
+            if processed_data.get("carrier") == "MSC" and not processed_data.get("etd"):
+                _etd_default = None
+            else:
+                _etd_default = parse_brazilian_date(processed_data.get("etd")) or datetime.today().date()
+            
             etd = st.date_input(
                 "ETD (Estimated Time of Departure)",
                 value=_etd_default,
@@ -2402,6 +2695,150 @@ def display_pdf_booking_section(farol_reference):
                 st.rerun()
 
 
+def map_msc_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: str = "msc_mapping.csv"):
+    """Mapeia todos os PDFs MSC no diretório e gera um CSV com os campos extraídos.
+
+    Args:
+        dir_path: Caminho da pasta contendo PDFs.
+        save_csv: Se True, salva um CSV na mesma pasta.
+        csv_name: Nome do arquivo CSV de saída.
+
+    Returns:
+        pandas.DataFrame com uma linha por PDF.
+    """
+    rows = []
+    # aceita .pdf e .PDF (e variações de caixa)
+    pdf_paths = sorted(glob.glob(os.path.join(dir_path, "*.[Pp][Dd][Ff]")))
+    for p in pdf_paths:
+        try:
+            with open(p, "rb") as f:
+                text = extract_text_from_pdf(f)
+            if not text:
+                rows.append({"file_name": os.path.basename(p), "status": "no_text"})
+                continue
+            extracted = extract_msc_data(text)
+            normalized = normalize_extracted_data(extracted)
+            rows.append({
+                "file_name": os.path.basename(p),
+                "booking_reference": normalized.get("booking_reference", ""),
+                "vessel_name": normalized.get("vessel_name", ""),
+                "voyage": normalized.get("voyage", ""),
+                "quantity": normalized.get("quantity", ""),
+                "pol": normalized.get("pol", ""),
+                "pod": normalized.get("pod", ""),
+                "transhipment_port": normalized.get("transhipment_port", ""),
+                "port_terminal_city": normalized.get("port_terminal_city", ""),
+                "etd": normalized.get("etd", ""),
+                "eta": normalized.get("eta", ""),
+                "pdf_print_date": normalized.get("pdf_print_date", normalized.get("print_date", "")),
+            })
+        except Exception as e:
+            rows.append({"file_name": os.path.basename(p), "error": str(e)})
+
+    df = pd.DataFrame(rows)
+    if save_csv:
+        csv_path = os.path.join(dir_path, csv_name)
+        df.to_csv(csv_path, index=False)
+        print(f"CSV salvo em: {csv_path}")
+    return df
+
+
+def map_oocl_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: str = "oocl_mapping.csv"):
+    """Mapeia todos os PDFs OOCL no diretório e gera um CSV com os campos extraídos.
+
+    Args:
+        dir_path: Caminho da pasta contendo PDFs.
+        save_csv: Se True, salva um CSV na mesma pasta.
+        csv_name: Nome do arquivo CSV de saída.
+
+    Returns:
+        pandas.DataFrame com uma linha por PDF.
+    """
+    rows = []
+    # aceita .pdf e .PDF (e variações de caixa)
+    pdf_paths = sorted(glob.glob(os.path.join(dir_path, "*.[Pp][Dd][Ff]")))
+    for p in pdf_paths:
+        try:
+            with open(p, "rb") as f:
+                text = extract_text_from_pdf(f)
+            if not text:
+                rows.append({"file_name": os.path.basename(p), "status": "no_text"})
+                continue
+            extracted = extract_pil_data(text)
+            normalized = normalize_extracted_data(extracted)
+            rows.append({
+                "file_name": os.path.basename(p),
+                "booking_reference": normalized.get("booking_reference", ""),
+                "vessel_name": normalized.get("vessel_name", ""),
+                "voyage": normalized.get("voyage", ""),
+                "quantity": normalized.get("quantity", ""),
+                "pol": normalized.get("pol", ""),
+                "pod": normalized.get("pod", ""),
+                "transhipment_port": normalized.get("transhipment_port", ""),
+                "port_terminal_city": normalized.get("port_terminal_city", ""),
+                "etd": normalized.get("etd", ""),
+                "eta": normalized.get("eta", ""),
+                "pdf_print_date": normalized.get("pdf_print_date", normalized.get("print_date", "")),
+            })
+        except Exception as e:
+            rows.append({"file_name": os.path.basename(p), "error": str(e)})
+
+    df = pd.DataFrame(rows)
+    if save_csv:
+        csv_path = os.path.join(dir_path, csv_name)
+        df.to_csv(csv_path, index=False)
+        print(f"CSV salvo em: {csv_path}")
+    return df
+
+
+def map_pil_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: str = "pil_mapping.csv"):
+    """Mapeia todos os PDFs PIL no diretório e gera um CSV com os campos extraídos.
+
+    Args:
+        dir_path: Caminho da pasta contendo PDFs.
+        save_csv: Se True, salva um CSV na mesma pasta.
+        csv_name: Nome do arquivo CSV de saída.
+
+    Returns:
+        pandas.DataFrame com uma linha por PDF.
+    """
+    rows = []
+    # aceita .pdf e .PDF (e variações de caixa)
+    pdf_paths = sorted(glob.glob(os.path.join(dir_path, "*.[Pp][Dd][Ff]")))
+    for p in pdf_paths:
+        try:
+            with open(p, "rb") as f:
+                text = extract_text_from_pdf(f)
+            if not text:
+                rows.append({"file_name": os.path.basename(p), "status": "no_text"})
+                continue
+            extracted = extract_generic_data(text)  # Usar extração genérica
+            normalized = normalize_extracted_data(extracted)
+            rows.append({
+                "file_name": os.path.basename(p),
+                "booking_reference": normalized.get("booking_reference", ""),
+                "vessel_name": normalized.get("vessel_name", ""),
+                "voyage": normalized.get("voyage", ""),
+                "quantity": normalized.get("quantity", ""),
+                "pol": normalized.get("pol", ""),
+                "pod": normalized.get("pod", ""),
+                "transhipment_port": normalized.get("transhipment_port", ""),
+                "port_terminal_city": normalized.get("port_terminal_city", ""),
+                "etd": normalized.get("etd", ""),
+                "eta": normalized.get("eta", ""),
+                "pdf_print_date": normalized.get("pdf_print_date", normalized.get("print_date", "")),
+            })
+        except Exception as e:
+            rows.append({"file_name": os.path.basename(p), "error": str(e)})
+
+    df = pd.DataFrame(rows)
+    if save_csv:
+        csv_path = os.path.join(dir_path, csv_name)
+        df.to_csv(csv_path, index=False)
+        print(f"CSV salvo em: {csv_path}")
+    return df
+
+
 def map_hapag_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: str = "hapag_mapping.csv"):
     """Mapeia todos os PDFs Hapag no diretório e gera um CSV com os campos extraídos.
 
@@ -2447,3 +2884,25 @@ def map_hapag_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: 
         out_path = os.path.join(dir_path, csv_name)
         df.to_csv(out_path, index=False)
     return df
+
+
+def map_all_carriers_pdfs(base_dirs: dict, save_csv: bool = True):
+    """Mapeia PDFs de múltiplos carriers e gera relatório consolidado.
+    
+    Args:
+        base_dirs: Dicionário {carrier: directory_path}
+        save_csv: Se True, salva CSVs individuais
+    
+    Returns:
+        dict: Resultados por carrier
+    """
+    mapping_functions = {
+        "HAPAG": map_hapag_pdfs_in_directory,
+        "MSC": map_msc_pdfs_in_directory,
+        "OOCL": map_oocl_pdfs_in_directory,
+        "PIL": map_pil_pdfs_in_directory
+    }
+    
+    results = {}
+    total_pdfs = 0
+    total_successful = 0
