@@ -982,7 +982,84 @@ def extract_hapag_lloyd_data(text_content):
     except Exception:
         pass
 
-    # Lógica especial para POD: sempre procurar HO CHI MINH CITY primeiro
+    # Extrair Port Terminal City (terminal de exportação)
+    if not data.get("port_terminal_city"):
+        # Procurar especificamente "BRASIL TERMINAL PORTUARIO SA" primeiro
+        brasil_terminal_match = re.search(r"(BRASIL\s+TERMINAL\s+PORTUARIO\s+SA)", text_content, re.IGNORECASE)
+        if brasil_terminal_match:
+            data["port_terminal_city"] = "BRASIL TERMINAL PORTUARIO SA"
+        else:
+            # Fallback para outros padrões de terminal
+            terminal_patterns = [
+                r"Terminal\s+de\s+entrega\s+de\s+exportação\s*\n\s*([A-Z][A-Z\s]*TERMINAL[A-Z\s]*)",
+                r"Endereço\s+do\s+Terminal.*?\n\s*([A-Z][A-Z\s]*TERMINAL[A-Z\s]*)",
+                r"([A-Z\s]{10,}TERMINAL\s+PORTUARIO[A-Z\s]*)",
+            ]
+            for pattern in terminal_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    terminal = re.sub(r'\s+', ' ', match.group(1).strip())
+                    # Limitar a primeira linha se houver quebra
+                    terminal = terminal.split('\n')[0]
+                    data["port_terminal_city"] = terminal
+                    break
+
+    # Extrair PDF Print Date (Date of Issue)
+    if not data.get("pdf_print_date"):
+        print_date_patterns = [
+            r"Date\s+of\s+Issue\s*:\s*(\d{2}-[A-Za-z]{3}-\d{4}\s+\d{2}:\d{2}:\d{2})",
+            r"ate\s+of\s+Issue\s*:\s*(\d{2}-[A-Za-z]{3}-\d{4}\s+\d{2}:\d{2}:\d{2})",  # Para casos com "D" cortado
+            r"Date\s+of\s+Issue\s*:\s*(\d{2}-[A-Za-z]{3}-\d{4}\s+\d{2}:\d{2})",
+        ]
+        for pattern in print_date_patterns:
+            match = re.search(pattern, text_content, re.IGNORECASE)
+            if match:
+                data["pdf_print_date"] = match.group(1).strip()
+                break
+
+    # Extrair ETD/ETA das datas de saída e chegada no contexto de viagem
+    if not data.get("etd") or not data.get("eta"):
+        # Procurar datas em linhas com "Vessel" (formato: CIDADE CIDADE Vessel DD-MMM-YYYY DD-MMM-YYYY)
+        lines = text_content.split('\n')
+        vessel_dates = []
+        
+        for line in lines:
+            if 'Vessel' in line or 'Inland Waterway' in line:
+                # Extrair todas as datas da linha que contém "Vessel" ou "Inland Waterway"
+                dates_in_line = re.findall(r"(\d{2}-[A-Za-z]{3}-\d{4})", line)
+                vessel_dates.extend(dates_in_line)
+        
+        if vessel_dates:
+            # ETD: primeira data de saída (primeira data de todas as viagens)
+            if not data.get("etd"):
+                data["etd"] = vessel_dates[0]
+            # ETA: última data de chegada (última data de todas as viagens)
+            if not data.get("eta"):
+                data["eta"] = vessel_dates[-1]
+        
+        # Fallback: procurar todas as datas DD-MMM-YYYY e filtrar por contexto
+        if not data.get("etd") or not data.get("eta"):
+            all_dates = re.findall(r"(\d{2}-[A-Za-z]{3}-\d{4})", text_content)
+            # Filtrar datas que não são Date of Issue
+            filtered_dates = []
+            for date_str in all_dates:
+                # Pular se for a data de emissão
+                if data.get("pdf_print_date") and date_str in data["pdf_print_date"]:
+                    continue
+                # Pular datas de reserva (Data da Reserva)
+                if re.search(f"Data\\s+da\\s+Reserva.*?{re.escape(date_str)}", text_content, re.IGNORECASE):
+                    continue
+                filtered_dates.append(date_str)
+            
+            if filtered_dates and len(filtered_dates) >= 2:
+                if not data.get("etd"):
+                    # ETD: terceira data (após Date of Issue e Data da Reserva)
+                    data["etd"] = filtered_dates[2] if len(filtered_dates) > 2 else filtered_dates[0]
+                if not data.get("eta"):
+                    # ETA: última data
+                    data["eta"] = filtered_dates[-1]
+
+    # Lógica especial para POD: sempre procurar HO CHI MINH CITY primeiro (apenas se existir no texto)
     if re.search(r"HO\s+CHI\s+MINH\s+CITY", text_content, re.IGNORECASE):
         data["pod"] = "HO CHI MINH CITY"  # Sempre maiúsculo
         # Se HO CHI MINH é o POD, procurar transhipments (SHANGHAI, SINGAPORE, VUNG TAU)
@@ -994,6 +1071,57 @@ def extract_hapag_lloyd_data(text_content):
                 data["transhipment_port"] = "SINGAPORE"
             elif re.search(r"\bVUNG\s+TAU\b", text_content, re.IGNORECASE):
                 data["transhipment_port"] = "VUNG TAU"
+    
+    # Lógica adicional para casos sem HO CHI MINH CITY: usar destino da última linha com "Vessel"
+    elif not data.get("pod"):
+        lines = text_content.split('\n')
+        vessel_lines = [line for line in lines if 'Vessel' in line]
+        if vessel_lines:
+            # Extrair destino da última linha com "Vessel"
+            last_vessel_line = vessel_lines[-1]
+            # Procurar padrão: ORIGEM DESTINO Vessel (melhor regex para destinos compostos)
+            match = re.search(r"^([A-Z\s]+?)\s+([A-Z\s]+?)\s+Vessel", last_vessel_line)
+            if match:
+                origin_candidate = match.group(1).strip()
+                destination_candidate = match.group(2).strip()
+                
+                # Lógica para dividir corretamente origem e destino
+                # Se o destino candidato é muito curto, pode ser parte de um nome composto
+                words = (origin_candidate + " " + destination_candidate).split()
+                if len(words) >= 3:
+                    # Assumir que as últimas 2 palavras são o destino
+                    destination = " ".join(words[-2:])
+                    origin = " ".join(words[:-2])
+                elif len(words) == 2:
+                    # Caso simples: primeira palavra origem, segunda destino
+                    origin = words[0]
+                    destination = words[1]
+                else:
+                    destination = destination_candidate
+                
+                # Verificar se não é uma palavra genérica
+                if destination and len(destination) >= 3 and destination not in ["VESSEL", "FLAG"]:
+                    data["pod"] = destination
+                    
+                    # Se há múltiplas linhas com "Vessel", o primeiro destino é transhipment
+                    if len(vessel_lines) > 1 and not data.get("transhipment_port"):
+                        first_vessel_line = vessel_lines[0]
+                        first_match = re.search(r"^([A-Z\s]+?)\s+([A-Z\s]+?)\s+Vessel", first_vessel_line)
+                        if first_match:
+                            first_origin_candidate = first_match.group(1).strip()
+                            first_destination_candidate = first_match.group(2).strip()
+                            
+                            # Aplicar mesma lógica para o primeiro destino
+                            first_words = (first_origin_candidate + " " + first_destination_candidate).split()
+                            if len(first_words) >= 3:
+                                first_dest = " ".join(first_words[-2:])
+                            elif len(first_words) == 2:
+                                first_dest = first_words[1]
+                            else:
+                                first_dest = first_destination_candidate
+                            
+                            if first_dest and len(first_dest) >= 3 and first_dest not in ["VESSEL", "FLAG"] and first_dest != destination:
+                                data["transhipment_port"] = first_dest
     
     # Fallback para POL/POD se não foram capturados pelos legs
     if not data.get("pol") or not data.get("pod"):
@@ -1763,11 +1891,15 @@ def normalize_extracted_data(extracted_data):
         if port_field in extracted_data:
             port = extracted_data[port_field]
             # Remove vírgulas e normaliza
-            port = re.sub(r',.*', '', port).strip().title()
-            normalized[port_field] = port
+            port = re.sub(r',.*', '', port).strip()
+            # Para port_terminal_city, manter maiúsculas se já estiver em maiúsculas
+            if port_field == "port_terminal_city" and port.isupper():
+                normalized[port_field] = port
+            else:
+                normalized[port_field] = port.title()
     
     # Normaliza datas
-    for date_field in ["etd", "eta"]:
+    for date_field in ["etd", "eta", "pdf_print_date"]:
         if date_field in extracted_data:
             date_str = extracted_data[date_field]
             try:
@@ -1798,13 +1930,26 @@ def normalize_extracted_data(extracted_data):
         else:
             normalized["print_date"] = cleaned
 
-    # Normaliza pdf_print_date (datetime com hora)
+    # Normaliza pdf_print_date (datetime com hora) — alinhar com padrão da CMA (YYYY-MM-DD HH:MM:SS)
     if "pdf_print_date" in extracted_data:
         raw = extracted_data["pdf_print_date"] or ""
-        cleaned = raw.replace(" UTC", "").replace(" UT", "").strip()
+        # Remover sufixos de timezone/eventuais rótulos cortados como "PT", "UTC", "UT"
+        cleaned = (
+            raw.replace(" UTC", "").replace(" UT", "").replace(" PT", "").strip()
+        )
         parsed = None
-        # Suportar abreviação de mês e ano com 2 dígitos
-        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d-%b-%y %H:%M", "%d-%b-%Y %H:%M", "%d/%m/%Y %H:%M"]:
+        # Suportar diversos formatos, incluindo segundos
+        parse_formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%d-%b-%y %H:%M:%S",
+            "%d-%b-%y %H:%M",
+            "%d-%b-%Y %H:%M:%S",
+            "%d-%b-%Y %H:%M",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y %H:%M",
+        ]
+        for fmt in parse_formats:
             try:
                 parsed = datetime.strptime(cleaned, fmt)
                 # Corrigir século quando usar %y
