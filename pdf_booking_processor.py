@@ -18,6 +18,8 @@ from datetime import datetime
 from database import get_database_connection, insert_return_carrier_from_ui
 from sqlalchemy import text
 import uuid
+import os
+import glob
 
 try:
     import pdfplumber
@@ -84,9 +86,19 @@ CARRIER_PATTERNS = {
     },
     "HAPAG-LLOYD": {
         "booking_reference": [
-            r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9]{8,12})",
-            r"BKG\s+(?:REF|NO)[\s:]+([A-Z0-9]{8,12})",
-            r"([A-Z]{4}\d{7})",  # Padrão típico HAPAG
+            # Nossa Referência (prioridade máxima para Hapag)
+            r"Nossa\s+Referência\s*[:：]\s*([0-9]{6,12})",
+            # BL/SWB completos (português / variantes) - fallback
+            r"No\.?\s*de\s*BL/SWB\s*[:：]?\s*([A-Z0-9\-]{10,30})",
+            r"No\.?\s*de\s*(?:BL|SWB)\s*[:：]?\s*([A-Z0-9\-]{10,30})",
+            # Prefixos longos típicos Hapag
+            r"(HLC[A-Z0-9]{10,20})",
+            r"(HL\-[0-9]{6,20})",
+            # Booking refs comuns
+            r"Booking\s+(?:Reference|Number|No)[\s:]+([A-Z0-9\-]{8,20})",
+            r"BKG\s+(?:REF|NO)[\s:]+([A-Z0-9\-]{8,20})",
+            # Padrão típico Hapag (mais flexível para não cortar)
+            r"([A-Z]{4}\d{7,12})",
         ],
         "vessel_name": [
             r"Vessel[\s:]+([A-Z\s]+)",
@@ -119,6 +131,12 @@ CARRIER_PATTERNS = {
         "eta": [
             r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
             r"Arrival[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        ],
+        "print_date": [
+            r"Print\s*Date[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?)",
+            r"Run\s*Date[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?)",
+            r"Generated\s+on[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?)",
+            r"Date[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
         ],
     },
     "MSC": {
@@ -312,7 +330,7 @@ def identify_carrier(text):
     
     # Padrões de identificação de carriers
     carrier_indicators = {
-        "HAPAG-LLOYD": ["HAPAG", "LLOYD", "HAPAG-LLOYD"],
+        "HAPAG-LLOYD": ["HAPAG", "LLOYD", "HAPAG-LLOYD", "HAPG", "HLAG"],
         "MAERSK": ["MAERSK", "A.P. MOLLER", "APM"],
         "MSC": ["MSC", "MEDITERRANEAN SHIPPING"],
         "CMA CGM": ["CMA", "CGM", "CMA CGM"],
@@ -821,18 +839,319 @@ def extract_maersk_data(text_content):
 def extract_hapag_lloyd_data(text_content):
     """Extrai dados específicos para PDFs da Hapag-Lloyd"""
     data = {}
-    
     # Usar padrões específicos da Hapag-Lloyd
     patterns = CARRIER_PATTERNS["HAPAG-LLOYD"]
-    
-    # Extrair dados básicos
+    # Extrair campos básicos
     for field, pattern_list in patterns.items():
         for pattern in pattern_list:
-            match = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
-            if match:
-                data[field] = match.group(1).strip()
+            m = re.search(pattern, text_content, re.IGNORECASE | re.MULTILINE)
+            if m:
+                data[field] = m.group(1).strip()
                 break
+    # Tentar capturar Vessel quando vier na linha seguinte ao rótulo
+    if "vessel_name" not in data:
+        m_vsl_nl = re.search(r"Vessel\s*(?:\n|:)\s*([A-Z][A-Z\s\-]+)", text_content, re.IGNORECASE)
+        if m_vsl_nl:
+            data["vessel_name"] = re.sub(r"\s+", " ", m_vsl_nl.group(1).strip())
+
+    # Heurísticas para extrair legs (De/Para) e campos estruturados
+    try:
+        lines = [ln.strip() for ln in text_content.split("\n") if ln.strip()]
+
+        def is_upper_city(s: str) -> bool:
+            # Casos especiais: aceitar "HO CHI MINH CITY" mesmo que não seja todo maiúsculo
+            if re.search(r"HO\s+CHI\s+MINH\s+CITY", s, re.IGNORECASE):
+                return True
+            
+            if not re.fullmatch(r"[A-Z][A-Z\s\-]+", s):
+                return False
+            bad = ["VESSEL", "VOY", "IMO", "CALL", "FLAG", "INLAND", "WATERWAY", "DATE", "HAPAG", "LLOYD", "DP VOYAGE"]
+            # Permitir "TERMINAL" se for parte do nome da cidade/porto
+            if any(b in s.upper() for b in bad):
+                return False
+            # Deve ter pelo menos 3 caracteres e não ser só números/códigos
+            return len(s.strip()) >= 3 and not re.fullmatch(r"[A-Z0-9\-]+", s)
+
+        legs = []
+        idx = 0
+        n = len(lines)
+        while idx < n:
+            if re.search(r"^Vessel\b", lines[idx], flags=re.IGNORECASE):
+                # Vessel name: procurar melhor candidato nas próximas linhas
+                vessel_name = None
+                stop_keywords = re.compile(r"^(?:DP\s*Voyage|Voy\.|IMO|Call\s*Sign|Flag)\b", re.IGNORECASE)
+                bad_words = re.compile(r"\b(Carrier|Is\s+In)\b", re.IGNORECASE)
+                jscan = idx + 1
+                while jscan < min(idx + 10, n):
+                    ln = lines[jscan].strip()
+                    if not ln or stop_keywords.search(ln):
+                        break
+                    # Ignorar linhas que obviamente não são nome de navio
+                    if bad_words.search(ln) or re.fullmatch(r"Is\s+In\s+Carrier", ln, re.IGNORECASE):
+                        jscan += 1
+                        continue
+                    if re.search(r"[A-Za-z]", ln) and len(ln) > 2:
+                        # Heurística: pelo menos 2 palavras ou string longa, mas não frases genéricas
+                        if (len(ln.split()) >= 2 or re.search(r"[A-Za-z]{6,}", ln)) and not re.search(r"^(Is\s+In|Carrier)", ln, re.IGNORECASE):
+                            vessel_name = re.sub(r"\s+", " ", ln).strip()
+                            break
+                    jscan += 1
+
+                # Voyage (DP Voyage) nas próximas 1-6 linhas
+                voyage_dp = None
+                for j in range(idx+1, min(idx+7, n)):
+                    m_v = re.search(r"DP\s*Voyage\s*:\s*([A-Z0-9]+)", lines[j], re.IGNORECASE)
+                    if m_v:
+                        voyage_dp = m_v.group(1).strip()
+                        break
+
+                # Encontrar destino e origem imediatamente antes de 'Vessel'
+                dest_city = None
+                origin_city = None
+                j = idx - 1
+                
+                # Procurar especificamente por "HO CHI MINH CITY" primeiro
+                for k in range(max(0, idx-10), idx):
+                    if re.search(r"HO\s+CHI\s+MINH\s+CITY", lines[k], re.IGNORECASE):
+                        dest_city = "HO CHI MINH CITY"
+                        break
+                
+                # Se não encontrou HO CHI MINH CITY, usar lógica padrão
+                if not dest_city:
+                    while j >= 0 and not dest_city:
+                        if is_upper_city(lines[j]):
+                            dest_city = lines[j]
+                        j -= 1
+                
+                while j >= 0 and not origin_city:
+                    if is_upper_city(lines[j]):
+                        origin_city = lines[j]
+                    j -= 1
+
+                # Terminal do origin: procurar entre origin_city e dest_city por linha com TERMINAL
+                origin_terminal = None
+                if origin_city and dest_city:
+                    # localizar índices exatos
+                    try:
+                        i_origin = max(i for i, ln in enumerate(lines[:idx]) if ln == origin_city)
+                        i_dest = max(i for i, ln in enumerate(lines[:idx]) if ln == dest_city)
+                        seg = lines[i_origin+1:i_dest]
+                        for ln in seg:
+                            if re.search(r"TERMINAL", ln, re.IGNORECASE):
+                                origin_terminal = ln
+                                break
+                    except Exception:
+                        pass
+
+                legs.append({
+                    "vessel_name": vessel_name,
+                    "voyage": voyage_dp,
+                    "origin": origin_city,
+                    "dest": dest_city,
+                    "origin_terminal": origin_terminal,
+                })
+                idx += 1
+            else:
+                idx += 1
+
+        # Preencher campos principais a partir dos legs
+        if legs:
+            first = legs[0]
+            last = legs[-1]
+            if first.get("vessel_name"):
+                data["vessel_name"] = first["vessel_name"]
+            if first.get("voyage") and not data.get("voyage"):
+                data["voyage"] = first["voyage"]
+            if first.get("origin") and not data.get("pol"):
+                data["pol"] = first["origin"]
+            if last.get("dest") and not data.get("pod"):
+                data["pod"] = last["dest"]
+            # Transhipment: primeiro destino intermediário, se houver múltiplos legs
+            if len(legs) > 1 and not data.get("transhipment_port"):
+                # Se há 3+ trechos, o primeiro destino é transhipment
+                # Se há 2 trechos, verificar se o primeiro destino não é o POD final
+                first_dest = legs[0].get("dest")
+                final_dest = last.get("dest")
+                if first_dest and first_dest != final_dest:
+                    data["transhipment_port"] = first_dest
+            # Terminal do POL
+            if first.get("origin_terminal") and not data.get("port_terminal_city"):
+                pt = first["origin_terminal"]
+                pt = re.sub(r"\s*\([^)]*\)", "", pt).strip()
+                data["port_terminal_city"] = pt
+    except Exception:
+        pass
+
+    # Lógica especial para POD: sempre procurar HO CHI MINH CITY primeiro
+    if re.search(r"HO\s+CHI\s+MINH\s+CITY", text_content, re.IGNORECASE):
+        data["pod"] = "HO CHI MINH CITY"  # Sempre maiúsculo
+        # Se HO CHI MINH é o POD, procurar transhipments (SHANGHAI, SINGAPORE, VUNG TAU)
+        if not data.get("transhipment_port"):
+            # Procurar SHANGHAI primeiro (tem prioridade como primeiro transhipment)
+            if re.search(r"SANTOS.*?SHANGHAI.*?Vessel", text_content, re.IGNORECASE | re.DOTALL):
+                data["transhipment_port"] = "SHANGHAI"
+            elif re.search(r"SINGAPORE.*?Vessel", text_content, re.IGNORECASE | re.DOTALL):
+                data["transhipment_port"] = "SINGAPORE"
+            elif re.search(r"\bVUNG\s+TAU\b", text_content, re.IGNORECASE):
+                data["transhipment_port"] = "VUNG TAU"
     
+    # Fallback para POL/POD se não foram capturados pelos legs
+    if not data.get("pol") or not data.get("pod"):
+        # Estratégia 1: Procurar cidades brasileiras (origem) e asiáticas (destino)
+        if not data.get("pol"):
+            pol_patterns = [
+                r"\b(SANTOS|PARANAGUA|SUAPE|ITAJAI|NAVEGANTES|RIO\s+GRANDE)\b",
+                r"\b([A-Z]{5,})\s+BRASIL\b"
+            ]
+            for pattern in pol_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE)
+                if match:
+                    data["pol"] = match.group(1).strip()
+                    break
+        
+        if not data.get("pod"):
+            pod_patterns = [
+                r"\b(HO\s+CHI\s+MINH\s+CITY|VUNG\s+TAU|SHANGHAI|SINGAPORE|HONG\s+KONG)\b",
+                r"\b([A-Z]{5,})\s+(?:CHINA|SINGAPORE|VIETNAM)\b"
+            ]
+            for pattern in pod_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE)
+                if match:
+                    data["pod"] = match.group(1).strip()
+                    break
+        
+        # Transhipment port fallback: procurar SINGAPORE se for intermediário
+        if not data.get("transhipment_port") and data.get("pod") != "SINGAPORE":
+            if re.search(r"\bSINGAPORE\b", text_content, re.IGNORECASE):
+                data["transhipment_port"] = "SINGAPORE"
+        
+        # Estratégia 2: Procurar padrão "De / Para" mais específico
+        if not data.get("pol") or not data.get("pod"):
+            # Procurar estrutura com múltiplas linhas após "De Para"
+            de_para_section = re.search(r"De\s+Para.*?\n((?:.*?\n){1,10})", text_content, re.IGNORECASE | re.MULTILINE)
+            if de_para_section:
+                section_text = de_para_section.group(1)
+                lines = [ln.strip() for ln in section_text.split('\n') if ln.strip()]
+                
+                # POL: primeira cidade encontrada (geralmente brasileira)
+                if not data.get("pol") and lines:
+                    for line in lines[:3]:  # Primeiras 3 linhas
+                        city_match = re.search(r"^([A-Z]{4,})", line)
+                        if city_match:
+                            city = city_match.group(1)
+                            if city in ['SANTOS', 'PARANAGUA', 'SUAPE', 'ITAJAI', 'NAVEGANTES']:
+                                data["pol"] = city
+                                break
+                
+                # POD: procurar o verdadeiro destino final (HO CHI MINH tem prioridade)
+                if not data.get("pod") and lines:
+                    # Primeiro procurar HO CHI MINH CITY especificamente
+                    for line in lines:
+                        if re.search(r"HO\s+CHI\s+MINH\s+CITY", line, re.IGNORECASE):
+                            data["pod"] = "HO CHI MINH CITY"
+                            break
+                    
+                    # Se não encontrou HO CHI MINH, usar a última cidade das últimas linhas
+                    if not data.get("pod"):
+                        for line in reversed(lines[-3:]):  # Últimas 3 linhas
+                            city_match = re.search(r"^([A-Z]{4,})", line)
+                            if city_match:
+                                city = city_match.group(1)
+                                if city in ['SHANGHAI', 'SINGAPORE', 'VUNG']:
+                                    data["pod"] = city
+                                    break
+
+    # Corrigir vessel_name inválido (ex.: "Is In Carrier") substituindo pelo melhor candidato após 'Vessel'
+    try:
+        invalid_vessel = False
+        vsl = (data.get("vessel_name") or "").strip()
+        if vsl:
+            # Detectar vessel_name inválido mais amplamente
+            if re.search(r"\b(Carrier|Is\s+In)\b", vsl, re.IGNORECASE):
+                invalid_vessel = True
+            if vsl in ["Is In Carrier", "Carrier", "Is In"]:
+                invalid_vessel = True
+            if len(vsl) < 4:  # Nomes muito curtos são suspeitos
+                invalid_vessel = True
+        else:
+            invalid_vessel = True  # Se não tem vessel_name, também é inválido
+        if invalid_vessel:
+            # procurar melhor candidato analisando até 10 linhas após cada 'Vessel'
+            lines = [ln.strip() for ln in text_content.split("\n")]
+            stop_keywords = re.compile(r"^(?:DP\s*Voyage|Voy\.|IMO|Call\s*Sign|Flag)\b", re.IGNORECASE)
+            bad_words = re.compile(r"\b(Carrier|Is\s+In)\b", re.IGNORECASE)
+            for i, ln in enumerate(lines):
+                if re.search(r"^Vessel\b", ln, re.IGNORECASE):
+                    for j in range(i+1, min(i+11, len(lines))):
+                        cand = lines[j].strip()
+                        if not cand or stop_keywords.search(cand):
+                            break
+                        if bad_words.search(cand) or re.fullmatch(r"Is\s+In\s+Carrier", cand, re.IGNORECASE):
+                            continue
+                        # Buscar nomes que parecem navios (múltiplas palavras maiúsculas ou nome longo)
+                        if re.search(r"[A-Za-z]", cand) and len(cand) > 5:
+                            # Deve ter pelo menos 2 palavras OU ser uma palavra longa (6+ chars)
+                            words = cand.split()
+                            if len(words) >= 2 or (len(words) == 1 and len(words[0]) >= 6):
+                                # Verificar se não é uma frase genérica
+                                if not re.search(r"^(Is\s+In|Carrier|HAPAG|LLOYD)", cand, re.IGNORECASE):
+                                    data["vessel_name"] = re.sub(r"\s+", " ", cand).strip()
+                                    raise StopIteration
+            
+            # Se ainda não encontrou, procurar nomes típicos de navios no texto geral
+            if invalid_vessel:
+                vessel_patterns = [
+                    r"\b(SEASPAN\s+HARRIER)\b",
+                    r"\b(WAN\s+HAI\s+A10)\b",
+                    r"\b(SEASPAN\s+[A-Z]+)\b",
+                    r"\b(WAN\s+HAI\s+[A-Z0-9]+)\b",
+                    r"\b(MSC\s+[A-Z]+)\b",
+                    r"\b(MAERSK\s+[A-Z]+)\b",
+                    r"\b(COSCO\s+[A-Z]+)\b"
+                ]
+                for pattern in vessel_patterns:
+                    match = re.search(pattern, text_content, re.IGNORECASE)
+                    if match:
+                        candidate = match.group(1).strip()
+                        # Verificar se não é uma palavra genérica
+                        if not re.search(r"\b(CARRIER|HAPAG|LLOYD|BRASIL|TERMINAL|INLAND|WATERWAY)\b", candidate, re.IGNORECASE):
+                            data["vessel_name"] = candidate
+                            break
+    except StopIteration:
+        pass
+    except Exception:
+        pass
+
+    # Tipo de documento
+    for kw, label in [
+        ("BOOKING CONFIRMATION", "BOOKING CONFIRMATION"),
+        ("BOOKING AMENDMENT", "BOOKING AMENDMENT"),
+        ("BOOKING CANCELLATION", "BOOKING CANCELLATION"),
+    ]:
+        if kw in text_content.upper():
+            data["document_type"] = label
+            break
+    # Limpeza de portos
+    if "pol" in data:
+        data["pol"] = clean_port_field(data["pol"]) or data["pol"]
+    if "pod" in data:
+        data["pod"] = clean_port_field(data["pod"]) or data["pod"]
+    # Quantidade e tipo de contêiner (formatos como 4x45GP, 4 x 40 HC etc.)
+    try:
+        m_qty = re.search(r"(\d+)\s*[xX×]\s*(20|40|45)\s*['’]?\s*([A-Za-z]{2,})", text_content)
+        if m_qty:
+            data["quantity"] = m_qty.group(1).strip()
+            data["container_type"] = f"{m_qty.group(2)}{m_qty.group(3).upper()}"
+        else:
+            # fallback: captura somente a quantidade antes de x
+            m_qty_only = re.search(r"\b(\d+)\s*[xX×]\s*(?:20|40|45)\b", text_content)
+            if m_qty_only and "quantity" not in data:
+                data["quantity"] = m_qty_only.group(1).strip()
+    except Exception:
+        pass
+    # Preferir pdf_print_date se só houver print_date
+    if "print_date" in data and "pdf_print_date" not in data:
+        data["pdf_print_date"] = data["print_date"]
     return data
 
 def extract_msc_data(text_content):
@@ -1432,12 +1751,15 @@ def normalize_extracted_data(extracted_data):
     # Normaliza quantity
     if "quantity" in extracted_data:
         try:
-            normalized["quantity"] = int(extracted_data["quantity"])
-        except ValueError:
+            q = int(str(extracted_data["quantity"]).strip())
+            if q < 1:
+                q = 1
+            normalized["quantity"] = q
+        except Exception:
             normalized["quantity"] = 1  # Default
     
     # Normaliza portos
-    for port_field in ["pol", "pod"]:
+    for port_field in ["pol", "pod", "transhipment_port", "port_terminal_city"]:
         if port_field in extracted_data:
             port = extracted_data[port_field]
             # Remove vírgulas e normaliza
@@ -1561,8 +1883,8 @@ def process_pdf_booking(pdf_content, farol_reference):
             "pod": normalized_data.get("pod", ""),
             "etd": normalized_data.get("etd", ""),
             "eta": normalized_data.get("eta", ""),
-            "transhipment_port": extracted_data.get("transhipment_port", ""),
-            "port_terminal_city": extracted_data.get("port_terminal_city", ""),
+            "transhipment_port": normalized_data.get("transhipment_port", ""),
+            "port_terminal_city": normalized_data.get("port_terminal_city", ""),
             "cargo_type": extracted_data.get("cargo_type", ""),
             "gross_weight": extracted_data.get("gross_weight", ""),
             "document_type": extracted_data.get("document_type", ""),
@@ -1603,10 +1925,17 @@ def display_pdf_validation_interface(processed_data):
                 help="Referência do booking do armador"
             )
         with col2:
+            _raw_qty = processed_data.get("quantity", 1)
+            try:
+                _qty = int(_raw_qty)
+            except Exception:
+                _qty = 1
+            if _qty < 1:
+                _qty = 1
             quantity = st.number_input(
                 "Quantidade de Containers",
                 min_value=1,
-                value=int(processed_data.get("quantity", 1)),
+                value=_qty,
                 help="Número de containers"
             )
         
@@ -1699,15 +2028,17 @@ def display_pdf_validation_interface(processed_data):
         # Quarta linha: ETD e ETA
         col8, col9 = st.columns(2)
         with col8:
+            _etd_default = parse_brazilian_date(processed_data.get("etd")) or datetime.today().date()
             etd = st.date_input(
                 "ETD (Estimated Time of Departure)",
-                value=parse_brazilian_date(processed_data.get("etd")),
+                value=_etd_default,
                 help="Data estimada de partida"
             )
         with col9:
+            _eta_default = parse_brazilian_date(processed_data.get("eta")) or datetime.today().date()
             eta = st.date_input(
                 "ETA (Estimated Time of Arrival)",
-                value=parse_brazilian_date(processed_data.get("eta")),
+                value=_eta_default,
                 help="Data estimada de chegada"
             )
         
@@ -1888,6 +2219,8 @@ def display_pdf_booking_section(farol_reference):
     
     if uploaded_pdf is not None:
         st.success(f"📄 PDF selecionado: **{uploaded_pdf.name}**")
+        # Guarda o arquivo para uso posterior (salvar como anexo)
+        st.session_state[f"booking_pdf_file_{farol_reference}"] = uploaded_pdf
         
         # Botão para processar
         if st.button("🔍 Processar PDF", key=f"process_pdf_{farol_reference}", type="primary"):
@@ -1922,3 +2255,50 @@ def display_pdf_booking_section(farol_reference):
                 del st.session_state[processed_data_key]
                 st.balloons()  # Celebração visual
                 st.rerun()
+
+
+def map_hapag_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: str = "hapag_mapping.csv"):
+    """Mapeia todos os PDFs Hapag no diretório e gera um CSV com os campos extraídos.
+
+    Args:
+        dir_path: Caminho da pasta contendo PDFs.
+        save_csv: Se True, salva um CSV na mesma pasta.
+        csv_name: Nome do arquivo CSV de saída.
+
+    Returns:
+        pandas.DataFrame com uma linha por PDF.
+    """
+    rows = []
+    # aceita .pdf e .PDF (e variações de caixa)
+    pdf_paths = sorted(glob.glob(os.path.join(dir_path, "*.[Pp][Dd][Ff]")))
+    for p in pdf_paths:
+        try:
+            with open(p, "rb") as f:
+                text = extract_text_from_pdf(f)
+            if not text:
+                rows.append({"file_name": os.path.basename(p), "status": "no_text"})
+                continue
+            extracted = extract_hapag_lloyd_data(text)
+            normalized = normalize_extracted_data(extracted)
+            rows.append({
+                "file_name": os.path.basename(p),
+                "booking_reference": normalized.get("booking_reference", ""),
+                "vessel_name": normalized.get("vessel_name", ""),
+                "voyage": normalized.get("voyage", ""),
+                "quantity": normalized.get("quantity", ""),
+                "pol": normalized.get("pol", ""),
+                "pod": normalized.get("pod", ""),
+                "transhipment_port": normalized.get("transhipment_port", ""),
+                "port_terminal_city": normalized.get("port_terminal_city", ""),
+                "etd": normalized.get("etd", ""),
+                "eta": normalized.get("eta", ""),
+                "pdf_print_date": normalized.get("pdf_print_date", normalized.get("print_date", "")),
+            })
+        except Exception as e:
+            rows.append({"file_name": os.path.basename(p), "error": str(e)})
+
+    df = pd.DataFrame(rows)
+    if save_csv:
+        out_path = os.path.join(dir_path, csv_name)
+        df.to_csv(out_path, index=False)
+    return df
