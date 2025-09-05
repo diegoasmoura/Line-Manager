@@ -49,7 +49,7 @@ with st.sidebar:
         icons=["truck", "clipboard-data", "bar-chart", "geo-alt", "clock-history", "gear"],  # Removido ícone "sliders" do Adjustments
         menu_icon="menu",
         default_index=current_index,
-        key=f"main_menu_{st.session_state.menu_choice}",  # Chave única baseada no estado
+        key="main_menu",  # Chave estável para evitar remount e flicker
         styles={
             "container": {"padding": "0!important", "background-color": "#f8f9fa"},
             "icon": {"color": "#2c3f43", "font-size": "20px"},
@@ -61,7 +61,6 @@ with st.sidebar:
     # Atualiza o estado do menu se houve mudança
     if choice != st.session_state.menu_choice:
         st.session_state.menu_choice = choice
-        st.rerun()
 
 # Usa o estado do menu para determinar qual página exibir
 if st.session_state.menu_choice == "Shipments":
