@@ -11,6 +11,28 @@ from ellox_api import ElloxAPI, enrich_booking_data, format_tracking_display, ge
 from database import get_database_connection
 from sqlalchemy import text
 
+@st.cache_data(ttl=300)  # Cache por 5 minutos
+def load_ships_from_database():
+    """Carrega navios do banco com cache"""
+    try:
+        from ellox_data_queries import ElloxDataQueries
+        queries = ElloxDataQueries()
+        ships_df = queries.get_ships_by_terminal()
+        return ships_df
+    except:
+        return pd.DataFrame()
+
+@st.cache_data(ttl=300)  # Cache por 5 minutos  
+def load_terminals_from_database():
+    """Carrega terminais do banco com cache"""
+    try:
+        from ellox_data_queries import ElloxDataQueries
+        queries = ElloxDataQueries()
+        terminals_df = queries.get_all_terminals()
+        return terminals_df
+    except:
+        return pd.DataFrame()
+
 def get_api_status_indicator():
     """
     Retorna indicador visual do status da API para exibição
@@ -183,18 +205,84 @@ def display_voyage_search():
     """Interface para busca manual de viagens"""
     st.markdown("### 🔍 Busca Manual de Viagem")
     
+    # Carregar dados do banco com cache
+    all_ships = load_ships_from_database()
+    all_terminals = load_terminals_from_database()
+    
+    # Preparar opções para selectbox
+    ship_options = [""] + sorted(all_ships['navio'].unique().tolist()) if not all_ships.empty else [""]
+    terminal_options = [""] + all_terminals['nome'].tolist() if not all_terminals.empty else [""]
+    
+    # Mostrar contador de opções
+    if len(ship_options) > 1:
+        st.info(f"📊 {len(ship_options)-1} navios e {len(terminal_options)-1} terminais carregados do banco")
+    
+    # Filtro por carrier para reduzir lista de navios
+    col_filter1, col_filter2 = st.columns(2)
+    
+    with col_filter1:
+        carrier_filter = st.selectbox(
+            "🔍 Filtrar por Carrier (Opcional)",
+            ["Todos"] + ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"],
+            help="Filtrar lista de navios por carrier para facilitar seleção"
+        )
+    
+    # Filtrar navios por carrier se selecionado
+    filtered_ship_options = ship_options
+    if carrier_filter != "Todos" and not all_ships.empty:
+        filtered_ships = all_ships[all_ships['carrier'] == carrier_filter]['navio'].unique()
+        filtered_ship_options = [""] + sorted(filtered_ships.tolist())
+        
+        if len(filtered_ship_options) > 1:
+            st.success(f"✅ {len(filtered_ship_options)-1} navios do carrier {carrier_filter}")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        vessel_name = st.text_input("Nome do Navio", help="Ex: MAERSK ESSEX")
+        vessel_name = st.selectbox(
+            "Nome do Navio",
+            filtered_ship_options,
+            help="Selecione um navio da lista filtrada"
+        )
+        
+        # Detectar carrier automaticamente baseado no navio selecionado
+        detected_carrier = ""
+        if vessel_name and not all_ships.empty:
+            ship_info = all_ships[all_ships['navio'] == vessel_name]
+            if not ship_info.empty:
+                detected_carrier = ship_info['carrier'].iloc[0]
+        
         carrier = st.selectbox(
             "Carrier/Armador",
-            ["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"]
+            ["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"],
+            index=(["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(detected_carrier) 
+                   if detected_carrier in ["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 0)
         )
     
     with col2:
         voyage = st.text_input("Voyage", help="Ex: 240W")
-        port_terminal = st.text_input("Terminal (Opcional)", help="Ex: Santos Brasil S/A")
+        port_terminal = st.selectbox(
+            "Terminal (Opcional)",
+            terminal_options,
+            help="Selecione um terminal da lista ou deixe vazio"
+        )
+        
+        # Mostrar informações do navio selecionado
+        if vessel_name and not all_ships.empty:
+            ship_info = all_ships[all_ships['navio'] == vessel_name]
+            if not ship_info.empty:
+                ship_data = ship_info.iloc[0]
+                st.info(f"🚢 **{vessel_name}**\n"
+                       f"Carrier: {ship_data.get('carrier', 'N/A')}\n"
+                       f"Terminal: {ship_data.get('terminal', 'N/A')}")
+    
+    # Pré-popular terminal se o navio foi selecionado
+    if vessel_name and not all_ships.empty and not port_terminal:
+        ship_info = all_ships[all_ships['navio'] == vessel_name]
+        if not ship_info.empty:
+            suggested_terminal = ship_info['terminal'].iloc[0]
+            if suggested_terminal in terminal_options:
+                st.info(f"💡 Sugestão: Terminal **{suggested_terminal}** (baseado no navio selecionado)")
     
     if st.button("🚢 Buscar Informações de Tracking"):
         if not vessel_name or not carrier or not voyage:
@@ -372,16 +460,64 @@ def display_vessel_schedule():
     """Interface para consulta de cronograma de navios"""
     st.markdown("### 🗓️ Cronograma de Navios")
     
+    # Carregar dados do banco com cache
+    all_ships = load_ships_from_database()
+    ship_options = [""] + sorted(all_ships['navio'].unique().tolist()) if not all_ships.empty else [""]
+    
+    # Mostrar contador de opções
+    if len(ship_options) > 1:
+        st.info(f"📊 {len(ship_options)-1} navios disponíveis no banco")
+    
+    # Filtro por carrier para cronograma
+    carrier_filter_schedule = st.selectbox(
+        "🔍 Filtrar por Carrier (Opcional)",
+        ["Todos"] + ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"],
+        key="schedule_carrier_filter",
+        help="Filtrar lista de navios por carrier"
+    )
+    
+    # Filtrar navios por carrier se selecionado
+    filtered_ship_options_schedule = ship_options
+    if carrier_filter_schedule != "Todos" and not all_ships.empty:
+        filtered_ships = all_ships[all_ships['carrier'] == carrier_filter_schedule]['navio'].unique()
+        filtered_ship_options_schedule = [""] + sorted(filtered_ships.tolist())
+        
+        if len(filtered_ship_options_schedule) > 1:
+            st.success(f"✅ {len(filtered_ship_options_schedule)-1} navios do carrier {carrier_filter_schedule}")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        vessel_name = st.text_input("Nome do Navio", key="schedule_vessel")
+        vessel_name = st.selectbox(
+            "Nome do Navio",
+            filtered_ship_options_schedule,
+            key="schedule_vessel",
+            help="Selecione um navio da lista filtrada"
+        )
+        
+        # Mostrar informações do navio selecionado
+        if vessel_name and not all_ships.empty:
+            ship_info = all_ships[all_ships['navio'] == vessel_name]
+            if not ship_info.empty:
+                ship_data = ship_info.iloc[0]
+                st.info(f"🚢 **{vessel_name}**\n"
+                       f"Carrier: {ship_data.get('carrier', 'N/A')}\n"
+                       f"Terminal: {ship_data.get('terminal', 'N/A')}")
     
     with col2:
+        # Detectar carrier automaticamente
+        detected_carrier_schedule = ""
+        if vessel_name and not all_ships.empty:
+            ship_info = all_ships[all_ships['navio'] == vessel_name]
+            if not ship_info.empty:
+                detected_carrier_schedule = ship_info['carrier'].iloc[0]
+        
         carrier = st.selectbox(
             "Carrier",
             ["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"],
-            key="schedule_carrier"
+            key="schedule_carrier",
+            index=(["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(detected_carrier_schedule) 
+                   if detected_carrier_schedule in ["", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 0)
         )
     
     if st.button("📅 Consultar Cronograma"):
@@ -435,10 +571,11 @@ def exibir_tracking():
         st.error("❌ Falha na autenticação com a API Ellox - Verifique as credenciais")
     
     # Tabs principais
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "🔍 Busca Manual", 
         "📦 Bookings Existentes", 
-        "📅 Cronograma de Navios"
+        "📅 Cronograma de Navios",
+        "📊 Dados da API"
     ])
     
     with tab1:
@@ -450,6 +587,126 @@ def exibir_tracking():
     with tab3:
         display_vessel_schedule()
     
+    with tab4:
+        display_ellox_database_data()
+    
     # Footer
     st.markdown("---")
     st.markdown("*Powered by [Ellox API - Comexia](https://developers.comexia.digital/)*")
+
+def display_ellox_database_data():
+    """Exibe interface para consultar dados extraídos da API Ellox"""
+    st.markdown("### 📊 Dados Extraídos da API Ellox")
+    
+    try:
+        from ellox_data_queries import ElloxDataQueries
+        
+        queries = ElloxDataQueries()
+        
+        # Estatísticas gerais
+        stats = queries.get_database_stats()
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("🏢 Terminais", stats['terminais'])
+        with col2:
+            st.metric("🚢 Navios", stats['navios'])
+        with col3:
+            st.metric("⛵ Voyages", stats['voyages'])
+        with col4:
+            st.metric("🏪 Carriers", stats['carriers'])
+        
+        st.info(f"📅 Última atualização: {stats['ultima_atualizacao']}")
+        
+        # Botão para nova extração
+        col_btn1, col_btn2 = st.columns([1, 3])
+        with col_btn1:
+            if st.button("🔄 Atualizar Dados"):
+                with st.spinner("Executando nova extração..."):
+                    try:
+                        from ellox_data_extractor import ElloxDataExtractor
+                        extractor = ElloxDataExtractor()
+                        result = extractor.run_full_extraction(ships_sample=30)
+                        
+                        st.success("✅ Dados atualizados com sucesso!")
+                        st.json(result)
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erro na atualização: {str(e)}")
+        
+        # Sub-tabs para diferentes consultas
+        subtab1, subtab2, subtab3 = st.tabs([
+            "🔍 Buscar Navios", "🏢 Terminais", "📊 Relatórios"
+        ])
+        
+        with subtab1:
+            st.markdown("#### 🔍 Busca de Navios no Banco")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                search_term = st.text_input("Nome do navio:", placeholder="Ex: MAERSK")
+            with col2:
+                carrier_options = ["Todos", "HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"]
+                selected_carrier = st.selectbox("Carrier:", carrier_options, key="db_carrier")
+            
+            if search_term:
+                results = queries.search_ships(search_term)
+                
+                if not results.empty:
+                    # Filtrar por carrier se selecionado
+                    if selected_carrier != "Todos":
+                        results = results[results['CARRIER'] == selected_carrier]
+                    
+                    st.success(f"✅ {len(results)} navios encontrados")
+                    st.dataframe(results, use_container_width=True)
+                    
+                    # Exportar resultados
+                    csv = results.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Baixar CSV",
+                        data=csv,
+                        file_name=f"navios_{search_term}_{selected_carrier}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.warning("⚠️ Nenhum navio encontrado")
+        
+        with subtab2:
+            st.markdown("#### 🏢 Terminais e Estatísticas")
+            
+            # Resumo dos terminais
+            terminals_summary = queries.get_terminals_summary()
+            st.dataframe(terminals_summary, use_container_width=True)
+            
+            # Gráfico de navios por terminal
+            if not terminals_summary.empty:
+                st.markdown("#### 📈 Navios por Terminal")
+                top_terminals = terminals_summary.head(10)
+                st.bar_chart(top_terminals.set_index('TERMINAL')['TOTAL_NAVIOS'])
+        
+        with subtab3:
+            st.markdown("#### 📊 Relatórios por Carrier")
+            
+            # Resumo por Carrier
+            carriers_summary = queries.get_carriers_summary()
+            st.dataframe(carriers_summary, use_container_width=True)
+            
+            # Gráfico de navios por carrier
+            if not carriers_summary.empty:
+                st.markdown("#### 📈 Navios por Carrier")
+                st.bar_chart(carriers_summary.set_index('CARRIER')['TOTAL_NAVIOS'])
+                
+                # Exportar relatório completo
+                csv = carriers_summary.to_csv(index=False)
+                st.download_button(
+                    label="📥 Baixar Relatório Completo",
+                    data=csv,
+                    file_name="relatorio_carriers_ellox.csv",
+                    mime="text/csv"
+                )
+    
+    except ImportError:
+        st.error("❌ Módulo ellox_data_queries não encontrado")
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar dados: {str(e)}")
