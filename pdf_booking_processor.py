@@ -328,8 +328,10 @@ def identify_carrier(text):
     """
     text_upper = text.upper()
     
-    # Padrões de identificação de carriers
+    # Padrões de identificação de carriers (ordem importa)
     carrier_indicators = {
+        # OOCL antes de COSCO, pois muitos PDFs trazem "FROM: COSCO ... as agent for OOCL"
+        "OOCL": ["OOCL", "BY OOCL APP", "MY OOCL CENTER", "BOOKING ACKNOWLEDGEMENT"],
         "HAPAG-LLOYD": ["HAPAG", "LLOYD", "HAPAG-LLOYD", "HAPG", "HLAG"],
         "MAERSK": ["MAERSK", "A.P. MOLLER", "APM"],
         "MSC": ["MSC", "MEDITERRANEAN SHIPPING"],
@@ -2122,6 +2124,84 @@ def extract_generic_data(text_content):
     
     return data
 
+def extract_oocl_data(text_content: str):
+    """Extrai dados específicos para PDFs da OOCL (Orient Overseas Container Line)."""
+    data = {}
+    
+    # PDF Print Date - "DATE: 01 Jul 2025 22:00"
+    m_date = re.search(r"DATE:\s*(\d{1,2}\s+\w{3}\s+\d{4}\s+\d{2}:\d{2})", text_content, re.IGNORECASE)
+    if m_date:
+        data["pdf_print_date"] = m_date.group(1).strip()
+    
+    # Booking Reference - "BOOKING NUMBER: 2160389150"
+    m_booking = re.search(r"BOOKING\s+NUMBER:\s*(\w+)", text_content, re.IGNORECASE)
+    if m_booking:
+        data["booking_reference"] = m_booking.group(1).strip()
+    
+    # Quantity - "TOTAL BOOKING CONTAINER QTY: 20 X 40' Hi-Cube Container"
+    m_qty = re.search(r"TOTAL\s+BOOKING\s+CONTAINER\s+QTY[:\s]*(\d+)", text_content, re.IGNORECASE)
+    if m_qty:
+        data["quantity"] = m_qty.group(1).strip()
+    
+    # Vessel Name e Voyage - "INTENDED VESSEL/VOYAGE: KOTA EBONY 002 E"
+    # Padrão mais flexível para capturar nome do navio e voyage
+    m_vessel = re.search(r"INTENDED\s+VESSEL/VOYAGE:\s*([A-Z][A-Z\s]+?)\s+(\d{3}\s*[A-Z])", text_content, re.IGNORECASE)
+    if m_vessel:
+        vessel_name = m_vessel.group(1).strip()
+        voyage = m_vessel.group(2).strip()
+        
+        # Limpar o nome do navio removendo espaços extras
+        vessel_name = re.sub(r'\s+', ' ', vessel_name).strip()
+        data["vessel_name"] = vessel_name
+        data["voyage"] = voyage
+    
+    # Flag - "VESSEL FLAG: Singapore"
+    m_flag = re.search(r"VESSEL\s+FLAG:\s*([^\n]+)", text_content, re.IGNORECASE)
+    if m_flag:
+        data["flag"] = m_flag.group(1).strip()
+    
+    # Carrier/Armador - "FROM: COSCO Shipping Lines (Brazil) S.A. as agent for OOCL (USA) Inc"
+    m_carrier = re.search(r"FROM:\s*([^(]+)", text_content, re.IGNORECASE)
+    if m_carrier:
+        carrier = m_carrier.group(1).strip()
+        # Extrair apenas o nome principal da empresa
+        if "COSCO" in carrier.upper():
+            data["carrier"] = "COSCO"
+        elif "OOCL" in carrier.upper():
+            data["carrier"] = "OOCL"
+        else:
+            data["carrier"] = carrier
+    
+    # Port of Loading (POL) - "PORT OF LOADING: Porto de Santos / Santos Brazil"
+    m_pol = re.search(r"PORT\s+OF\s+LOADING:\s*([^/\n]+)", text_content, re.IGNORECASE)
+    if m_pol:
+        pol = m_pol.group(1).strip()
+        data["pol"] = pol
+    
+    # Port of Discharge (POD) - "PORT OF DISCHARGE: Ho Chi Minh (Cat Lai) / Cat Lai Terminal"
+    m_pod = re.search(r"PORT\s+OF\s+DISCHARGE:\s*([^/\n]+)", text_content, re.IGNORECASE)
+    if m_pod:
+        pod = m_pod.group(1).strip()
+        data["pod"] = pod
+    
+    # Transhipment Port - "TRANSSHIPMENT PORT: Singapore / PSA Corporation Limited"
+    m_tranship = re.search(r"TRANSSHIPMENT\s+PORT:\s*([^/\n]+)", text_content, re.IGNORECASE)
+    if m_tranship:
+        tranship = m_tranship.group(1).strip()
+        data["transhipment_port"] = tranship
+    
+    # ETD - "INTENDED VESSEL/VOYAGE: KOTA EBONY 002 E ETD: 04 Aug 2025"
+    m_etd = re.search(r"INTENDED\s+VESSEL/VOYAGE:.*?ETD:\s*(\d{1,2}\s+\w{3}\s+\d{4})", text_content, re.IGNORECASE | re.DOTALL)
+    if m_etd:
+        data["etd"] = m_etd.group(1).strip()
+    
+    # ETA - "FINAL DESTINATION: Ho Chi Minh,Vietnam ETA: 06 Sep 2025"
+    m_eta = re.search(r"FINAL\s+DESTINATION:.*?ETA:\s*(\d{1,2}\s+\w{3}\s+\d{4})", text_content, re.IGNORECASE | re.DOTALL)
+    if m_eta:
+        data["eta"] = m_eta.group(1).strip()
+    
+    return data
+
 def clean_port_field(value):
     """Limpa campo de porto para formato 'Cidade,Estado,País'"""
     if not value:
@@ -2158,11 +2238,17 @@ def normalize_extracted_data(extracted_data):
         vessel = extracted_data["vessel_name"]
         # Remove prefixos comuns e normaliza
         vessel = re.sub(r'^(M/V|MV|MS)\s+', '', vessel, flags=re.IGNORECASE)
-        normalized["vessel_name"] = vessel.strip().title()
+        vessel_clean = vessel.strip()
+        # Se o nome original vier todo em maiúsculas (padrão OOCL), manter
+        if vessel_clean.isupper():
+            normalized["vessel_name"] = vessel_clean
+        else:
+            normalized["vessel_name"] = vessel_clean.title()
     
-    # Normaliza voyage
+    # Normaliza voyage (manter espaços internos; normalizar múltiplos espaços)
     if "voyage" in extracted_data:
-        normalized["voyage"] = extracted_data["voyage"].upper()
+        voyage = re.sub(r"\s+", " ", str(extracted_data["voyage"])) .strip()
+        normalized["voyage"] = voyage.upper()
     
     # Normaliza quantity
     if "quantity" in extracted_data:
@@ -2173,6 +2259,14 @@ def normalize_extracted_data(extracted_data):
             normalized["quantity"] = q
         except Exception:
             normalized["quantity"] = 1  # Default
+    
+    # Normaliza flag
+    if "flag" in extracted_data:
+        normalized["flag"] = extracted_data["flag"].strip().title()
+    
+    # Normaliza carrier
+    if "carrier" in extracted_data:
+        normalized["carrier"] = extracted_data["carrier"].strip().upper()
     
     # Normaliza portos
     for port_field in ["pol", "pod", "transhipment_port", "port_terminal_city"]:
@@ -2192,7 +2286,7 @@ def normalize_extracted_data(extracted_data):
             date_str = extracted_data[date_field]
             try:
                 # Tenta diferentes formatos de data
-                for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y", "%d/%m/%y", "%d-%m-%y", "%d-%b-%Y", "%d-%b-%Y %H:%M"]:
+                for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y", "%d/%m/%y", "%d-%m-%y", "%d-%b-%Y", "%d-%b-%Y %H:%M", "%d %b %Y"]:
                     try:
                         date_obj = datetime.strptime(date_str, fmt)
                         normalized[date_field] = date_obj.strftime("%Y-%m-%d")
@@ -2236,6 +2330,7 @@ def normalize_extracted_data(extracted_data):
             "%d-%b-%Y %H:%M",
             "%d/%m/%Y %H:%M:%S",
             "%d/%m/%Y %H:%M",
+            "%d %b %Y %H:%M",
         ]
         for fmt in parse_formats:
             try:
@@ -2295,6 +2390,8 @@ def process_pdf_booking(pdf_content, farol_reference):
         extracted_data = extract_cosco_data(text)
     elif carrier == "EVERGREEN":
         extracted_data = extract_evergreen_data(text)
+    elif carrier == "OOCL":
+        extracted_data = extract_oocl_data(text)
     else:
         # Usar padrões genéricos para outros armadores
         patterns = CARRIER_PATTERNS.get(carrier, CARRIER_PATTERNS["GENERIC"])
@@ -2383,10 +2480,10 @@ def display_pdf_validation_interface(processed_data):
         with col4:
             carrier = st.selectbox(
                 "Carrier/Armador",
-                ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OTHER"],
+                ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "OTHER"],
                 index=0 if processed_data["carrier"] == "GENERIC" else 
-                      ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN"].index(processed_data["carrier"]) 
-                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN"] else 6
+                      ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL"].index(processed_data["carrier"]) 
+                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL"] else 7
             )
         with col5:
             voyage = st.text_input(
@@ -2764,7 +2861,7 @@ def map_oocl_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: s
             if not text:
                 rows.append({"file_name": os.path.basename(p), "status": "no_text"})
                 continue
-            extracted = extract_pil_data(text)
+            extracted = extract_oocl_data(text)
             normalized = normalize_extracted_data(extracted)
             rows.append({
                 "file_name": os.path.basename(p),
@@ -2772,6 +2869,8 @@ def map_oocl_pdfs_in_directory(dir_path: str, save_csv: bool = True, csv_name: s
                 "vessel_name": normalized.get("vessel_name", ""),
                 "voyage": normalized.get("voyage", ""),
                 "quantity": normalized.get("quantity", ""),
+                "flag": normalized.get("flag", ""),
+                "carrier": normalized.get("carrier", ""),
                 "pol": normalized.get("pol", ""),
                 "pod": normalized.get("pod", ""),
                 "transhipment_port": normalized.get("transhipment_port", ""),
