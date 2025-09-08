@@ -332,6 +332,8 @@ def identify_carrier(text):
     carrier_indicators = {
         # OOCL antes de COSCO, pois muitos PDFs trazem "FROM: COSCO ... as agent for OOCL"
         "OOCL": ["OOCL", "BY OOCL APP", "MY OOCL CENTER", "BOOKING ACKNOWLEDGEMENT"],
+        # PIL deve ser detectado explicitamente
+        "PIL": ["PIL", "PACIFIC INTERNATIONAL LINES", "PIL AGENCIA"],
         "HAPAG-LLOYD": ["HAPAG", "LLOYD", "HAPAG-LLOYD", "HAPG", "HLAG"],
         "MAERSK": ["MAERSK", "A.P. MOLLER", "APM"],
         "MSC": ["MSC", "MEDITERRANEAN SHIPPING"],
@@ -2018,6 +2020,32 @@ def extract_pil_data(text_content: str):
     if m_bkg:
         data["booking_reference"] = m_bkg.group(1).strip()
 
+    # Quantity a partir de "Equipment Type/Q’ty : 40HC-20" (pode haver múltiplos tipos)
+    qty_total = 0
+    for m in re.findall(r"Equipment\s+Type/Q[’'`]?ty\s*:\s*([^\n]+)", text_content, re.IGNORECASE):
+        # Capturar todos os números após hífen (ex.: 40HC-20 -> 20)
+        hyphen_qty = re.findall(r"[A-Za-z0-9]+-(\d+)\b", m)
+        qty_total += sum(int(q) for q in hyphen_qty)
+    if qty_total > 0:
+        data["quantity"] = str(qty_total)
+
+    # PDF Print Date (cabeçalho do documento), ex.: "16 JUL 25 10:37"
+    # Procurar a primeira ocorrência de DD MMM YY HH:MM em qualquer lugar do texto
+    m_pdf_dt = re.search(r"\b(\d{1,2}\s+[A-Z]{3}\s+\d{2}\s+\d{2}:\d{2})\b", text_content)
+    if m_pdf_dt:
+        # Normaliza mês para formato Title (Jul) para facilitar parsing posterior
+        raw_dt = m_pdf_dt.group(1)
+        try:
+            parts = raw_dt.split()
+            if len(parts) >= 4:
+                # parts: [DD, MMM, YY, HH:MM]
+                parts[1] = parts[1].title()
+                data["pdf_print_date"] = " ".join(parts[:4])
+            else:
+                data["pdf_print_date"] = raw_dt
+        except Exception:
+            data["pdf_print_date"] = raw_dt
+
     # Vessel/Voyage (Trunk Vessel line)
     m_vsl = re.search(r"\bTrunk\s+Vessel\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
     if m_vsl:
@@ -2054,22 +2082,49 @@ def extract_pil_data(text_content: str):
         term = re.sub(r"\s+", " ", m_term.group(1)).strip()
         data["port_terminal_city"] = term
 
+    # Port Terminal City (prioritário): "Full Return CY : SANTOS BRASIL S/A"
+    # Cortar antes de próximos rótulos na mesma linha (ex.: "Full Return Date :")
+    m_full_return = re.search(r"\bFull\s+Return\s+CY\s*:\s*([^\n]+?)(?:\s+Full\s+Return\s+Date\s*:|$)", text_content, re.IGNORECASE)
+    if m_full_return:
+        full_return = re.sub(r"\s+", " ", m_full_return.group(1)).strip()
+        if full_return:
+            data["port_terminal_city"] = full_return
+
     # Transhipment Port (T/S Port dentro do Ocean Route Type)
     m_ts = re.search(r"\bT/S\s*Port\s*:\s*([^)]+)\)", text_content, re.IGNORECASE)
     if m_ts:
         data["transhipment_port"] = clean_city(m_ts.group(1))
 
-    # ETA/ETD (Trunk Vessel): capturar apenas ETA e NÃO preencher ETD (deixar em branco para MSC)
-    m_et = re.search(r"ETA/ETD\s*:\s*([0-9A-Za-z]{5,}\/[0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
-    if m_et:
-        try:
-            parts = m_et.group(1).split("/")
-            if len(parts) == 2:
-                data["eta"] = parts[0].strip()
-            elif len(parts) == 1:
-                data["eta"] = parts[0].strip()
-        except Exception:
-            pass
+    # ETA/ETD (Trunk Vessel): capturar ambos especificamente da linha de Trunk Vessel
+    # Ex.: "Trunk Vessel : ... ETA/ETD : 26Aug25/28Aug25"
+    m_tv = re.search(r"Trunk\s+Vessel\s*:\s*[^\n]*?ETA/ETD\s*:\s*([0-9A-Za-z]{5,})/([0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
+    if m_tv:
+        data["eta"] = m_tv.group(1).strip()
+        data["etd"] = m_tv.group(2).strip()
+    else:
+        # Fallback: qualquer ETA/ETD
+        m_et = re.search(r"ETA/ETD\s*:\s*([0-9A-Za-z]{5,})/([0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
+        if m_et:
+            data["eta"] = m_et.group(1).strip()
+            data["etd"] = m_et.group(2).strip()
+
+    # ETA do Port of Discharging (POC/POD) se existir (buscar após o rótulo, janela limitada)
+    m_pod_label = re.search(r"Port\s+of\s+Discharg\w*\s*:\s*", text_content, re.IGNORECASE)
+    if m_pod_label:
+        start = m_pod_label.end()
+        window = text_content[start:start+1500]
+        m_pod_eta = re.search(r"ETA\s*:\s*([0-9A-Za-z]{5,})", window, re.IGNORECASE)
+        if m_pod_eta and "eta" not in data:
+            data["eta"] = m_pod_eta.group(1).strip()
+
+    # Sobrescrever ETA com a ETA do Place of Delivery (prioridade máxima)
+    m_podl_label = re.search(r"Place\s+of\s+Delivery\s*:\s*", text_content, re.IGNORECASE)
+    if m_podl_label:
+        start = m_podl_label.end()
+        window = text_content[start:start+2000]
+        m_podl_eta = re.search(r"ETA\s*:\s*([0-9A-Za-z]{5,})", window, re.IGNORECASE)
+        if m_podl_eta:
+            data["eta"] = m_podl_eta.group(1).strip()
 
     return data
 
@@ -2289,7 +2344,12 @@ def normalize_extracted_data(extracted_data):
             date_str = extracted_data[date_field]
             try:
                 # Tenta diferentes formatos de data
-                for fmt in ["%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y", "%d/%m/%y", "%d-%m-%y", "%d-%b-%Y", "%d-%b-%Y %H:%M", "%d %b %Y"]:
+                for fmt in [
+                    "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%m-%d-%Y",
+                    "%d/%m/%y", "%d-%m-%y",
+                    "%d-%b-%Y", "%d-%b-%Y %H:%M", "%d %b %Y",
+                    "%d%b%y", "%d%b%Y"
+                ]:
                     try:
                         date_obj = datetime.strptime(date_str, fmt)
                         normalized[date_field] = date_obj.strftime("%Y-%m-%d")
@@ -2334,6 +2394,7 @@ def normalize_extracted_data(extracted_data):
             "%d/%m/%Y %H:%M:%S",
             "%d/%m/%Y %H:%M",
             "%d %b %Y %H:%M",
+            "%d %b %y %H:%M",
         ]
         for fmt in parse_formats:
             try:
@@ -2395,6 +2456,8 @@ def process_pdf_booking(pdf_content, farol_reference):
         extracted_data = extract_evergreen_data(text)
     elif carrier == "OOCL":
         extracted_data = extract_oocl_data(text)
+    elif carrier == "PIL":
+        extracted_data = extract_pil_data(text)
     else:
         # Usar padrões genéricos para outros armadores
         patterns = CARRIER_PATTERNS.get(carrier, CARRIER_PATTERNS["GENERIC"])
@@ -2483,10 +2546,10 @@ def display_pdf_validation_interface(processed_data):
         with col4:
             carrier = st.selectbox(
                 "Carrier/Armador",
-                ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "OTHER"],
+                ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL", "OTHER"],
                 index=0 if processed_data["carrier"] == "GENERIC" else 
-                      ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL"].index(processed_data["carrier"]) 
-                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL"] else 7
+                      ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(processed_data["carrier"]) 
+                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 8
             )
         with col5:
             voyage = st.text_input(
