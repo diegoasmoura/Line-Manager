@@ -2245,9 +2245,9 @@ def normalize_extracted_data(extracted_data):
         else:
             normalized["vessel_name"] = vessel_clean.title()
     
-    # Normaliza voyage (manter espaços internos; normalizar múltiplos espaços)
+    # Normaliza voyage removendo espaços internos (ex.: "002 E" -> "002E")
     if "voyage" in extracted_data:
-        voyage = re.sub(r"\s+", " ", str(extracted_data["voyage"])) .strip()
+        voyage = re.sub(r"\s+", "", str(extracted_data["voyage"]))
         normalized["voyage"] = voyage.upper()
     
     # Normaliza quantity
@@ -2272,8 +2272,11 @@ def normalize_extracted_data(extracted_data):
     for port_field in ["pol", "pod", "transhipment_port", "port_terminal_city"]:
         if port_field in extracted_data:
             port = extracted_data[port_field]
-            # Remove vírgulas e normaliza
-            port = re.sub(r',.*', '', port).strip()
+            # Remove conteúdo entre parênteses e após vírgulas
+            port = re.sub(r"\s*\([^)]*\)", "", port)
+            port = re.sub(r",.*", "", port)
+            # Normaliza espaços
+            port = re.sub(r"\s+", " ", port).strip()
             # Para port_terminal_city, manter maiúsculas se já estiver em maiúsculas
             if port_field == "port_terminal_city" and port.isupper():
                 normalized[port_field] = port
