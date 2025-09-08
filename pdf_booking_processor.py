@@ -20,6 +20,7 @@ from sqlalchemy import text
 import uuid
 import os
 import glob
+from ellox_api import enrich_booking_data, format_tracking_display, get_default_api_client
 
 try:
     import pdfplumber
@@ -2652,6 +2653,81 @@ def display_pdf_validation_interface(processed_data):
                 help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
+        # Seção de Enriquecimento via API Ellox
+        st.markdown("---")
+        st.markdown("### 🚢 Informações de Tracking (API Ellox)")
+        
+        # Verificar autenticação automática
+        client = get_default_api_client()
+        
+        col_api1, col_api2 = st.columns([2, 1])
+        
+        with col_api1:
+            if client.authenticated:
+                st.success("✅ Sistema de tracking ativo - Dados serão consultados automaticamente")
+            else:
+                st.warning("⚠️ Sistema de tracking indisponível - Verifique conectividade")
+        
+        with col_api2:
+            consult_api = st.checkbox(
+                "Consultar API Ellox",
+                value=client.authenticated,
+                help="Consulta informações de tracking da viagem via API Ellox",
+                disabled=not client.authenticated
+            )
+        
+        # Consulta da API se habilitada
+        tracking_info = None
+        if consult_api and client.authenticated and vessel_name and carrier and voyage:
+            with st.spinner("🔍 Consultando informações de tracking..."):
+                try:
+                    # Preparar dados para enriquecimento
+                    booking_data = {
+                        "vessel_name": vessel_name,
+                        "carrier": carrier,
+                        "voyage": voyage,
+                        "port_terminal_city": port_terminal_city
+                    }
+                    
+                    enriched_data = enrich_booking_data(booking_data, client)
+                    tracking_info = enriched_data.get("api_tracking")
+                    
+                    if tracking_info and tracking_info.get("success"):
+                        st.success("✅ Informações de tracking obtidas com sucesso!")
+                        
+                        # Exibir informações de tracking
+                        api_data = tracking_info.get("data", {})
+                        
+                        if api_data:
+                            col_t1, col_t2, col_t3 = st.columns(3)
+                            
+                            with col_t1:
+                                st.metric("IMO", api_data.get("vessel_imo", "N/A"))
+                                st.metric("Status", api_data.get("status", "N/A"))
+                            
+                            with col_t2:
+                                st.metric("Próximo Porto", api_data.get("next_port", "N/A"))
+                                st.metric("ETA Estimado", api_data.get("estimated_arrival", "N/A"))
+                            
+                            with col_t3:
+                                current_pos = api_data.get("current_position", {})
+                                if current_pos:
+                                    pos_text = f"{current_pos.get('latitude', 'N/A')}, {current_pos.get('longitude', 'N/A')}"
+                                else:
+                                    pos_text = "N/A"
+                                st.metric("Posição Atual", pos_text)
+                                st.metric("Atrasos", api_data.get("delays", "Nenhum"))
+                            
+                            # Alertas importantes
+                            if api_data.get("delays"):
+                                st.warning(f"⚠️ **Atraso reportado:** {api_data['delays']}")
+                    
+                    elif tracking_info:
+                        st.warning(f"⚠️ {tracking_info.get('error', 'Erro na consulta da API')}")
+                
+                except Exception as e:
+                    st.error(f"❌ Erro ao consultar API: {str(e)}")
+        
         # Campos ETD e ETA movidos para a quarta linha acima
         
         # Área de texto extraído removida para interface mais limpa
@@ -3071,3 +3147,5 @@ def map_all_carriers_pdfs(base_dirs: dict, save_csv: bool = True):
     results = {}
     total_pdfs = 0
     total_successful = 0
+
+
