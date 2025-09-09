@@ -2270,6 +2270,108 @@ def clean_port_field(value):
         return None
     return ",".join(parts[:3])
 
+def standardize_terminal_name(terminal_name):
+    """
+    Padroniza o nome do terminal para o formato usado na ferramenta Ellox
+    
+    Args:
+        terminal_name (str): Nome do terminal extraído do PDF
+        
+    Returns:
+        str: Nome padronizado do terminal
+    """
+    if not terminal_name:
+        return ""
+    
+    # Mapeamento de terminais para nomes padrão da Ellox
+    terminal_mapping = {
+        # Santos
+        "BRASIL TERMINAL PORTUARIO SA": "BTP",
+        "BTP": "BTP",
+        "BRASIL TERMINAL PORTUARIO": "BTP",
+        "BRASIL TERMINAL": "BTP",
+        
+        "SANTOS BRASIL S/A": "Santos Brasil",
+        "SANTOS BRASIL": "Santos Brasil",
+        "SANTOS BRASIL SA": "Santos Brasil",
+        
+        "DP WORLD SANTOS": "DPW",
+        "DPW": "DPW",
+        "DP WORLD": "DPW",
+        
+        "ECOPORTO": "Ecoporto",
+        
+        # Rio de Janeiro
+        "ICTSI RIO BRASIL": "ICTSI Rio Brasil",
+        "ICTSI RIO": "ICTSI Rio Brasil",
+        
+        "MULTI-RIO": "Multi-Rio",
+        "MULTI RIO": "Multi-Rio",
+        
+        # Paranaguá
+        "PARANAGUA": "Paranagua",
+        "PARANAGUÁ": "Paranagua",
+        
+        # Itajaí
+        "ITAJAÍ": "Itajai",
+        "ITAJAI": "Itajai",
+        
+        # Itapoá
+        "ITAPOÁ": "Itapoa",
+        "ITAPOA": "Itapoa",
+        
+        # Imbituba
+        "IMBITUBA": "Imbituba",
+        
+        # Navegantes
+        "NAVEGANTES": "Navegantes",
+        
+        # Rio Grande
+        "RIO GRANDE": "Rio Grande",
+        
+        # Pecem
+        "PECEM": "Pecem",
+        "PECÉM": "Pecem",
+        
+        # Suape
+        "SUAPE": "Suape",
+        
+        # Sepetiba
+        "SEPETIBA": "Sepetiba",
+        
+        # Manaus
+        "MANAUS CHIBATÃO": "Manaus Chibatão",
+        "CHIBATÃO": "Manaus Chibatão",
+        
+        "MANAUS SUPER TERMINAIS": "Manaus Super Terminais",
+        "SUPER TERMINAIS": "Manaus Super Terminais",
+        
+        # Salvador
+        "TECON SALVADOR": "Tecon Salvador",
+        "SALVADOR": "Tecon Salvador",
+        
+        # Vila do Conde
+        "VILA DO CONDE": "Vila do Conde",
+        
+        # TVV
+        "TVV": "TVV",
+    }
+    
+    # Normalizar entrada (remover espaços extras, converter para maiúscula)
+    normalized = re.sub(r'\s+', ' ', terminal_name.strip()).upper()
+    
+    # Buscar correspondência exata
+    if normalized in terminal_mapping:
+        return terminal_mapping[normalized]
+    
+    # Buscar correspondência parcial
+    for key, value in terminal_mapping.items():
+        if key in normalized or normalized in key:
+            return value
+    
+    # Se não encontrar correspondência, retornar o nome original limpo
+    return re.sub(r'\s+', ' ', terminal_name.strip())
+
 def normalize_extracted_data(extracted_data):
     """
     Normaliza e valida os dados extraídos.
@@ -2333,9 +2435,10 @@ def normalize_extracted_data(extracted_data):
             port = re.sub(r",.*", "", port)
             # Normaliza espaços
             port = re.sub(r"\s+", " ", port).strip()
-            # Para port_terminal_city, manter maiúsculas se já estiver em maiúsculas
-            if port_field == "port_terminal_city" and port.isupper():
-                normalized[port_field] = port
+            
+            # Para port_terminal_city, aplicar padronização com Ellox
+            if port_field == "port_terminal_city":
+                normalized[port_field] = standardize_terminal_name(port)
             else:
                 normalized[port_field] = port.title()
     

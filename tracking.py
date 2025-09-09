@@ -7,9 +7,54 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import re
 from ellox_api import ElloxAPI, enrich_booking_data, format_tracking_display, get_default_api_client
 from database import get_database_connection
 from sqlalchemy import text
+
+def format_cnpj(cnpj_input: str) -> str:
+    """
+    Formata CNPJ no padrão XX.XXX.XXX/XXXX-XX
+    
+    Args:
+        cnpj_input: CNPJ em qualquer formato (só números ou já formatado)
+        
+    Returns:
+        CNPJ formatado ou string original se inválido
+    """
+    if not cnpj_input:
+        return ""
+    
+    # Remove tudo que não é número
+    numbers_only = re.sub(r'[^\d]', '', cnpj_input)
+    
+    # Verifica se tem 14 dígitos
+    if len(numbers_only) != 14:
+        return cnpj_input  # Retorna original se não tiver 14 dígitos
+    
+    # Aplica a máscara XX.XXX.XXX/XXXX-XX
+    formatted = f"{numbers_only[:2]}.{numbers_only[2:5]}.{numbers_only[5:8]}/{numbers_only[8:12]}-{numbers_only[12:14]}"
+    
+    return formatted
+
+def validate_cnpj_format(cnpj: str) -> bool:
+    """
+    Valida se o CNPJ tem o formato correto (14 dígitos)
+    
+    Args:
+        cnpj: CNPJ para validar
+        
+    Returns:
+        True se válido, False caso contrário
+    """
+    if not cnpj:
+        return False
+    
+    # Remove caracteres não numéricos
+    numbers_only = re.sub(r'[^\d]', '', cnpj)
+    
+    # Verifica se tem exatamente 14 dígitos
+    return len(numbers_only) == 14
 
 @st.cache_data(ttl=300)  # Cache por 5 minutos
 def load_ships_from_database():
@@ -272,9 +317,21 @@ def display_voyage_search():
             ship_info = all_ships[all_ships['navio'] == vessel_name]
             if not ship_info.empty:
                 ship_data = ship_info.iloc[0]
-                st.info(f"🚢 **{vessel_name}**\n"
-                       f"Carrier: {ship_data.get('carrier', 'N/A')}\n"
-                       f"Terminal: {ship_data.get('terminal', 'N/A')}")
+                real_carrier = ship_data.get('carrier', 'N/A')
+                real_terminal = ship_data.get('terminal', 'N/A')
+                
+                # Verificar se carrier selecionado difere do real
+                if carrier and carrier != real_carrier:
+                    st.warning(f"⚠️ **Inconsistência detectada!**\n"
+                             f"🚢 Navio: **{vessel_name}**\n"
+                             f"📦 Carrier no banco: **{real_carrier}**\n"
+                             f"📦 Carrier selecionado: **{carrier}**\n"
+                             f"🏢 Terminal: {real_terminal}\n\n"
+                             f"💡 **Recomendação**: Use o carrier do banco para melhor resultado na API")
+                else:
+                    st.info(f"🚢 **{vessel_name}**\n"
+                           f"📦 Carrier: {real_carrier}\n"
+                           f"🏢 Terminal: {real_terminal}")
     
     # Pré-popular terminal se o navio foi selecionado
     if vessel_name and not all_ships.empty and not port_terminal:
@@ -284,10 +341,43 @@ def display_voyage_search():
             if suggested_terminal in terminal_options:
                 st.info(f"💡 Sugestão: Terminal **{suggested_terminal}** (baseado no navio selecionado)")
     
+    # Botão para usar carrier do banco automaticamente
+    if vessel_name and not all_ships.empty:
+        ship_info = all_ships[all_ships['navio'] == vessel_name]
+        if not ship_info.empty:
+            real_carrier = ship_info.iloc[0]['carrier']
+            if carrier != real_carrier:
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button(f"🔄 Usar Carrier do Banco ({real_carrier})", key="use_real_carrier"):
+                        st.session_state.temp_carrier = real_carrier
+                        st.rerun()
+                        
+                # Aplicar carrier do banco se selecionado
+                if st.session_state.get('temp_carrier'):
+                    carrier = st.session_state.temp_carrier
+                    st.success(f"✅ Usando carrier do banco: **{carrier}**")
+    
     if st.button("🚢 Buscar Informações de Tracking"):
         if not vessel_name or not carrier or not voyage:
             st.error("⚠️ Preencha pelo menos Nome do Navio, Carrier e Voyage")
             return
+        
+        # Usar carrier do banco se disponível
+        final_carrier = carrier
+        if vessel_name and not all_ships.empty:
+            ship_info = all_ships[all_ships['navio'] == vessel_name]
+            if not ship_info.empty:
+                real_carrier = ship_info.iloc[0]['carrier']
+                if st.session_state.get('use_bank_carrier', False):
+                    final_carrier = real_carrier
+                    st.info(f"🔄 Usando carrier do banco: **{real_carrier}**")
+                
+                # Aviso especial para carrier "OUTROS"
+                if real_carrier == "OUTROS":
+                    st.warning(f"⚠️ **Atenção**: O navio **{vessel_name}** está classificado como carrier \"**OUTROS**\" no banco.\n"
+                             f"Isso pode indicar que o carrier real não foi identificado corretamente pela API Ellox.\n"
+                             f"A busca pode não retornar resultados precisos.")
         
         with st.spinner("Consultando API Ellox..."):
             client = get_default_api_client()
@@ -297,13 +387,13 @@ def display_voyage_search():
                 return
             result = client.search_voyage_tracking(
                 vessel_name=vessel_name,
-                carrier=carrier,
+                carrier=final_carrier,
                 voyage=voyage,
                 port_terminal=port_terminal
             )
         
         if result.get("success"):
-            st.success("✅ Informações encontradas!")
+            st.success("✅ Viagem encontrada!")
             
             # Exibir dados em formato amigável
             data = result.get("data", {})
@@ -311,23 +401,58 @@ def display_voyage_search():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.metric("Status", data.get("status", "N/A"))
-                st.metric("IMO", data.get("vessel_imo", "N/A"))
+                st.metric("🚢 Navio", data.get("vessel_name", "N/A"))
+                st.metric("📦 Carrier", data.get("carrier", "N/A"))
             
             with col2:
-                st.metric("MMSI", data.get("vessel_mmsi", "N/A"))
-                st.metric("Próximo Porto", data.get("next_port", "N/A"))
+                st.metric("🚢 Voyage", data.get("voyage", "N/A"))
+                st.metric("🏢 Terminal", data.get("terminal", "N/A"))
             
             with col3:
-                st.metric("ETA Estimado", data.get("estimated_arrival", "N/A"))
-                st.metric("Atrasos", data.get("delays", "Nenhum"))
+                st.metric("📋 Status", data.get("status", "N/A"))
+                if data.get("voyage_confirmed"):
+                    st.metric("✅ Voyage Confirmada", "Sim")
+                else:
+                    st.metric("⚠️ Voyage Confirmada", "Não")
+            
+            # Mostrar voyages disponíveis
+            if data.get("available_voyages"):
+                st.info(f"🚢 **Voyages disponíveis para este navio:** {', '.join(data.get('available_voyages', []))}")
             
             # Exibir dados completos em expandir
-            with st.expander("📋 Dados Completos da API"):
+            with st.expander("📋 Dados Técnicos Completos"):
                 st.json(data)
         
         else:
-            st.error(f"❌ {result.get('error', 'Erro na consulta')}")
+            error_msg = result.get('error', 'Erro desconhecido')
+            st.error(f"❌ {error_msg}")
+            
+            # Se o navio foi encontrado mas não a voyage, mostrar informações úteis
+            if result.get("data"):
+                data = result.get("data", {})
+                st.warning("⚠️ **Navio encontrado, mas voyage específica não disponível**")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info(f"🚢 **Navio**: {data.get('vessel_name', 'N/A')}")
+                    st.info(f"🏢 **Terminal**: {data.get('terminal', 'N/A')}")
+                
+                with col2:
+                    st.info(f"🚢 **Voyage procurada**: {data.get('voyage', 'N/A')}")
+                    if data.get("available_voyages"):
+                        st.success(f"🚢 **Voyages disponíveis**: {', '.join(data.get('available_voyages', []))}")
+                
+                st.info("💡 **Sugestão**: Tente uma das voyages disponíveis listadas acima")
+            
+            # Verificar outros tipos de erro
+            elif result.get("suggestion"):
+                st.info(f"💡 **Sugestão**: {result.get('suggestion')}")
+            
+            if result.get("website_url"):
+                st.markdown(f"🌐 **Consulte diretamente no site:** [{result.get('website_url')}]({result.get('website_url')})")
+            
+            if result.get("status_code") == 404 and not result.get("data"):
+                st.info("💡 **Dica**: Verifique se os dados estão corretos ou se a viagem já foi finalizada.")
 
 def display_bookings_tracking():
     """Interface para tracking de bookings existentes"""
@@ -553,7 +678,7 @@ def display_vessel_schedule():
         
         else:
             st.error(f"❌ {result.get('error')}")
-
+ 
 def exibir_tracking():
     """Interface principal do módulo de tracking integrado ao Farol"""
     
@@ -571,11 +696,12 @@ def exibir_tracking():
         st.error("❌ Falha na autenticação com a API Ellox - Verifique as credenciais")
     
     # Tabs principais
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🔍 Busca Manual", 
         "📦 Bookings Existentes", 
         "📅 Cronograma de Navios",
-        "📊 Dados da API"
+        "📊 Dados da API",
+        "🔔 Monitoramento"
     ])
     
     with tab1:
@@ -590,6 +716,397 @@ def exibir_tracking():
     with tab4:
         display_ellox_database_data()
     
+    with tab5:
+        display_vessel_monitoring()
+    
+def display_vessel_monitoring():
+    """Interface para monitoramento de navios"""
+    st.markdown("### 🔔 Terminal - Monitoramento de Navios")
+    
+    # Carregar dados do banco com cache
+    all_ships = load_ships_from_database()
+    all_terminals = load_terminals_from_database()
+    
+    # Preparar opções para selectbox
+    ship_options = [""] + sorted(all_ships['navio'].unique().tolist()) if not all_ships.empty else [""]
+    terminal_options = [""] + all_terminals['nome'].tolist() if not all_terminals.empty else [""]
+    
+    # Sub-tabs para diferentes funcionalidades
+    subtab1, subtab2 = st.tabs(["📝 Solicitar Monitoramento", "👁️ Visualizar Monitoramento"])
+    
+    with subtab1:
+        st.markdown("#### 📝 Solicitar Monitoramento de Navios")
+        
+        # Configuração do cliente
+        st.markdown("##### 🏢 Configuração do Cliente")
+        cnpj_client_raw = st.text_input(
+            "CNPJ do Cliente",
+            placeholder="00.000.000/0000-00 ou 00000000000000",
+            help="CNPJ da empresa que está solicitando o monitoramento (digite apenas números ou formatado)"
+        )
+        
+        # Formatação automática do CNPJ
+        cnpj_client = ""
+        if cnpj_client_raw:
+            cnpj_client = format_cnpj(cnpj_client_raw)
+            if cnpj_client != cnpj_client_raw:
+                st.info(f"🔄 **CNPJ formatado automaticamente:** `{cnpj_client}`")
+            
+            if not validate_cnpj_format(cnpj_client):
+                st.error("❌ CNPJ deve ter exatamente 14 dígitos")
+            else:
+                st.success(f"✅ CNPJ válido: `{cnpj_client}`")
+        
+        # Seção para múltiplas solicitações
+        st.markdown("##### 🚢 Navios para Monitoramento")
+        
+        # Inicializar session state para múltiplas solicitações
+        if 'monitoring_requests' not in st.session_state:
+            st.session_state.monitoring_requests = []
+        
+        # Formulário para adicionar nova solicitação
+        with st.form("add_monitoring_request"):
+            st.markdown("**Adicionar Navio ao Monitoramento**")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Filtro por carrier
+                carrier_filter = st.selectbox(
+                    "🔍 Filtrar por Carrier (Opcional)",
+                    ["Todos"] + ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"],
+                    key="monitoring_carrier_filter"
+                )
+                
+                # Filtrar navios por carrier
+                filtered_ship_options = ship_options
+                if carrier_filter != "Todos" and not all_ships.empty:
+                    filtered_ships = all_ships[all_ships['carrier'] == carrier_filter]['navio'].unique()
+                    filtered_ship_options = [""] + sorted(filtered_ships.tolist())
+                
+                vessel_name = st.selectbox(
+                    "Nome do Navio",
+                    filtered_ship_options,
+                    key="monitoring_vessel"
+                )
+                
+                terminal_name = st.selectbox(
+                    "Terminal",
+                    terminal_options,
+                    key="monitoring_terminal"
+                )
+            
+            with col2:
+                # Buscar voyages automaticamente quando navio e terminal são selecionados
+                available_voyages = []
+                if vessel_name and terminal_name and not all_terminals.empty:
+                    terminal_info = all_terminals[all_terminals['nome'] == terminal_name]
+                    if not terminal_info.empty:
+                        terminal_cnpj = terminal_info.iloc[0]['cnpj']
+                        
+                        # Buscar voyages via API
+                        try:
+                            client = get_default_api_client()
+                            if client.authenticated:
+                                from urllib.parse import quote
+                                encoded_ship = quote(vessel_name)
+                                voyages_response = client._make_api_request(
+                                    f"/api/voyages?ship={encoded_ship}&terminal={terminal_cnpj}"
+                                )
+                                if voyages_response.get("success"):
+                                    available_voyages = voyages_response.get("data", [])
+                        except:
+                            pass
+                
+                # Campo de texto para voyage
+                viagem_navio = st.text_input(
+                    "Voyage do Navio",
+                    key="monitoring_voyage_text",
+                    placeholder="Ex: 044E, MM223A, etc.",
+                    help="Digite a voyage do navio"
+                )
+                
+                # Mostrar voyages disponíveis como sugestão (se houver)
+                if available_voyages:
+                    st.info(f"💡 **Sugestões da API**: {', '.join(available_voyages[:10])}")
+                    if len(available_voyages) > 10:
+                        st.info(f"... e mais {len(available_voyages) - 10} voyages disponíveis")
+            
+            # Botão para adicionar à lista
+            add_button = st.form_submit_button("➕ Adicionar à Lista de Monitoramento")
+            
+            if add_button:
+                if vessel_name and terminal_name and viagem_navio:
+                    # Buscar CNPJ do terminal
+                    terminal_info = all_terminals[all_terminals['nome'] == terminal_name]
+                    if not terminal_info.empty:
+                        cnpj_terminal = terminal_info.iloc[0]['cnpj']
+                        
+                        new_request = {
+                            "cnpj_terminal": cnpj_terminal,
+                            "nome_navio": vessel_name,
+                            "viagem_navio": viagem_navio,
+                            "terminal_name": terminal_name  # Para exibição
+                        }
+                        
+                        # Verificar se já existe
+                        exists = any(
+                            req["nome_navio"] == vessel_name and 
+                            req["viagem_navio"] == viagem_navio and
+                            req["cnpj_terminal"] == cnpj_terminal
+                            for req in st.session_state.monitoring_requests
+                        )
+                        
+                        if not exists:
+                            st.session_state.monitoring_requests.append(new_request)
+                            st.success(f"✅ {vessel_name} - {viagem_navio} adicionado!")
+                        else:
+                            st.warning("⚠️ Esta combinação já está na lista")
+                    else:
+                        st.error("❌ Terminal não encontrado")
+                else:
+                    st.error("❌ Preencha todos os campos obrigatórios")
+        
+        # Mostrar lista atual de solicitações
+        if st.session_state.monitoring_requests:
+            st.markdown("##### 📋 Lista de Monitoramentos Solicitados")
+            
+            for i, req in enumerate(st.session_state.monitoring_requests):
+                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                
+                with col1:
+                    st.text(f"🚢 {req['nome_navio']}")
+                with col2:
+                    st.text(f"🏢 {req['terminal_name']}")
+                with col3:
+                    st.text(f"🚢 {req['viagem_navio']}")
+                with col4:
+                    if st.button("🗑️", key=f"remove_{i}", help="Remover da lista"):
+                        st.session_state.monitoring_requests.pop(i)
+                        st.rerun()
+            
+            # Botões de ação
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("🧹 Limpar Lista"):
+                    st.session_state.monitoring_requests = []
+                    st.rerun()
+            
+            with col2:
+                if st.button("📋 Exportar JSON"):
+                    import json
+                    json_data = json.dumps(st.session_state.monitoring_requests, indent=2, ensure_ascii=False)
+                    st.code(json_data, language="json")
+            
+            with col3:
+                # Botão principal para solicitar monitoramento
+                if st.button("🔔 Solicitar Monitoramento", type="primary"):
+                    if cnpj_client and st.session_state.monitoring_requests:
+                        if not validate_cnpj_format(cnpj_client):
+                            st.error("❌ CNPJ deve ter 14 dígitos válidos")
+                        else:
+                            with st.spinner("Verificando empresa no sistema..."):
+                                client = get_default_api_client()
+                                
+                                if client.authenticated:
+                                    # Primeiro verifica se o CNPJ existe no sistema
+                                    company_check = client.check_company_exists(cnpj_client)
+                                    
+                                    if company_check.get("success"):
+                                        if company_check.get("exists"):
+                                            st.success(f"✅ {company_check.get('message')}")
+                                            
+                                            # Empresa encontrada, prossegue com a solicitação
+                                            with st.spinner("Enviando solicitação de monitoramento..."):
+                                                # Preparar dados para API (sem terminal_name)
+                                                api_requests = [
+                                                    {
+                                                        "cnpj_terminal": req["cnpj_terminal"],
+                                                        "nome_navio": req["nome_navio"],
+                                                        "viagem_navio": req["viagem_navio"]
+                                                    }
+                                                    for req in st.session_state.monitoring_requests
+                                                ]
+                                                
+                                                result = client.request_vessel_monitoring(cnpj_client, api_requests)
+                                                
+                                                if result.get("success"):
+                                                    st.success("✅ Monitoramento solicitado com sucesso!")
+                                                    
+                                                    # Mostrar resposta da API
+                                                    data = result.get("data", [])
+                                                    if data:
+                                                        st.markdown("##### 📊 Resposta da API")
+                                                        for item in data:
+                                                            col1, col2, col3 = st.columns(3)
+                                                            with col1:
+                                                                st.metric("🚢 Navio", item.get("nome_navio", "N/A"))
+                                                            with col2:
+                                                                st.metric("🚢 Voyage", item.get("viagem_navio", "N/A"))
+                                                            with col3:
+                                                                st.metric("🏢 CNPJ Shipowner", item.get("cnpj_shipowner", "N/A"))
+                                                    
+                                                    # Limpar lista após sucesso
+                                                    st.session_state.monitoring_requests = []
+                                                    
+                                                else:
+                                                    st.error(f"❌ Erro no monitoramento: {result.get('error')}")
+                                                    if result.get('details'):
+                                                        st.code(result.get('details'), language="text")
+                                        else:
+                                            # Empresa não encontrada
+                                            st.error(f"❌ {company_check.get('message')}")
+                                            st.info(f"💡 {company_check.get('suggestion', '')}")
+                                            
+                                            # Mostrar CNPJs válidos como exemplo
+                                            st.markdown("##### 🏢 CNPJs de Exemplo (Terminais Cadastrados)")
+                                            
+                                            # Buscar alguns CNPJs válidos para mostrar como exemplo
+                                            try:
+                                                terminals_response = client._make_api_request("/api/terminals")
+                                                if terminals_response.get("success"):
+                                                    terminals = terminals_response.get("data", [])
+                                                    if terminals:
+                                                        st.markdown("**Exemplos de CNPJs válidos no sistema:**")
+                                                        for terminal in terminals[:5]:  # Mostrar apenas os primeiros 5
+                                                            terminal_name = terminal.get('nome', 'N/A')
+                                                            terminal_cnpj = terminal.get('cnpj', 'N/A')
+                                                            st.info(f"🏢 **{terminal_name}**: `{terminal_cnpj}`")
+                                            except:
+                                                pass
+                                    else:
+                                        st.error(f"❌ Erro na verificação: {company_check.get('error')}")
+                                else:
+                                    st.error("❌ Falha na autenticação com a API")
+                    else:
+                        st.error("❌ Preencha o CNPJ do cliente e adicione pelo menos um navio")
+        else:
+            st.info("📝 Adicione navios à lista de monitoramento usando o formulário acima")
+    
+    with subtab2:
+        st.markdown("#### 👁️ Visualizar Monitoramento")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            cnpj_client_view_raw = st.text_input(
+                "CNPJ do Cliente",
+                placeholder="00.000.000/0000-00 ou 00000000000000",
+                key="view_cnpj_client",
+                help="Digite apenas números ou formatado"
+            )
+            
+            # Formatação automática do CNPJ para visualização
+            cnpj_client_view = ""
+            if cnpj_client_view_raw:
+                cnpj_client_view = format_cnpj(cnpj_client_view_raw)
+                if cnpj_client_view != cnpj_client_view_raw:
+                    st.info(f"🔄 **CNPJ formatado:** `{cnpj_client_view}`")
+                
+                if not validate_cnpj_format(cnpj_client_view):
+                    st.error("❌ CNPJ deve ter 14 dígitos")
+                else:
+                    st.success(f"✅ CNPJ válido")
+            
+            # Filtro por carrier
+            carrier_filter_view = st.selectbox(
+                "🔍 Filtrar por Carrier (Opcional)",
+                ["Todos"] + ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"],
+                key="view_carrier_filter"
+            )
+            
+            # Filtrar navios por carrier
+            filtered_ship_options_view = ship_options
+            if carrier_filter_view != "Todos" and not all_ships.empty:
+                filtered_ships = all_ships[all_ships['carrier'] == carrier_filter_view]['navio'].unique()
+                filtered_ship_options_view = [""] + sorted(filtered_ships.tolist())
+            
+            vessel_name_view = st.selectbox(
+                "Nome do Navio",
+                filtered_ship_options_view,
+                key="view_vessel"
+            )
+        
+        with col2:
+            terminal_name_view = st.selectbox(
+                "Terminal",
+                terminal_options,
+                key="view_terminal"
+            )
+            
+            # Buscar voyages automaticamente
+            available_voyages_view = []
+            if vessel_name_view and terminal_name_view and not all_terminals.empty:
+                terminal_info = all_terminals[all_terminals['nome'] == terminal_name_view]
+                if not terminal_info.empty:
+                    terminal_cnpj = terminal_info.iloc[0]['cnpj']
+                    
+                    try:
+                        client = get_default_api_client()
+                        if client.authenticated:
+                            from urllib.parse import quote
+                            encoded_ship = quote(vessel_name_view)
+                            voyages_response = client._make_api_request(
+                                f"/api/voyages?ship={encoded_ship}&terminal={terminal_cnpj}"
+                            )
+                            if voyages_response.get("success"):
+                                available_voyages_view = voyages_response.get("data", [])
+                    except:
+                        pass
+            
+            # Campo de texto para voyage
+            viagem_navio_view = st.text_input(
+                "Voyage do Navio",
+                key="view_voyage_text",
+                placeholder="Ex: 044E, MM223A, etc.",
+                help="Digite a voyage do navio"
+            )
+            
+            # Mostrar sugestões da API (se houver)
+            if available_voyages_view:
+                st.info(f"💡 **Sugestões da API**: {', '.join(available_voyages_view[:10])}")
+                if len(available_voyages_view) > 10:
+                    st.info(f"... e mais {len(available_voyages_view) - 10} voyages disponíveis")
+        
+        if st.button("👁️ Consultar Monitoramento"):
+            if cnpj_client_view and vessel_name_view and terminal_name_view and viagem_navio_view:
+                # Buscar CNPJ do terminal
+                terminal_info = all_terminals[all_terminals['nome'] == terminal_name_view]
+                if not terminal_info.empty:
+                    cnpj_terminal_view = terminal_info.iloc[0]['cnpj']
+                    
+                    with st.spinner("Consultando monitoramento..."):
+                        client = get_default_api_client()
+                        
+                        if client.authenticated:
+                            result = client.view_vessel_monitoring(
+                                cnpj_client_view,
+                                cnpj_terminal_view,
+                                vessel_name_view,
+                                viagem_navio_view
+                            )
+                            
+                            if result.get("success"):
+                                st.success(f"✅ {result.get('message')}")
+                                
+                                data = result.get("data", {})
+                                if data:
+                                    st.markdown("##### 📊 Informações do Monitoramento")
+                                    st.json(data)
+                                else:
+                                    st.info("📋 Monitoramento ativo, mas sem dados detalhados disponíveis")
+                            else:
+                                st.error(f"❌ {result.get('error')}")
+                                if result.get('details'):
+                                    st.code(result.get('details'), language="text")
+                        else:
+                            st.error("❌ Falha na autenticação com a API")
+                else:
+                    st.error("❌ Terminal não encontrado")
+            else:
+                st.error("❌ Preencha todos os campos obrigatórios")
+
     # Footer
     st.markdown("---")
     st.markdown("*Powered by [Ellox API - Comexia](https://developers.comexia.digital/)*")

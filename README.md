@@ -18,6 +18,7 @@ Sistema completo de gerenciamento de embarques marítimos com interface web intu
 - [Estrutura do Banco de Dados](#-estrutura-do-banco-de-dados)
 - [Fluxos de Trabalho](#-fluxos-de-trabalho)
 - [API e Integrações](#-api-e-integrações)
+- [Boas Práticas](#-boas-práticas---identificação-de-carriers)
 - [Contribuição](#-contribuição)
 - [Suporte](#-suporte)
 
@@ -383,6 +384,60 @@ POST https://apidtz.comexia.digital/api/auth
   "expiracao": 86400
 }
 ```
+
+### 🏢 Boas Práticas - Identificação de Carriers
+
+#### ⚠️ Importante: Uso de CNPJs vs Nomes de Carriers
+
+**Recomendação**: Sempre utilize **CNPJs** ao invés de nomes de carriers para consultas e identificações no sistema.
+
+#### 🚢 Casos Especiais de Fusões/Aquisições
+
+**COSCO e OOCL - Mesmo CNPJ no Brasil:**
+- **CNPJ**: `02.502.234/0001-62`
+- **Razão Social**: COSCO SHIPPING LINES (BRASIL) S.A.
+- **Motivo**: A COSCO adquiriu a OOCL em 2018, unificando as operações no Brasil
+- **Implicação**: Ambas as marcas (COSCO e OOCL) operam sob o mesmo CNPJ no Brasil
+
+#### 📋 Mapeamento de Carriers para CNPJs
+
+| Carrier | CNPJ | Observações |
+|---------|------|-------------|
+| COSCO | `02.502.234/0001-62` | Inclui operações OOCL |
+| OOCL | `02.502.234/0001-62` | Mesmo CNPJ da COSCO |
+| MAERSK | `33.592.510/0001-54` | Maersk Line Brasil |
+| MSC | `33.592.510/0001-54` | Mediterranean Shipping |
+| HAPAG-LLOYD | `33.592.510/0001-54` | Hapag-Lloyd Brasil |
+| CMA CGM | `33.592.510/0001-54` | CMA CGM Brasil |
+| EVERGREEN | `33.592.510/0001-54` | Evergreen Line Brasil |
+| PIL | `33.592.510/0001-54` | Pacific International Lines |
+
+#### ✅ Benefícios do Uso de CNPJs
+
+1. **Precisão Legal**: CNPJ é identificador único e oficial
+2. **Evita Duplicatas**: Previne registros duplicados por variações de nome
+3. **Compliance**: Atende requisitos regulatórios brasileiros
+4. **Integração**: Facilita integração com sistemas fiscais
+5. **Auditoria**: Melhora rastreabilidade e auditoria
+
+#### 🔍 Como Implementar
+
+```python
+# ❌ Evitar - Uso de nomes
+carrier_name = "COSCO"
+carrier_name = "OOCL"
+
+# ✅ Recomendado - Uso de CNPJ
+carrier_cnpj = "02.502.234/0001-62"  # COSCO/OOCL
+carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
+```
+
+#### 📊 Impacto no Sistema
+
+- **Consultas**: Sempre filtrar por CNPJ nas consultas de banco
+- **Relatórios**: Agrupar dados por CNPJ para análise precisa
+- **Integrações**: Usar CNPJ como chave primária nas integrações
+- **Validações**: Validar CNPJ antes de inserir/atualizar registros
 
 #### Endpoints Disponíveis
 - **`/api/terminals`**: Lista terminais disponíveis

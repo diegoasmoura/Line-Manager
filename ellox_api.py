@@ -202,38 +202,20 @@ class ElloxAPI:
         
         return vessel.upper()
     
-    def search_voyage_tracking(self, vessel_name: str, carrier: str, voyage: str, 
-                             port_terminal: str = None) -> Dict[str, Any]:
+    def _make_api_request(self, endpoint: str, params: dict = None) -> Dict[str, Any]:
         """
-        Busca informações de tracking de uma viagem específica
+        Faz uma requisição à API com tratamento de erros
         
         Args:
-            vessel_name: Nome do navio
-            carrier: Nome do carrier/armador
-            voyage: Código da viagem
-            port_terminal: Terminal portuário (opcional)
+            endpoint: Endpoint da API
+            params: Parâmetros da requisição
             
         Returns:
-            Dicionário com informações de tracking da viagem
+            Dicionário com resultado da requisição
         """
         try:
-            # Normalizar dados de entrada
-            normalized_carrier = self.normalize_carrier_name(carrier)
-            normalized_vessel = self.normalize_vessel_name(vessel_name)
-            
-            # Parâmetros de busca
-            params = {
-                "vessel_name": normalized_vessel,
-                "carrier": normalized_carrier,
-                "voyage": voyage.upper().strip()
-            }
-            
-            if port_terminal:
-                params["terminal"] = port_terminal
-            
-            # Chamada para endpoint de tracking (ajustar conforme documentação real)
             response = requests.get(
-                f"{self.base_url}/v1/tracking/voyage",
+                f"{self.base_url}{endpoint}",
                 headers=self.headers,
                 params=params,
                 timeout=30
@@ -245,28 +227,370 @@ class ElloxAPI:
                     "data": response.json(),
                     "status_code": response.status_code
                 }
-            elif response.status_code == 404:
-                return {
-                    "success": False,
-                    "error": "Viagem não encontrada na base de dados",
-                    "status_code": response.status_code
-                }
             else:
                 return {
                     "success": False,
-                    "error": f"Erro na API: {response.status_code} - {response.text}",
+                    "error": f"HTTP {response.status_code}: {response.text}",
                     "status_code": response.status_code
                 }
                 
         except requests.exceptions.Timeout:
             return {
                 "success": False,
-                "error": "Timeout na consulta à API"
+                "error": "Timeout na requisição"
             }
         except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error": f"Erro de conexão: {str(e)}"
+                "error": f"Erro na requisição: {str(e)}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Erro inesperado: {str(e)}"
+            }
+    
+    def search_voyage_tracking(self, vessel_name: str, carrier: str, voyage: str, 
+                             port_terminal: str = None) -> Dict[str, Any]:
+        """
+        Busca informações de tracking de uma viagem específica usando a API Ellox
+        
+        Args:
+            vessel_name: Nome do navio
+            carrier: Nome do carrier/armador
+            voyage: Código da viagem
+            port_terminal: Terminal portuário (opcional)
+            
+        Returns:
+            Dicionário com informações de tracking da viagem
+        """
+        try:
+            from urllib.parse import quote
+            
+            # Normalizar dados de entrada
+            normalized_vessel = self.normalize_vessel_name(vessel_name)
+            
+            # Primeiro, encontrar o terminal do navio
+            terminals_response = self._make_api_request("/api/terminals")
+            if not terminals_response.get("success"):
+                return {
+                    "success": False,
+                    "error": "Erro ao consultar terminais da API"
+                }
+            
+            terminals = terminals_response.get("data", [])
+            vessel_found = False
+            terminal_info = None
+            voyages_found = []
+            
+            # Procurar o navio em cada terminal
+            for terminal in terminals:
+                terminal_cnpj = terminal.get("cnpj")
+                if not terminal_cnpj:
+                    continue
+                
+                # Se terminal específico foi fornecido, dar prioridade
+                is_preferred_terminal = not port_terminal or terminal.get("name", "").upper() == port_terminal.upper()
+                
+                # Verificar se o navio está neste terminal
+                ships_response = self._make_api_request(f"/api/ships?terminal={terminal_cnpj}")
+                if ships_response.get("success"):
+                    ships = ships_response.get("data", [])
+                    
+                    for ship in ships:
+                        if isinstance(ship, str) and normalized_vessel.upper() in ship.upper():
+                            vessel_found = True
+                            terminal_info = terminal
+                            
+                            # Buscar voyages para este navio neste terminal
+                            encoded_ship = quote(ship)
+                            voyages_response = self._make_api_request(
+                                f"/api/voyages?ship={encoded_ship}&terminal={terminal_cnpj}"
+                            )
+                            
+                            if voyages_response.get("success"):
+                                voyages = voyages_response.get("data", [])
+                                voyages_found.extend(voyages)
+                                
+                                # Verificar se a voyage específica existe
+                                if voyage.upper() in [v.upper() for v in voyages]:
+                                    return {
+                                        "success": True,
+                                        "data": {
+                                            "vessel_name": vessel_name,
+                                            "carrier": carrier,
+                                            "voyage": voyage,
+                                            "terminal": terminal_info.get("name"),
+                                            "terminal_cnpj": terminal_info.get("cnpj"),
+                                            "status": "Viagem encontrada",
+                                            "available_voyages": voyages,
+                                            "voyage_confirmed": True,
+                                            "found_via_api": True
+                                        },
+                                        "status_code": 200
+                                    }
+                            
+                            # Se encontrou no terminal preferido, para
+                            if is_preferred_terminal:
+                                break
+                    
+                    # Se encontrou no terminal preferido, para a busca
+                    if vessel_found and is_preferred_terminal:
+                        break
+            
+            # Se encontrou o navio mas não a voyage específica
+            if vessel_found:
+                return {
+                    "success": False,
+                    "error": f"Navio '{vessel_name}' encontrado, mas voyage '{voyage}' não disponível",
+                    "data": {
+                        "vessel_name": vessel_name,
+                        "carrier": carrier,
+                        "voyage": voyage,
+                        "terminal": terminal_info.get("name") if terminal_info else "N/A",
+                        "terminal_cnpj": terminal_info.get("cnpj") if terminal_info else "N/A",
+                        "available_voyages": voyages_found,
+                        "voyage_confirmed": False,
+                        "found_via_api": True
+                    },
+                    "status_code": 404
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Navio '{vessel_name}' não encontrado nos terminais disponíveis",
+                    "suggestion": f"Verifique se '{vessel_name}' está correto ou consulte diretamente o site da Ellox",
+                    "website_url": "https://elloxdigital.com/",
+                    "status_code": 404
+                }
+                
+        except requests.exceptions.Timeout:
+            return {
+                "success": False,
+                "error": "Timeout na consulta à API - A API pode estar sobrecarregada"
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "success": False,
+                "error": f"Erro na requisição: {str(e)}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Erro inesperado: {str(e)}"
+            }
+    
+    def check_company_exists(self, cnpj: str) -> Dict[str, Any]:
+        """
+        Verifica se uma empresa (CNPJ) existe no sistema
+        
+        Args:
+            cnpj: CNPJ da empresa para verificar
+            
+        Returns:
+            Dicionário com resultado da verificação
+        """
+        try:
+            # Tenta buscar informações da empresa via API
+            # Usando endpoint de terminais que pode retornar info sobre empresas
+            response = requests.get(
+                f"{self.base_url}/api/terminals",
+                headers=self.headers,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                terminals = response.json()
+                
+                # Verifica se o CNPJ existe entre os terminais/empresas
+                cnpj_clean = cnpj.replace(".", "").replace("/", "").replace("-", "")
+                
+                for terminal in terminals:
+                    terminal_cnpj = terminal.get('cnpj', '')
+                    terminal_cnpj_clean = terminal_cnpj.replace(".", "").replace("/", "").replace("-", "")
+                    
+                    if cnpj_clean == terminal_cnpj_clean:
+                        return {
+                            "success": True,
+                            "exists": True,
+                            "company_info": terminal,
+                            "message": f"Empresa encontrada: {terminal.get('nome', 'N/A')}"
+                        }
+                
+                return {
+                    "success": True,
+                    "exists": False,
+                    "message": f"CNPJ {cnpj} não encontrado no sistema",
+                    "suggestion": "Verifique se o CNPJ está correto ou se a empresa está cadastrada na plataforma Ellox"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Erro ao verificar empresa: HTTP {response.status_code}",
+                    "details": response.text
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Erro na verificação da empresa: {str(e)}"
+            }
+
+    def request_vessel_monitoring(self, cnpj_client: str, monitoring_requests: List[Dict[str, str]]) -> Dict[str, Any]:
+        """
+        Solicita monitoramento de navios no sistema
+        
+        Args:
+            cnpj_client: CNPJ do cliente
+            monitoring_requests: Lista de solicitações de monitoramento
+                Cada item deve conter: cnpj_terminal, nome_navio, viagem_navio
+                
+        Returns:
+            Dicionário com resultado da solicitação
+        """
+        try:
+            import json
+            
+            payload = {
+                "cnpj": cnpj_client,
+                "lista": monitoring_requests
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/api/monitor/navio",
+                headers={**self.headers, "Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=30
+            )
+            
+            if response.status_code == 201:
+                return {
+                    "success": True,
+                    "data": response.json(),
+                    "message": "Monitoramento solicitado com sucesso",
+                    "status_code": response.status_code
+                }
+            elif response.status_code == 400:
+                return {
+                    "success": False,
+                    "error": "Dados inválidos ou parâmetros em falta",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+            elif response.status_code == 500:
+                return {
+                    "success": False,
+                    "error": "Erro interno do servidor",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Erro HTTP {response.status_code}",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+                
+        except requests.exceptions.Timeout:
+            return {
+                "success": False,
+                "error": "Timeout na solicitação de monitoramento"
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "success": False,
+                "error": f"Erro na requisição: {str(e)}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Erro inesperado: {str(e)}"
+            }
+    
+    def view_vessel_monitoring(self, cnpj_client: str, cnpj_terminal: str, 
+                              nome_navio: str, viagem_navio: str) -> Dict[str, Any]:
+        """
+        Visualiza monitoramento de um navio específico
+        
+        Args:
+            cnpj_client: CNPJ do cliente
+            cnpj_terminal: CNPJ do terminal de embarque
+            nome_navio: Nome do navio
+            viagem_navio: Identificador da viagem
+            
+        Returns:
+            Dicionário com informações do monitoramento
+        """
+        try:
+            import json
+            
+            payload = {
+                "cnpj": cnpj_client,
+                "cnpj_terminal": cnpj_terminal,
+                "nome_navio": nome_navio,
+                "viagem_navio": viagem_navio
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/api/terminalmonitorings",
+                headers={**self.headers, "Content-Type": "application/json"},
+                data=json.dumps(payload),
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "data": response.json(),
+                    "message": "Monitoramento encontrado",
+                    "status_code": response.status_code
+                }
+            elif response.status_code == 201:
+                return {
+                    "success": True,
+                    "data": response.json(),
+                    "message": "Monitoramento criado/atualizado",
+                    "status_code": response.status_code
+                }
+            elif response.status_code == 400:
+                return {
+                    "success": False,
+                    "error": "Dados inválidos ou parâmetros em falta",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+            elif response.status_code == 404:
+                return {
+                    "success": False,
+                    "error": "Monitoramento não encontrado",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+            elif response.status_code == 500:
+                return {
+                    "success": False,
+                    "error": "Erro interno do servidor",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Erro HTTP {response.status_code}",
+                    "details": response.text,
+                    "status_code": response.status_code
+                }
+                
+        except requests.exceptions.Timeout:
+            return {
+                "success": False,
+                "error": "Timeout na consulta de monitoramento"
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "success": False,
+                "error": f"Erro na requisição: {str(e)}"
             }
         except Exception as e:
             return {
