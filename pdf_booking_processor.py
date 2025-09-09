@@ -20,7 +20,6 @@ from sqlalchemy import text
 import uuid
 import os
 import glob
-from ellox_api import enrich_booking_data, format_tracking_display, get_default_api_client
 
 try:
     import pdfplumber
@@ -2372,6 +2371,53 @@ def standardize_terminal_name(terminal_name):
     # Se não encontrar correspondência, retornar o nome original limpo
     return re.sub(r'\s+', ' ', terminal_name.strip())
 
+@st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
+def load_ships_from_database():
+    """
+    Carrega lista de navios únicos da tabela F_ELLOX_SHIPS.
+    Como um navio pode estar em múltiplos terminais, retorna apenas uma entrada por navio.
+    
+    Returns:
+        list: Lista de tuplas (nome, carrier) dos navios únicos
+    """
+    try:
+        conn = get_database_connection()
+        # Buscar navios únicos (um registro por nome de navio)
+        query = text("""
+            SELECT DISTINCT NOME, CARRIER 
+            FROM F_ELLOX_SHIPS 
+            ORDER BY NOME
+        """)
+        result = conn.execute(query).fetchall()
+        conn.close()
+        
+        ships = [(row[0], row[1]) for row in result]
+        return ships
+    except Exception as e:
+        st.error(f"Erro ao carregar navios: {str(e)}")
+        return []
+
+@st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
+def load_terminals_from_database():
+    """
+    Carrega lista de terminais da tabela F_ELLOX_TERMINALS.
+    
+    Returns:
+        list: Lista de nomes dos terminais
+    """
+    try:
+        conn = get_database_connection()
+        query = text("SELECT NOME FROM F_ELLOX_TERMINALS ORDER BY NOME")
+        result = conn.execute(query).fetchall()
+        conn.close()
+        
+        terminals = [row[0] for row in result]
+        return terminals
+    except Exception as e:
+        st.error(f"Erro ao carregar terminais: {str(e)}")
+        return []
+
+
 def normalize_extracted_data(extracted_data):
     """
     Normaliza e valida os dados extraídos.
@@ -2641,12 +2687,6 @@ def display_pdf_validation_interface(processed_data):
         
         # Segunda linha: Nome do Navio, Carrier/Armador e Voyage
         col3, col4, col5 = st.columns(3)
-        with col3:
-            vessel_name = st.text_input(
-                "Nome do Navio",
-                value=processed_data.get("vessel_name", ""),
-                help="Nome da embarcação"
-            )
         with col4:
             carrier = st.selectbox(
                 "Carrier/Armador",
@@ -2654,6 +2694,35 @@ def display_pdf_validation_interface(processed_data):
                 index=0 if processed_data["carrier"] == "GENERIC" else 
                       ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(processed_data["carrier"]) 
                       if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 8
+            )
+        with col3:
+            # Carregar navios do banco de dados
+            ships_data = load_ships_from_database()
+            ship_names = [ship[0] for ship in ships_data]
+            
+            # Encontrar índice do navio extraído
+            extracted_vessel = processed_data.get("vessel_name", "")
+            vessel_index = 0
+            
+            if extracted_vessel:
+                # Buscar correspondência case-insensitive
+                extracted_lower = extracted_vessel.lower()
+                ship_names_lower = [name.lower() for name in ship_names]
+                
+                if extracted_lower in ship_names_lower:
+                    # Encontrou correspondência case-insensitive, usar a versão do banco
+                    vessel_index = ship_names_lower.index(extracted_lower)
+                else:
+                    # Normalizar o nome extraído para Title Case antes de adicionar
+                    normalized_vessel = extracted_vessel.title()
+                    ship_names.insert(0, normalized_vessel)
+                    vessel_index = 0
+            
+            vessel_name = st.selectbox(
+                "Nome do Navio",
+                options=ship_names,
+                index=vessel_index,
+                help="Selecione o navio da lista"
             )
         with col5:
             voyage = st.text_input(
@@ -2685,10 +2754,24 @@ def display_pdf_validation_interface(processed_data):
                 help="Porto de transbordo (se houver)"
             )
         with col7b:
-            port_terminal_city = st.text_input(
+            # Carregar terminais do banco de dados
+            terminals_data = load_terminals_from_database()
+            
+            # Encontrar índice do terminal extraído
+            extracted_terminal = processed_data.get("port_terminal_city", "")
+            terminal_index = 0
+            if extracted_terminal and extracted_terminal in terminals_data:
+                terminal_index = terminals_data.index(extracted_terminal)
+            elif extracted_terminal:
+                # Se não encontrar exato, adicionar como opção
+                terminals_data.insert(0, extracted_terminal)
+                terminal_index = 0
+            
+            port_terminal_city = st.selectbox(
                 "Port Terminal City",
-                value=processed_data.get("port_terminal_city", ""),
-                help="Cidade do terminal portuário"
+                options=terminals_data,
+                index=terminal_index,
+                help="Selecione o terminal da lista ou digite para buscar"
             )
         
         # Converte datas do formato DD/MM/YYYY para datetime
@@ -2756,80 +2839,6 @@ def display_pdf_validation_interface(processed_data):
                 help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
-        # Seção de Enriquecimento via API Ellox
-        st.markdown("---")
-        st.markdown("### 🚢 Informações de Tracking (API Ellox)")
-        
-        # Verificar autenticação automática
-        client = get_default_api_client()
-        
-        col_api1, col_api2 = st.columns([2, 1])
-        
-        with col_api1:
-            if client.authenticated:
-                st.success("✅ Sistema de tracking ativo - Dados serão consultados automaticamente")
-            else:
-                st.warning("⚠️ Sistema de tracking indisponível - Verifique conectividade")
-        
-        with col_api2:
-            consult_api = st.checkbox(
-                "Consultar API Ellox",
-                value=client.authenticated,
-                help="Consulta informações de tracking da viagem via API Ellox",
-                disabled=not client.authenticated
-            )
-        
-        # Consulta da API se habilitada
-        tracking_info = None
-        if consult_api and client.authenticated and vessel_name and carrier and voyage:
-            with st.spinner("🔍 Consultando informações de tracking..."):
-                try:
-                    # Preparar dados para enriquecimento
-                    booking_data = {
-                        "vessel_name": vessel_name,
-                        "carrier": carrier,
-                        "voyage": voyage,
-                        "port_terminal_city": port_terminal_city
-                    }
-                    
-                    enriched_data = enrich_booking_data(booking_data, client)
-                    tracking_info = enriched_data.get("api_tracking")
-                    
-                    if tracking_info and tracking_info.get("success"):
-                        st.success("✅ Informações de tracking obtidas com sucesso!")
-                        
-                        # Exibir informações de tracking
-                        api_data = tracking_info.get("data", {})
-                        
-                        if api_data:
-                            col_t1, col_t2, col_t3 = st.columns(3)
-                            
-                            with col_t1:
-                                st.metric("IMO", api_data.get("vessel_imo", "N/A"))
-                                st.metric("Status", api_data.get("status", "N/A"))
-                            
-                            with col_t2:
-                                st.metric("Próximo Porto", api_data.get("next_port", "N/A"))
-                                st.metric("ETA Estimado", api_data.get("estimated_arrival", "N/A"))
-                            
-                            with col_t3:
-                                current_pos = api_data.get("current_position", {})
-                                if current_pos:
-                                    pos_text = f"{current_pos.get('latitude', 'N/A')}, {current_pos.get('longitude', 'N/A')}"
-                                else:
-                                    pos_text = "N/A"
-                                st.metric("Posição Atual", pos_text)
-                                st.metric("Atrasos", api_data.get("delays", "Nenhum"))
-                            
-                            # Alertas importantes
-                            if api_data.get("delays"):
-                                st.warning(f"⚠️ **Atraso reportado:** {api_data['delays']}")
-                    
-                    elif tracking_info:
-                        st.warning(f"⚠️ {tracking_info.get('error', 'Erro na consulta da API')}")
-                
-                except Exception as e:
-                    st.error(f"❌ Erro ao consultar API: {str(e)}")
         
         # Campos ETD e ETA movidos para a quarta linha acima
         

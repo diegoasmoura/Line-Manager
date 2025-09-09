@@ -210,6 +210,14 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Validação e correção de informações
 - Interface de confirmação
 - Integração com sistema de anexos
+- Dropdowns alimentados pelo banco (navios/terminais) via `F_ELLOX_SHIPS` e `F_ELLOX_TERMINALS`
+- "Nome do Navio": busca case-insensitive e normalização, evitando duplicatas entre valor extraído do PDF e valor do banco
+- Normalização de `port_terminal_city` com mapeamento para padrão Ellox (`standardize_terminal_name`)
+- Limpeza de nomes de portos removendo parênteses e conteúdos após vírgula
+- `voyage` normalizado removendo espaços internos (ex.: "002 E" → "002E")
+- `Voyage do Navio`: campo de texto com sugestões via API exibidas como dica
+- Cache de listas com `@st.cache_data(ttl=300)` para refletir atualizações
+- Removida a validação "navio pertence ao carrier"
 
 ### 🗄️ `database.py`
 **Camada de dados**
@@ -239,6 +247,11 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Consulta de cronogramas de navios
 - Status visual da conectividade da API
 - Configuração interativa de credenciais
+- Aba "🔔 Monitoramento" com subtabs:
+  - "📝 Solicitar Monitoramento": POST `/api/monitor/navio` e `/api/monitor/shipowner`
+  - "👁️ Visualizar Monitoramento": POST `/api/terminalmonitorings` e `/api/shipownermonitorings`
+- Formatação e validação de CNPJ; checagem prévia de existência (`check_company_exists`)
+- Autenticação automática (sem chave manual no sidebar) e indicador 🟢/🟡/🔴
 
 ### 🚢 `ellox_api.py`
 **Cliente da API Ellox**
@@ -248,6 +261,12 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Padronização de nomenclaturas
 - Teste de conectividade em tempo real
 - Tratamento robusto de erros
+- Base URL: `https://apidtz.comexia.digital`
+- Autenticação em `/api/auth` com payload `{ email, senha }`
+- `_make_api_request` padroniza chamadas com timeout e tratamento de erros
+- `search_voyage_tracking` usa `/api/voyages?ship=NOME&terminal=CNPJ` e sugere voyages disponíveis
+- `check_company_exists` verifica CNPJ em terminais Ellox
+- Monitoramento: `POST /api/monitor/navio`, `POST /api/terminalmonitorings`, `POST /api/monitor/shipowner`, `POST /api/shipownermonitorings`
 
 ### 📝 `nomenclature_standardizer.py`
 **Padronização de Dados**
@@ -315,6 +334,45 @@ F_CON_SALES_BOOKING_DATA (1) ←→ (N) F_CON_RETURN_CARRIERS
 F_CON_SALES_BOOKING_DATA (1) ←→ (N) F_CON_ANEXOS
 ```
 
+### Tabelas Ellox (Locais)
+
+#### `F_ELLOX_TERMINALS`
+Tabela de terminais obtidos via Ellox
+```sql
+- ID (PK)
+- NOME
+- CNPJ
+- CIDADE
+- UF
+```
+
+#### `F_ELLOX_SHIPS`
+Tabela de navios obtidos via Ellox
+```sql
+- ID (PK)
+- NOME
+- CARRIER
+- TERMINAL
+```
+
+#### `F_ELLOX_VOYAGES`
+Tabela de viagens por navio/terminal
+```sql
+- ID (PK)
+- NAVIO
+- TERMINAL
+- VIAGEM
+```
+
+#### `F_ELLOX_CARRIERS`
+Tabela de carriers (armadores) e CNPJs
+```sql
+- ID (PK)
+- NOME
+- NOME_COMPLETO
+- CNPJ
+```
+
 ## 🔄 Fluxos de Trabalho
 
 ### 1. Criação de Novo Embarque
@@ -362,7 +420,7 @@ update_sales_booking_from_return_carriers() # Atualiza dados principais
 - **API Ellox (Comexia)**: Tracking marítimo em tempo real
   - URL Base: `https://apidtz.comexia.digital`
   - Autenticação: Email/Senha com token JWT
-  - Endpoints: `/api/auth`, `/api/terminals`, `/api/ships`, `/api/voyages`
+  - Endpoints: `/api/auth`, `/api/terminals`, `/api/ships`, `/api/voyages`, `/api/monitor/navio`, `/api/terminalmonitorings`, `/api/shipownermonitorings`, `/api/monitor/shipowner`
 - **Sistema de Email**: Processamento de PDFs recebidos
 - **Sistemas ERP**: Integração via views e triggers
 
@@ -374,7 +432,7 @@ update_sales_booking_from_return_carriers() # Atualiza dados principais
 POST https://apidtz.comexia.digital/api/auth
 {
   "email": "user@example.com",
-  "senha": "password"
+  "senha": "password"  # campo correto: "senha"
 }
 
 # Resposta
@@ -384,6 +442,19 @@ POST https://apidtz.comexia.digital/api/auth
   "expiracao": 86400
 }
 ```
+
+#### Voyages
+```text
+GET /api/voyages?ship=NOME&terminal=CNPJ
+```
+Retorna viagens disponíveis para um navio e terminal. Útil para sugerir voyages quando não há correspondência exata.
+
+#### Monitoramento
+- Solicitar (Terminal): `POST /api/monitor/navio`
+- Visualizar (Terminal): `POST /api/terminalmonitorings`
+- Solicitar (ShipOwner): `POST /api/monitor/shipowner`
+- Visualizar (ShipOwner): `POST /api/shipownermonitorings`
+Observação: alguns CNPJs de clientes só são aceitos se estiverem na base interna de `companies` da Ellox. Utilize a verificação prévia via `check_company_exists`.
 
 ### 🏢 Boas Práticas - Identificação de Carriers
 
