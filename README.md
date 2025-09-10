@@ -218,7 +218,8 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - `Voyage do Navio`: campo de texto com sugestões via API exibidas como dica
 - Cache de listas com `@st.cache_data(ttl=300)` para refletir atualizações
 - Removida a validação "navio pertence ao carrier"
- - Coleta automática de monitoramento ao validar o PDF (Ellox): usa `collect_voyage_monitoring_data(vessel_name, port_terminal_city)`, resolve CNPJ do terminal via `F_ELLOX_TERMINALS` (com `standardize_terminal_name`) e salva na `F_ELLOX_TERMINAL_MONITORINGS`
+ - Coleta automática de monitoramento ao validar o PDF (Ellox): agora a função `collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code)`
+   1) autentica, 2) solicita monitoramento (`POST /api/monitor/navio`, tolera "already exist"), 3) visualiza (`POST /api/terminalmonitorings`), 4) salva na `F_ELLOX_TERMINAL_MONITORINGS`
 
 ### 🗄️ `database.py`
 **Camada de dados**
@@ -261,6 +262,12 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - A alimentação é automática ao validar um PDF, via `collect_voyage_monitoring_data` (ver `pdf_booking_processor.py`)
 - Função de busca: `get_voyage_monitoring_for_reference(farol_reference)` com busca case-insensitive por navio
 
+#### Melhorias recentes na aba "Histórico de Viagens"
+- Tabela posicionada acima dos botões, alinhada às demais abas
+- Removidos título/emoji redundantes e textos de debug acima da tabela
+- Datas numéricas (epoch em ms) convertidas para `DD/MM/YYYY HH:MM` e exibidas como texto
+- Removida limitação de exibição (`.head(10)`), passando a mostrar todos os registros
+
 ### 🚢 `ellox_api.py`
 **Cliente da API Ellox**
 - Autenticação automática com email/senha
@@ -275,6 +282,24 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - `search_voyage_tracking` usa `/api/voyages?ship=NOME&terminal=CNPJ` e sugere voyages disponíveis
 - `check_company_exists` verifica CNPJ em terminais Ellox
 - Monitoramento: `POST /api/monitor/navio`, `POST /api/terminalmonitorings`, `POST /api/monitor/shipowner`, `POST /api/shipownermonitorings`
+
+### 🧰 `ellox_data_queries.py`
+**Consultas e utilitários sobre as tabelas locais Ellox**
+- Funções de consulta para `F_ELLOX_TERMINALS`, `F_ELLOX_SHIPS`, `F_ELLOX_VOYAGES`, `F_ELLOX_TERMINAL_MONITORINGS`
+- `get_database_stats()`, `search_ships(term)`, listagens por terminal/navio/voyage
+- Fornece DataFrames prontos para UI e relatórios (usado também em interfaces auxiliares)
+
+### 🧪 `ellox_data_extractor.py`
+**Extração e normalização de dados vindos da Ellox**
+- Rotinas de chamada a endpoints Ellox para carregar terminais, navios e voyages
+- Normalização de payloads e conversão para DataFrames padronizados
+- Funções de carga em lote (upsert) para popular as tabelas locais Ellox
+
+### 🛠️ `setup_ellox_database.py`
+**Bootstrapping do banco local Ellox**
+- Script de inicialização para criar/preencher as tabelas locais Ellox
+- Orquestra a extração via `ellox_data_extractor.py` e persiste no Oracle (upsert idempotente)
+- Pode ser reexecutado com segurança para atualizar cadastros (terminais/navios/voyages)
 
 ### 📝 `nomenclature_standardizer.py`
 **Padronização de Dados**
@@ -685,6 +710,27 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.2
+- Integração automática com Ellox após validação de PDF: autentica → solicita monitoramento (tolera "Tracked ship already exist") → visualiza → salva em `F_ELLOX_TERMINAL_MONITORINGS`
+- Correções na aba "Histórico de Viagens":
+  - tabela movida acima dos botões; remoção de título/emoji e texto "Dados de Monitoramento:"
+  - datas em epoch ms convertidas para `DD/MM/YYYY HH:MM` e exibidas como texto
+  - removida limitação `.head(10)`, exibindo todos os registros
+- Hapag-Lloyd (extração de PDFs):
+  - prioriza "Nossa Referência" para `booking_reference` e aceita IDs longos (ex.: `HLCUSS5250729291`)
+  - `quantity` extraída de formatos como `4x45GP` (nunca < 1)
+  - `vessel_name` corrige falsos positivos (ex.: "Is In Carrier") e reconhece nomes conhecidos
+  - rotas multi-leg: `pod` é o destino final (ex.: HO CHI MINH CITY); `transhipment_port` é a primeira conexão (ex.: SHANGHAI/TANGER MED)
+  - `port_terminal_city` prioriza "BRASIL TERMINAL PORTUARIO SA"
+  - `pdf_print_date` a partir de "Date of Issue" com normalização para `YYYY-MM-DD HH:MM:SS`
+  - `etd`/`eta` capturadas do bloco de viagens (Vessel/Inland Waterway)
+- MSC (extração de PDFs):
+  - suporte a rótulos em PT: "NAVIO E VIAGEM", "PORTO DE EMBARQUE", "PORTO DE TRANSBORDO", "PORTO DE DESCARGA", "DESTINO FINAL"
+  - `quantity` de linhas como "14 40' HIGH CUBE"; `port_terminal_city` como "BRASIL TERMINAL PORTUARIO S/A"
+  - `eta` de "DATA PREVISTA DE CHEGADA"; `pdf_print_date` do cabeçalho (inclui AM/PM), normalizada
+  - `etd` deixada em branco quando não fornecida (evita `today()` como default)
+- OOCL e PIL: melhorias gerais e normalização de datas/portos
+- `teste.ipynb`: fluxo robusto (auth → solicitar → visualizar), trata 500 "already exist" e persiste no Oracle; opção de exportar Excel
 ### 📌 v3.1
 - Dropdown de "Nome do Navio" com correspondência case-insensitive, evitando duplicatas entre valores do PDF e do banco
 - Normalização de terminais para padrão Ellox ao validar dados extraídos
