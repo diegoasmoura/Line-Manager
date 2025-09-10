@@ -1204,72 +1204,149 @@ def exibir_history():
                     
                     # Card para cada viagem - layout mais limpo
                     with st.container():
-                        # Título mais compacto
-                        st.markdown(f"**🚢 {voyage_key}**")
+                        # Função helper para formatar datas
+                        def format_date_safe(date_val):
+                            if date_val and hasattr(date_val, 'strftime'):
+                                return date_val.strftime('%d/%m/%Y %H:%M')
+                            elif date_val:
+                                return str(date_val)
+                            return 'N/A'
                         
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.metric("🏗️", latest_record.get('terminal', 'N/A'))
-                        with col2:
-                            # ETA formatada
-                            eta_formatted = latest_record.get('data_estimativa_chegada', 'N/A')
-                            if eta_formatted and eta_formatted != 'N/A':
-                                try:
-                                    if hasattr(eta_formatted, 'strftime'):
-                                        eta_str = eta_formatted.strftime('%d/%m/%Y %H:%M')
-                                    else:
-                                        eta_str = str(eta_formatted)
-                                    st.metric("⏰", eta_str)
-                                except:
-                                    st.metric("⏰", "N/A")
-                            else:
-                                st.metric("⏰", "N/A")
-                        with col3:
-                            # Status baseado se já chegou
-                            status = "🟢 Chegou" if latest_record.get('data_chegada') else "🟡 Em Trânsito"
-                            st.metric("📊", status)
-                        with col4:
-                            # Data de atualização
-                            atualizacao = latest_record.get('data_atualizacao', 'N/A')
-                            if atualizacao and atualizacao != 'N/A':
-                                try:
-                                    if hasattr(atualizacao, 'strftime'):
-                                        atualizacao_str = atualizacao.strftime('%d/%m/%Y %H:%M')
-                                    else:
-                                        atualizacao_str = str(atualizacao)
-                                    st.metric("📅", atualizacao_str)
-                                except:
-                                    st.metric("📅", "N/A")
-                            else:
-                                st.metric("📅", "N/A")
+                        # Layout card expandido mantendo o estilo original
+                        st.markdown(f"""
+                        <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
+                                   padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 600; color: #2c3e50; margin-bottom: 0.25rem;">
+                                        🚢 {latest_record.get('navio', 'N/A')} - {latest_record.get('viagem', 'N/A')}
+                                    </div>
+                                    <div style="color: #7f8c8d; font-size: 0.9em;">
+                                        🏗️ {latest_record.get('terminal', 'N/A')}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">🚀 ETD</div>
+                                    <div style="font-weight: 500; color: #34495e; font-size: 0.85em;">
+                                        {format_date_safe(latest_record.get('data_estimativa_saida'))}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">⛵ ETA</div>
+                                    <div style="font-weight: 500; color: #3498db; font-size: 0.85em;">
+                                        {format_date_safe(latest_record.get('data_estimativa_chegada'))}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">🚪 Gate</div>
+                                    <div style="font-weight: 500; color: #e67e22; font-size: 0.85em;">
+                                        {format_date_safe(latest_record.get('data_abertura_gate'))}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">⏰ Deadline</div>
+                                    <div style="font-weight: 500; color: #e74c3c; font-size: 0.85em;">
+                                        {format_date_safe(latest_record.get('data_deadline'))}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">Status</div>
+                                    <div style="font-weight: 500; color: {'#27ae60' if latest_record.get('data_chegada') else '#f39c12'}; font-size: 0.85em;">
+                                        {'🟢 Chegou' if latest_record.get('data_chegada') else '🟡 Em Trânsito'}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">📅 Atualizado</div>
+                                    <div style="font-weight: 500; color: #8e44ad; font-size: 0.85em;">
+                                        {format_date_safe(latest_record.get('data_atualizacao'))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         # Histórico dessa viagem específica em expander
                         voyage_count = len(voyage_records)
                         if voyage_count > 1:
                             with st.expander(f"📈 Ver histórico ({voyage_count} registros)", expanded=False):
-                                # Detectar e exibir alterações entre registros
-                                st.markdown("#### 📋 Dados Gerais")
+                                # Layout moderno com cards estilizados
+                                st.markdown("""
+                                <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                                           padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
+                                    <h4 style="color: white; margin: 0; text-align: center;">
+                                        📋 Resumo da Viagem
+                                    </h4>
+                                </div>
+                                """, unsafe_allow_html=True)
                                 
-                                # Campos principais em linha horizontal
-                                col1, col2, col3, col4 = st.columns(4)
+                                # Preparar dados
+                                navio_info = f"{latest_record.get('navio', 'N/A')} - {latest_record.get('viagem', 'N/A')}"
+                                terminal_info = latest_record.get('terminal', 'N/A')
+                                
+                                deadline_info = "N/A"
+                                if latest_record.get('data_deadline'):
+                                    deadline_info = latest_record['data_deadline'].strftime('%d/%m/%Y - %H:%M') if hasattr(latest_record['data_deadline'], 'strftime') else str(latest_record['data_deadline'])
+                                
+                                gate_info = "N/A"
+                                if latest_record.get('data_abertura_gate'):
+                                    gate_info = latest_record['data_abertura_gate'].strftime('%d/%m/%Y - %H:%M') if hasattr(latest_record['data_abertura_gate'], 'strftime') else str(latest_record['data_abertura_gate'])
+                                
+                                # Cards informativos com design moderno
+                                col1, col2 = st.columns(2)
+                                
                                 with col1:
-                                    st.markdown(f"**🚢 Navio:**<br>{latest_record.get('navio', 'N/A')} - {latest_record.get('viagem', 'N/A')}", unsafe_allow_html=True)
+                                    st.markdown(f"""
+                                    <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; 
+                                               padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                            <span style="font-size: 1.2em; margin-right: 0.5rem;">🚢</span>
+                                            <strong style="color: #495057;">Navio & Viagem</strong>
+                                        </div>
+                                        <div style="color: #007bff; font-weight: 500; font-size: 0.95em;">
+                                            {navio_info}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    st.markdown(f"""
+                                    <div style="background-color: #f8f9fa; border-left: 4px solid #28a745; 
+                                               padding: 1rem; border-radius: 5px;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                            <span style="font-size: 1.2em; margin-right: 0.5rem;">⏰</span>
+                                            <strong style="color: #495057;">Deadline</strong>
+                                        </div>
+                                        <div style="color: #28a745; font-weight: 500; font-size: 0.95em;">
+                                            {deadline_info}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                
                                 with col2:
-                                    st.markdown(f"**🏗️ Terminal:**<br>{latest_record.get('terminal', 'N/A')}", unsafe_allow_html=True)
-                                with col3:
-                                    # Campo deadline
-                                    if latest_record.get('data_deadline'):
-                                        deadline_str = latest_record['data_deadline'].strftime('%d/%m/%Y - %H:%M') if hasattr(latest_record['data_deadline'], 'strftime') else str(latest_record['data_deadline'])
-                                        st.markdown(f"**⏰ Deadline:**<br>{deadline_str}", unsafe_allow_html=True)
-                                    else:
-                                        st.markdown("**⏰ Deadline:**<br>N/A", unsafe_allow_html=True)
-                                with col4:
-                                    # Campo abertura gate
-                                    if latest_record.get('data_abertura_gate'):
-                                        gate_str = latest_record['data_abertura_gate'].strftime('%d/%m/%Y - %H:%M') if hasattr(latest_record['data_abertura_gate'], 'strftime') else str(latest_record['data_abertura_gate'])
-                                        st.markdown(f"**🚪 Abertura Gate:**<br>{gate_str}", unsafe_allow_html=True)
-                                    else:
-                                        st.markdown("**🚪 Abertura Gate:**<br>N/A", unsafe_allow_html=True)
+                                    st.markdown(f"""
+                                    <div style="background-color: #f8f9fa; border-left: 4px solid #ffc107; 
+                                               padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                            <span style="font-size: 1.2em; margin-right: 0.5rem;">🏗️</span>
+                                            <strong style="color: #495057;">Terminal</strong>
+                                        </div>
+                                        <div style="color: #856404; font-weight: 500; font-size: 0.95em;">
+                                            {terminal_info}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    st.markdown(f"""
+                                    <div style="background-color: #f8f9fa; border-left: 4px solid #dc3545; 
+                                               padding: 1rem; border-radius: 5px;">
+                                        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                            <span style="font-size: 1.2em; margin-right: 0.5rem;">🚪</span>
+                                            <strong style="color: #495057;">Abertura Gate</strong>
+                                        </div>
+                                        <div style="color: #dc3545; font-weight: 500; font-size: 0.95em;">
+                                            {gate_info}
+                                        </div>
+                                    </div>
+                                    """, unsafe_allow_html=True)
                                 
                                 st.markdown("#### 🔄 Alterações Detectadas")
                                 
