@@ -1190,9 +1190,163 @@ def exibir_history():
             # Copia dados
             df_monitoring_display = df_voyage_monitoring.copy()
 
-            # Exibe tabela com dados brutos (funcionando)
             if not df_monitoring_display.empty:
-                st.dataframe(df_monitoring_display, use_container_width=True)
+                # Agrupar por navio/viagem para identificar diferentes viagens
+                df_monitoring_display['navio_viagem'] = df_monitoring_display['navio'].astype(str) + " - " + df_monitoring_display['viagem'].astype(str)
+                
+                # Identificar viagens únicas
+                unique_voyages = df_monitoring_display['navio_viagem'].unique()
+                
+                # Para cada viagem única, mostrar o status atual
+                for i, voyage_key in enumerate(unique_voyages):
+                    voyage_records = df_monitoring_display[df_monitoring_display['navio_viagem'] == voyage_key]
+                    latest_record = voyage_records.iloc[0]  # Mais recente dessa viagem específica
+                    
+                    # Card para cada viagem - layout mais limpo
+                    with st.container():
+                        # Título mais compacto
+                        st.markdown(f"**🚢 {voyage_key}**")
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("🏗️", latest_record.get('terminal', 'N/A'))
+                        with col2:
+                            # ETA formatada
+                            eta_formatted = latest_record.get('data_estimativa_chegada', 'N/A')
+                            if eta_formatted and eta_formatted != 'N/A':
+                                try:
+                                    if hasattr(eta_formatted, 'strftime'):
+                                        eta_str = eta_formatted.strftime('%d/%m/%Y %H:%M')
+                                    else:
+                                        eta_str = str(eta_formatted)
+                                    st.metric("⏰", eta_str)
+                                except:
+                                    st.metric("⏰", "N/A")
+                            else:
+                                st.metric("⏰", "N/A")
+                        with col3:
+                            # Status baseado se já chegou
+                            status = "🟢 Chegou" if latest_record.get('data_chegada') else "🟡 Em Trânsito"
+                            st.metric("📊", status)
+                        with col4:
+                            # Data de atualização
+                            atualizacao = latest_record.get('data_atualizacao', 'N/A')
+                            if atualizacao and atualizacao != 'N/A':
+                                try:
+                                    if hasattr(atualizacao, 'strftime'):
+                                        atualizacao_str = atualizacao.strftime('%d/%m/%Y %H:%M')
+                                    else:
+                                        atualizacao_str = str(atualizacao)
+                                    st.metric("📅", atualizacao_str)
+                                except:
+                                    st.metric("📅", "N/A")
+                            else:
+                                st.metric("📅", "N/A")
+                        
+                        # Histórico dessa viagem específica em expander
+                        voyage_count = len(voyage_records)
+                        if voyage_count > 1:
+                            with st.expander(f"📈 Ver histórico ({voyage_count} registros)", expanded=False):
+                                # Detectar e exibir alterações entre registros
+                                st.markdown("#### 📋 Dados Gerais")
+                                
+                                # Campos principais em linha horizontal
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.markdown(f"**🚢 Navio:**<br>{latest_record.get('navio', 'N/A')} - {latest_record.get('viagem', 'N/A')}", unsafe_allow_html=True)
+                                with col2:
+                                    st.markdown(f"**🏗️ Terminal:**<br>{latest_record.get('terminal', 'N/A')}", unsafe_allow_html=True)
+                                with col3:
+                                    # Campo deadline
+                                    if latest_record.get('data_deadline'):
+                                        deadline_str = latest_record['data_deadline'].strftime('%d/%m/%Y - %H:%M') if hasattr(latest_record['data_deadline'], 'strftime') else str(latest_record['data_deadline'])
+                                        st.markdown(f"**⏰ Deadline:**<br>{deadline_str}", unsafe_allow_html=True)
+                                    else:
+                                        st.markdown("**⏰ Deadline:**<br>N/A", unsafe_allow_html=True)
+                                with col4:
+                                    # Campo abertura gate
+                                    if latest_record.get('data_abertura_gate'):
+                                        gate_str = latest_record['data_abertura_gate'].strftime('%d/%m/%Y - %H:%M') if hasattr(latest_record['data_abertura_gate'], 'strftime') else str(latest_record['data_abertura_gate'])
+                                        st.markdown(f"**🚪 Abertura Gate:**<br>{gate_str}", unsafe_allow_html=True)
+                                    else:
+                                        st.markdown("**🚪 Abertura Gate:**<br>N/A", unsafe_allow_html=True)
+                                
+                                st.markdown("#### 🔄 Alterações Detectadas")
+                                
+                                # Função para detectar alterações
+                                def detect_changes(records):
+                                    changes = []
+                                    # Campos a monitorar
+                                    monitored_fields = {
+                                        'data_deadline': 'Deadline',
+                                        'data_abertura_gate': 'Abertura de Gate',
+                                        'data_abertura_gate_reefer': 'Abertura de Gate Reefer', 
+                                        'data_estimativa_chegada': 'ETA',
+                                        'data_estimativa_saida': 'ETD',
+                                        'data_chegada': 'Data de Chegada',
+                                        'data_partida': 'Data de Partida'
+                                    }
+                                    
+                                    # Comparar registros consecutivos (do mais novo para o mais antigo)
+                                    for i in range(len(records) - 1):
+                                        current = records.iloc[i]
+                                        previous = records.iloc[i + 1]
+                                        
+                                        for field, label in monitored_fields.items():
+                                            current_val = current.get(field)
+                                            previous_val = previous.get(field)
+                                            
+                                            # Função helper para formatar data
+                                            def format_date(val):
+                                                import pandas as pd
+                                                if val is None or pd.isna(val):
+                                                    return "Sem Registro"
+                                                if hasattr(val, 'strftime'):
+                                                    return val.strftime('%d/%m/%Y - %H:%M')
+                                                return str(val)
+                                            
+                                            current_formatted = format_date(current_val)
+                                            previous_formatted = format_date(previous_val)
+                                            
+                                            # Detectar mudança
+                                            if current_formatted != previous_formatted:
+                                                update_time = current.get('data_atualizacao')
+                                                if hasattr(update_time, 'strftime'):
+                                                    update_str = update_time.strftime('%d/%m/%Y às %H:%M')
+                                                else:
+                                                    update_str = str(update_time)
+                                                
+                                                changes.append({
+                                                    'field': label,
+                                                    'from': previous_formatted,
+                                                    'to': current_formatted,
+                                                    'updated_at': update_str
+                                                })
+                                    
+                                    return changes
+                                
+                                # Detectar alterações
+                                changes = detect_changes(voyage_records)
+                                
+                                if changes:
+                                    for change in changes:
+                                        st.markdown(f"""
+                                        <div style="padding: 0.5rem; margin: 0.25rem 0; border-left: 3px solid #1f77b4; background-color: #f8f9fa;">
+                                            <strong>Alteração de {change['field']}</strong> de <em>{change['from']}</em> para <em>{change['to']}</em><br>
+                                            <small>Atualizado em {change['updated_at']}</small>
+                                        </div>
+                                        """, unsafe_allow_html=True)
+                                else:
+                                    st.info("📝 Nenhuma alteração detectada entre as atualizações")
+                                
+                                st.markdown("#### 📊 Tabela Completa")
+                                # Remover coluna auxiliar antes de exibir
+                                voyage_display = voyage_records.drop(columns=['navio_viagem'])
+                                st.dataframe(voyage_display, use_container_width=True, hide_index=True)
+                        
+                        # Separador visual entre viagens
+                        if i < len(unique_voyages) - 1:
+                            st.markdown("---")
 
 
     # Determina qual DataFrame usar baseado na aba ativa
