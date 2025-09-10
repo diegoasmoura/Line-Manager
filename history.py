@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table, get_return_carrier_status_by_adjustment_id
+from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table, get_return_carrier_status_by_adjustment_id, get_terminal_monitorings
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
 from datetime import datetime
@@ -31,6 +31,54 @@ def get_next_linked_reference_number():
     except Exception as e:
         st.error(f"❌ Erro ao obter próximo número sequencial: {str(e)}")
         return 1
+
+def get_voyage_monitoring_for_reference(farol_reference):
+    """Busca dados de monitoramento de viagens relacionados a uma referência Farol"""
+    try:
+        conn = get_database_connection()
+        
+        # Busca navios associados a esta referência na tabela F_CON_RETURN_CARRIERS
+        vessels_query = text("""
+            SELECT DISTINCT B_VESSEL_NAME
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE FAROL_REFERENCE = :ref
+              AND B_VESSEL_NAME IS NOT NULL
+              AND LENGTH(TRIM(B_VESSEL_NAME)) > 0
+        """)
+        vessels_result = conn.execute(vessels_query, {"ref": farol_reference}).fetchall()
+        
+        if not vessels_result:
+            return pd.DataFrame()
+        
+        # Lista de navios únicos
+        vessel_names = [row[0] for row in vessels_result if row[0]]
+        
+        if not vessel_names:
+            return pd.DataFrame()
+        
+        # Busca dados de monitoramento para esses navios
+        # Usa UPPER para busca case-insensitive
+        placeholders = ", ".join([f":vessel_{i}" for i in range(len(vessel_names))])
+        monitoring_query = text(f"""
+            SELECT *
+            FROM F_ELLOX_TERMINAL_MONITORINGS
+            WHERE UPPER(NAVIO) IN ({placeholders})
+            ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+        """)
+        
+        # Prepara parâmetros com nomes em maiúsculas para busca
+        params = {f"vessel_{i}": vessel_name.upper() for i, vessel_name in enumerate(vessel_names)}
+        
+        result = conn.execute(monitoring_query, params).mappings().fetchall()
+        conn.close()
+        
+        df = pd.DataFrame([dict(r) for r in result]) if result else pd.DataFrame()
+        return df
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao buscar dados de monitoramento: {str(e)}")
+        return pd.DataFrame()
+
 
 def get_available_references_for_relation():
     """Busca referências originais (não-split) na aba 'Other Status' para relacionamento"""
@@ -868,6 +916,10 @@ def exibir_history():
     # Rótulos das "abas"
     other_label = f"📋 History ({len(df_other_status)} records)"
     received_label = f"📨 Carrier Returns ({len(df_received_carrier)} records)"
+    
+    # Busca dados de monitoramento relacionados aos navios desta referência
+    df_voyage_monitoring = get_voyage_monitoring_for_reference(farol_reference)
+    voyages_label = f"🚢 Histórico de Viagens ({len(df_voyage_monitoring)} records)"
 
     # Controle de "aba" ativa (segmented control) para detectar troca e limpar seleções da outra
     active_tab_key = f"history_active_tab_{farol_reference}"
@@ -878,7 +930,7 @@ def exibir_history():
 
     active_tab = st.segmented_control(
         "",
-        options=[other_label, received_label],
+        options=[other_label, received_label, voyages_label],
         key=active_tab_key
     )
 
@@ -886,11 +938,17 @@ def exibir_history():
     prev_tab = st.session_state.get(last_active_tab_key)
     if prev_tab != active_tab:
         if active_tab == other_label:
-            # Limpamos seleção da aba Received
+            # Limpamos seleção das outras abas
             st.session_state[f"clear_received_selection_{farol_reference}"] = True
-        else:
-            # Limpamos seleção da aba Other
+            st.session_state[f"clear_voyages_selection_{farol_reference}"] = True
+        elif active_tab == received_label:
+            # Limpamos seleção das outras abas
             st.session_state[f"clear_other_selection_{farol_reference}"] = True
+            st.session_state[f"clear_voyages_selection_{farol_reference}"] = True
+        else:  # voyages_label
+            # Limpamos seleção das outras abas
+            st.session_state[f"clear_other_selection_{farol_reference}"] = True
+            st.session_state[f"clear_received_selection_{farol_reference}"] = True
         st.session_state[last_active_tab_key] = active_tab
 
     # Função para processar e configurar DataFrame
@@ -1123,6 +1181,19 @@ def exibir_history():
             disabled=False,
             key=f"history_received_carrier_editor_{farol_reference}"
         )
+
+    # Conteúdo da aba "Histórico de Viagens" 
+    if active_tab == voyages_label:
+        if df_voyage_monitoring.empty:
+            st.info("📋 Nenhum dado de monitoramento encontrado para esta referência.")
+        else:
+            # Copia dados
+            df_monitoring_display = df_voyage_monitoring.copy()
+
+            # Exibe tabela com dados brutos (funcionando)
+            if not df_monitoring_display.empty:
+                st.dataframe(df_monitoring_display, use_container_width=True)
+
 
     # Determina qual DataFrame usar baseado na aba ativa
     # Por padrão, usa o primeiro DataFrame disponível
@@ -1559,6 +1630,7 @@ def exibir_history():
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
+
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1589,6 +1661,7 @@ def exibir_history():
             st.rerun()
 
     # Seção de anexos (toggle)
+    
     if st.session_state.get("history_show_attachments", False):
         st.markdown("---")
         st.subheader("📎 Attachment Management")

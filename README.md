@@ -218,6 +218,7 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - `Voyage do Navio`: campo de texto com sugestões via API exibidas como dica
 - Cache de listas com `@st.cache_data(ttl=300)` para refletir atualizações
 - Removida a validação "navio pertence ao carrier"
+ - Coleta automática de monitoramento ao validar o PDF (Ellox): usa `collect_voyage_monitoring_data(vessel_name, port_terminal_city)`, resolve CNPJ do terminal via `F_ELLOX_TERMINALS` (com `standardize_terminal_name`) e salva na `F_ELLOX_TERMINAL_MONITORINGS`
 
 ### 🗄️ `database.py`
 **Camada de dados**
@@ -252,6 +253,13 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
   - "👁️ Visualizar Monitoramento": POST `/api/terminalmonitorings` e `/api/shipownermonitorings`
 - Formatação e validação de CNPJ; checagem prévia de existência (`check_company_exists`)
 - Autenticação automática (sem chave manual no sidebar) e indicador 🟢/🟡/🔴
+
+### 🕘 `history.py`
+**Histórico e aprovações + Monitoramento Ellox**
+- Abas: "📋 History", "📨 Carrier Returns" e nova aba "🚢 Histórico de Viagens"
+- A aba "🚢 Histórico de Viagens" exibe dados locais de monitoramento (Ellox) relacionados à referência selecionada
+- A alimentação é automática ao validar um PDF, via `collect_voyage_monitoring_data` (ver `pdf_booking_processor.py`)
+- Função de busca: `get_voyage_monitoring_for_reference(farol_reference)` com busca case-insensitive por navio
 
 ### 🚢 `ellox_api.py`
 **Cliente da API Ellox**
@@ -365,6 +373,28 @@ Tabela de viagens por navio/terminal
 ```
 
 #### `F_ELLOX_CARRIERS`
+#### `F_ELLOX_TERMINAL_MONITORINGS`
+Tabela de histórico de monitoramentos (Ellox) por navio/terminal/viagem
+```sql
+- ID (PK)
+- NAVIO
+- VIAGEM
+- AGENCIA
+- DATA_DEADLINE
+- DATA_DRAFT_DEADLINE
+- DATA_ABERTURA_GATE
+- DATA_ABERTURA_GATE_REEFER
+- DATA_ESTIMATIVA_SAIDA
+- DATA_ESTIMATIVA_CHEGADA
+- DATA_ATUALIZACAO
+- TERMINAL
+- CNPJ_TERMINAL
+- DATA_CHEGADA
+- DATA_ESTIMATIVA_ATRACACAO
+- DATA_ATRACACAO
+- DATA_PARTIDA
+- ROW_INSERTED_DATE
+```
 Tabela de carriers (armadores) e CNPJs
 ```sql
 - ID (PK)
@@ -455,6 +485,14 @@ Retorna viagens disponíveis para um navio e terminal. Útil para sugerir voyage
 - Solicitar (ShipOwner): `POST /api/monitor/shipowner`
 - Visualizar (ShipOwner): `POST /api/shipownermonitorings`
 Observação: alguns CNPJs de clientes só são aceitos se estiverem na base interna de `companies` da Ellox. Utilize a verificação prévia via `check_company_exists`.
+
+#### Integração automática com PDFs
+- Ao validar um PDF na tela de histórico, o sistema:
+  1. Identifica `Vessel Name` e `Port Terminal City`
+  2. Resolve o `CNPJ` do terminal via `F_ELLOX_TERMINALS` (com padronização `standardize_terminal_name`)
+  3. Consulta a API (`view_vessel_monitoring`) com `cnpj_client`, `cnpj_terminal`, `nome_navio` e `viagem_navio` (opcional)
+  4. Persiste o retorno como snapshot em `F_ELLOX_TERMINAL_MONITORINGS`
+  5. Exibe na nova aba "🚢 Histórico de Viagens"
 
 ### 🏢 Boas Práticas - Identificação de Carriers
 
@@ -598,6 +636,11 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - Verificar se credenciais não expiraram
      - Testar manualmente via Postman/curl
 
+5. **Dropdown com nomes duplicados (navios)**
+   - Causa comum: o nome extraído do PDF está em caixa alta e não bate exatamente com o nome normalizado do banco
+   - Correção: busca case-insensitive e uso da versão do banco; o valor do PDF é normalizado para Title Case apenas se inexistente
+   - Observação: listas usam `@st.cache_data(ttl=300)`; o refresh ocorre automaticamente em até 5 minutos
+
 #### Diagnóstico da API Ellox
 
 ```bash
@@ -641,6 +684,17 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.1
+- Dropdown de "Nome do Navio" com correspondência case-insensitive, evitando duplicatas entre valores do PDF e do banco
+- Normalização de terminais para padrão Ellox ao validar dados extraídos
+- Remoção da validação "navio pertence ao carrier" na confirmação de PDF
+- Campo "Voyage do Navio" simplificado para texto com sugestões por API
+- Cache de listas com TTL de 300s em `load_ships_from_database` e `load_terminals_from_database`
+- Novas abas de Monitoramento no `tracking.py` (solicitar/visualizar, terminal e shipowner)
+- Novos módulos: `ellox_data_extractor.py`, `ellox_data_queries.py`, `setup_ellox_database.py`
+- Novas tabelas locais Ellox: `F_ELLOX_TERMINALS`, `F_ELLOX_SHIPS`, `F_ELLOX_VOYAGES`, `F_ELLOX_CARRIERS`
+- Correções de API: base URL `apidtz`, payload de auth com `senha`, endpoint de voyages
 
 ### 🚢 Sistema de Tracking via API Ellox (v3.0)
 - **Integração completa** com API Ellox da Comexia para tracking marítimo

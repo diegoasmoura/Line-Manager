@@ -1865,3 +1865,185 @@ def get_return_carrier_status_by_adjustment_id(adjustment_id: str):
         return result
     finally:
         conn.close()
+
+
+# ============================
+# ELLOX TERMINAL MONITORINGS
+# ============================
+def _parse_iso_datetime(value):
+    """Converte strings ISO (YYYY-MM-DDTHH:MM:SSZ) em datetime. Retorna None se inválido."""
+    if value is None:
+        return None
+    try:
+        s = str(value).strip()
+        if s == "":
+            return None
+        # Normaliza: remove Z e troca T por espaço
+        s = s.replace("T", " ").replace("Z", "").strip()
+        # Tenta formatos comuns
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                from datetime import datetime as _dt
+                return _dt.strptime(s, fmt)
+            except Exception:
+                continue
+        return None
+    except Exception:
+        return None
+
+
+def ensure_table_f_ellox_terminal_monitorings():
+    """Cria a tabela F_ELLOX_TERMINAL_MONITORINGS caso não exista."""
+    conn = get_database_connection()
+    try:
+        exists = conn.execute(text(
+            """
+            SELECT COUNT(*) AS ct
+            FROM user_tables
+            WHERE table_name = 'F_ELLOX_TERMINAL_MONITORINGS'
+            """
+        )).scalar()
+
+        if int(exists or 0) == 0:
+            ddl = text(
+                """
+                CREATE TABLE F_ELLOX_TERMINAL_MONITORINGS (
+                    ID                          NUMBER(20)      PRIMARY KEY,
+                    NAVIO                       VARCHAR2(100 CHAR),
+                    VIAGEM                      VARCHAR2(50 CHAR),
+                    AGENCIA                     VARCHAR2(100 CHAR),
+                    DATA_DEADLINE               DATE,
+                    DATA_DRAFT_DEADLINE         DATE,
+                    DATA_ABERTURA_GATE          DATE,
+                    DATA_ABERTURA_GATE_REEFER   DATE,
+                    DATA_ESTIMATIVA_SAIDA       DATE,
+                    DATA_ESTIMATIVA_CHEGADA     DATE,
+                    DATA_ATUALIZACAO            DATE,
+                    TERMINAL                    VARCHAR2(100 CHAR),
+                    CNPJ_TERMINAL               VARCHAR2(20 CHAR),
+                    DATA_CHEGADA                DATE,
+                    DATA_ESTIMATIVA_ATRACACAO   DATE,
+                    DATA_ATRACACAO              DATE,
+                    DATA_PARTIDA                DATE,
+                    ROW_INSERTED_DATE           DATE DEFAULT SYSDATE
+                )
+                """
+            )
+            conn.execute(ddl)
+            conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
+    """Realiza upsert (MERGE) em F_ELLOX_TERMINAL_MONITORINGS a partir de um DataFrame.
+
+    Espera colunas (case-insensitive):
+      id, navio, viagem, agencia, data_deadline, data_draft_deadline, data_abertura_gate,
+      data_abertura_gate_reefer, data_estimativa_saida, data_estimativa_chegada, data_atualizacao,
+      terminal, cnpj_terminal, data_chegada, data_estimativa_atracacao, data_atracacao, data_partida
+
+    Retorna: quantidade de linhas processadas.
+    """
+    if df is None or df.empty:
+        return 0
+
+    ensure_table_f_ellox_terminal_monitorings()
+
+    # Normaliza nomes de colunas para minúsculas para acesso resiliente
+    cols_map = {c.lower(): c for c in df.columns}
+
+    required = [
+        'id', 'navio', 'viagem', 'agencia', 'data_deadline', 'data_draft_deadline',
+        'data_abertura_gate', 'data_abertura_gate_reefer', 'data_estimativa_saida',
+        'data_estimativa_chegada', 'data_atualizacao', 'terminal', 'cnpj_terminal',
+        'data_chegada', 'data_estimativa_atracacao', 'data_atracacao', 'data_partida'
+    ]
+
+    processed = 0
+    with get_database_connection() as conn:
+        for _, row in df.iterrows():
+            def g(key):
+                c = cols_map.get(key)
+                return row[c] if c in row else None
+
+            params = {
+                "ID": int(g('id')) if g('id') is not None and str(g('id')).strip() != '' else None,
+                "NAVIO": g('navio'),
+                "VIAGEM": g('viagem'),
+                "AGENCIA": g('agencia'),
+                "DATA_DEADLINE": _parse_iso_datetime(g('data_deadline')),
+                "DATA_DRAFT_DEADLINE": _parse_iso_datetime(g('data_draft_deadline')),
+                "DATA_ABERTURA_GATE": _parse_iso_datetime(g('data_abertura_gate')),
+                "DATA_ABERTURA_GATE_REEFER": _parse_iso_datetime(g('data_abertura_gate_reefer')),
+                "DATA_ESTIMATIVA_SAIDA": _parse_iso_datetime(g('data_estimativa_saida')),
+                "DATA_ESTIMATIVA_CHEGADA": _parse_iso_datetime(g('data_estimativa_chegada')),
+                "DATA_ATUALIZACAO": _parse_iso_datetime(g('data_atualizacao')),
+                "TERMINAL": g('terminal'),
+                "CNPJ_TERMINAL": g('cnpj_terminal'),
+                "DATA_CHEGADA": _parse_iso_datetime(g('data_chegada')),
+                "DATA_ESTIMATIVA_ATRACACAO": _parse_iso_datetime(g('data_estimativa_atracacao')),
+                "DATA_ATRACACAO": _parse_iso_datetime(g('data_atracacao')),
+                "DATA_PARTIDA": _parse_iso_datetime(g('data_partida')),
+            }
+
+            # Pula se não há ID
+            if params["ID"] is None:
+                continue
+
+            merge_sql = text(
+                """
+                MERGE INTO F_ELLOX_TERMINAL_MONITORINGS t
+                USING (SELECT :ID AS ID FROM dual) s
+                ON (t.ID = s.ID)
+                WHEN MATCHED THEN UPDATE SET
+                    NAVIO = :NAVIO,
+                    VIAGEM = :VIAGEM,
+                    AGENCIA = :AGENCIA,
+                    DATA_DEADLINE = :DATA_DEADLINE,
+                    DATA_DRAFT_DEADLINE = :DATA_DRAFT_DEADLINE,
+                    DATA_ABERTURA_GATE = :DATA_ABERTURA_GATE,
+                    DATA_ABERTURA_GATE_REEFER = :DATA_ABERTURA_GATE_REEFER,
+                    DATA_ESTIMATIVA_SAIDA = :DATA_ESTIMATIVA_SAIDA,
+                    DATA_ESTIMATIVA_CHEGADA = :DATA_ESTIMATIVA_CHEGADA,
+                    DATA_ATUALIZACAO = :DATA_ATUALIZACAO,
+                    TERMINAL = :TERMINAL,
+                    CNPJ_TERMINAL = :CNPJ_TERMINAL,
+                    DATA_CHEGADA = :DATA_CHEGADA,
+                    DATA_ESTIMATIVA_ATRACACAO = :DATA_ESTIMATIVA_ATRACACAO,
+                    DATA_ATRACACAO = :DATA_ATRACACAO,
+                    DATA_PARTIDA = :DATA_PARTIDA
+                WHEN NOT MATCHED THEN INSERT (
+                    ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
+                    DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
+                    DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
+                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA
+                ) VALUES (
+                    :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
+                    :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
+                    :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
+                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA
+                )
+                """
+            )
+            conn.execute(merge_sql, params)
+            processed += 1
+
+        conn.commit()
+    return processed
+
+
+def get_terminal_monitorings(limit: int = 200) -> pd.DataFrame:
+    """Consulta recentes da F_ELLOX_TERMINAL_MONITORINGS."""
+    ensure_table_f_ellox_terminal_monitorings()
+    with get_database_connection() as conn:
+        rows = conn.execute(text(
+            f"""
+            SELECT *
+            FROM F_ELLOX_TERMINAL_MONITORINGS
+            ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+            FETCH FIRST {int(limit)} ROWS ONLY
+            """
+        )).mappings().fetchall()
+        df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+        return df

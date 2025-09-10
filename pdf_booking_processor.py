@@ -15,7 +15,7 @@ import streamlit as st
 import pandas as pd
 import re
 from datetime import datetime
-from database import get_database_connection, insert_return_carrier_from_ui
+from database import get_database_connection, insert_return_carrier_from_ui, upsert_terminal_monitorings_from_dataframe
 from sqlalchemy import text
 import uuid
 import os
@@ -1270,7 +1270,7 @@ def extract_hapag_lloyd_data(text_content):
         data["pod"] = clean_port_field(data["pod"]) or data["pod"]
     # Quantidade e tipo de contêiner (formatos como 4x45GP, 4 x 40 HC etc.)
     try:
-        m_qty = re.search(r"(\d+)\s*[xX×]\s*(20|40|45)\s*['’]?\s*([A-Za-z]{2,})", text_content)
+        m_qty = re.search(r"(\d+)\s*[xX×]\s*(20|40|45)\s*[''']\s*([A-Za-z]{2,})", text_content)
         if m_qty:
             data["quantity"] = m_qty.group(1).strip()
             data["container_type"] = f"{m_qty.group(2)}{m_qty.group(3).upper()}"
@@ -1405,15 +1405,15 @@ def extract_msc_data(text_content):
 
     # Quantidade e tipo (MSC) — cobrir formatos comuns
     try:
-        # 1) Equipment Type/Q’ty: 40HC-5
+        # 1) Equipment Type/Q'ty: 40HC-5
         if not data.get("quantity"):
-            m_eq = re.search(r"Equipment\s+Type\s*/\s*Q[’']?ty\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
+            m_eq = re.search(r"Equipment\s+Type\s*/\s*Q[']?ty\s*:\s*([^\n]+)", text_content, re.IGNORECASE)
             if m_eq:
                 tail = m_eq.group(1)
                 m_qty = re.search(r"-(\d{1,4})\b", tail)
                 if m_qty:
                     data["quantity"] = m_qty.group(1)
-                m_typ = re.search(r"\b(20|40|45)\s*['’]?\s*(HC|HIGH\s*CUBE|GP|DV)\b", tail, re.IGNORECASE)
+                m_typ = re.search(r"\b(20|40|45)\s*['']?\s*(HC|HIGH\s*CUBE|GP|DV)\b", tail, re.IGNORECASE)
                 if m_typ:
                     size = m_typ.group(1)
                     kind = m_typ.group(2)
@@ -1422,7 +1422,7 @@ def extract_msc_data(text_content):
 
         # 2) Linha solta: 14 40' HIGH CUBE 350,000.00 Kgs
         if not data.get("quantity"):
-            m_line = re.search(r"\b(\d{1,4})\s+(20|40|45)\s*['’]?\s*(HIGH\s*CUBE|HC|GP|DV)\b", text_content, re.IGNORECASE)
+            m_line = re.search(r"\b(\d{1,4})\s+(20|40|45)\s*['']?\s*(HIGH\s*CUBE|HC|GP|DV)\b", text_content, re.IGNORECASE)
             if m_line:
                 data["quantity"] = m_line.group(1)
                 size = m_line.group(2)
@@ -1432,7 +1432,7 @@ def extract_msc_data(text_content):
 
         # 3) Multiplicador: 14 x 40 HC
         if not data.get("quantity"):
-            m_mul = re.search(r"\b(\d{1,4})\s*[xX×]\s*(20|40|45)\s*['’]?\s*(HC|HIGH\s*CUBE|GP|DV)\b", text_content, re.IGNORECASE)
+            m_mul = re.search(r"\b(\d{1,4})\s*[xX×]\s*(20|40|45)\s*['']?\s*(HC|HIGH\s*CUBE|GP|DV)\b", text_content, re.IGNORECASE)
             if m_mul:
                 data["quantity"] = m_mul.group(1)
                 size = m_mul.group(2)
@@ -1590,14 +1590,14 @@ def extract_cma_cgm_data(text_content):
 
     def extract_container_info(text: str):
         # Captura formatos como: "8 x 40'HC", "8x40 HC", "8 × 40'HC"
-        m = re.search(r"(\d+)\s*[xX×]\s*(20|40|45)\s*['’]?\s*([A-Za-z]{2,})", text)
+        m = re.search(r"(\d+)\s*[xX×]\s*(20|40|45)\s*['']?\s*([A-Za-z]{2,})", text)
         if m:
             qty = m.group(1)
             size = m.group(2)
             ctype = m.group(3)
             return qty, f"{size}{ctype.upper()}"
         # Fallback: "8 containers 40HC" ou similares
-        m = re.search(r"(\d+)\s*(?:containers?|cntr|ctr)[^\n]*?(20|40|45)\s*['’]?\s*([A-Za-z]{2,})", text, re.IGNORECASE)
+        m = re.search(r"(\d+)\s*(?:containers?|cntr|ctr)[^\n]*?(20|40|45)\s*['']?\s*([A-Za-z]{2,})", text, re.IGNORECASE)
         if m:
             qty = m.group(1)
             size = m.group(2)
@@ -2020,9 +2020,9 @@ def extract_pil_data(text_content: str):
     if m_bkg:
         data["booking_reference"] = m_bkg.group(1).strip()
 
-    # Quantity a partir de "Equipment Type/Q’ty : 40HC-20" (pode haver múltiplos tipos)
+    # Quantity a partir de "Equipment Type/Q'ty : 40HC-20" (pode haver múltiplos tipos)
     qty_total = 0
-    for m in re.findall(r"Equipment\s+Type/Q[’'`]?ty\s*:\s*([^\n]+)", text_content, re.IGNORECASE):
+    for m in re.findall(r"Equipment\s+Type/Q[']'`]?ty\s*:\s*([^\n]+)", text_content, re.IGNORECASE):
         # Capturar todos os números após hífen (ex.: 40HC-20 -> 20)
         hyphen_qty = re.findall(r"[A-Za-z0-9]+-(\d+)\b", m)
         qty_total += sum(int(q) for q in hyphen_qty)
@@ -2370,6 +2370,174 @@ def standardize_terminal_name(terminal_name):
     
     # Se não encontrar correspondência, retornar o nome original limpo
     return re.sub(r'\s+', ' ', terminal_name.strip())
+
+
+def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=""):
+    """
+    Coleta dados de monitoramento da viagem usando a API Ellox Terminal.
+    Primeiro solicita o monitoramento, depois visualiza os dados.
+    
+    Args:
+        vessel_name: Nome do navio
+        port_terminal_city: Nome do terminal/cidade
+        voyage_code: Código da viagem (opcional)
+    """
+    try:
+        import requests
+        import json
+        import pandas as pd
+        from database import get_database_connection, upsert_terminal_monitorings_from_dataframe
+        from sqlalchemy import text
+        
+        # Função para autenticar na API Ellox
+        def authenticate_ellox():
+            EMAIL = "diego_moura@cargill.com"
+            SENHA = "Cargill@25"
+            
+            url_auth = "https://apidtz.comexia.digital/api/auth"
+            payload_auth = {"email": EMAIL, "senha": SENHA}
+            
+            resp_auth = requests.post(
+                url_auth, 
+                json=payload_auth, 
+                headers={"Content-Type": "application/json"}
+            )
+            
+            if resp_auth.status_code != 200:
+                return None
+            
+            data_auth = resp_auth.json()
+            token = data_auth.get("access_token") or data_auth.get("token")
+            if not token:
+                raise ValueError("Token de autenticação ausente na resposta")
+            return token
+        
+        # Função para solicitar monitoramento
+        def solicitar_monitoramento(token, cnpj_terminal, vessel_name, voyage_code):
+            url = "https://apidtz.comexia.digital/api/monitor/navio"
+            payload = {
+                "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
+                "lista": [
+                    {
+                        "cnpj_terminal": cnpj_terminal,
+                        "nome_navio": vessel_name,
+                        "viagem_navio": voyage_code or ""
+                    }
+                ]
+            }
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            resp = requests.post(url, headers=headers, json=payload)
+            
+            if resp.status_code >= 400:
+                body_text = (resp.text or "").lower()
+                if "already exist" in body_text or "already tracked" in body_text:
+                    return "already_exists"
+                return None
+            return "ok"
+        
+        # Função para visualizar monitoramentos
+        def visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code):
+            url = "https://apidtz.comexia.digital/api/terminalmonitorings"
+            payload = {
+                "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
+                "cnpj_terminal": cnpj_terminal,
+                "nome_navio": vessel_name,
+                "viagem_navio": voyage_code or ""
+            }
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            resp = requests.post(url, headers=headers, json=payload)
+            
+            if resp.status_code >= 400:
+                return pd.DataFrame()
+            
+            data = resp.json() if resp.content else []
+            return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame()
+        
+        # Mapeamento de terminais para CNPJs (expandido)
+        terminal_cnpj_map = {
+            "BTP": "04.887.625/0001-78",
+            "BRASIL TERMINAL PORTUARIO": "04.887.625/0001-78", 
+            "BRASIL TERMINAL PORTUARIO SA": "04.887.625/0001-78",
+            "BRASIL TERMINAL PORTUARIO S/A": "04.887.625/0001-78",
+            "SANTOS BRASIL": "02.762.121/0001-04",  # Atualizado conforme teste.ipynb
+            "SANTOS BRASIL S.A.": "02.762.121/0001-04",
+            "SANTOS BRASIL SA": "02.762.121/0001-04",
+            "TECON SANTOS": "03.518.221/0001-06",
+            "COSCO": "02.762.121/0001-04"  # Default: Santos Brasil (conforme teste)
+        }
+        
+        # Buscar CNPJ do terminal
+        cnpj_terminal = "02.762.121/0001-04"  # Default: Santos Brasil (conforme teste.ipynb)
+        
+        # Normalizar nome do terminal para busca
+        terminal_normalized = port_terminal_city.upper().strip()
+        
+        for terminal_key, cnpj in terminal_cnpj_map.items():
+            if terminal_key in terminal_normalized:
+                cnpj_terminal = cnpj
+                break
+        
+        # Buscar na base local se não encontrou
+        if cnpj_terminal == "02.762.121/0001-04" and "SANTOS BRASIL" not in terminal_normalized:
+            try:
+                conn = get_database_connection()
+                query = text("""
+                    SELECT DISTINCT CNPJ, NOME
+                    FROM F_ELLOX_TERMINALS
+                    WHERE UPPER(NOME) LIKE UPPER(:terminal_name)
+                    FETCH FIRST 1 ROWS ONLY
+                """)
+                result = conn.execute(query, {
+                    "terminal_name": f"%{port_terminal_city}%"
+                }).mappings().fetchone()
+                
+                if result:
+                    cnpj_terminal = result["cnpj"]
+                
+                conn.close()
+            except:
+                pass  # Usar default
+        
+        # 1) Autenticar na API
+        token = authenticate_ellox()
+        if not token:
+            st.warning("⚠️ Erro na autenticação com API Ellox")
+            return
+        
+        # 2) Solicitar monitoramento (mesmo se já existir)
+        status_solicitacao = solicitar_monitoramento(token, cnpj_terminal, vessel_name, voyage_code)
+        
+        if status_solicitacao in ("ok", "already_exists"):
+            if status_solicitacao == "already_exists":
+                st.info(f"ℹ️ Navio **{vessel_name}** já está sendo monitorado. Coletando dados...")
+            else:
+                st.info(f"✅ Monitoramento solicitado para **{vessel_name}**")
+            
+            # 3) Visualizar monitoramentos
+            df_monitoring = visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code)
+            
+            if not df_monitoring.empty:
+                # Salvar no Oracle (F_ELLOX_TERMINAL_MONITORINGS)
+                try:
+                    processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                    if processed_count > 0:
+                        st.success(f"✅ {processed_count} registros de monitoramento coletados via API Ellox!")
+                        st.info(f"🚢 Navio: **{vessel_name}** | 🏗️ Terminal: **{cnpj_terminal}**")
+                    else:
+                        st.info("ℹ️ Nenhum novo registro de monitoramento encontrado (dados já existem)")
+                except Exception as e:
+                    st.warning(f"⚠️ Erro ao salvar monitoramentos no Oracle: {str(e)}")
+            else:
+                st.info(f"ℹ️ Nenhum dado de monitoramento encontrado para **{vessel_name}** no terminal {cnpj_terminal}")
+                st.info("💡 O navio pode não estar na base Ellox ainda ou usar nome diferente na agência")
+        else:
+            st.warning("⚠️ Não foi possível solicitar o monitoramento. Verifique os dados do navio.")
+            
+    except Exception as e:
+        # Log do erro para debug, mas não quebra o fluxo principal
+        st.warning(f"⚠️ Erro na coleta de monitoramento: {str(e)}")
+        import traceback
+        print(f"collect_voyage_monitoring_data error: {traceback.format_exc()}")
 
 @st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
 def load_ships_from_database():
@@ -2934,6 +3102,15 @@ def save_pdf_booking_data(validated_data):
             conn.close()
             if ct > 0:
                 st.warning("⚠️ Este PDF já foi processado para esta Farol Reference com os mesmos dados (Booking/Carrier/Voyage/Vessel/Print Date). Operação cancelada.")
+                # Ainda assim tenta coletar o monitoramento para atualizar a aba Histórico de Viagens
+                try:
+                    collect_voyage_monitoring_data(
+                        validated_data.get("Vessel Name"),
+                        validated_data.get("Port Terminal City"),
+                        validated_data.get("Voyage Code", "")
+                    )
+                except Exception as e:
+                    st.info(f"ℹ️ Coleta de monitoramento não realizada: {str(e)}")
                 return False
         except Exception as _:
             # Em caso de falha na checagem, prossegue sem bloquear
@@ -2946,6 +3123,16 @@ def save_pdf_booking_data(validated_data):
         if success:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
             st.info("📋 Status definido como: **Received from Carrier**")
+            
+            # Coleta dados de monitoramento da viagem
+            try:
+                collect_voyage_monitoring_data(
+                    validated_data.get("Vessel Name"),
+                    validated_data.get("Port Terminal City"),
+                    validated_data.get("Voyage Code", "")
+                )
+            except Exception as e:
+                st.warning(f"⚠️ Não foi possível coletar dados de monitoramento: {str(e)}")
             
             # Salva também o PDF como anexo
             if pdf_file:
