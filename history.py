@@ -1216,47 +1216,57 @@ def exibir_history():
                         st.markdown(f"""
                         <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
                                    padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
-                                <div>
-                                    <div style="font-weight: 600; color: #2c3e50; margin-bottom: 0.25rem;">
-                                        🚢 {latest_record.get('navio', 'N/A')} - {latest_record.get('viagem', 'N/A')}
-                                    </div>
-                                    <div style="color: #7f8c8d; font-size: 0.9em;">
-                                        🏗️ {latest_record.get('terminal', 'N/A')}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">🚢 Navio:</div>
+                                    <div style="font-weight: 600; color: #2c3e50; font-size: 0.85em;">
+                                        {latest_record.get('navio', 'N/A')}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">🚀 ETD</div>
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">⚡ Viagem:</div>
+                                    <div style="color: #3498db; font-size: 0.85em; font-weight: 500;">
+                                        {latest_record.get('viagem', 'N/A')}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">🏗️ Terminal:</div>
+                                    <div style="color: #7f8c8d; font-size: 0.85em; font-weight: 500;">
+                                        {latest_record.get('terminal', 'N/A')}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">⚓ ETD</div>
                                     <div style="font-weight: 500; color: #34495e; font-size: 0.85em;">
                                         {format_date_safe(latest_record.get('data_estimativa_saida'))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">⛵ ETA</div>
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">🛳️ ETA</div>
                                     <div style="font-weight: 500; color: #3498db; font-size: 0.85em;">
                                         {format_date_safe(latest_record.get('data_estimativa_chegada'))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">🚪 Gate</div>
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">🚧 Gate</div>
                                     <div style="font-weight: 500; color: #e67e22; font-size: 0.85em;">
                                         {format_date_safe(latest_record.get('data_abertura_gate'))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">⏰ Deadline</div>
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">📋 Deadline</div>
                                     <div style="font-weight: 500; color: #e74c3c; font-size: 0.85em;">
                                         {format_date_safe(latest_record.get('data_deadline'))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">Status</div>
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">📍 Status</div>
                                     <div style="font-weight: 500; color: {'#27ae60' if latest_record.get('data_chegada') else '#f39c12'}; font-size: 0.85em;">
                                         {'🟢 Chegou' if latest_record.get('data_chegada') else '🟡 Em Trânsito'}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.25rem;">📅 Atualizado</div>
+                                    <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 0.1rem;">🔄 Atualizado</div>
                                     <div style="font-weight: 500; color: #8e44ad; font-size: 0.85em;">
                                         {format_date_safe(latest_record.get('data_atualizacao'))}
                                     </div>
