@@ -710,6 +710,13 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.3
+- Sales (New Sales Record): adicionados os campos "Shipment Period Start Date" e "Shipment Period End Date" no formulário manual e no upload em massa; mapeados para `S_SHIPMENT_PERIOD_START_DATE` e `S_SHIPMENT_PERIOD_END_DATE`.
+- Booking (New Booking): agora exibe (somente leitura) as datas "Required Arrival Date", "Shipment Period Start Date" e "Shipment Period End Date"; todas as datas de visualização foram padronizadas para formato somente data (YYYY-MM-DD) quando aplicável.
+- History (Return Carriers History): rótulos padronizados para os mesmos nomes da tela principal (ex.: "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "Data Abertura Gate", "Voyage Code"); conversões de data preservadas.
+- Return Carriers (persistência): alinhamento do schema atual — comandos INSERT/UPDATE não usam ainda `B_DATA_PARTIDA_ATD`, `B_DATA_CHEGADA_ATA`, `B_DATA_ESTIMATIVA_ATRACACAO_ETB`, `B_DATA_ATRACACAO_ATB` até que as colunas estejam criadas no Oracle (evita ORA-00904). Upsert/snapshot ajustados e variáveis ausentes tratadas com `None`.
+- Renomeações consolidadas: `B_PORT_TERMINAL_CITY` → `B_TERMINAL`, `B_DOCUMENT_CUT_OFF_DOCCUT` → `B_DATA_DRAFT_DEADLINE`, `B_PORT_CUT_OFF_PORTCUT` → `B_DATA_DEADLINE`, `B_ESTIMATED_TIME_OF_DEPARTURE_ETD` → `B_DATA_ESTIMATIVA_SAIDA_ETD`, `B_ESTIMATED_TIME_OF_ARRIVAL_ETA` → `B_DATA_ESTIMATIVA_CHEGADA_ETA`, `B_GATE_OPENING` → `B_DATA_ABERTURA_GATE`.
+- Ellox: confirmação das chaves retornadas pelo endpoint `/api/terminalmonitorings` e documentação dos campos (inclui `data_draft_deadline` quando disponível).
 ### 📌 v3.2
 - Integração automática com Ellox após validação de PDF: autentica → solicita monitoramento (tolera "Tracked ship already exist") → visualiza → salva em `F_ELLOX_TERMINAL_MONITORINGS`
 - Correções na aba "Histórico de Viagens":

@@ -772,15 +772,15 @@ def exibir_history():
         "S_PORT_OF_DELIVERY_POD",
         "S_FINAL_DESTINATION",
         "B_TRANSHIPMENT_PORT",
-        "B_PORT_TERMINAL_CITY",
+        "B_TERMINAL",
         "B_VESSEL_NAME",
         "B_VOYAGE_CARRIER",
         "B_VOYAGE_CODE",
-        "B_DOCUMENT_CUT_OFF_DOCCUT",
-        "B_PORT_CUT_OFF_PORTCUT",
-        "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA",
-        "B_GATE_OPENING",
+        "B_DATA_DRAFT_DEADLINE",
+        "B_DATA_DEADLINE",
+        "B_DATA_ESTIMATIVA_SAIDA_ETD",
+        "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+        "B_DATA_ABERTURA_GATE",
         "P_STATUS",
         "P_PDF_NAME",
         "ROW_INSERTED_DATE",
@@ -855,15 +855,15 @@ def exibir_history():
         "ROW_INSERTED_DATE": "Inserted Date",
         "USER_INSERT": "Inserted By",
         # Remover prefixos B_/P_ dos rótulos solicitados
-        "B_GATE_OPENING": "Gate Opening",
+        "B_DATA_ABERTURA_GATE": "Gate Opening",
         "P_STATUS": "Status",
         "P_PDF_NAME": "PDF Name",
         "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             # Aliases para campos de data
-            "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
-            "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
-            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
-            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": "ETA",
+            "B_DATA_DRAFT_DEADLINE": "Draft Deadline",
+            "B_DATA_DEADLINE": "Deadline",
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
             # Alias para Voyage Code
             "B_VOYAGE_CODE": "Voyage Code",
         }
@@ -897,10 +897,10 @@ def exibir_history():
         
         # Converte campos de data específicos de epoch (ms) para datetime (APÓS os aliases)
         date_fields_mapped = {
-            "Document Cut Off": "B_DOCUMENT_CUT_OFF_DOCCUT",
-            "Port Cut Off": "B_PORT_CUT_OFF_PORTCUT", 
-            "ETD": "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-            "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA"
+            "Draft Deadline": "B_DATA_DRAFT_DEADLINE",
+            "Deadline": "B_DATA_DEADLINE", 
+            "ETD": "B_DATA_ESTIMATIVA_SAIDA_ETD",
+            "ETA": "B_DATA_ESTIMATIVA_CHEGADA_ETA"
         }
         
         for mapped_name, original_name in date_fields_mapped.items():
@@ -1199,9 +1199,9 @@ def exibir_history():
                     fields = [
                         "S_SPLITTED_BOOKING_REFERENCE","S_PLACE_OF_RECEIPT","S_QUANTITY_OF_CONTAINERS",
                         "S_PORT_OF_LOADING_POL","S_PORT_OF_DELIVERY_POD","S_FINAL_DESTINATION",
-                        "B_TRANSHIPMENT_PORT","B_PORT_TERMINAL_CITY","B_VESSEL_NAME","B_VOYAGE_CARRIER",
-                        "B_DOCUMENT_CUT_OFF_DOCCUT","B_PORT_CUT_OFF_PORTCUT","B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-                        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA","B_GATE_OPENING"
+                        "B_TRANSHIPMENT_PORT","B_TERMINAL","B_VESSEL_NAME","B_VOYAGE_CARRIER",
+                        "B_DATA_DRAFT_DEADLINE","B_DATA_DEADLINE","B_DATA_ESTIMATIVA_SAIDA_ETD",
+                        "B_DATA_ESTIMATIVA_CHEGADA_ETA","B_DATA_ABERTURA_GATE"
                     ]
                     cols = ", ".join(fields)
                     # Retorno: pela linha aprovada

@@ -7,6 +7,29 @@ import streamlit as st
 from database import load_df_udc, get_booking_data_by_farol_reference, update_booking_data_by_farol_reference, get_data_bookingData, upsert_return_carrier_from_unified
 from datetime import datetime, date
 import time
+
+# ---------- 1.1. Funções auxiliares ----------
+def format_date_only(date_value):
+    """Formata uma data para exibir apenas a parte da data (sem hora)."""
+    if date_value is None or date_value == "":
+        return ""
+    
+    # Se for datetime, extrair apenas a data
+    if isinstance(date_value, datetime):
+        return date_value.strftime("%Y-%m-%d")
+    # Se for date, formatar diretamente
+    elif isinstance(date_value, date):
+        return date_value.strftime("%Y-%m-%d")
+    # Se for string, tentar converter e formatar
+    elif isinstance(date_value, str):
+        try:
+            # Tentar fazer parse da string para datetime
+            parsed_date = datetime.strptime(date_value[:10], "%Y-%m-%d")
+            return parsed_date.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            return str(date_value)[:10] if len(str(date_value)) >= 10 else str(date_value)
+    
+    return str(date_value)
  
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
@@ -50,7 +73,10 @@ def show_booking_management_form():
             "b_voyage_carrier": "",
             "b_freight_forwarder": "",
             "b_booking_request_date": None,
-            "b_comments": ""
+            "b_comments": "",
+            "required_arrival_date": "",
+            "shipment_period_start_date": "",
+            "shipment_period_end_date": ""
         }
         if not sales_row.empty:
             sales_row = sales_row.iloc[0]
@@ -63,6 +89,9 @@ def show_booking_management_form():
             booking_data["final_destination"] = sales_row.get("Final Destination", "")
             booking_data["dthc"] = sales_row.get("DTHC", "")
             booking_data["requested_shipment_week"] = sales_row.get("Requested Shipment Week", "")
+            booking_data["required_arrival_date"] = sales_row.get("Required Arrival Date", "")
+            booking_data["shipment_period_start_date"] = sales_row.get("Shipment Period Start Date", "")
+            booking_data["shipment_period_end_date"] = sales_row.get("Shipment Period End Date", "")
  
     # Conversão segura da data
     request_date = booking_data["b_booking_request_date"]
@@ -100,11 +129,20 @@ def show_booking_management_form():
         with col1:
             st.text_input("Quantity of Containers", value=booking_data.get("sales_quantity_of_containers", ""), disabled=True)
         with col2:
-            st.text_input("Requested Deadline Start Date", value=str(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
+            st.text_input("Requested Deadline Start Date", value=format_date_only(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
         with col3:
-            st.text_input("Requested Deadline End Date", value=str(booking_data.get("requested_cut_off_end_date", "")), disabled=True)
+            st.text_input("Requested Deadline End Date", value=format_date_only(booking_data.get("requested_cut_off_end_date", "")), disabled=True)
 
-        # Terceira linha: POL, POD, Final Destination
+        # Nova linha: Required Arrival Date, Shipment Period Start Date, Shipment Period End Date
+        col_arr, col_start, col_end = st.columns(3)
+        with col_arr:
+            st.text_input("Required Arrival Date", value=format_date_only(booking_data.get("required_arrival_date", "")), disabled=True)
+        with col_start:
+            st.text_input("Shipment Period Start Date", value=format_date_only(booking_data.get("shipment_period_start_date", "")), disabled=True)
+        with col_end:
+            st.text_input("Shipment Period End Date", value=format_date_only(booking_data.get("shipment_period_end_date", "")), disabled=True)
+
+        # Quarta linha: POL, POD, Final Destination
         col4, col5, col6 = st.columns(3)
         with col4:
             values["booking_port_of_loading_pol"] = st.selectbox(

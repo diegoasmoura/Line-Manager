@@ -54,15 +54,15 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
                 B_VOYAGE_CODE,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING,
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
@@ -103,15 +103,15 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
                 B_VOYAGE_CODE,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING,
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
@@ -239,7 +239,7 @@ def get_data_bookingData():
         B_BOOKING_CONFIRMATION_DATE          AS b_booking_confirmation_date,
         B_VESSEL_NAME                        AS b_vessel_name,
         B_VOYAGE_CODE                        AS b_voyage_code,
-        B_PORT_TERMINAL_CITY                 AS b_port_terminal_city,
+        B_TERMINAL                           AS b_terminal,
         S_PLACE_OF_RECEIPT                   AS b_place_of_receipt,
         S_FINAL_DESTINATION                  AS b_final_destination,
         B_TRANSHIPMENT_PORT                  AS b_transhipment_port,
@@ -247,10 +247,15 @@ def get_data_bookingData():
         B_POD_COUNTRY_ACRONYM                AS b_pod_country_acronym,
         B_DESTINATION_TRADE_REGION           AS b_destination_trade_region,
         /* Campos de cut-offs/ETAs/ETDs */
-        B_DOCUMENT_CUT_OFF_DOCCUT            AS b_document_cut_off_doccut,
-        B_PORT_CUT_OFF_PORTCUT               AS b_port_cut_off_portcut,
-        B_ESTIMATED_TIME_OF_DEPARTURE_ETD    AS b_estimated_time_of_departure_etd,
-        B_ESTIMATED_TIME_OF_ARRIVAL_ETA      AS b_estimated_time_of_arrival_eta,
+        B_DATA_DRAFT_DEADLINE                AS b_data_draft_deadline,
+        B_DATA_DEADLINE                      AS b_data_deadline,
+        B_DATA_ESTIMATIVA_SAIDA_ETD          AS b_data_estimativa_saida_etd,
+        B_DATA_ESTIMATIVA_CHEGADA_ETA        AS b_data_estimativa_chegada_eta,
+        B_DATA_ABERTURA_GATE                 AS b_data_abertura_gate,
+        B_DATA_PARTIDA_ATD                   AS b_data_partida_atd,
+        B_DATA_CHEGADA_ATA                   AS b_data_chegada_ata,
+        B_DATA_ESTIMATIVA_ATRACACAO_ETB      AS b_data_estimativa_atracacao_etb,
+        B_DATA_ATRACACAO_ATB                 AS b_data_atracacao_atb,
         /* demais valores */
         B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
         B_BOGEY_SALE_PRICE_USD               AS b_bogey_sale_price_usd,
@@ -287,9 +292,10 @@ def get_data_bookingData():
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
             "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
-            "Document Cut Off DOCCUT", "Port Cut Off PORTCUT", "Estimated Time Of Departure ETD", "Estimated Time Of Arrival ETA",
+            "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "Data Abertura Gate",
+            "Data Partida ATD", "Data Chegada ATA", "Data Estimativa Atracação ETB", "Data Atracação ATB",
             # Armador/viagem
-            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal City", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
             # Administração
@@ -1012,6 +1018,9 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
             S_QUANTITY_OF_CONTAINERS          AS sales_quantity_of_containers,
             S_REQUESTED_DEADLINE_START_DATE   AS requested_cut_off_start_date,
             S_REQUESTED_DEADLINE_END_DATE     AS requested_cut_off_end_date,
+            S_REQUIRED_ARRIVAL_DATE           AS required_arrival_date,
+            S_SHIPMENT_PERIOD_START_DATE      AS shipment_period_start_date,
+            S_SHIPMENT_PERIOD_END_DATE        AS shipment_period_end_date,
             S_PORT_OF_LOADING_POL             AS booking_port_of_loading_pol,
             S_PORT_OF_DELIVERY_POD            AS booking_port_of_delivery_pod,
             S_FINAL_DESTINATION               AS final_destination
@@ -1097,14 +1106,18 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB
             FROM LogTransp.F_CON_SALES_BOOKING_DATA
             WHERE FAROL_REFERENCE = :ref
             """
@@ -1118,9 +1131,19 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             text("SELECT COUNT(*) AS ct FROM LogTransp.F_CON_RETURN_CARRIERS WHERE FAROL_REFERENCE = :ref"),
             {"ref": farol_reference},
         ).fetchone()
+
         # Converte resultado para dicionário e normaliza chaves para MAIÚSCULAS
         row_dict = dict(row)
         data = {k.upper(): v for k, v in row_dict.items()}
+        # Garante binds para novos campos mesmo quando não vierem do SELECT
+        for k in (
+            "B_DATA_PARTIDA_ATD",
+            "B_DATA_CHEGADA_ATA",
+            "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+            "B_DATA_ATRACACAO_ATB",
+        ):
+            if k not in data:
+                data[k] = None
         data["USER_INSERT"] = user_insert
         data["USER_UPDATE"] = None
         data["DATE_UPDATE"] = None
@@ -1141,14 +1164,14 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     S_PORT_OF_DELIVERY_POD = :S_PORT_OF_DELIVERY_POD,
                     S_FINAL_DESTINATION = :S_FINAL_DESTINATION,
                     B_TRANSHIPMENT_PORT = :B_TRANSHIPMENT_PORT,
-                    B_PORT_TERMINAL_CITY = :B_PORT_TERMINAL_CITY,
+                    B_TERMINAL = :B_TERMINAL,
                     B_VESSEL_NAME = :B_VESSEL_NAME,
                     B_VOYAGE_CARRIER = :B_VOYAGE_CARRIER,
-                    B_DOCUMENT_CUT_OFF_DOCCUT = :B_DOCUMENT_CUT_OFF_DOCCUT,
-                    B_PORT_CUT_OFF_PORTCUT = :B_PORT_CUT_OFF_PORTCUT,
-                    B_ESTIMATED_TIME_OF_DEPARTURE_ETD = :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                    B_ESTIMATED_TIME_OF_ARRIVAL_ETA = :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                    B_GATE_OPENING = :B_GATE_OPENING,
+                    B_DATA_DRAFT_DEADLINE = :B_DATA_DRAFT_DEADLINE,
+                    B_DATA_DEADLINE = :B_DATA_DEADLINE,
+                    B_DATA_ESTIMATIVA_SAIDA_ETD = :B_DATA_ESTIMATIVA_SAIDA_ETD,
+                    B_DATA_ESTIMATIVA_CHEGADA_ETA = :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                    B_DATA_ABERTURA_GATE = :B_DATA_ABERTURA_GATE,
                     USER_UPDATE = :USER_INSERT,
                     DATE_UPDATE = SYSDATE
                 WHERE FAROL_REFERENCE = :FAROL_REFERENCE
@@ -1172,14 +1195,14 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     S_PORT_OF_DELIVERY_POD,
                     S_FINAL_DESTINATION,
                     B_TRANSHIPMENT_PORT,
-                    B_PORT_TERMINAL_CITY,
+                    B_TERMINAL,
                     B_VESSEL_NAME,
                     B_VOYAGE_CARRIER,
-                    B_DOCUMENT_CUT_OFF_DOCCUT,
-                    B_PORT_CUT_OFF_PORTCUT,
-                    B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                    B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                    B_GATE_OPENING,
+                    B_DATA_DRAFT_DEADLINE,
+                    B_DATA_DEADLINE,
+                    B_DATA_ESTIMATIVA_SAIDA_ETD,
+                    B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                    B_DATA_ABERTURA_GATE,
                     USER_INSERT,
                     ADJUSTMENT_ID
                 ) VALUES (
@@ -1194,14 +1217,14 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     :S_PORT_OF_DELIVERY_POD,
                     :S_FINAL_DESTINATION,
                     :B_TRANSHIPMENT_PORT,
-                    :B_PORT_TERMINAL_CITY,
+                    :B_TERMINAL,
                     :B_VESSEL_NAME,
                     :B_VOYAGE_CARRIER,
-                    :B_DOCUMENT_CUT_OFF_DOCCUT,
-                    :B_PORT_CUT_OFF_PORTCUT,
-                    :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                    :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                    :B_GATE_OPENING,
+                    :B_DATA_DRAFT_DEADLINE,
+                    :B_DATA_DEADLINE,
+                    :B_DATA_ESTIMATIVA_SAIDA_ETD,
+                    :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                    :B_DATA_ABERTURA_GATE,
                     :USER_INSERT,
                     :ADJUSTMENT_ID
                 )
@@ -1231,14 +1254,18 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB
             FROM LogTransp.F_CON_SALES_BOOKING_DATA
             WHERE FAROL_REFERENCE = :ref
             """
@@ -1265,14 +1292,14 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING,
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
                 USER_INSERT,
                 ADJUSTMENT_ID
             ) VALUES (
@@ -1287,14 +1314,14 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                 :S_PORT_OF_DELIVERY_POD,
                 :S_FINAL_DESTINATION,
                 :B_TRANSHIPMENT_PORT,
-                :B_PORT_TERMINAL_CITY,
+                :B_TERMINAL,
                 :B_VESSEL_NAME,
                 :B_VOYAGE_CARRIER,
-                :B_DOCUMENT_CUT_OFF_DOCCUT,
-                :B_PORT_CUT_OFF_PORTCUT,
-                :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                :B_GATE_OPENING,
+                :B_DATA_DRAFT_DEADLINE,
+                :B_DATA_DEADLINE,
+                :B_DATA_ESTIMATIVA_SAIDA_ETD,
+                :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                :B_DATA_ABERTURA_GATE,
                 :USER_INSERT,
                 :ADJUSTMENT_ID
             )
@@ -1313,17 +1340,26 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "S_PORT_OF_DELIVERY_POD": rd.get("S_PORT_OF_DELIVERY_POD"),
             "S_FINAL_DESTINATION": rd.get("S_FINAL_DESTINATION"),
             "B_TRANSHIPMENT_PORT": rd.get("B_TRANSHIPMENT_PORT"),
-            "B_PORT_TERMINAL_CITY": rd.get("B_PORT_TERMINAL_CITY"),
+            "B_TERMINAL": rd.get("B_TERMINAL"),
             "B_VESSEL_NAME": rd.get("B_VESSEL_NAME"),
             "B_VOYAGE_CARRIER": rd.get("B_VOYAGE_CARRIER"),
-            "B_DOCUMENT_CUT_OFF_DOCCUT": rd.get("B_DOCUMENT_CUT_OFF_DOCCUT"),
-            "B_PORT_CUT_OFF_PORTCUT": rd.get("B_PORT_CUT_OFF_PORTCUT"),
-            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": rd.get("B_ESTIMATED_TIME_OF_DEPARTURE_ETD"),
-            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": rd.get("B_ESTIMATED_TIME_OF_ARRIVAL_ETA"),
-            "B_GATE_OPENING": rd.get("B_GATE_OPENING"),
+            "B_DATA_DRAFT_DEADLINE": rd.get("B_DATA_DRAFT_DEADLINE"),
+            "B_DATA_DEADLINE": rd.get("B_DATA_DEADLINE"),
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": rd.get("B_DATA_ESTIMATIVA_SAIDA_ETD"),
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": rd.get("B_DATA_ESTIMATIVA_CHEGADA_ETA"),
+            "B_DATA_ABERTURA_GATE": rd.get("B_DATA_ABERTURA_GATE"),
             "USER_INSERT": user_insert,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
         }
+
+        # Garante binds quando SELECT não retornar colunas (compatibilidade)
+        for k in (
+            "B_DATA_PARTIDA_ATD",
+            "B_DATA_CHEGADA_ATA",
+            "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+            "B_DATA_ATRACACAO_ATB",
+        ):
+            params.setdefault(k, None)
 
         conn.execute(insert_sql, params)
         conn.commit()
@@ -1452,15 +1488,19 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
             "S_PORT_OF_DELIVERY_POD": norm(ui_row.get("Port of Delivery POD")),
             "S_FINAL_DESTINATION": norm(ui_row.get("Final Destination")),
             "B_TRANSHIPMENT_PORT": norm(ui_row.get("Transhipment Port")),
-            "B_PORT_TERMINAL_CITY": norm(ui_row.get("Port Terminal City")),
+            "B_TERMINAL": norm(ui_row.get("Terminal")),
             "B_VESSEL_NAME": norm(ui_row.get("Vessel Name")),
             "B_VOYAGE_CODE": norm(ui_row.get("Voyage Code")),
             "B_VOYAGE_CARRIER": norm(ui_row.get("Voyage Carrier")),
-            "B_DOCUMENT_CUT_OFF_DOCCUT": convert_date_string(ui_row.get("Requested Deadline Start Date")),
-            "B_PORT_CUT_OFF_PORTCUT": convert_date_string(ui_row.get("Requested Deadline End Date")),
-            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": convert_date_string(ui_row.get("Requested Deadline Start Date")),  # ETD
-            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": convert_date_string(ui_row.get("Required Arrival Date")),
-            "B_GATE_OPENING": None,
+            "B_DATA_DRAFT_DEADLINE": convert_date_string(ui_row.get("Requested Deadline Start Date")),
+            "B_DATA_DEADLINE": convert_date_string(ui_row.get("Requested Deadline End Date")),
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": convert_date_string(ui_row.get("Requested Deadline Start Date")),  # ETD
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": convert_date_string(ui_row.get("Required Arrival Date")),
+            "B_DATA_ABERTURA_GATE": None,
+            "B_DATA_PARTIDA_ATD": None,
+            "B_DATA_CHEGADA_ATA": None,
+            "B_DATA_ESTIMATIVA_ATRACACAO_ETB": None,
+            "B_DATA_ATRACACAO_ATB": None,
             "AREA": area,
             "REQUEST_REASON": request_reason,
             "ADJUSTMENTS_OWNER": adjustments_owner,
@@ -1484,15 +1524,15 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CODE,
                 B_VOYAGE_CARRIER,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING,
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
                 AREA,
                 REQUEST_REASON,
                 ADJUSTMENTS_OWNER,
@@ -1512,15 +1552,15 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
                 :S_PORT_OF_DELIVERY_POD,
                 :S_FINAL_DESTINATION,
                 :B_TRANSHIPMENT_PORT,
-                :B_PORT_TERMINAL_CITY,
+                :B_TERMINAL,
                 :B_VESSEL_NAME,
                 :B_VOYAGE_CODE,
                 :B_VOYAGE_CARRIER,
-                :B_DOCUMENT_CUT_OFF_DOCCUT,
-                :B_PORT_CUT_OFF_PORTCUT,
-                :B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                :B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                :B_GATE_OPENING,
+                :B_DATA_DRAFT_DEADLINE,
+                :B_DATA_DEADLINE,
+                :B_DATA_ESTIMATIVA_SAIDA_ETD,
+                :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                :B_DATA_ABERTURA_GATE,
                 :AREA,
                 :REQUEST_REASON,
                 :ADJUSTMENTS_OWNER,
@@ -1587,7 +1627,7 @@ def get_split_data_by_farol_reference(farol_reference):
             B_VOYAGE_CARRIER                   AS s_carrier,
             B_VOYAGE_CODE                      AS b_voyage_code,
             B_TRANSHIPMENT_PORT                AS b_transhipment_port,
-            B_PORT_TERMINAL_CITY               AS b_port_terminal_city,
+            B_TERMINAL                         AS b_terminal,
             B_BOOKING_REFERENCE                AS b_booking_reference,
             B_VESSEL_NAME                      AS b_vessel_name
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
@@ -1664,15 +1704,19 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
                 S_PORT_OF_DELIVERY_POD,
                 S_FINAL_DESTINATION,
                 B_TRANSHIPMENT_PORT,
-                B_PORT_TERMINAL_CITY,
+                B_TERMINAL,
                 B_VESSEL_NAME,
                 B_VOYAGE_CARRIER,
                 B_VOYAGE_CODE,
-                B_DOCUMENT_CUT_OFF_DOCCUT,
-                B_PORT_CUT_OFF_PORTCUT,
-                B_ESTIMATED_TIME_OF_DEPARTURE_ETD,
-                B_ESTIMATED_TIME_OF_ARRIVAL_ETA,
-                B_GATE_OPENING,
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
@@ -1753,15 +1797,19 @@ def update_sales_booking_from_return_carriers(adjustment_id: str) -> bool:
         # Campos B_ (Booking)
         add_if_present("B_BOOKING_REFERENCE")
         add_if_present("B_TRANSHIPMENT_PORT")
-        add_if_present("B_PORT_TERMINAL_CITY")
+        add_if_present("B_TERMINAL")
         add_if_present("B_VESSEL_NAME")
         add_if_present("B_VOYAGE_CODE")
         add_if_present("B_VOYAGE_CARRIER")
-        add_if_present("B_DOCUMENT_CUT_OFF_DOCCUT")
-        add_if_present("B_PORT_CUT_OFF_PORTCUT")
-        add_if_present("B_ESTIMATED_TIME_OF_DEPARTURE_ETD")
-        add_if_present("B_ESTIMATED_TIME_OF_ARRIVAL_ETA")
-        add_if_present("B_GATE_OPENING")
+        add_if_present("B_DATA_DRAFT_DEADLINE")
+        add_if_present("B_DATA_DEADLINE")
+        add_if_present("B_DATA_ESTIMATIVA_SAIDA_ETD")
+        add_if_present("B_DATA_ESTIMATIVA_CHEGADA_ETA")
+        add_if_present("B_DATA_ABERTURA_GATE")
+        add_if_present("B_DATA_PARTIDA_ATD")
+        add_if_present("B_DATA_CHEGADA_ATA")
+        add_if_present("B_DATA_ESTIMATIVA_ATRACACAO_ETB")
+        add_if_present("B_DATA_ATRACACAO_ATB")
         
         # Se não há campos para atualizar, retorna True (não é erro)
         if not update_fields:

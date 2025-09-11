@@ -877,15 +877,19 @@ def exibir_history():
         "S_PORT_OF_DELIVERY_POD",
         "S_FINAL_DESTINATION",
         "B_TRANSHIPMENT_PORT",
-        "B_PORT_TERMINAL_CITY",
+        "B_TERMINAL",
         "B_VESSEL_NAME",
         "B_VOYAGE_CARRIER",
         "B_VOYAGE_CODE",
-        "B_DOCUMENT_CUT_OFF_DOCCUT",
-        "B_PORT_CUT_OFF_PORTCUT",
-        "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA",
-        "B_GATE_OPENING",
+        "B_DATA_DRAFT_DEADLINE",
+        "B_DATA_DEADLINE",
+        "B_DATA_ESTIMATIVA_SAIDA_ETD",
+        "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+        "B_DATA_ABERTURA_GATE",
+        "B_DATA_PARTIDA_ATD",
+        "B_DATA_CHEGADA_ATA",
+        "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+        "B_DATA_ATRACACAO_ATB",
         "P_STATUS",
         "P_PDF_NAME",
         "PDF_BOOKING_EMISSION_DATE",
@@ -1004,17 +1008,17 @@ def exibir_history():
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
-            # Remover prefixos B_/P_ dos rótulos solicitados
-            "B_GATE_OPENING": "Gate Opening",
+            # Remover prefixos B_/P_ dos rótulos solicitados (padronizados com shipments_mapping)
+            "B_DATA_ABERTURA_GATE": "Data Abertura Gate",
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",  # Nome corrigido
-            # Aliases para campos de data
-            "B_DOCUMENT_CUT_OFF_DOCCUT": "Document Cut Off",
-            "B_PORT_CUT_OFF_PORTCUT": "Port Cut Off",
-            "B_ESTIMATED_TIME_OF_DEPARTURE_ETD": "ETD",
-            "B_ESTIMATED_TIME_OF_ARRIVAL_ETA": "ETA",
+            # Aliases para campos de data (padronizados)
+            "B_DATA_DRAFT_DEADLINE": "Data Draft Deadline",
+            "B_DATA_DEADLINE": "Data Deadline",
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": "Data Estimativa Saída ETD",
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "Data Estimativa Chegada ETA",
             # Alias para Voyage Code
             "B_VOYAGE_CODE": "Voyage Code",
         }
@@ -1023,7 +1027,7 @@ def exibir_history():
         rename_map = {}
         for col in df_to_process.columns:
             rename_map[col] = custom_overrides.get(col, mapping_upper.get(col, prettify(col)))
-
+        
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
         
@@ -1048,10 +1052,14 @@ def exibir_history():
         
         # Converte campos de data específicos de epoch (ms) para datetime (APÓS os aliases)
         date_fields_mapped = {
-            "Document Cut Off": "B_DOCUMENT_CUT_OFF_DOCCUT",
-            "Port Cut Off": "B_PORT_CUT_OFF_PORTCUT", 
-            "ETD": "B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-            "ETA": "B_ESTIMATED_TIME_OF_ARRIVAL_ETA",
+            "Draft Deadline": "B_DATA_DRAFT_DEADLINE",
+            "Deadline": "B_DATA_DEADLINE", 
+            "ETD": "B_DATA_ESTIMATIVA_SAIDA_ETD",
+            "ETA": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+            "ATD": "B_DATA_PARTIDA_ATD",
+            "ATA": "B_DATA_CHEGADA_ATA",
+            "ETB": "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+            "ATB": "B_DATA_ATRACACAO_ATB",
             "PDF Print Date": "PDF_BOOKING_EMISSION_DATE"
         }
         
@@ -1114,7 +1122,7 @@ def exibir_history():
                 column_config[col] = st.column_config.DatetimeColumn(
                     "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
                 )
-            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA", "PDF Print Date"]:
+            elif col in ["Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Print Date"]:
                 column_config[col] = st.column_config.DatetimeColumn(
                     col, format="YYYY-MM-DD HH:mm", disabled=True
                 )
@@ -1173,7 +1181,7 @@ def exibir_history():
                 column_config[col] = st.column_config.DatetimeColumn(
                     "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
                 )
-            elif col in ["Document Cut Off", "Port Cut Off", "ETD", "ETA", "PDF Print Date"]:
+            elif col in ["Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Print Date"]:
                 column_config[col] = st.column_config.DatetimeColumn(
                     col, format="YYYY-MM-DD HH:mm", disabled=True
                 )
@@ -1368,6 +1376,27 @@ def exibir_history():
                                 st.markdown("#### 📊 Tabela Completa")
                                 # Remover coluna auxiliar antes de exibir
                                 voyage_display = voyage_records.drop(columns=['navio_viagem'])
+                                # Padroniza rótulos conforme telas principais
+                                rename_map_voyage = {
+                                    'navio': 'Vessel Name',
+                                    'viagem': 'Voyage Code',
+                                    'terminal': 'Terminal',
+                                    'cnpj_terminal': 'Terminal CNPJ',
+                                    'agencia': 'Agência',
+                                    'data_deadline': 'Data Deadline',
+                                    'data_draft_deadline': 'Data Draft Deadline',
+                                    'data_abertura_gate': 'Data Abertura Gate',
+                                    'data_abertura_gate_reefer': 'Data Abertura Gate Reefer',
+                                    'data_estimativa_saida': 'Data Estimativa Saída ETD',
+                                    'data_estimativa_chegada': 'Data Estimativa Chegada ETA',
+                                    'data_estimativa_atracacao': 'Data Estimativa Atracação ETB',
+                                    'data_atracacao': 'Data Atracação ATB',
+                                    'data_partida': 'Data Partida ATD',
+                                    'data_chegada': 'Data Chegada ATA',
+                                    'data_atualizacao': 'Data Atualização',
+                                    'row_inserted_date': 'Inserted Date',
+                                }
+                                voyage_display = voyage_display.rename(columns=rename_map_voyage)
                                 st.dataframe(voyage_display, use_container_width=True, hide_index=True)
                         
                         # Separador visual entre viagens
@@ -1533,9 +1562,10 @@ def exibir_history():
                     fields = [
                         "S_SPLITTED_BOOKING_REFERENCE","S_PLACE_OF_RECEIPT","S_QUANTITY_OF_CONTAINERS",
                         "S_PORT_OF_LOADING_POL","S_PORT_OF_DELIVERY_POD","S_FINAL_DESTINATION",
-                        "B_TRANSHIPMENT_PORT","B_PORT_TERMINAL_CITY","B_VESSEL_NAME","B_VOYAGE_CARRIER",
-                        "B_DOCUMENT_CUT_OFF_DOCCUT","B_PORT_CUT_OFF_PORTCUT","B_ESTIMATED_TIME_OF_DEPARTURE_ETD",
-                        "B_ESTIMATED_TIME_OF_ARRIVAL_ETA","B_GATE_OPENING"
+                        "B_TRANSHIPMENT_PORT","B_TERMINAL","B_VESSEL_NAME","B_VOYAGE_CARRIER",
+                        "B_DATA_DRAFT_DEADLINE","B_DATA_DEADLINE","B_DATA_ESTIMATIVA_SAIDA_ETD",
+                        "B_DATA_ESTIMATIVA_CHEGADA_ETA","B_DATA_ABERTURA_GATE","B_DATA_PARTIDA_ATD",
+                        "B_DATA_CHEGADA_ATA","B_DATA_ESTIMATIVA_ATRACACAO_ETB","B_DATA_ATRACACAO_ATB"
                     ]
                     cols = ", ".join(fields)
                     # Retorno: pela linha aprovada

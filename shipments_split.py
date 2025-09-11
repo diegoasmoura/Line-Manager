@@ -139,7 +139,7 @@ def show_split_form():
             "Place of Receipt": split_data["s_place_of_receipt"],
             "Final Destination": split_data["s_final_destination"],
             "Transhipment Port": split_dict.get("b_transhipment_port"),
-            "Port Terminal City": split_dict.get("b_port_terminal_city"),
+            "Terminal": split_dict.get("b_terminal"),
             "Voyage Carrier": split_data["s_carrier"],
             "Voyage Code": split_dict.get("b_voyage_code"),
             "Booking Reference": split_dict.get("b_booking_reference"),

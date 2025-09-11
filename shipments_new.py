@@ -29,6 +29,8 @@ form_fields = {
     "Requested Shipment Week": "s_requested_shipment_week",
             "Requested Deadline Start Date": "s_requested_deadlines_start_date",
         "Requested Deadline End Date": "s_requested_deadlines_end_date",
+    "Shipment Period Start Date": "s_shipment_period_start_date",
+    "Shipment Period End Date": "s_shipment_period_end_date",
     "DTHC Prepaid": "s_dthc_prepaid",
     "Afloat": "s_afloat",
     "Required Arrival Date": "s_required_arrival_date",
@@ -94,6 +96,12 @@ def show_add_form():
                 values["s_requested_deadlines_start_date"] = st.date_input("Requested Deadline Start Date", value=None)
             with col2:
                 values["s_requested_deadlines_end_date"] = st.date_input("Requested Deadline End Date", value=None)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                values["s_shipment_period_start_date"] = st.date_input("Shipment Period Start Date", value=None)
+            with col2:
+                values["s_shipment_period_end_date"] = st.date_input("Shipment Period End Date", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
@@ -283,6 +291,8 @@ def show_add_form():
                         "s_required_arrival_date": s_required_arrival_date,
                         "s_requested_deadlines_start_date": "",
                         "s_requested_deadlines_end_date": "",
+                        "s_shipment_period_start_date": "",
+                        "s_shipment_period_end_date": "",
                         "s_dthc_prepaid": row.get("DTHC", ""),
                         "s_afloat": s_afloat_val,
                         "s_port_of_loading_pol": "",
