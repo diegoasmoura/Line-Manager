@@ -8,7 +8,7 @@ Documentação: https://developers.comexia.digital/
 import requests
 import json
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import streamlit as st
 import re
@@ -16,7 +16,7 @@ import re
 class ElloxAPI:
     """Cliente para integração com a API Ellox da Comexia"""
     
-    def __init__(self, email: str = None, password: str = None, api_key: str = None, base_url: str = "https://apidtz.comexia.digital"):
+    def __init__(self, email: str = None, password: str = None, api_key: str = None, base_url: str = "https://apidtz.comexia.digital", token_expires_at: Optional[datetime] = None):
         """
         Inicializa o cliente da API Ellox
         
@@ -31,11 +31,14 @@ class ElloxAPI:
         self.password = password
         self.api_key = api_key
         self.authenticated = False
+        self.token_expires_at = token_expires_at
         
-        # Se não tiver api_key, tentar autenticar com email/senha
-        if not self.api_key and self.email and self.password:
-            self.api_key = self._authenticate()
-        
+        # Se temos api_key e não está expirada, utiliza; senão tenta autenticar
+        if self.api_key and self.token_expires_at and datetime.utcnow() < self.token_expires_at:
+            pass
+        elif self.email and self.password:
+            self._authenticate()
+
         if self.api_key:
             self.headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -78,9 +81,30 @@ class ElloxAPI:
             if response.status_code == 200:
                 data = response.json()
                 token = data.get("access_token") or data.get("token")
+                # Muitos endpoints retornam também 'expiracao' (segundos)
+                expires_in = data.get("expiracao") or data.get("expires_in")
                 if token:
+                    self.api_key = token
                     self.authenticated = True
-                    return token
+                    # Define expiração se disponível
+                    try:
+                        if expires_in:
+                            self.token_expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+                    except Exception:
+                        self.token_expires_at = None
+                    # Atualiza headers
+                    self.headers = {
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    }
+                    # Persiste em session_state para reutilização
+                    try:
+                        st.session_state.api_token = self.api_key
+                        st.session_state.api_token_expires_at = self.token_expires_at.isoformat() if self.token_expires_at else None
+                    except Exception:
+                        pass
+                    return self.api_key
             
             return None
             
@@ -141,6 +165,14 @@ class ElloxAPI:
                 "error": str(e),
                 "status": "error"
             }
+
+    def _ensure_auth(self) -> None:
+        """Garante que há autenticação válida; renova se expirado."""
+        if not self.email or not self.password:
+            return
+        needs_auth = (not self.api_key) or (self.token_expires_at and datetime.utcnow() >= self.token_expires_at)
+        if needs_auth:
+            self._authenticate()
     
     def normalize_carrier_name(self, carrier: str) -> str:
         """
@@ -214,6 +246,10 @@ class ElloxAPI:
             Dicionário com resultado da requisição
         """
         try:
+            # Garante autenticação válida antes da chamada
+            if not endpoint.startswith("/api/auth"):
+                self._ensure_auth()
+
             response = requests.get(
                 f"{self.base_url}{endpoint}",
                 headers=self.headers,
@@ -221,6 +257,16 @@ class ElloxAPI:
                 timeout=30
             )
             
+            # Se o token expirou e retornou 401, tentar reautenticar e refazer uma vez
+            if response.status_code == 401 and self.email and self.password:
+                self._authenticate()
+                response = requests.get(
+                    f"{self.base_url}{endpoint}",
+                    headers=self.headers,
+                    params=params,
+                    timeout=30
+                )
+
             if response.status_code == 200:
                 return {
                     "success": True,
@@ -696,13 +742,19 @@ def get_default_api_client() -> ElloxAPI:
         email = st.session_state.get("api_email", "diego_moura@cargill.com")
         password = st.session_state.get("api_password", "Cargill@25")
         base_url = st.session_state.get("api_base_url", "https://apidtz.comexia.digital")
+        # Reutiliza token se disponível e válido
+        api_token = st.session_state.get("api_token")
+        token_expires_raw = st.session_state.get("api_token_expires_at")
+        token_expires_at = None
+        try:
+            if token_expires_raw:
+                token_expires_at = datetime.fromisoformat(token_expires_raw)
+        except Exception:
+            token_expires_at = None
+        return ElloxAPI(email=email, password=password, api_key=api_token, base_url=base_url, token_expires_at=token_expires_at)
     except:
         # Fallback para credenciais padrão se streamlit não estiver disponível
-        email = "diego_moura@cargill.com"
-        password = "Cargill@25"
-        base_url = "https://apidtz.comexia.digital"
-    
-    return ElloxAPI(email=email, password=password, base_url=base_url)
+        return ElloxAPI(email="diego_moura@cargill.com", password="Cargill@25", base_url="https://apidtz.comexia.digital")
 
 def enrich_booking_data(booking_data: Dict[str, Any], client: ElloxAPI = None) -> Dict[str, Any]:
     """

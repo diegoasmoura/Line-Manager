@@ -51,6 +51,17 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Extração automática** de campos-chave (booking reference, vessel name, voyage, datas, portos)
 - **Interface de validação** com correção manual de dados
 - **Histórico completo** de documentos por embarque
+ 
+#### Padronização de Terminais (PDF → API Ellox)
+
+- Alguns PDFs utilizam nomes históricos/alternativos de terminais. Exemplo:
+  - "Embraport Empresa Brasileira" (PDF) → reconhecido como "DPW"/"DP WORLD" na API Ellox.
+- O sistema aplica normalização automática ao solicitar/visualizar monitoramento:
+  - Mapeia por heurística (contains) e consulta a tabela local `F_ELLOX_TERMINALS` por termos: `DPW`, `DP WORLD`, `EMBRAPORT`.
+  - Caso encontrado, usa o `CNPJ` correspondente para as chamadas `/api/monitor/navio` e `/api/terminalmonitorings`.
+  - Caso não encontrado, permanece com o fallback (ex.: Santos Brasil) e informa na interface.
+
+Observação: se notar um novo alias de terminal em PDFs, informe para incluirmos na regra de normalização.
 
 ### 🚢 Sistema de Tracking em Tempo Real
 - **Integração com API Ellox** da Comexia para tracking marítimo

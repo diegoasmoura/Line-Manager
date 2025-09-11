@@ -2470,12 +2470,33 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
         cnpj_terminal = "02.762.121/0001-04"  # Default: Santos Brasil (conforme teste.ipynb)
         
         # Normalizar nome do terminal para busca
-        terminal_normalized = port_terminal_city.upper().strip()
+        terminal_normalized = (port_terminal_city or "").upper().strip()
         
         for terminal_key, cnpj in terminal_cnpj_map.items():
             if terminal_key in terminal_normalized:
                 cnpj_terminal = cnpj
                 break
+
+        # Caso especial: Embraport (DP World Santos)
+        # Alguns PDFs trazem "Embraport Empresa Brasileira"; na API é reconhecido como DPW/DP WORLD
+        if "EMBRAPORT" in terminal_normalized or "EMPRESA BRASILEIRA" in terminal_normalized:
+            try:
+                conn = get_database_connection()
+                query = text("""
+                    SELECT CNPJ, NOME
+                    FROM F_ELLOX_TERMINALS
+                    WHERE UPPER(NOME) LIKE '%DPW%'
+                       OR UPPER(NOME) LIKE '%DP WORLD%'
+                       OR UPPER(NOME) LIKE '%EMBRAPORT%'
+                    FETCH FIRST 1 ROWS ONLY
+                """)
+                res = conn.execute(query).mappings().fetchone()
+                conn.close()
+                if res and res.get("cnpj"):
+                    cnpj_terminal = res["cnpj"]
+            except Exception:
+                # mantém fallback se não encontrar
+                pass
         
         # Buscar na base local se não encontrou
         if cnpj_terminal == "02.762.121/0001-04" and "SANTOS BRASIL" not in terminal_normalized:

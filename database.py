@@ -2031,9 +2031,22 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                 "DATA_PARTIDA": _parse_iso_datetime(g('data_partida')),
             }
 
-            # Pula se não há ID
+            # Se não há ID vindo da API, gera ID determinístico a partir de campos-chave
             if params["ID"] is None:
-                continue
+                try:
+                    import hashlib
+                    seed_parts = [
+                        str(params.get("NAVIO") or ""),
+                        str(params.get("VIAGEM") or ""),
+                        str(params.get("CNPJ_TERMINAL") or params.get("TERMINAL") or ""),
+                        str(params.get("DATA_ATUALIZACAO") or params.get("DATA_ESTIMATIVA_SAIDA") or params.get("DATA_DEADLINE") or "")
+                    ]
+                    seed = "|".join(seed_parts)
+                    digest16 = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16]
+                    params["ID"] = int(digest16, 16)
+                except Exception:
+                    # Se falhar, ainda assim pula para evitar PK nula
+                    continue
 
             merge_sql = text(
                 """
