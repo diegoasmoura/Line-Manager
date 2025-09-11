@@ -2827,8 +2827,8 @@ def display_pdf_validation_interface(processed_data):
     
     # Cria formulário de validação
     with st.form("pdf_validation_form"):
-        # Layout mais compacto e organizado
-        st.markdown("**📋 Validação dos Dados Extraídos**")
+        # Layout mais compacto e organizado (padronizado com demais telas)
+        st.markdown("**📋 Extracted Data Validation**")
         
         # Primeira linha: Booking Reference e Quantidade de Containers
         col1, col2 = st.columns(2)
@@ -2847,7 +2847,7 @@ def display_pdf_validation_interface(processed_data):
             if _qty < 1:
                 _qty = 1
             quantity = st.number_input(
-                "Quantidade de Containers",
+                "Quantity of Containers",
                 min_value=1,
                 value=_qty,
                 help="Número de containers"
@@ -2857,7 +2857,7 @@ def display_pdf_validation_interface(processed_data):
         col3, col4, col5 = st.columns(3)
         with col4:
             carrier = st.selectbox(
-                "Carrier/Armador",
+                "Voyage Carrier",
                 ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL", "OTHER"],
                 index=0 if processed_data["carrier"] == "GENERIC" else 
                       ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(processed_data["carrier"]) 
@@ -2887,14 +2887,14 @@ def display_pdf_validation_interface(processed_data):
                     vessel_index = 0
             
             vessel_name = st.selectbox(
-                "Nome do Navio",
+                "Vessel Name",
                 options=ship_names,
                 index=vessel_index,
                 help="Selecione o navio da lista"
             )
         with col5:
             voyage = st.text_input(
-                "Voyage",
+                "Voyage Code",
                 value=processed_data.get("voyage", ""),
                 help="Código da viagem"
             )
@@ -2903,13 +2903,13 @@ def display_pdf_validation_interface(processed_data):
         col6, col7 = st.columns(2)
         with col6:
             pol = st.text_input(
-                "Porto de Origem (POL)",
+                "Port of Loading POL",
                 value=processed_data.get("pol", ""),
                 help="Port of Loading"
             )
         with col7:
             pod = st.text_input(
-                "Porto de Destino (POD)",
+                "Port of Delivery POD",
                 value=processed_data.get("pod", ""),
                 help="Port of Discharge"
             )

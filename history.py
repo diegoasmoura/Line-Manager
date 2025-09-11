@@ -1021,6 +1021,13 @@ def exibir_history():
             "B_DATA_ESTIMATIVA_CHEGADA_ETA": "Data Estimativa Chegada ETA",
             # Alias para Voyage Code
             "B_VOYAGE_CODE": "Voyage Code",
+            # Padronização adicional conforme pedido
+            "B_VESSEL_NAME": "Vessel Name",
+            "B_VOYAGE_CARRIER": "Voyage Carrier",
+            "B_TRANSHIPMENT_PORT": "Transhipment Port",
+            "B_TERMINAL": "Port Terminal City",
+            "S_PORT_OF_LOADING_POL": "Port of Loading POL",
+            "S_PORT_OF_DELIVERY_POD": "Port of Delivery POD",
         }
 
         # Aplica aliases ao DataFrame
@@ -1054,8 +1061,8 @@ def exibir_history():
         date_fields_mapped = {
             "Draft Deadline": "B_DATA_DRAFT_DEADLINE",
             "Deadline": "B_DATA_DEADLINE", 
-            "ETD": "B_DATA_ESTIMATIVA_SAIDA_ETD",
-            "ETA": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+            "Data Estimativa Saída ETD": "B_DATA_ESTIMATIVA_SAIDA_ETD",
+            "Data Estimativa Chegada ETA": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
             "ATD": "B_DATA_PARTIDA_ATD",
             "ATA": "B_DATA_CHEGADA_ATA",
             "ETB": "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
