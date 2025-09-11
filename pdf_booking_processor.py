@@ -3035,8 +3035,8 @@ def display_pdf_validation_interface(processed_data):
                 "Final Destination": pod,
                 "Transhipment Port": transhipment_port,
                 "Port Terminal City": port_terminal_city,
-                "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",
-                "Requested Deadline End Date": etd.strftime("%Y-%m-%d") if etd else "",
+                "Requested Deadline Start Date": "",  # não inferir de ETD
+                "Requested Deadline End Date": "",    # não inferir de ETD
                 "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",
                 "PDF Booking Emission Date": pdf_print_date
             }

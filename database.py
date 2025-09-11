@@ -1492,10 +1492,10 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
             "B_VESSEL_NAME": norm(ui_row.get("Vessel Name")),
             "B_VOYAGE_CODE": norm(ui_row.get("Voyage Code")),
             "B_VOYAGE_CARRIER": norm(ui_row.get("Voyage Carrier")),
-            "B_DATA_DRAFT_DEADLINE": convert_date_string(ui_row.get("Requested Deadline Start Date")),
-            "B_DATA_DEADLINE": convert_date_string(ui_row.get("Requested Deadline End Date")),
-            "B_DATA_ESTIMATIVA_SAIDA_ETD": convert_date_string(ui_row.get("Requested Deadline Start Date")),  # ETD
-            "B_DATA_ESTIMATIVA_CHEGADA_ETA": convert_date_string(ui_row.get("Required Arrival Date")),
+            "B_DATA_DRAFT_DEADLINE": convert_date_string(ui_row.get("Requested Deadline Start Date")) if ui_row.get("Requested Deadline Start Date") else None,
+            "B_DATA_DEADLINE": convert_date_string(ui_row.get("Requested Deadline End Date")) if ui_row.get("Requested Deadline End Date") else None,
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": convert_date_string(ui_row.get("Requested Deadline Start Date")) if ui_row.get("Requested Deadline Start Date") else None,  # ETD
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": convert_date_string(ui_row.get("Required Arrival Date")) if ui_row.get("Required Arrival Date") else None,
             "B_DATA_ABERTURA_GATE": None,
             "B_DATA_PARTIDA_ATD": None,
             "B_DATA_CHEGADA_ATA": None,
@@ -1713,10 +1713,6 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
-                B_DATA_PARTIDA_ATD,
-                B_DATA_CHEGADA_ATA,
-                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
-                B_DATA_ATRACACAO_ATB,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
@@ -2095,3 +2091,33 @@ def get_terminal_monitorings(limit: int = 200) -> pd.DataFrame:
         )).mappings().fetchall()
         df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
         return df
+
+        # Converte campos de data em epoch ms para datetime quando necessário
+        from datetime import datetime as _dt
+        def _convert_epoch_ms(val):
+            try:
+                import pandas as _pd
+                if val is None or (_pd.isna(val)):
+                    return None
+            except Exception:
+                if val is None:
+                    return None
+            # se for numérico e plausível como epoch ms
+            try:
+                if isinstance(val, (int, float)) and val > 10_000_000_000:
+                    # epoch em milissegundos
+                    return _dt.fromtimestamp(val / 1000.0)
+            except Exception:
+                pass
+            # se já é datetime ou string, retorna como está (engine tratará)
+            return val
+
+        for date_field in [
+            "B_DATA_DRAFT_DEADLINE",
+            "B_DATA_DEADLINE",
+            "B_DATA_ESTIMATIVA_SAIDA_ETD",
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+            "B_DATA_ABERTURA_GATE",
+        ]:
+            if date_field in update_fields:
+                update_fields[date_field] = _convert_epoch_ms(update_fields[date_field])
