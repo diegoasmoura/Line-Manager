@@ -2828,7 +2828,7 @@ def display_pdf_validation_interface(processed_data):
     # Cria formulário de validação
     with st.form("pdf_validation_form"):
         # Layout mais compacto e organizado (padronizado com demais telas)
-        st.markdown("**📋 Extracted Data Validation**")
+        st.markdown("**📋 Validação de Booking**")
         
         # Primeira linha: Booking Reference e Quantidade de Containers
         col1, col2 = st.columns(2)
@@ -2986,14 +2986,14 @@ def display_pdf_validation_interface(processed_data):
                 _etd_default = parse_brazilian_date(processed_data.get("etd")) or datetime.today().date()
             
             etd = st.date_input(
-                "ETD (Estimated Time of Departure)",
+                "Data Estimativa Saída ETD",
                 value=_etd_default,
                 help="Data estimada de partida"
             )
         with col9:
             _eta_default = parse_brazilian_date(processed_data.get("eta")) or datetime.today().date()
             eta = st.date_input(
-                "ETA (Estimated Time of Arrival)",
+                "Data Estimativa Chegada ETA",
                 value=_eta_default,
                 help="Data estimada de chegada"
             )
@@ -3035,11 +3035,17 @@ def display_pdf_validation_interface(processed_data):
                 "Final Destination": pod,
                 "Transhipment Port": transhipment_port,
                 "Port Terminal City": port_terminal_city,
-                "Requested Deadline Start Date": "",  # não inferir de ETD
-                "Requested Deadline End Date": "",    # não inferir de ETD
+                # Preenchimentos padronizados esperados por insert_return_carrier_from_ui
+                # ETD → Requested Deadline Start Date
+                "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",
+                "Requested Deadline End Date": "",
                 "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",
                 "PDF Booking Emission Date": pdf_print_date
             }
+
+            # Compatibilidade: alguns fluxos esperam a chave 'Terminal'
+            if port_terminal_city:
+                validated_data["Terminal"] = port_terminal_city
             
             # Debug simples para verificar se chegou aqui
             st.info("🔍 Dados preparados para salvamento")
