@@ -202,19 +202,38 @@ def get_voyage_monitoring_for_reference(farol_reference):
         return pd.DataFrame()
 
 
-def get_available_references_for_relation():
-    """Busca referências originais (não-split) na aba 'Other Status' para relacionamento"""
+def get_available_references_for_relation(farol_reference=None):
+    """Busca referências na aba 'Other Status' para relacionamento.
+
+    Regra: se uma Farol Reference específica for fornecida (ex.: FR_25.09_0001.1),
+    retornar apenas registros dessa mesma referência (exatos), excluindo apenas
+    os com status 'Received from Carrier'. Caso contrário, mantém o comportamento
+    anterior (listar originais/base de todas as referências).
+    """
     try:
         conn = get_database_connection()
-        query = text("""
-            SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE B_BOOKING_STATUS != 'Received from Carrier'
-              AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
-              AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
-            ORDER BY ROW_INSERTED_DATE DESC
-        """)
-        result = conn.execute(query).mappings().fetchall()
+        if farol_reference:
+            # Lista somente a própria referência (exata), na aba Other Status
+            query = text("""
+                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE B_BOOKING_STATUS != 'Received from Carrier'
+                  AND UPPER(FAROL_REFERENCE) = UPPER(:farol_reference)
+                ORDER BY ROW_INSERTED_DATE DESC
+            """)
+            params = {"farol_reference": farol_reference}
+            result = conn.execute(query, params).mappings().fetchall()
+        else:
+            # Comportamento legado: somente originais (não-split) de todas as referências
+            query = text("""
+                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE B_BOOKING_STATUS != 'Received from Carrier'
+                  AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
+                  AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
+                ORDER BY ROW_INSERTED_DATE DESC
+            """)
+            result = conn.execute(query).mappings().fetchall()
         conn.close()
         # Converte as chaves para maiúsculas para consistência
         return [{k.upper(): v for k, v in dict(row).items()} for row in result] if result else []
@@ -1713,8 +1732,8 @@ def exibir_history():
             if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
                 st.info("📋 **Este item é um retorno do armador. Antes de aprovar, informe a referência da aba relacionada:**")
                 
-                # Busca referências disponíveis na aba 'Other Status'
-                available_refs = get_available_references_for_relation()
+                # Busca referências disponíveis na aba 'Other Status' restringindo à mesma Farol Reference
+                available_refs = get_available_references_for_relation(farol_ref)
                 
                 if available_refs:
                     # Cria opções para o selectbox com formato limpo
