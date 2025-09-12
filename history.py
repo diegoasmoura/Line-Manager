@@ -1496,6 +1496,15 @@ def exibir_history():
         # Aviso imediato para seleção múltipla
         if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() > 1:
             st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
+        
+        # Aviso para seleção de linha "Cargill Booking Request" ou "Split Info" na aba Request Timeline
+        if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() == 1:
+            selected_row = edited_df_other[edited_df_other["Selecionar"] == True].iloc[0]
+            status = selected_row.get("Status")
+            if status == "📦 Cargill Booking Request":
+                st.warning("⚠️ **Atenção:** Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
+            elif status == "📄 Split Info":
+                st.warning("⚠️ **Atenção:** Esta linha representa informações de divisão (Split Info). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
 
     # Conteúdo da "aba" Retornos do Armador
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")

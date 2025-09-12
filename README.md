@@ -212,6 +212,37 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Contém a lógica da interface de usuário para o fluxo de aprovação de retornos do carrier, coletando os dados necessários e invocando a lógica de negócio que foi centralizada em `database.py`.
 - Gerencia a seção de upload e visualização de anexos para cada referência.
 
+#### 🎯 **Regras de Seleção e Interface (v3.6+)**
+
+**Regra de Seleção Única:**
+- ✅ **Apenas 1 linha por vez**: O sistema permite selecionar apenas uma linha por aba
+- ⚠️ **Aviso de seleção múltipla**: Quando 2+ linhas são marcadas, aparece o aviso: "⚠️ **Seleção inválida:** Selecione apenas uma linha por vez."
+- 🔄 **Limpeza automática**: Ao trocar de aba, as seleções das outras abas são limpas automaticamente
+- 🚫 **Bloqueio de ações**: A área de botões de status só aparece quando exatamente 1 linha está selecionada
+
+**Alertas Contextuais por Aba:**
+
+**📋 Request Timeline:**
+- ⚠️ **Cargill Booking Request**: "Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
+- ⚠️ **Split Info**: "Esta linha representa informações de divisão (Split Info). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
+
+**📨 Returns Awaiting Review:**
+- ✅ **Ações permitidas**: Booking Approved, Booking Rejected, Booking Cancelled
+- 🔗 **Linking obrigatório**: Para "Booking Approved", deve selecionar uma referência relacionada no dropdown
+- 📋 **Filtros do dropdown**: Mostra apenas "Cargill Booking Request" (Booking Requested + Linked_Reference vazio)
+
+**Comportamento do Dropdown de Referências:**
+- 🎯 **Filtro por Farol Reference**: Mostra apenas referências da mesma Farol Reference acessada
+- 📅 **Ordenação cronológica**: Mais antigo primeiro, mesmo dia ordenado por hora (descendente)
+- 🏷️ **Formato de exibição**: "FR_... | DD/MM/YYYY HH:MM | Status" (sem ícones)
+- 🚫 **Exclusões**: Não mostra "Carrier Return (Linked)" nem registros já linkados
+
+**Mensagens de Feedback:**
+- ✅ **Sucesso**: "✅ Approval successful!" / "✅ Status atualizado para 'X'."
+- ❌ **Erro**: "❌ Falha ao aprovar. Verifique os campos e tente novamente."
+- ⚠️ **Avisos**: Aparecem diretamente abaixo da grade da aba ativa
+- 🔄 **Persistência**: Mensagens persistem após recarregamento da página
+
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
 - Extração automática de dados
@@ -786,6 +817,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - "📋 Request Timeline": todos os registros exceto `Received from Carrier`.
   - "📨 Returns Awaiting Review": somente `Received from Carrier`.
 - Estabilidade de UI: eliminação de loops de `st.rerun()` (uma única rerenderização por ação) e mensagens de feedback claras em aprovações/atualizações.
+
+#### 🎯 **Regras de Seleção e Interface (v3.6.1)**
+- **Seleção Única Obrigatória**: Apenas 1 linha pode ser selecionada por vez em qualquer aba
+- **Avisos Contextuais**: Alertas específicos para linhas "📦 Cargill Booking Request" e "📄 Split Info" na aba Request Timeline
+- **Limpeza Automática**: Seleções são limpas automaticamente ao trocar de abas
+- **Validação de Ações**: Área de botões só aparece quando exatamente 1 linha está selecionada
+- **Mensagens Persistentes**: Feedback de sucesso/erro persiste após recarregamento da página
+- **Dropdown Inteligente**: Filtra referências por Farol Reference exata e ordena cronologicamente
 
 ### 📌 v3.5 - Correções de Importação (Setembro 2025)
 - **🐛 Correções Críticas de ImportError:**
