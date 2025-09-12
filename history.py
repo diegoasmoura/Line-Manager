@@ -54,8 +54,8 @@ def get_next_linked_reference_number(farol_reference=None):
                 SELECT NVL(MAX(Linked_Reference), 0) + 1 as next_number
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE Linked_Reference IS NOT NULL
-                  AND Linked_Reference NOT LIKE '%-R%'
-                  AND Linked_Reference != 'New Adjustment'
+                      AND Linked_Reference NOT LIKE '%-R%'
+                      AND Linked_Reference != 'New Adjustment'
             """)
             result = conn.execute(query).scalar()
             conn.close()
@@ -1035,6 +1035,25 @@ def exibir_history():
     internal_cols = display_cols + ["ADJUSTMENT_ID"]
     df_show = df[[c for c in internal_cols if c in df.columns]].copy()
     
+    # Aplica ordenação por Inserted Date antes de separar em abas
+    if "ROW_INSERTED_DATE" in df_show.columns:
+        # Ordenação primária por data inserida (mais antigo → mais novo)
+        # Critério secundário estável: raiz da Farol Reference e sufixo numérico (.1, .2, ...)
+        if "FAROL_REFERENCE" in df_show.columns:
+            refs_base = df_show["FAROL_REFERENCE"].astype(str)
+            df_show["__ref_root"] = refs_base.str.split(".").str[0]
+            df_show["__ref_suffix_num"] = (
+                refs_base.str.extract(r"\.(\d+)$")[0].fillna(0).astype(int)
+            )
+            df_show = df_show.sort_values(
+                by=["ROW_INSERTED_DATE", "__ref_root", "__ref_suffix_num"],
+                ascending=[True, True, True],
+                kind="mergesort",
+            )
+            df_show = df_show.drop(columns=["__ref_root", "__ref_suffix_num"])  # limpeza
+        else:
+            df_show = df_show.sort_values(by=["ROW_INSERTED_DATE"], ascending=[True], kind="mergesort")
+    
     # Adiciona coluna de seleção ao df_display
     df_display = df_show.copy()
     df_display.insert(0, "Selecionar", False)
@@ -1210,6 +1229,39 @@ def exibir_history():
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
         
+        # Adiciona ícones na coluna de Status (origem do ajuste) e prioriza indicação de retorno do carrier
+        try:
+            has_status = "Status" in df_processed.columns
+            has_linked = "Linked Reference" in df_processed.columns
+            if has_status:
+                def _render_status_row(row):
+                    # Se há Linked Reference, indicar retorno do carrier
+                    if has_linked:
+                        linked = row.get("Linked Reference")
+                        if linked is not None:
+                            linked_str = str(linked).strip()
+                            if linked_str and linked_str.upper() != "NULL":
+                                if linked_str == "New Adjustment":
+                                    return "🚢 Carrier Return (New Adjustment)"
+                                return "🚢 Carrier Return (Linked)"
+                    # Caso contrário, usar origem padrão
+                    val = row.get("Status")
+                    try:
+                        txt = str(val).strip() if val is not None else ""
+                    except Exception:
+                        txt = ""
+                    if not txt:
+                        return "⚙️"
+                    low = txt.lower()
+                    if low == "adjusts cargill":
+                        return "🛠️ Adjusts (Cargill)"
+                    if low == "adjusts carrier":
+                        return "🚢 Adjusts Carrier"
+                    return f"⚙️ {txt}"
+                df_processed["Status"] = df_processed.apply(_render_status_row, axis=1)
+        except Exception:
+            pass
+        
         return df_processed
 
     # Função para exibir grade em uma aba
@@ -1231,9 +1283,41 @@ def exibir_history():
             if col in df_processed.columns:
                 df_processed[col] = pd.to_datetime(df_processed[col], errors='coerce')
 
-        # Ordena somente por Inserted Date (ascendente: mais antigo → mais novo)
+        # Ordena por Inserted Date e, dentro do mesmo dia/hora, por raiz e sufixo da Farol Reference
         if "Inserted Date" in df_processed.columns:
-            df_processed = df_processed.sort_values(by=["Inserted Date"], ascending=[True])
+            if "Farol Reference" in df_processed.columns:
+                refs_base = df_processed["Farol Reference"].astype(str)
+                df_processed["__ref_root"] = refs_base.str.split(".").str[0]
+                df_processed["__ref_suffix_num"] = (
+                    refs_base.str.extract(r"\.(\d+)$")[0].fillna(0).astype(int)
+                )
+                df_processed = df_processed.sort_values(
+                    by=["Inserted Date", "__ref_root", "__ref_suffix_num"],
+                    ascending=[True, True, True],
+                    kind="mergesort",
+                )
+                df_processed = df_processed.drop(columns=["__ref_root", "__ref_suffix_num"])  # limpeza
+            else:
+                df_processed = df_processed.sort_values(by=["Inserted Date"], ascending=[True], kind="mergesort")
+
+        # Marca a primeira linha "Booking Requested" como pedido de booking Cargill por Farol Reference
+        try:
+            required_cols = {"Farol Status", "Inserted Date", "Farol Reference"}
+            if required_cols.issubset(set(df_processed.columns)):
+                df_req = df_processed[df_processed["Farol Status"] == "Booking Requested"].copy()
+                if not df_req.empty:
+                    idx_first = df_req.sort_values("Inserted Date").groupby("Farol Reference", as_index=False).head(1).index
+                    if "Linked Reference" in df_processed.columns:
+                        import pandas as _pd
+                        for i in idx_first:
+                            linked_val = df_processed.loc[i, "Linked Reference"] if "Linked Reference" in df_processed.columns else None
+                            is_empty = (linked_val is None) or (isinstance(linked_val, str) and linked_val.strip() == "") or (str(linked_val).upper() == "NULL") or (hasattr(_pd, 'isna') and _pd.isna(linked_val))
+                            if is_empty:
+                                df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
+                    else:
+                        df_processed.loc[idx_first, "Status"] = "📦 Cargill Booking Request"
+        except Exception:
+            pass
                 
         return df_processed
 
@@ -1479,23 +1563,23 @@ def exibir_history():
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
         if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
             justification = {
-                "area": area,
-                "request_reason": reason,
-                "adjustments_owner": responsibility,
+                            "area": area,
+                            "request_reason": reason,
+                            "adjustments_owner": responsibility,
                 "comments": comment
             }
             if approve_carrier_return(adjustment_id, related_reference, justification):
                 st.success("✅ Approval successful!")
-                st.cache_data.clear()
-                st.rerun()
+            st.cache_data.clear()
+            st.rerun()
         elif new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
             if update_record_status(adjustment_id, new_status):
                 st.cache_data.clear()
-                st.rerun()
+            st.rerun()
         else:
             st.warning(f"Status change to '{new_status}' is not handled by this logic yet.")
-
-
+    
+    
     # Interface de botões de status para linha selecionada
     if len(selected) == 1:
         st.markdown("---")
@@ -1545,7 +1629,7 @@ def exibir_history():
                             type="secondary"):
                     st.session_state["pending_status_change"] = "Adjustment Requested"
                     st.rerun()
-        
+            
         # Confirmação quando há status pendente
         pending_status = st.session_state.get("pending_status_change")
         if pending_status:
@@ -1561,110 +1645,110 @@ def exibir_history():
                 available_refs = get_available_references_for_relation()
                 
                 if available_refs:
-                   # Cria opções para o selectbox com formato limpo
-                   ref_options = []
-                   for ref in available_refs:
-                       # Formata a data de inserção com hora e minuto
-                       inserted_date = ref.get('ROW_INSERTED_DATE', '')
-                       if inserted_date and hasattr(inserted_date, 'strftime'):
-                           date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
-                       else:
-                           # Para strings, tenta extrair data e hora
-                           date_str_raw = str(inserted_date) if inserted_date else ''
-                           if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
-                               try:
-                                   # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
-                                   parts = date_str_raw[:16].replace(' ', 'T').split('T')
-                                   if len(parts) == 2:
-                                       date_part = parts[0].split('-')
-                                       time_part = parts[1][:5]  # HH:MM
-                                       if len(date_part) == 3:
-                                           date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
-                                       else:
-                                           date_str = date_str_raw[:16]
-                                   else:
-                                       date_str = date_str_raw[:16]
-                               except:
-                                   date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
-                           else:
-                               date_str = 'N/A'
-                       
-                       option_text = f"{ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']} | {date_str}"
-                       ref_options.append(option_text)
-                   
-                   ref_options.insert(0, "Selecione uma referência...")
-                   ref_options.append("🆕 New Adjustment")  # Opção para ajuste sem referência prévia
-                   
-                   selected_ref = st.selectbox(
-                       "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
-                       options=ref_options,
-                       key="related_reference_select"
-                   )
-                   
-                   if selected_ref and selected_ref != "Selecione uma referência...":
-                       if selected_ref == "🆕 New Adjustment":
-                           related_reference = "New Adjustment"
-                           st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
-                           
-                           # Campos de justificativa obrigatórios para New Adjustment
-                           st.markdown("#### 📋 Justificativas do New Adjustment")
-                           col_a, col_b, col_c = st.columns([1, 1, 1])
-                           with col_a:
-                               area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
-                           with col_b:
-                               reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
-                           with col_c:
-                               responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
-                           
-                           comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
-                           
-                           # Armazena os valores no session_state para usar na confirmação
-                           st.session_state["new_adjustment_area"] = area_new_adj
-                           st.session_state["new_adjustment_reason"] = reason_new_adj
-                           st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
-                           st.session_state["new_adjustment_comment"] = comment_new_adj
-                       else:
-                           # Extrai a Farol Reference da opção selecionada (formato limpo)
-                           # Formato: "FR_25.09_0001 | Booking Requested | 12/09/2025"
-                           farol_ref_from_selection = selected_ref.split(" | ")[0]
-                           
-                           # Busca o registro correspondente pela Farol Reference
-                           selected_ref_data = next((ref for ref in available_refs if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
-                           if selected_ref_data:
-                               # Salva a string completa como Linked Reference
-                               related_reference = selected_ref
-                               
-                               # Formata a data para exibição com hora e minuto
-                               inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')
-                               if inserted_date and hasattr(inserted_date, 'strftime'):
-                                   date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
-                               else:
-                                   # Para strings, tenta extrair data e hora
-                                   date_str_raw = str(inserted_date) if inserted_date else ''
-                                   if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
-                                       try:
-                                           # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
-                                           parts = date_str_raw[:16].replace(' ', 'T').split('T')
-                                           if len(parts) == 2:
-                                               date_part = parts[0].split('-')
-                                               time_part = parts[1][:5]  # HH:MM
-                                               if len(date_part) == 3:
-                                                   date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
-                                               else:
-                                                   date_str = date_str_raw[:16]
-                                           else:
-                                               date_str = date_str_raw[:16]
-                                       except:
-                                           date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
-                                   else:
-                                       date_str = 'N/A'
-                               
-                               st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']} | {date_str}")
-                           else:
-                               st.error("❌ Erro ao encontrar a referência selecionada")
+                    # Cria opções para o selectbox com formato limpo
+                    ref_options = []
+                    for ref in available_refs:
+                        # Formata a data de inserção com hora e minuto
+                        inserted_date = ref.get('ROW_INSERTED_DATE', '')
+                        if inserted_date and hasattr(inserted_date, 'strftime'):
+                            date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                        else:
+                            # Para strings, tenta extrair data e hora
+                            date_str_raw = str(inserted_date) if inserted_date else ''
+                            if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
+                                try:
+                                    # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
+                                    parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                    if len(parts) == 2:
+                                        date_part = parts[0].split('-')
+                                        time_part = parts[1][:5]  # HH:MM
+                                        if len(date_part) == 3:
+                                            date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                        else:
+                                            date_str = date_str_raw[:16]
+                                    else:
+                                        date_str = date_str_raw[:16]
+                                except:
+                                    date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                            else:
+                                date_str = 'N/A'
+                        
+                        option_text = f"{ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']} | {date_str}"
+                        ref_options.append(option_text)
+                    
+                    ref_options.insert(0, "Selecione uma referência...")
+                    ref_options.append("🆕 New Adjustment")  # Opção para ajuste sem referência prévia
+                    
+                    selected_ref = st.selectbox(
+                        "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
+                        options=ref_options,
+                        key="related_reference_select"
+                    )
+                    
+                    if selected_ref and selected_ref != "Selecione uma referência...":
+                        if selected_ref == "🆕 New Adjustment":
+                            related_reference = "New Adjustment"
+                            st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                            
+                            # Campos de justificativa obrigatórios para New Adjustment
+                            st.markdown("#### 📋 Justificativas do New Adjustment")
+                            col_a, col_b, col_c = st.columns([1, 1, 1])
+                            with col_a:
+                                area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
+                            with col_b:
+                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
+                            with col_c:
+                                responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
+                            
+                            comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
+                            
+                            # Armazena os valores no session_state para usar na confirmação
+                            st.session_state["new_adjustment_area"] = area_new_adj
+                            st.session_state["new_adjustment_reason"] = reason_new_adj
+                            st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
+                            st.session_state["new_adjustment_comment"] = comment_new_adj
+                        else:
+                            # Extrai a Farol Reference da opção selecionada (formato limpo)
+                            # Formato: "FR_25.09_0001 | Booking Requested | 12/09/2025"
+                            farol_ref_from_selection = selected_ref.split(" | ")[0]
+                            
+                            # Busca o registro correspondente pela Farol Reference
+                            selected_ref_data = next((ref for ref in available_refs if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
+                            if selected_ref_data:
+                                # Salva a string completa como Linked Reference
+                                related_reference = selected_ref
+                                
+                                # Formata a data para exibição com hora e minuto
+                                inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')
+                                if inserted_date and hasattr(inserted_date, 'strftime'):
+                                    date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                                else:
+                                    # Para strings, tenta extrair data e hora
+                                    date_str_raw = str(inserted_date) if inserted_date else ''
+                                    if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
+                                        try:
+                                            # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
+                                            parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                            if len(parts) == 2:
+                                                date_part = parts[0].split('-')
+                                                time_part = parts[1][:5]  # HH:MM
+                                                if len(date_part) == 3:
+                                                    date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                                else:
+                                                    date_str = date_str_raw[:16]
+                                            else:
+                                                date_str = date_str_raw[:16]
+                                        except:
+                                            date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                                    else:
+                                        date_str = 'N/A'
+                                
+                                st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']} | {date_str}")
+                            else:
+                                st.error("❌ Erro ao encontrar a referência selecionada")
                 else:
-                   st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
-                   related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
+                    st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
+                    related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
             
             col1, col2 = st.columns([1, 3])
             with col1:
@@ -1716,7 +1800,7 @@ def exibir_history():
                             st.session_state.pop("new_adjustment_reason", None)
                             st.session_state.pop("new_adjustment_responsibility", None)
                             st.session_state.pop("new_adjustment_comment", None)
-                        # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
+                    # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
                 
                 with subcol2:
                     if st.button("❌ Cancelar", 
