@@ -219,7 +219,7 @@ def get_available_references_for_relation(farol_reference=None):
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE B_BOOKING_STATUS != 'Received from Carrier'
                   AND UPPER(FAROL_REFERENCE) = UPPER(:farol_reference)
-                ORDER BY ROW_INSERTED_DATE DESC
+                ORDER BY ROW_INSERTED_DATE ASC
             """)
             params = {"farol_reference": farol_reference}
             result = conn.execute(query, params).mappings().fetchall()
@@ -231,7 +231,7 @@ def get_available_references_for_relation(farol_reference=None):
                 WHERE B_BOOKING_STATUS != 'Received from Carrier'
                   AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
                   AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
-                ORDER BY ROW_INSERTED_DATE DESC
+                ORDER BY ROW_INSERTED_DATE ASC
             """)
             result = conn.execute(query).mappings().fetchall()
         conn.close()
@@ -1746,6 +1746,20 @@ def exibir_history():
                 available_refs = get_available_references_for_relation(farol_ref)
                 
                 if available_refs:
+                    # Ordena por dia crescente e, dentro do mesmo dia, horário decrescente (HH:MM mais recente primeiro)
+                    def sort_by_date(ref):
+                        try:
+                            date_val = ref.get('ROW_INSERTED_DATE')
+                            dt = pd.to_datetime(date_val, errors='coerce')
+                            if pd.isna(dt):
+                                return (pd.Timestamp('1900-01-01').date(), 0)
+                            # dt.value = nanosegundos desde epoch; negativo para ordem decrescente de horário
+                            return (dt.date(), -int(getattr(dt, 'value', 0)))
+                        except Exception:
+                            return (pd.Timestamp('1900-01-01').date(), 0)
+
+                    available_refs = sorted(available_refs, key=sort_by_date)
+                    
                     # Cria opções para o selectbox com formato limpo
                     ref_options = []
                     for ref in available_refs:
@@ -1774,7 +1788,7 @@ def exibir_history():
                             else:
                                 date_str = 'N/A'
                         
-                        option_text = f"{ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']} | {date_str}"
+                        option_text = f"{ref['FAROL_REFERENCE']} | {date_str} | {ref['B_BOOKING_STATUS']}"
                         ref_options.append(option_text)
                     
                     ref_options.insert(0, "Selecione uma referência...")
@@ -1810,7 +1824,7 @@ def exibir_history():
                             st.session_state["new_adjustment_comment"] = comment_new_adj
                         else:
                             # Extrai a Farol Reference da opção selecionada (formato limpo)
-                            # Formato: "FR_25.09_0001 | Booking Requested | 12/09/2025"
+                            # Formato: "FR_25.09_0001 | 12/09/2025 17:25 | Booking Requested"
                             farol_ref_from_selection = selected_ref.split(" | ")[0]
                             
                             # Busca o registro correspondente pela Farol Reference
@@ -1844,7 +1858,7 @@ def exibir_history():
                                     else:
                                         date_str = 'N/A'
                                 
-                                st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']} | {date_str}")
+                                st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {date_str} | {selected_ref_data['B_BOOKING_STATUS']}")
                             else:
                                 st.error("❌ Erro ao encontrar a referência selecionada")
                 else:
