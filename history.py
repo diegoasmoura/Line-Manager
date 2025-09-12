@@ -1228,13 +1228,57 @@ def exibir_history():
         
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
+
+        # Deriva/Preenche a coluna "Splitted Farol Reference" quando a referência tem sufixo .n
+        try:
+            if "Splitted Farol Reference" not in df_processed.columns:
+                df_processed["Splitted Farol Reference"] = None
+            if "Farol Reference" in df_processed.columns:
+                refs_series = df_processed["Farol Reference"].astype(str)
+                has_suffix = refs_series.str.contains(r"\.\d+$", regex=True)
+
+                def _is_empty_split(val):
+                    if val is None:
+                        return True
+                    if isinstance(val, str):
+                        v = val.strip()
+                        return v == "" or v.upper() == "NULL"
+                    try:
+                        return pd.isna(val)
+                    except Exception:
+                        return False
+
+                mask_empty = df_processed["Splitted Farol Reference"].apply(_is_empty_split)
+                fill_mask = has_suffix & mask_empty
+                if fill_mask.any():
+                    df_processed.loc[fill_mask, "Splitted Farol Reference"] = df_processed.loc[fill_mask, "Farol Reference"]
+        except Exception:
+            pass
         
-        # Adiciona ícones na coluna de Status (origem do ajuste) e prioriza indicação de retorno do carrier
+        # Adiciona ícones na coluna de Status (origem do ajuste), com prioridade:
+        # 1) Linhas de Split → "📄 Split"
+        # 2) Linked Reference presente → "🚢 Carrier Return (Linked|New Adjustment)"
+        # 3) P_STATUS categorizado → "🛠️ Adjusts (Cargill)" / "🚢 Adjusts Carrier" / fallback
         try:
             has_status = "Status" in df_processed.columns
             has_linked = "Linked Reference" in df_processed.columns
+            has_splitcol = "Splitted Farol Reference" in df_processed.columns
             if has_status:
                 def _render_status_row(row):
+                    # Se for split, mostrar informação reduzida (via coluna explícita ou pelo padrão .n)
+                    if has_splitcol:
+                        split_val = row.get("Splitted Farol Reference")
+                        if split_val is not None:
+                            split_str = str(split_val).strip()
+                            if split_str and split_str.upper() != "NULL":
+                                return "📄 Split Info"
+                    fr_val = row.get("Farol Reference")
+                    if fr_val is not None:
+                        fr_str = str(fr_val).strip()
+                        if "." in fr_str:
+                            last_part = fr_str.split(".")[-1]
+                            if last_part.isdigit():
+                                return "📄 Split"
                     # Se há Linked Reference, indicar retorno do carrier
                     if has_linked:
                         linked = row.get("Linked Reference")
