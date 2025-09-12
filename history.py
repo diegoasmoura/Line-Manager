@@ -1436,16 +1436,39 @@ def exibir_history():
         except Exception:
             pass
 
-        # Reordenar colunas: "Selecionar" primeiro (se existir) e "Status" como segunda coluna
+        # Reordenar colunas conforme ordem solicitada nas duas abas
         try:
-            preferred = []
-            if "Selecionar" in df_processed.columns:
-                preferred.append("Selecionar")
-            if "Status" in df_processed.columns:
-                preferred.append("Status")
-            others = [c for c in df_processed.columns if c not in preferred]
-            if preferred:
-                df_processed = df_processed[preferred + others]
+            desired_order = [
+                "Selecionar",
+                "Status",
+                "Inserted Date",
+                "Farol Reference",
+                "Farol Status",
+                "Booking",
+                "Vessel Name",
+                "Voyage Carrier",
+                "Voyage Code",
+                "Quantity of Containers",
+                "Place of Receipt",
+                "Port of Loading POL",
+                "Port of Delivery POD",
+                "Final Destination",
+                "Transhipment Port",
+                "Port Terminal City",
+                "Data Draft Deadline",
+                "Data Deadline",
+                "Data Estimativa Saída ETD",
+                "Data Estimativa Chegada ETA",
+                "Data Abertura Gate",
+                "PDF Name",
+                "PDF Booking Emission Date",
+                "Splitted Farol Reference",
+                "Linked Reference",
+            ]
+            ordered = [c for c in desired_order if c in df_processed.columns]
+            remaining = [c for c in df_processed.columns if c not in ordered]
+            if ordered:
+                df_processed = df_processed[ordered + remaining]
         except Exception:
             pass
                 
@@ -1921,8 +1944,8 @@ def exibir_history():
                             # Busca o registro correspondente pela Farol Reference
                             selected_ref_data = next((ref for ref in available_refs if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
                             if selected_ref_data:
-                                # Salva apenas a Farol Reference (sem ícones/descrições) como Linked Reference
-                                related_reference = farol_ref_from_selection
+                                # Salva a chave completa (sem ícones) como Linked Reference
+                                related_reference = selected_ref
                                 
                                 # Formata a data para exibição com hora e minuto
                                 inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')

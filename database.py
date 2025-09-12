@@ -1433,7 +1433,8 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Requested Deadline Start Date": "B_DATA_DEADLINE",
             "Requested Deadline End Date": "B_DATA_DRAFT_DEADLINE",
             "Required Arrival Date": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
-            "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE"
+            "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE",
+            "PDF Name": "P_PDF_NAME",
         }
         
         # Converte dados da UI para formato da tabela
@@ -1475,6 +1476,11 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                                 value = ""
                         except Exception:
                             value = ""
+                    # Trunca PDF Name se necessário (evita ORA-12899)
+                    if db_key == "P_PDF_NAME" and isinstance(value, str):
+                        value = value.strip()
+                        if len(value) > 200:
+                            value = value[:200]
                     db_data[db_key] = value
         
         # Campos obrigatórios e padrões
@@ -1611,12 +1617,11 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             update_params.update(justification)
             set_clauses.extend(["Linked_Reference = 'New Adjustment'", "AREA = :area", "REQUEST_REASON = :request_reason", "ADJUSTMENTS_OWNER = :adjustments_owner", "COMMENTS = :comments"])
         else:
-            # related_reference deve ser apenas a Farol Reference (sem ícones/descrições)
-            try:
-                # Se vier no formato "FR_... | ... | ...", pegamos só a primeira parte
-                update_params["linked_ref"] = str(related_reference).split(" | ")[0]
-            except Exception:
-                update_params["linked_ref"] = related_reference
+            # Persistir a chave completa enviada pela UI (sem ícones). Caso ultrapasse 60, truncar com segurança
+            ref_str = str(related_reference) if related_reference is not None else ''
+            if len(ref_str) > 60:
+                ref_str = ref_str[:60]
+            update_params["linked_ref"] = ref_str
             set_clauses.append("Linked_Reference = :linked_ref")
 
         update_query_str = f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {', '.join(set_clauses)} WHERE ADJUSTMENT_ID = :adjustment_id"
