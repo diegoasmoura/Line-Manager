@@ -21,21 +21,138 @@ Booking_adj_area = df_udc[df_udc["grupo"] == "Booking Adj Area"]["dado"].dropna(
 Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["dado"].dropna().unique().tolist()
 Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
 
-def get_next_linked_reference_number():
-    """Obtém o próximo número sequencial para Linked_Reference"""
+def get_next_linked_reference_number(farol_reference=None):
+    """
+    Obtém o próximo número sequencial para Linked_Reference.
+    Se farol_reference for fornecido, gera formato hierárquico: FR_XX.XX_XXXX-R01
+    Senão, mantém comportamento atual (global).
+    """
     try:
         conn = get_database_connection()
-        query = text("""
-            SELECT NVL(MAX(Linked_Reference), 0) + 1 as next_number
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE Linked_Reference IS NOT NULL
-        """)
-        result = conn.execute(query).scalar()
-        conn.close()
-        return result if result else 1
+        
+        if farol_reference:
+            # Novo formato hierárquico: FR_25.09_0001-R01
+            query = text("""
+                SELECT NVL(MAX(
+                    CAST(SUBSTR(Linked_Reference, LENGTH(:farol_ref) + 3) AS NUMBER)
+                ), 0) + 1 as next_number
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE Linked_Reference LIKE :pattern
+                  AND Linked_Reference NOT IN ('New Adjustment')
+            """)
+            pattern = f"{farol_reference}-R%"
+            result = conn.execute(query, {
+                "farol_ref": farol_reference, 
+                "pattern": pattern
+            }).scalar()
+            conn.close()
+            next_num = result if result else 1
+            return f"{farol_reference}-R{next_num:02d}"
+        else:
+            # Comportamento atual (global)
+            query = text("""
+                SELECT NVL(MAX(Linked_Reference), 0) + 1 as next_number
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE Linked_Reference IS NOT NULL
+                  AND Linked_Reference NOT LIKE '%-R%'
+                  AND Linked_Reference != 'New Adjustment'
+            """)
+            result = conn.execute(query).scalar()
+            conn.close()
+            return result if result else 1
+            
     except Exception as e:
         st.error(f"❌ Erro ao obter próximo número sequencial: {str(e)}")
-        return 1
+        return f"{farol_reference}-R01" if farol_reference else 1
+
+def format_linked_reference_display(linked_ref, farol_ref=None):
+    """
+    Formata Linked Reference para exibição amigável na UI.
+    Exemplos:
+    - "FR_25.09_0001-R01" -> "Request #01 (FR_25.09_0001)"
+    - "New Adjustment" -> "New Adjustment"
+    - "123" -> "Global Request #123"
+    - None/NULL -> "🔄 Pending Assignment" (para registros antigos)
+    """
+    if not linked_ref or str(linked_ref).strip() == "" or str(linked_ref).upper() == "NULL":
+        # Para registros antigos sem Linked Reference, oferece opção de auto-assignment
+        if farol_ref:
+            return f"🔄 Auto-assign Next ({farol_ref})"
+        return "🔄 Pending Assignment"
+    
+    linked_ref_str = str(linked_ref)
+    
+    if linked_ref_str == "New Adjustment":
+        return "🆕 New Adjustment"
+    
+    # Formato hierárquico: FR_25.09_0001-R01
+    if "-R" in linked_ref_str:
+        parts = linked_ref_str.split("-R")
+        if len(parts) == 2:
+            farol_part = parts[0]
+            request_num = parts[1]
+            return f"📋 Request #{request_num} ({farol_part})"
+    
+    # Formato numérico simples (legacy)
+    if linked_ref_str.isdigit():
+        return f"📋 Global Request #{linked_ref_str}"
+    
+    # Fallback
+    return str(linked_ref)
+
+def update_missing_linked_references():
+    """
+    Atualiza registros antigos que não têm LINKED_REFERENCE definido.
+    Gera automaticamente o novo formato hierárquico.
+    """
+    try:
+        conn = get_database_connection()
+        
+        # Busca registros sem LINKED_REFERENCE
+        query = text("""
+            SELECT ID, FAROL_REFERENCE 
+            FROM LogTransp.F_CON_RETURN_CARRIERS 
+            WHERE LINKED_REFERENCE IS NULL 
+               OR LINKED_REFERENCE = ''
+            ORDER BY FAROL_REFERENCE, ROW_INSERTED_DATE
+        """)
+        
+        records = conn.execute(query).mappings().fetchall()
+        
+        if not records:
+            return 0
+        
+        updated_count = 0
+        for record in records:
+            farol_ref = record['FAROL_REFERENCE']
+            record_id = record['ID']
+            
+            # Gera novo Linked Reference
+            new_linked_ref = get_next_linked_reference_number(farol_ref)
+            
+            # Atualiza o registro
+            update_query = text("""
+                UPDATE LogTransp.F_CON_RETURN_CARRIERS 
+                SET LINKED_REFERENCE = :linked_ref 
+                WHERE ID = :record_id
+            """)
+            
+            conn.execute(update_query, {
+                "linked_ref": new_linked_ref,
+                "record_id": record_id
+            })
+            updated_count += 1
+        
+        conn.commit()
+        conn.close()
+        return updated_count
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao atualizar Linked References: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return 0
 
 def get_voyage_monitoring_for_reference(farol_reference):
     """Busca dados de monitoramento de viagens relacionados a uma referência Farol"""
@@ -690,6 +807,18 @@ def display_attachments_section(farol_reference):
 def exibir_history():
     st.header("📜 Return Carriers History")
     
+    # Botão para atualizar registros antigos sem Linked Reference
+    col_update, col_spacer = st.columns([3, 7])
+    with col_update:
+        if st.button("🔄 Update Missing Linked References", help="Atualiza registros antigos que não têm Linked Reference definido"):
+            with st.spinner("Atualizando registros..."):
+                updated_count = update_missing_linked_references()
+                if updated_count > 0:
+                    st.success(f"✅ {updated_count} registros atualizados com sucesso!")
+                    st.rerun()
+                else:
+                    st.info("ℹ️ Todos os registros já possuem Linked Reference definido.")
+    
     # Espaçamento após o título
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -869,8 +998,8 @@ def exibir_history():
     st.markdown("---")
 
     # Grade principal com colunas relevantes (ADJUSTMENT_ID oculto mas usado internamente)
+    # ID removido da visualização - não é mais necessário para o usuário
     display_cols = [
-        "ID",
         "FAROL_REFERENCE",
         "B_BOOKING_REFERENCE",
         "LINKED_REFERENCE",
@@ -1432,50 +1561,110 @@ def exibir_history():
                 available_refs = get_available_references_for_relation()
                 
                 if available_refs:
-                    # Cria opções para o selectbox
-                    ref_options = [f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}" for ref in available_refs]
-                    ref_options.insert(0, "Selecione uma referência...")
-                    ref_options.append("New Adjustment")  # Opção para ajuste sem referência prévia
-                    
-                    selected_ref = st.selectbox(
-                        "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
-                        options=ref_options,
-                        key="related_reference_select"
-                    )
-                    
-                    if selected_ref and selected_ref != "Selecione uma referência...":
-                        if selected_ref == "New Adjustment":
-                            related_reference = "New Adjustment"
-                            st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
-                            
-                            # Campos de justificativa obrigatórios para New Adjustment
-                            st.markdown("#### 📋 Justificativas do New Adjustment")
-                            col_a, col_b, col_c = st.columns([1, 1, 1])
-                            with col_a:
-                                area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
-                            with col_b:
-                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
-                            with col_c:
-                                responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
-                            
-                            comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
-                            
-                            # Armazena os valores no session_state para usar na confirmação
-                            st.session_state["new_adjustment_area"] = area_new_adj
-                            st.session_state["new_adjustment_reason"] = reason_new_adj
-                            st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
-                            st.session_state["new_adjustment_comment"] = comment_new_adj
-                        else:
-                            # Extrai o ID da opção selecionada
-                            related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
-                        
-                            # Mostra detalhes da linha selecionada
-                            selected_ref_data = next((ref for ref in available_refs if str(ref['ID']) == related_reference), None)
-                            if selected_ref_data:
-                                st.info(f"📋 **Linha selecionada:** ID {selected_ref_data['ID']} | {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']}")
+                   # Cria opções para o selectbox com formato limpo
+                   ref_options = []
+                   for ref in available_refs:
+                       # Formata a data de inserção com hora e minuto
+                       inserted_date = ref.get('ROW_INSERTED_DATE', '')
+                       if inserted_date and hasattr(inserted_date, 'strftime'):
+                           date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                       else:
+                           # Para strings, tenta extrair data e hora
+                           date_str_raw = str(inserted_date) if inserted_date else ''
+                           if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
+                               try:
+                                   # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
+                                   parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                   if len(parts) == 2:
+                                       date_part = parts[0].split('-')
+                                       time_part = parts[1][:5]  # HH:MM
+                                       if len(date_part) == 3:
+                                           date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                       else:
+                                           date_str = date_str_raw[:16]
+                                   else:
+                                       date_str = date_str_raw[:16]
+                               except:
+                                   date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                           else:
+                               date_str = 'N/A'
+                       
+                       option_text = f"{ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']} | {date_str}"
+                       ref_options.append(option_text)
+                   
+                   ref_options.insert(0, "Selecione uma referência...")
+                   ref_options.append("🆕 New Adjustment")  # Opção para ajuste sem referência prévia
+                   
+                   selected_ref = st.selectbox(
+                       "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
+                       options=ref_options,
+                       key="related_reference_select"
+                   )
+                   
+                   if selected_ref and selected_ref != "Selecione uma referência...":
+                       if selected_ref == "🆕 New Adjustment":
+                           related_reference = "New Adjustment"
+                           st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                           
+                           # Campos de justificativa obrigatórios para New Adjustment
+                           st.markdown("#### 📋 Justificativas do New Adjustment")
+                           col_a, col_b, col_c = st.columns([1, 1, 1])
+                           with col_a:
+                               area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
+                           with col_b:
+                               reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
+                           with col_c:
+                               responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
+                           
+                           comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
+                           
+                           # Armazena os valores no session_state para usar na confirmação
+                           st.session_state["new_adjustment_area"] = area_new_adj
+                           st.session_state["new_adjustment_reason"] = reason_new_adj
+                           st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
+                           st.session_state["new_adjustment_comment"] = comment_new_adj
+                       else:
+                           # Extrai a Farol Reference da opção selecionada (formato limpo)
+                           # Formato: "FR_25.09_0001 | Booking Requested | 12/09/2025"
+                           farol_ref_from_selection = selected_ref.split(" | ")[0]
+                           
+                           # Busca o registro correspondente pela Farol Reference
+                           selected_ref_data = next((ref for ref in available_refs if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
+                           if selected_ref_data:
+                               # Salva a string completa como Linked Reference
+                               related_reference = selected_ref
+                               
+                               # Formata a data para exibição com hora e minuto
+                               inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')
+                               if inserted_date and hasattr(inserted_date, 'strftime'):
+                                   date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                               else:
+                                   # Para strings, tenta extrair data e hora
+                                   date_str_raw = str(inserted_date) if inserted_date else ''
+                                   if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
+                                       try:
+                                           # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
+                                           parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                           if len(parts) == 2:
+                                               date_part = parts[0].split('-')
+                                               time_part = parts[1][:5]  # HH:MM
+                                               if len(date_part) == 3:
+                                                   date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                               else:
+                                                   date_str = date_str_raw[:16]
+                                           else:
+                                               date_str = date_str_raw[:16]
+                                       except:
+                                           date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                                   else:
+                                       date_str = 'N/A'
+                               
+                               st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']} | {date_str}")
+                           else:
+                               st.error("❌ Erro ao encontrar a referência selecionada")
                 else:
-                    st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
-                    related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
+                   st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
+                   related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
             
             col1, col2 = st.columns([1, 3])
             with col1:

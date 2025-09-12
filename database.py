@@ -1473,6 +1473,16 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         db_data["USER_INSERT"] = user_insert
         db_data["ADJUSTMENT_ID"] = str(uuid.uuid4())
         
+        # Gera Linked Reference no novo formato hierárquico se tiver Farol Reference
+        farol_ref = db_data.get("FAROL_REFERENCE")
+        if farol_ref and "LINKED_REFERENCE" not in db_data:
+            try:
+                from history import get_next_linked_reference_number
+                db_data["LINKED_REFERENCE"] = get_next_linked_reference_number(farol_ref)
+            except Exception:
+                # Fallback para formato legacy se houver problema
+                db_data["LINKED_REFERENCE"] = "New Adjustment"
+        
         # Campos de ajuste (se fornecidos)
         if area:
             db_data["AREA"] = area
@@ -1537,7 +1547,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
     This includes fetching Ellox data, updating the return carrier record, and propagating changes to the main sales/booking table.
 
     :param adjustment_id: The ADJUSTMENT_ID of the F_CON_RETURN_CARRIERS record to approve.
-    :param related_reference: The ID of the related record from the 'Other Status' tab, or 'New Adjustment'.
+    :param related_reference: The complete selection string (e.g., 'FR_25.09_0001 | Booking Requested | 11/09/2025 19:27') or 'New Adjustment'.
     :param justification: A dict with justification fields for 'New Adjustment' cases.
     :return: True if successful, False otherwise.
     """
@@ -1593,6 +1603,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             update_params.update(justification)
             set_clauses.extend(["Linked_Reference = 'New Adjustment'", "AREA = :area", "REQUEST_REASON = :request_reason", "ADJUSTMENTS_OWNER = :adjustments_owner", "COMMENTS = :comments"])
         else:
+            # related_reference agora é a string completa da seleção (FR_XX.XX_XXXX | Status | Data Hora)
             update_params["linked_ref"] = related_reference
             set_clauses.append("Linked_Reference = :linked_ref")
 

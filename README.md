@@ -786,6 +786,35 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - **Validação e Conversão:** Conversão automática de datas e normalização de tipos de dados
   - **Tratamento de Erros:** Melhor tratamento de erros com rollback automático em falhas
   - **Truncamento de Campos:** `PDF_BOOKING_EMISSION_DATE` automaticamente truncado para 18 caracteres (remove segundos: YYYY-MM-DD HH:MM)
+  - **Sistema de Linked Reference Melhorado:** Novo formato hierárquico para melhor visibilidade e rastreabilidade de pedidos relacionados
+
+#### 🔗 **Novo Sistema de Linked Reference (v3.5)**
+
+**Problema anterior:** IDs sequenciais globais (1, 2, 3...) sem clara associação ao Farol Reference específico.
+
+**Solução implementada:** Formato hierárquico intuitivo que combina Farol Reference + número sequencial.
+
+**Formatos suportados:**
+- **🆕 Hierárquico**: `FR_25.09_0001-R01`, `FR_25.09_0001-R02` (recomendado)
+- **📋 Legacy**: `123` (compatibilidade com dados antigos)
+- **🆕 Especial**: `"New Adjustment"` (ajustes sem pedido prévio)
+
+**Vantagens:**
+- ✅ **Visibilidade clara**: Cada request mostra a qual Farol Reference pertence
+- ✅ **Sequencial por embarque**: Contador reinicia (R01, R02...) para cada Farol Reference
+- ✅ **Rastreabilidade**: Identificação rápida de relacionamentos
+- ✅ **Compatibilidade**: Funciona com dados existentes
+
+**Display na UI:**
+- `FR_25.09_0001-R01` → 📋 Request #01 (FR_25.09_0001)
+- `FR_25.09_0001-R05` → 📋 Request #05 (FR_25.09_0001)
+- `New Adjustment` → 🆕 New Adjustment
+- `123` → 📋 Global Request #123 (legacy)
+
+**Implementação:**
+- Função `get_next_linked_reference_number(farol_reference)` atualizada
+- Função `format_linked_reference_display()` para exibição amigável
+- Compatibilidade com formato antigo mantida
 
 ### 📌 v3.4
 - **Refatoração do Fluxo de Aprovação:**
