@@ -1811,12 +1811,7 @@ def exibir_history():
                         b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
                         linked = ref.get('LINKED_REFERENCE')
 
-                        # 🛠️ Adjusts (Cargill)
-                        if p_status.lower() == 'adjusts cargill':
-                            filtered.append(ref)
-                            continue
-
-                        # 📦 Cargill Booking Request → inferimos como as primeiras inserções Booking Requested sem Linked
+                        # Apenas 📦 Cargill Booking Request (Primeiras inserções Booking Requested sem Linked)
                         if b_status == 'Booking Requested' and _is_empty(linked):
                             filtered.append(ref)
 
@@ -1878,9 +1873,9 @@ def exibir_history():
                                 return False
 
                         if p_status.lower() == 'adjusts cargill':
-                            status_display = '🛠️ Adjusts (Cargill)'
+                            status_display = 'Adjusts (Cargill)'
                         elif b_status == 'Booking Requested' and _is_empty_local(linked):
-                            status_display = '📦 Cargill Booking Request'
+                            status_display = 'Cargill Booking Request'
                         else:
                             status_display = b_status or p_status or 'Status'
 
@@ -1960,9 +1955,9 @@ def exibir_history():
                                 linked_sel = selected_ref_data.get('LINKED_REFERENCE')
 
                                 if p_status_sel.lower() == 'adjusts cargill':
-                                    status_display_sel = '🛠️ Adjusts (Cargill)'
+                                    status_display_sel = 'Adjusts (Cargill)'
                                 elif b_status_sel == 'Booking Requested' and ((linked_sel is None) or (isinstance(linked_sel, str) and linked_sel.strip() in ('', 'NULL'))):
-                                    status_display_sel = '📦 Cargill Booking Request'
+                                    status_display_sel = 'Cargill Booking Request'
                                 else:
                                     status_display_sel = b_status_sel or p_status_sel or 'Status'
 
