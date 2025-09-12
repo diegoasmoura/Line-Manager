@@ -229,6 +229,40 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
  - Coleta automática de monitoramento ao validar o PDF (Ellox): agora a função `collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code)`
    1) autentica, 2) solicita monitoramento (`POST /api/monitor/navio`, tolera "already exist"), 3) visualiza (`POST /api/terminalmonitorings`), 4) salva na `F_ELLOX_TERMINAL_MONITORINGS`
 
+#### 📎 Attachment Management (PDF Booking) — Passo a passo
+
+1. **Upload do PDF**
+   - Acesse a seção Attachment Management e selecione o arquivo PDF de booking
+   - Tamanho máximo por arquivo: 200 MB
+
+2. **Extração Automática**
+   - O sistema tenta extrair: Booking Reference, Quantity, Vessel Name, Voyage Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal City, ETD, ETA, PDF Print Date
+   - Nomes de terminais são normalizados para padrão Ellox
+
+3. **Validação e Ajustes**
+   - Revise os campos extraídos na tela de validação
+   - Ajuste manualmente se necessário (ex.: carrier, voyage, terminal)
+
+4. **Confirmação**
+   - Ao confirmar, os dados são preparados para persistência
+   - O campo `PDF Booking Emission Date` é ajustado automaticamente para caber no banco (sem segundos: YYYY-MM-DD HH:MM)
+
+5. **Persistência**
+   - A função `insert_return_carrier_from_ui` insere um registro em `F_CON_RETURN_CARRIERS` com status `Received from Carrier`
+   - Em seguida, é iniciada a coleta de monitoramento Ellox da viagem
+
+6. **Monitoramento da Viagem**
+   - O sistema autentica e consulta/solicita monitoramento
+   - Os dados retornados são salvos em `F_ELLOX_TERMINAL_MONITORINGS`
+
+7. **Auditoria e Histórico**
+   - O registro fica disponível na aba de histórico, inclusive para fluxo de aprovação
+
+8. **Erros Comuns e Tratamento**
+   - `ORA-12899` no `PDF_BOOKING_EMISSION_DATE`: corrigido com truncamento automático (sem segundos)
+   - PDF duplicado (mesma combinação de chave): operação bloqueada e usuário informado
+
+
 ### 🗄️ `database.py`
 **Camada de dados**
 - Conexões com Oracle Database
@@ -666,6 +700,11 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - ✅ **Resolvido**: Função implementada no `database.py` linha 1690
      - **Causa**: Chamada no processo de aprovação mas função inexistente
      - **Solução**: Busca completa por ADJUSTMENT_ID com suporte a transações
+   
+   - **`ORA-12899: value too large for column PDF_BOOKING_EMISSION_DATE`**:
+     - ✅ **Resolvido**: Truncamento automático implementado na função `insert_return_carrier_from_ui`
+     - **Causa**: Campo limitado a 18 caracteres, mas datas com segundos têm 19 caracteres
+     - **Solução**: Remoção automática de segundos (formato: YYYY-MM-DD HH:MM)
 
 5. **Problemas com API Ellox**
    - **🔴 API Desconectada**:
@@ -746,6 +785,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - **Reutilização de Conexão:** `get_return_carriers_by_adjustment_id` suporta reutilização de conexão existente para operações transacionais
   - **Validação e Conversão:** Conversão automática de datas e normalização de tipos de dados
   - **Tratamento de Erros:** Melhor tratamento de erros com rollback automático em falhas
+  - **Truncamento de Campos:** `PDF_BOOKING_EMISSION_DATE` automaticamente truncado para 18 caracteres (remove segundos: YYYY-MM-DD HH:MM)
 
 ### 📌 v3.4
 - **Refatoração do Fluxo de Aprovação:**

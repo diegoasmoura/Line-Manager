@@ -1451,6 +1451,20 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                             db_data[db_key] = datetime.strptime(value, "%Y-%m-%d")
                     except:
                         db_data[db_key] = value
+                elif db_key == "PDF_BOOKING_EMISSION_DATE" and isinstance(value, str):
+                    # Trunca PDF_BOOKING_EMISSION_DATE para máximo 18 caracteres (formato: YYYY-MM-DD HH:MM)
+                    # Remove segundos se existirem para caber no limite da coluna
+                    if len(value) > 18:
+                        try:
+                            from datetime import datetime
+                            # Tenta parsear e reformatar sem segundos
+                            dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+                            db_data[db_key] = dt.strftime("%Y-%m-%d %H:%M")  # 16 caracteres
+                        except:
+                            # Se falhar, trunca diretamente para 18 caracteres
+                            db_data[db_key] = value[:18]
+                    else:
+                        db_data[db_key] = value
                 else:
                     db_data[db_key] = value
         
