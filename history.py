@@ -4,7 +4,7 @@ from database import (
     get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, 
     get_database_connection, get_current_status_from_main_table, 
     get_return_carrier_status_by_adjustment_id, get_terminal_monitorings,
-    approve_carrier_return # Import the new refactored function
+    approve_carrier_return, update_record_status
 )
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
@@ -128,7 +128,7 @@ def get_file_type(uploaded_file):
 
 def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
     """
-    Salva um anexo na tabela F_CON_ANEXOS. 
+    Salva um anexo na tabela F_CON_ANEXOS.
     
     Args:
         farol_reference: Referência do Farol
@@ -1348,7 +1348,6 @@ def exibir_history():
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
-        # This function is now a simple wrapper around the database logic
         if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
             justification = {
                 "area": area,
@@ -1360,9 +1359,11 @@ def exibir_history():
                 st.success("✅ Approval successful!")
                 st.cache_data.clear()
                 st.rerun()
-            # Error is handled inside the function
+        elif new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
+            if update_record_status(adjustment_id, new_status):
+                st.cache_data.clear()
+                st.rerun()
         else:
-            # Handle other status changes if necessary, or show an error
             st.warning(f"Status change to '{new_status}' is not handled by this logic yet.")
 
 

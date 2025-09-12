@@ -1001,6 +1001,36 @@ def get_merged_data():
         return df
    
  
+#Função utilizada para obter dados de split baseados no farol reference
+def get_split_data_by_farol_reference(farol_reference):
+    """Busca dados unificados da tabela F_CON_SALES_BOOKING_DATA para splits/adjustments."""
+    conn = get_database_connection()
+    try:
+        query = """
+        SELECT 
+            FAROL_REFERENCE      AS s_farol_reference,
+            S_QUANTITY_OF_CONTAINERS AS s_quantity_of_containers,
+            S_PORT_OF_LOADING_POL AS s_port_of_loading_pol,
+            S_PORT_OF_DELIVERY_POD AS s_port_of_delivery_pod,
+            S_PLACE_OF_RECEIPT AS s_place_of_receipt,
+            S_FINAL_DESTINATION AS s_final_destination,
+            B_TRANSHIPMENT_PORT AS b_transhipment_port,
+            B_TERMINAL AS b_terminal,
+            B_VOYAGE_CARRIER AS s_carrier,
+            B_VOYAGE_CODE AS b_voyage_code,
+            B_BOOKING_REFERENCE AS b_booking_reference,
+            B_VESSEL_NAME AS b_vessel_name,
+            S_REQUESTED_DEADLINE_START_DATE AS s_requested_deadlines_start_date,
+            S_REQUESTED_DEADLINE_END_DATE AS s_requested_deadlines_end_date,
+            S_REQUIRED_ARRIVAL_DATE AS s_required_arrival_date
+        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+        WHERE FAROL_REFERENCE = :ref
+        """
+        result = conn.execute(text(query), {"ref": farol_reference}).mappings().fetchone()
+        return result if result else None
+    finally:
+        conn.close()
+
 #Função utilizada para preencher os dados no formulário para a referência selecionada
 def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo booking_new.py
     conn = get_database_connection()
@@ -1366,339 +1396,99 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
     finally:
         conn.close()
 
-
-# Insere uma linha em F_CON_RETURN_CARRIERS a partir dos valores editados na UI (split)
-def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, status_override: str | None = None, area: str | None = None, request_reason: str | None = None, adjustments_owner: str | None = None, comments: str | None = None):
+def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=None, area=None, request_reason=None, adjustments_owner=None, comments=None):
+    """
+    Insere dados na tabela F_CON_RETURN_CARRIERS baseado em dados da interface do usuário.
+    Usado para PDFs processados, splits e ajustes.
+    
+    :param ui_data: Dicionário com dados da UI (com nomes de colunas amigáveis)
+    :param user_insert: Usuário que está inserindo os dados
+    :param status_override: Status específico a ser definido (ex: "Received from Carrier")
+    :param area: Área do ajuste (para casos de split/adjustment)
+    :param request_reason: Motivo do ajuste
+    :param adjustments_owner: Responsável pelo ajuste
+    :param comments: Comentários
+    :return: True se sucesso, False caso contrário
+    """
     conn = get_database_connection()
     try:
-        farol_reference = ui_row.get("Farol Reference")
-        # Normalizações de tipos/valores
-        def norm(val):
-            return _normalize_value(val)
-
-        def convert_date_string(date_str):
-            """Converte string de data (YYYY-MM-DD ou YYYY-MM-DD HH:MM[:SS] [UTC|UT]) para datetime"""
-            if not date_str or str(date_str).strip() == "":
-                return None
-            try:
-                from datetime import datetime
-                s = str(date_str).strip().replace(" UTC", "").replace(" UT", "")
-                # Tenta com segundos
-                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
-                    try:
-                        return datetime.strptime(s, fmt)
-                    except Exception:
-                        continue
-                return None
-            except Exception:
-                return None
-
-        qty_raw = ui_row.get("Quantity of Containers")
-        if qty_raw is None:
-            qty_raw = ui_row.get("Sales Quantity of Containers")
-        try:
-            qty = int(qty_raw) if qty_raw is not None and str(qty_raw) != "" else None
-        except Exception:
-            qty = None
-
-        # Determina se é um split ou linha original
-        # Split tem formato: FR_25.08_0001.1, FR_25.08_0001.2, etc.
-        # Referência base tem formato: FR_25.08_0001
-        # Identifica se é split verificando se o último ponto é seguido por números
-        import re
-        split_pattern = r'^(.+)\.(\d+)$'  # Padrão: qualquer coisa + ponto + números
-        match = re.match(split_pattern, farol_reference)
-        
-        if match:
-            # É um split - extrai a referência base
-            base_reference = match.group(1)  # Primeira parte (antes do último ponto)
-            splitted_booking_ref = base_reference
-        else:
-            # Linha original - não tem referência de split
-            splitted_booking_ref = None
-        
-        # Determina o status a ser usado
-        booking_status = status_override if status_override else "Adjustment Requested"
-        
-        # Prepara string da data de emissão do PDF (guardar como texto "YYYY-MM-DD HH:MM")
-        pdf_emission_raw = ui_row.get("PDF Booking Emission Date")
-        pdf_emission_str = None
-        try:
-            if pdf_emission_raw:
-                s = str(pdf_emission_raw).replace("UTC", "").replace("UT", "").strip()
-                # Extrai até minutos (YYYY-MM-DD HH:MM)
-                import re as _re
-                m = _re.match(r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})", s)
-                if m:
-                    pdf_emission_str = m.group(1)
-                else:
-                    pdf_emission_str = s[:16] if len(s) >= 16 else s
-        except Exception:
-            pdf_emission_str = None
-        
-        params = {
-            "FAROL_REFERENCE": farol_reference,
-            "B_BOOKING_REFERENCE": norm(ui_row.get("Booking Reference")),
-            "ADJUSTMENT_ID": str(uuid.uuid4()),
-            "B_BOOKING_STATUS": booking_status,
-            "P_STATUS": None,
-            "P_PDF_NAME": norm(ui_row.get("PDF Name")),
-            "S_SPLITTED_BOOKING_REFERENCE": splitted_booking_ref,
-            "S_PLACE_OF_RECEIPT": norm(ui_row.get("Place of Receipt")),
-            "S_QUANTITY_OF_CONTAINERS": qty,
-            "S_PORT_OF_LOADING_POL": norm(ui_row.get("Port of Loading POL")),
-            "S_PORT_OF_DELIVERY_POD": norm(ui_row.get("Port of Delivery POD")),
-            "S_FINAL_DESTINATION": norm(ui_row.get("Final Destination")),
-            "B_TRANSHIPMENT_PORT": norm(ui_row.get("Transhipment Port")),
-            "B_TERMINAL": norm(ui_row.get("Terminal")),
-            "B_VESSEL_NAME": norm(ui_row.get("Vessel Name")),
-            "B_VOYAGE_CODE": norm(ui_row.get("Voyage Code")),
-            "B_VOYAGE_CARRIER": norm(ui_row.get("Voyage Carrier")),
-            "B_DATA_DRAFT_DEADLINE": convert_date_string(ui_row.get("Requested Deadline Start Date")) if ui_row.get("Requested Deadline Start Date") else None,
-            "B_DATA_DEADLINE": convert_date_string(ui_row.get("Requested Deadline End Date")) if ui_row.get("Requested Deadline End Date") else None,
-            "B_DATA_ESTIMATIVA_SAIDA_ETD": convert_date_string(ui_row.get("Requested Deadline Start Date")) if ui_row.get("Requested Deadline Start Date") else None,  # ETD
-            "B_DATA_ESTIMATIVA_CHEGADA_ETA": convert_date_string(ui_row.get("Required Arrival Date")) if ui_row.get("Required Arrival Date") else None,
-            "B_DATA_ABERTURA_GATE": None,
-            "B_DATA_PARTIDA_ATD": None,
-            "B_DATA_CHEGADA_ATA": None,
-            "B_DATA_ESTIMATIVA_ATRACACAO_ETB": None,
-            "B_DATA_ATRACACAO_ATB": None,
-            "AREA": area,
-            "REQUEST_REASON": request_reason,
-            "ADJUSTMENTS_OWNER": adjustments_owner,
-            "COMMENTS": comments,
-            "PDF_BOOKING_EMISSION_DATE": pdf_emission_str,
+        # Mapeia campos da UI para campos da tabela
+        field_mapping = {
+            "Farol Reference": "FAROL_REFERENCE",
+            "Booking Reference": "B_BOOKING_REFERENCE", 
+            "Splitted Booking Reference": "S_SPLITTED_BOOKING_REFERENCE",
+            "Voyage Carrier": "B_VOYAGE_CARRIER",
+            "Voyage Code": "B_VOYAGE_CODE",
+            "Vessel Name": "B_VESSEL_NAME",
+            "Quantity of Containers": "S_QUANTITY_OF_CONTAINERS",
+            "Sales Quantity of Containers": "S_QUANTITY_OF_CONTAINERS",
+            "Port of Loading POL": "S_PORT_OF_LOADING_POL",
+            "Port of Delivery POD": "S_PORT_OF_DELIVERY_POD",
+            "Place of Receipt": "S_PLACE_OF_RECEIPT",
+            "Final Destination": "S_FINAL_DESTINATION",
+            "Transhipment Port": "B_TRANSHIPMENT_PORT",
+            "Terminal": "B_TERMINAL",
+            "Port Terminal City": "B_TERMINAL",
+            "Requested Deadline Start Date": "B_DATA_DEADLINE",
+            "Requested Deadline End Date": "B_DATA_DRAFT_DEADLINE",
+            "Required Arrival Date": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+            "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE"
         }
-
-        insert_sql = text(
-            """
-            INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
-                FAROL_REFERENCE,
-                B_BOOKING_REFERENCE,
-                ADJUSTMENT_ID,
-                B_BOOKING_STATUS,
-                P_STATUS,
-                P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
-                S_PLACE_OF_RECEIPT,
-                S_QUANTITY_OF_CONTAINERS,
-                S_PORT_OF_LOADING_POL,
-                S_PORT_OF_DELIVERY_POD,
-                S_FINAL_DESTINATION,
-                B_TRANSHIPMENT_PORT,
-                B_TERMINAL,
-                B_VESSEL_NAME,
-                B_VOYAGE_CODE,
-                B_VOYAGE_CARRIER,
-                B_DATA_DRAFT_DEADLINE,
-                B_DATA_DEADLINE,
-                B_DATA_ESTIMATIVA_SAIDA_ETD,
-                B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                B_DATA_ABERTURA_GATE,
-                AREA,
-                REQUEST_REASON,
-                ADJUSTMENTS_OWNER,
-                COMMENTS,
-                PDF_BOOKING_EMISSION_DATE
-            ) VALUES (
-                :FAROL_REFERENCE,
-                :B_BOOKING_REFERENCE,
-                :ADJUSTMENT_ID,
-                :B_BOOKING_STATUS,
-                :P_STATUS,
-                :P_PDF_NAME,
-                :S_SPLITTED_BOOKING_REFERENCE,
-                :S_PLACE_OF_RECEIPT,
-                :S_QUANTITY_OF_CONTAINERS,
-                :S_PORT_OF_LOADING_POL,
-                :S_PORT_OF_DELIVERY_POD,
-                :S_FINAL_DESTINATION,
-                :B_TRANSHIPMENT_PORT,
-                :B_TERMINAL,
-                :B_VESSEL_NAME,
-                :B_VOYAGE_CODE,
-                :B_VOYAGE_CARRIER,
-                :B_DATA_DRAFT_DEADLINE,
-                :B_DATA_DEADLINE,
-                :B_DATA_ESTIMATIVA_SAIDA_ETD,
-                :B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                :B_DATA_ABERTURA_GATE,
-                :AREA,
-                :REQUEST_REASON,
-                :ADJUSTMENTS_OWNER,
-                :COMMENTS,
-                :PDF_BOOKING_EMISSION_DATE
-            )
-            """
-        )
-        conn.execute(insert_sql, params)
-        conn.commit()
-        return True  # Retorna True se chegou até aqui sem erro
-    except Exception as e:
-        conn.rollback()
-        raise e  # Re-lança a exceção para ser capturada pela função chamadora
-    finally:
-        conn.close()
-
-def get_actions_count_by_farol_reference():
-    """
-    Retorna um dicionário com o número de ações (registros) por FAROL_REFERENCE exato
-    na tabela F_CON_RETURN_CARRIERS. A agregação por ramo (base ou split) será feita
-    na camada da aplicação (shipments.py), permitindo:
-      - Se ref é base (ex.: FR_25.08_0001): contar ele + todos os descendentes (FR_25.08_0001.*)
-      - Se ref é split (ex.: FR_25.08_0001.1): contar ele + seus descendentes (FR_25.08_0001.1.*)
-    """
-    conn = get_database_connection()
-    try:
-        query = text("""
-            SELECT FAROL_REFERENCE, COUNT(*) AS ACTION_COUNT
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            GROUP BY FAROL_REFERENCE
+        
+        # Converte dados da UI para formato da tabela
+        db_data = {}
+        for ui_key, db_key in field_mapping.items():
+            if ui_key in ui_data and ui_data[ui_key] is not None:
+                value = ui_data[ui_key]
+                # Converte valores especiais
+                if db_key.startswith("B_DATA_") and isinstance(value, str) and value.strip():
+                    try:
+                        # Tenta converter data se for string
+                        from datetime import datetime
+                        if ":" in value:  # formato com hora
+                            db_data[db_key] = datetime.strptime(value, "%Y-%m-%d %H:%M")
+                        else:  # formato só data
+                            db_data[db_key] = datetime.strptime(value, "%Y-%m-%d")
+                    except:
+                        db_data[db_key] = value
+                else:
+                    db_data[db_key] = value
+        
+        # Campos obrigatórios e padrões
+        db_data["B_BOOKING_STATUS"] = status_override or "Adjustment Requested"
+        db_data["USER_INSERT"] = user_insert
+        db_data["ADJUSTMENT_ID"] = str(uuid.uuid4())
+        
+        # Campos de ajuste (se fornecidos)
+        if area:
+            db_data["AREA"] = area
+        if request_reason:
+            db_data["REQUEST_REASON"] = request_reason
+        if adjustments_owner:
+            db_data["ADJUSTMENTS_OWNER"] = adjustments_owner
+        if comments:
+            db_data["COMMENTS"] = comments
+        
+        # SQL de inserção
+        columns = list(db_data.keys())
+        placeholders = [f":{col}" for col in columns]
+        
+        insert_sql = text(f"""
+            INSERT INTO LogTransp.F_CON_RETURN_CARRIERS ({', '.join(columns)})
+            VALUES ({', '.join(placeholders)})
         """)
-        result = conn.execute(query).fetchall()
-
-        # Converte para dicionário: ref exata -> action_count
-        actions_dict = {}
-        for row in result:
-            actions_dict[row[0]] = row[1]
-
-        return actions_dict
+        
+        conn.execute(insert_sql, db_data)
+        conn.commit()
+        return True
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        st.error(f"Erro ao inserir dados de retorno do carrier: {e}")
+        return False
     finally:
         conn.close()
-
-#Função utilizada para preencher os dados no formulário para a referência selecionada
-def get_split_data_by_farol_reference(farol_reference):
-    """Executa a consulta SQL para obter dados específicos para splits."""
-    conn = get_database_connection()
-    try:
-        query = """
-        SELECT
-            FAROL_REFERENCE                    AS s_farol_reference,
-            S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
-            S_VOLUME_IN_TONS                   AS s_volume_in_tons,
-            S_CUSTOMER                         AS s_customer,
-            S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
-            S_PORT_OF_LOADING_POL              AS s_port_of_loading_pol,
-            S_PORT_OF_DELIVERY_POD             AS s_port_of_delivery_pod,
-            S_PLACE_OF_RECEIPT                 AS s_place_of_receipt,
-            S_FINAL_DESTINATION                AS s_final_destination,
-            S_SHIPMENT_STATUS                  AS s_shipment_status,
-            S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
-            S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
-            S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
-            B_VOYAGE_CARRIER                   AS s_carrier,
-            B_VOYAGE_CODE                      AS b_voyage_code,
-            B_TRANSHIPMENT_PORT                AS b_transhipment_port,
-            B_TERMINAL                         AS b_terminal,
-            B_BOOKING_REFERENCE                AS b_booking_reference,
-            B_VESSEL_NAME                      AS b_vessel_name
-        FROM LogTransp.F_CON_SALES_BOOKING_DATA
-        WHERE FAROL_REFERENCE = :ref
-        """
-        result = conn.execute(text(query), {"ref": farol_reference}).mappings().fetchone()
-        return result if result else None
-    finally:
-        conn.close()
- 
-def insert_booking_if_not_exists(farol_reference, booking_data):
-    conn = get_database_connection()
-    try:
-        # Verifica se já existe
-        result = conn.execute(
-            text("SELECT COUNT(*) as count FROM LogTransp.F_CON_BOOKING_MANAGEMENT WHERE b_farol_reference = :ref"),
-            {"ref": farol_reference}
-        ).fetchone()
-        if result and result[0] == 0:
-            # Insere novo registro
-            booking_data["b_farol_reference"] = farol_reference
-            booking_fields = ", ".join(booking_data.keys())
-            booking_placeholders = ", ".join([f":{key}" for key in booking_data.keys()])
-            booking_query = text(f"""
-                INSERT INTO LogTransp.F_CON_BOOKING_MANAGEMENT ({booking_fields})
-                VALUES ({booking_placeholders})
-            """)
-            conn.execute(booking_query, booking_data)
-            conn.commit()
-    finally:
-        conn.close()
-
-def insert_container_release_if_not_exists(farol_reference, container_data):
-    conn = get_database_connection()
-    try:
-        # Verifica se já existe
-        result = conn.execute(
-            text("SELECT COUNT(*) as count FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE WHERE l_farol_reference = :ref"),
-            {"ref": farol_reference}
-        ).fetchone()
-        if result and result[0] == 0:
-            # Insere novo registro
-            container_data["l_farol_reference"] = farol_reference
-            container_fields = ", ".join(container_data.keys())
-            container_placeholders = ", ".join([f":{key}" for key in container_data.keys()])
-            container_query = text(f"""
-                INSERT INTO LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE ({container_fields})
-                VALUES ({container_placeholders})
-            """)
-            conn.execute(container_query, container_data)
-            conn.commit()
-    finally:
-        conn.close()
-
-def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.DataFrame:
-    """Busca dados da F_CON_RETURN_CARRIERS por ADJUSTMENT_ID."""
-    manage_connection = conn is None
-    if manage_connection:
-        conn = get_database_connection()
-    try:
-        query = text(
-            """
-            SELECT 
-                ID,
-                FAROL_REFERENCE,
-                B_BOOKING_REFERENCE,
-                ADJUSTMENT_ID,
-                Linked_Reference,
-                B_BOOKING_STATUS,
-                P_STATUS,
-                P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
-                S_PLACE_OF_RECEIPT,
-                S_QUANTITY_OF_CONTAINERS,
-                S_PORT_OF_LOADING_POL,
-                S_PORT_OF_DELIVERY_POD,
-                S_FINAL_DESTINATION,
-                B_TRANSHIPMENT_PORT,
-                B_TERMINAL,
-                B_VESSEL_NAME,
-                B_VOYAGE_CARRIER,
-                B_VOYAGE_CODE,
-                B_DATA_DRAFT_DEADLINE,
-                B_DATA_DEADLINE,
-                B_DATA_ESTIMATIVA_SAIDA_ETD,
-                B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                B_DATA_ABERTURA_GATE,
-                B_DATA_PARTIDA_ATD,
-                B_DATA_CHEGADA_ATA,
-                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
-                B_DATA_ATRACACAO_ATB,
-                USER_INSERT,
-                USER_UPDATE,
-                DATE_UPDATE,
-                ROW_INSERTED_DATE,
-                PDF_BOOKING_EMISSION_DATE
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE ADJUSTMENT_ID = :adjustment_id
-            """
-        )
-        rows = conn.execute(query, {"adjustment_id": adjustment_id}).mappings().fetchall()
-        df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
-        if not df.empty:
-            df.columns = [str(c).upper() for c in df.columns]
-        return df
-    finally:
-        if manage_connection and conn:
-            conn.close()
-
 
 def _normalize_value(val):
     """Converts pandas/numpy types to native Python types for DB compatibility."""
@@ -1761,7 +1551,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                     WHERE UPPER(NAVIO) = UPPER(:vessel_name)
                     ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
                 ) WHERE ROWNUM = 1
-            """)
+            """ )
             latest_monitoring_record = conn.execute(monitoring_query, {"vessel_name": vessel_name}).mappings().fetchone()
             if latest_monitoring_record:
                 st.success("✅ Latest Ellox monitoring record found.")
@@ -1842,7 +1632,6 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         if 'conn' in locals() and not conn.closed:
             conn.close()
 
-
 def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
     """
     Atualiza o status da linha na tabela F_CON_RETURN_CARRIERS.
@@ -1897,6 +1686,65 @@ def get_current_status_from_main_table(farol_reference: str) -> str:
     finally:
         conn.close()
 
+
+def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.DataFrame:
+    """Busca dados da F_CON_RETURN_CARRIERS pelo ADJUSTMENT_ID."""
+    should_close = conn is None
+    if conn is None:
+        conn = get_database_connection()
+    try:
+        query = text(
+            """
+            SELECT 
+                ID,
+                FAROL_REFERENCE,
+                B_BOOKING_REFERENCE,
+                ADJUSTMENT_ID,
+                Linked_Reference,
+                B_BOOKING_STATUS,
+                P_STATUS,
+                P_PDF_NAME,
+                S_SPLITTED_BOOKING_REFERENCE,
+                S_PLACE_OF_RECEIPT,
+                S_QUANTITY_OF_CONTAINERS,
+                S_PORT_OF_LOADING_POL,
+                S_PORT_OF_DELIVERY_POD,
+                S_FINAL_DESTINATION,
+                B_TRANSHIPMENT_PORT,
+                B_TERMINAL,
+                B_VESSEL_NAME,
+                B_VOYAGE_CARRIER,
+                B_VOYAGE_CODE,
+                B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE,
+                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                B_DATA_ABERTURA_GATE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB,
+                AREA,
+                REQUEST_REASON,
+                ADJUSTMENTS_OWNER,
+                COMMENTS,
+                USER_INSERT,
+                USER_UPDATE,
+                DATE_UPDATE,
+                ROW_INSERTED_DATE,
+                PDF_BOOKING_EMISSION_DATE
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE ADJUSTMENT_ID = :adjustment_id
+            """
+        )
+        rows = conn.execute(query, {"adjustment_id": adjustment_id}).mappings().fetchall()
+        df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
+        if not df.empty:
+            df.columns = [str(c).upper() for c in df.columns]
+        return df
+    finally:
+        if should_close:
+            conn.close()
 
 def get_return_carrier_status_by_adjustment_id(adjustment_id: str):
     """Retorna o B_BOOKING_STATUS da F_CON_RETURN_CARRIERS para o ADJUSTMENT_ID dado."""
@@ -2093,7 +1941,6 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
         conn.commit()
     return processed
 
-
 def get_terminal_monitorings(limit: int = 200) -> pd.DataFrame:
     """Consulta recentes da F_ELLOX_TERMINAL_MONITORINGS."""
     ensure_table_f_ellox_terminal_monitorings()
@@ -2109,32 +1956,73 @@ def get_terminal_monitorings(limit: int = 200) -> pd.DataFrame:
         df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
         return df
 
-        # Converte campos de data em epoch ms para datetime quando necessário
-        from datetime import datetime as _dt
-        def _convert_epoch_ms(val):
-            try:
-                import pandas as _pd
-                if val is None or (_pd.isna(val)):
-                    return None
-            except Exception:
-                if val is None:
-                    return None
-            # se for numérico e plausível como epoch ms
-            try:
-                if isinstance(val, (int, float)) and val > 10_000_000_000:
-                    # epoch em milissegundos
-                    return _dt.fromtimestamp(val / 1000.0)
-            except Exception:
-                pass
-            # se já é datetime ou string, retorna como está (engine tratará)
-            return val
+def get_actions_count_by_farol_reference():
+    """
+    Retorna um dicionário com o número de ações (registros) por FAROL_REFERENCE exato
+    na tabela F_CON_RETURN_CARRIERS. A agregação por ramo (base ou split) será feita
+    na camada da aplicação (shipments.py), permitindo:
+      - Se ref é base (ex.: FR_25.08_0001): contar ele + todos os descendentes (FR_25.08_0001.*)
+      - Se ref é split (ex.: FR_25.08_0001.1): contar ele + seus descendentes (FR_25.08_0001.1.*)
+    """
+    conn = get_database_connection()
+    try:
+        query = text("""
+            SELECT FAROL_REFERENCE, COUNT(*) AS ACTION_COUNT
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            GROUP BY FAROL_REFERENCE
+        """)
+        result = conn.execute(query).fetchall()
 
-        for date_field in [
-            "B_DATA_DRAFT_DEADLINE",
-            "B_DATA_DEADLINE",
-            "B_DATA_ESTIMATIVA_SAIDA_ETD",
-            "B_DATA_ESTIMATIVA_CHEGADA_ETA",
-            "B_DATA_ABERTURA_GATE",
-        ]:
-            if date_field in update_fields:
-                update_fields[date_field] = _convert_epoch_ms(update_fields[date_field])
+        # Converte para dicionário: ref exata -> action_count
+        actions_dict = {}
+        for row in result:
+            actions_dict[row[0]] = row[1]
+
+        return actions_dict
+    finally:
+        conn.close()
+
+def update_record_status(adjustment_id: str, new_status: str) -> bool:
+    """
+    Updates the status for a record in both F_CON_RETURN_CARRIERS and F_CON_SALES_BOOKING_DATA.
+    Used for simple status changes like Rejected, Cancelled, etc.
+    """
+    conn = get_database_connection()
+    tx = conn.begin()
+    try:
+        # 1. Get the Farol Reference from the adjustment ID
+        farol_ref_query = text("SELECT FAROL_REFERENCE FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adj_id")
+        farol_ref = conn.execute(farol_ref_query, {"adj_id": adjustment_id}).scalar()
+
+        if not farol_ref:
+            raise Exception(f"Could not find Farol Reference for Adjustment ID: {adjustment_id}")
+
+        # 2. Update the status in F_CON_RETURN_CARRIERS
+        update_return_query = text("""
+            UPDATE LogTransp.F_CON_RETURN_CARRIERS
+            SET B_BOOKING_STATUS = :new_status, USER_UPDATE = 'System', DATE_UPDATE = SYSDATE
+            WHERE ADJUSTMENT_ID = :adj_id
+        """)
+        conn.execute(update_return_query, {"new_status": new_status, "adj_id": adjustment_id})
+
+        # 3. Update the status in F_CON_SALES_BOOKING_DATA
+        update_main_query = text("""
+            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+            SET FAROL_STATUS = :new_status
+            WHERE FAROL_REFERENCE = :farol_ref
+        """)
+        conn.execute(update_main_query, {"new_status": new_status, "farol_ref": farol_ref})
+
+        # 4. Commit
+        tx.commit()
+        st.success(f"✅ Status for {farol_ref} successfully updated to '{new_status}'.")
+        return True
+
+    except Exception as e:
+        if 'tx' in locals() and tx.is_active:
+            tx.rollback()
+        st.error(f"❌ An error occurred while updating status: {e}")
+        return False
+    finally:
+        if 'conn' in locals() and not conn.closed:
+            conn.close()

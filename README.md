@@ -236,6 +236,13 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Transações seguras
 - Mapeamento de dados
 
+#### 🔧 **Funções Principais**
+- **`get_split_data_by_farol_reference(farol_reference)`**: Busca dados unificados para operações de split/adjustments
+- **`insert_return_carrier_from_ui(ui_data, ...)`**: Insere dados na F_CON_RETURN_CARRIERS a partir da UI com mapeamento automático
+- **`get_return_carriers_by_adjustment_id(adjustment_id, conn=None)`**: Busca dados de return carriers por ADJUSTMENT_ID
+- **`approve_carrier_return(adjustment_id, related_reference, justification)`**: Processo completo de aprovação de retornos
+- **`update_record_status(adjustment_id, new_status)`**: Atualização de status simples
+
 ### 📊 `operation_control.py`
 **Controle operacional**
 - Métricas de performance
@@ -461,7 +468,8 @@ O sistema utiliza funções Python para comunicação com o banco:
 get_data_salesData()           # Busca dados de vendas
 get_data_bookingData()         # Busca dados de booking
 insert_return_carrier_from_ui() # Insere dados de retorno
-update_sales_booking_from_return_carriers() # Atualiza dados principais
+approve_carrier_return()       # Aprova retorno do carrier e sincroniza dados
+update_record_status()         # Realiza mudanças simples de status
 ```
 
 ### Integrações Externas
@@ -643,7 +651,23 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - Validar estrutura do PDF
    - Conferir logs de extração
 
-4. **Problemas com API Ellox**
+4. **Erros de ImportError (Resolvidos na v3.5)**
+   - **`ImportError: cannot import name 'get_split_data_by_farol_reference'`**:
+     - ✅ **Resolvido**: Função implementada no `database.py` linha 1005
+     - **Causa**: Função estava sendo importada em `shipments_split.py` mas não existia
+     - **Solução**: Implementação completa com busca na tabela unificada
+   
+   - **`ImportError: cannot import name 'insert_return_carrier_from_ui'`**:
+     - ✅ **Resolvido**: Função implementada no `database.py` linha 1399
+     - **Causa**: Função usada em PDFs e splits mas não estava definida
+     - **Solução**: Implementação com mapeamento UI→DB automático
+   
+   - **`name 'get_return_carriers_by_adjustment_id' is not defined`**:
+     - ✅ **Resolvido**: Função implementada no `database.py` linha 1690
+     - **Causa**: Chamada no processo de aprovação mas função inexistente
+     - **Solução**: Busca completa por ADJUSTMENT_ID com suporte a transações
+
+5. **Problemas com API Ellox**
    - **🔴 API Desconectada**:
      - Verificar credenciais (email/senha)
      - Testar conectividade de rede
@@ -656,7 +680,7 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - Verificar se credenciais não expiraram
      - Testar manualmente via Postman/curl
 
-5. **Dropdown com nomes duplicados (navios)**
+6. **Dropdown com nomes duplicados (navios)**
    - Causa comum: o nome extraído do PDF está em caixa alta e não bate exatamente com o nome normalizado do banco
    - Correção: busca case-insensitive e uso da versão do banco; o valor do PDF é normalizado para Title Case apenas se inexistente
    - Observação: listas usam `@st.cache_data(ttl=300)`; o refresh ocorre automaticamente em até 5 minutos
@@ -704,6 +728,36 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.5 - Correções de Importação (Setembro 2025)
+- **🐛 Correções Críticas de ImportError:**
+  - **Função `get_split_data_by_farol_reference`:** Adicionada função ausente no `database.py` (linha 1005) que estava sendo importada em `shipments_split.py`. A função busca dados unificados da tabela `F_CON_SALES_BOOKING_DATA` para operações de split e ajustes.
+  - **Função `insert_return_carrier_from_ui`:** Implementada função ausente no `database.py` (linha 1399) para inserção de dados na tabela `F_CON_RETURN_CARRIERS` baseado em dados da interface do usuário. Inclui mapeamento automático de campos UI→DB, conversão de datas e tratamento de erros.
+  - **Função `get_return_carriers_by_adjustment_id`:** Adicionada função ausente no `database.py` (linha 1690) que estava sendo chamada no processo de aprovação. Busca dados completos da `F_CON_RETURN_CARRIERS` pelo `ADJUSTMENT_ID`.
+
+- **✅ Problemas Resolvidos:**
+  - Erro: `ImportError: cannot import name 'get_split_data_by_farol_reference' from 'database'`
+  - Erro: `ImportError: cannot import name 'insert_return_carrier_from_ui' from 'database'`
+  - Erro: `name 'get_return_carriers_by_adjustment_id' is not defined` no processo de aprovação
+  - Sistema agora inicia e executa sem erros de importação
+
+- **🔧 Melhorias Técnicas:**
+  - **Mapeamento UI→DB:** A função `insert_return_carrier_from_ui` inclui mapeamento completo entre nomes de campos amigáveis da UI e campos da tabela do banco
+  - **Reutilização de Conexão:** `get_return_carriers_by_adjustment_id` suporta reutilização de conexão existente para operações transacionais
+  - **Validação e Conversão:** Conversão automática de datas e normalização de tipos de dados
+  - **Tratamento de Erros:** Melhor tratamento de erros com rollback automático em falhas
+
+### 📌 v3.4
+- **Refatoração do Fluxo de Aprovação:**
+  - A lógica de aprovação de "Received from Carrier" foi centralizada na nova função `approve_carrier_return` em `database.py`, melhorando a atomicidade e separação de camadas.
+  - A lógica para status simples ("Rejected", "Cancelled") foi movida para a nova função `update_record_status` em `database.py`.
+  - O código em `history.py` foi simplificado para apenas chamar as novas funções da camada de dados.
+- **Sincronização de Dados com Ellox:**
+  - Ao aprovar um registro, o sistema agora busca e atualiza o embarque com os dados de data mais recentes (ETD, ETA, Deadline, etc.) do sistema de monitoramento Ellox.
+- **Melhorias de Robustez e UX:**
+  - **Tratamento de Locks:** Adicionado mecanismo `NOWAIT` para detectar bloqueios no banco de dados, retornando um erro imediato ao usuário em vez de deixar a aplicação travada.
+  - **Múltiplas Aprovações:** Removida a restrição que impedia aprovar um registro múltiplas vezes, permitindo a re-sincronização de dados quando necessário.
+  - **Correções de Bugs:** Resolvidos múltiplos erros (`KeyError`, `TypeError`, `NotSupportedError`, `ImportError`) que surgiram durante a implementação, garantindo que o fluxo de seleção e aprovação funcione de forma estável e confiável.
 
 ### 📌 v3.3
 - Sales (New Sales Record): adicionados os campos "Shipment Period Start Date" e "Shipment Period End Date" no formulário manual e no upload em massa; mapeados para `S_SHIPMENT_PERIOD_START_DATE` e `S_SHIPMENT_PERIOD_END_DATE`.
@@ -850,17 +904,18 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.0*
+*Sistema de Gerenciamento de Embarques - Versão 3.5*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~15.000+ linhas Python
+- **Linhas de Código**: ~16.000+ linhas Python (atualizado v3.5)
 - **Módulos**: 15+ módulos especializados  
 - **Carriers Suportados**: 8 carriers principais
 - **Integrações**: Oracle DB + API Ellox
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
+- **Estabilidade**: ✅ Sem erros de importação (v3.5)
 
 ### 🎯 Roadmap Técnico Detalhado
 
