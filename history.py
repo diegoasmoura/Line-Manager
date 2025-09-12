@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
-from database import get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, get_database_connection, update_sales_booking_from_return_carriers, update_return_carrier_status, get_current_status_from_main_table, get_return_carrier_status_by_adjustment_id, get_terminal_monitorings
+from database import (
+    get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, 
+    get_database_connection, get_current_status_from_main_table, 
+    get_return_carrier_status_by_adjustment_id, get_terminal_monitorings,
+    approve_carrier_return # Import the new refactored function
+)
 from shipments_mapping import get_column_mapping
 from sqlalchemy import text
 from datetime import datetime
@@ -1473,190 +1478,23 @@ def exibir_history():
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
-        try:
-            conn = get_database_connection()
-            tx = conn.begin()
-            
-            # Resolve ADJUSTMENT_ID (usa o passado ou busca por fallback)
-            adj_id = (str(adjustment_id).strip() if adjustment_id is not None else None)
-            if not adj_id or adj_id.lower() in ("none", "nan", "null", ""):
-                # Fallback: tenta pelo FAROL_REFERENCE e, se informado, pelo status da linha selecionada
-                try:
-                    if selected_row_status:
-                        sql_adj = text("""
-                            SELECT ADJUSTMENT_ID
-                              FROM LogTransp.F_CON_RETURN_CARRIERS
-                             WHERE FAROL_REFERENCE = :farol_reference
-                               AND B_BOOKING_STATUS = :status_atual
-                          ORDER BY ROW_INSERTED_DATE DESC
-                          FETCH FIRST 1 ROWS ONLY
-                        """)
-                        adj_id = conn.execute(sql_adj, {"farol_reference": farol_ref, "status_atual": selected_row_status}).scalar()
-                    if not adj_id:
-                        sql_adj_any = text("""
-                            SELECT ADJUSTMENT_ID
-                              FROM LogTransp.F_CON_RETURN_CARRIERS
-                             WHERE FAROL_REFERENCE = :farol_reference
-                          ORDER BY ROW_INSERTED_DATE DESC
-                          FETCH FIRST 1 ROWS ONLY
-                        """)
-                        adj_id = conn.execute(sql_adj_any, {"farol_reference": farol_ref}).scalar()
-                    if adj_id:
-                        adj_id = str(adj_id).strip()
-                        st.caption(f"DEBUG: ADJUSTMENT_ID usado={adj_id}")
-                except Exception:
-                    pass
-            
-            # Se o status foi alterado para "Booking Approved", executa a lógica de aprovação
-            if new_status == "Booking Approved" and adj_id:
-                # Validação especial para itens "Received from Carrier"
-                if selected_row_status == "Received from Carrier" and related_reference:
-                    if related_reference == "New Adjustment":
-                        # Caso especial: New Adjustment - não precisa validar referência
-                        st.success("✅ New Adjustment selecionado - ajuste do carrier sem referência prévia!")
-                        # Atualiza o Linked_Reference e as justificativas
-                        conn.execute(text("""
-                            UPDATE LogTransp.F_CON_RETURN_CARRIERS
-                            SET Linked_Reference = :linked_ref,
-                                AREA = :area,
-                                REQUEST_REASON = :request_reason,
-                                ADJUSTMENTS_OWNER = :adjustments_owner,
-                                COMMENTS = :comments,
-                                USER_UPDATE = :user_update,
-                                DATE_UPDATE = SYSDATE
-                            WHERE ADJUSTMENT_ID = :adjustment_id
-                        """), {
-                            "linked_ref": "New Adjustment",
-                            "area": area,
-                            "request_reason": reason,
-                            "adjustments_owner": responsibility,
-                            "comments": comment,
-                            "user_update": "System",
-                            "adjustment_id": adj_id
-                        })
-                        st.success("✅ Linked_Reference e justificativas atualizados para 'New Adjustment'")
-                    else:
-                        # Valida se o ID relacionado existe na aba 'Other Status'
-                        related_exists = conn.execute(text("""
-                            SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS
-                            WHERE ID = :related_id
-                            AND B_BOOKING_STATUS != 'Received from Carrier'
-                        """), {"related_id": related_reference}).scalar()
-                        
-                        if related_exists > 0:
-                            st.success(f"✅ ID relacionado '{related_reference}' validado com sucesso!")
-                            # Atualiza o Linked_Reference na linha atual
-                            conn.execute(text("""
-                                UPDATE LogTransp.F_CON_RETURN_CARRIERS
-                                SET Linked_Reference = :linked_ref,
-                                    USER_UPDATE = :user_update,
-                                    DATE_UPDATE = SYSDATE
-                                WHERE ADJUSTMENT_ID = :adjustment_id
-                            """), {
-                                "linked_ref": related_reference,
-                                "user_update": "System",
-                                "adjustment_id": adj_id
-                            })
-                            st.success(f"✅ Linked_Reference atualizado para ID {related_reference}")
-                        else:
-                            st.error(f"❌ ID relacionado '{related_reference}' não encontrado na aba 'Other Status'")
-                            tx.rollback()
-                            conn.close()
-                            return
-                
-                # Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
-                if update_sales_booking_from_return_carriers(adj_id):
-                    st.success(f"✅ Dados atualizados na tabela F_CON_SALES_BOOKING_DATA para {farol_ref}")
-                else:
-                    st.warning(f"⚠️ Nenhum dado foi atualizado para {farol_ref} (todos os campos estavam vazios)")
+        # This function is now a simple wrapper around the database logic
+        if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
+            justification = {
+                "area": area,
+                "request_reason": reason,
+                "adjustments_owner": responsibility,
+                "comments": comment
+            }
+            if approve_carrier_return(adjustment_id, related_reference, justification):
+                st.success("✅ Approval successful!")
+                st.cache_data.clear()
+                st.rerun()
+            # Error is handled inside the function
+        else:
+            # Handle other status changes if necessary, or show an error
+            st.warning(f"Status change to '{new_status}' is not handled by this logic yet.")
 
-            # Atualiza o status na tabela F_CON_RETURN_CARRIERS SEMPRE (na mesma transação)
-            # Sanity check: existe linha com esse ADJUSTMENT_ID?
-            try:
-                exists_cnt = conn.execute(text("""
-                    SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adjustment_id
-                """), {"adjustment_id": adj_id}).scalar()
-                st.caption(f"DEBUG: adjustment_id={adj_id}, rows_encontradas={exists_cnt}")
-            except Exception:
-                exists_cnt = None
-
-            res_rc = conn.execute(text("""
-                UPDATE LogTransp.F_CON_RETURN_CARRIERS
-                   SET B_BOOKING_STATUS = :new_status,
-                       USER_UPDATE = :user_update,
-                       DATE_UPDATE = SYSDATE
-                 WHERE ADJUSTMENT_ID = :adjustment_id
-            """), {
-                "new_status": new_status,
-                "user_update": "System",
-                "adjustment_id": adj_id,
-            })
-            if getattr(res_rc, "rowcount", 0) > 0:
-                st.success(f"✅ Status atualizado em F_CON_RETURN_CARRIERS para {farol_ref}")
-            else:
-                st.warning("⚠️ Nenhuma linha foi atualizada em F_CON_RETURN_CARRIERS (verifique o ADJUSTMENT_ID)")
-
-            # Regras específicas por status
-            if new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
-                # Atualiza SOMENTE a coluna FAROL_STATUS na tabela principal
-                conn.execute(text("""
-                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-                       SET FAROL_STATUS = :farol_status
-                     WHERE FAROL_REFERENCE = :farol_reference
-                """), {"farol_status": new_status, "farol_reference": farol_ref})
-                st.success(f"✅ FAROL_STATUS atualizado em F_CON_SALES_BOOKING_DATA para {farol_ref}")
-            else:
-                # Demais status (Approved)
-                conn.execute(text("""
-                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-                       SET FAROL_STATUS = :farol_status
-                     WHERE FAROL_REFERENCE = :farol_reference
-                """), {"farol_status": new_status, "farol_reference": farol_ref})
-
-            # Verificação pós-aprovação: comparar campos entre as duas tabelas
-            if new_status == "Booking Approved":
-                try:
-                    fields = [
-                        "S_SPLITTED_BOOKING_REFERENCE","S_PLACE_OF_RECEIPT","S_QUANTITY_OF_CONTAINERS",
-                        "S_PORT_OF_LOADING_POL","S_PORT_OF_DELIVERY_POD","S_FINAL_DESTINATION",
-                        "B_TRANSHIPMENT_PORT","B_TERMINAL","B_VESSEL_NAME","B_VOYAGE_CARRIER",
-                        "B_DATA_DRAFT_DEADLINE","B_DATA_DEADLINE","B_DATA_ESTIMATIVA_SAIDA_ETD",
-                        "B_DATA_ESTIMATIVA_CHEGADA_ETA","B_DATA_ABERTURA_GATE","B_DATA_PARTIDA_ATD",
-                        "B_DATA_CHEGADA_ATA","B_DATA_ESTIMATIVA_ATRACACAO_ETB","B_DATA_ATRACACAO_ATB"
-                    ]
-                    cols = ", ".join(fields)
-                    # Retorno: pela linha aprovada
-                    rc_row = conn.execute(text(f"""
-                        SELECT {cols}
-                          FROM LogTransp.F_CON_RETURN_CARRIERS
-                         WHERE ADJUSTMENT_ID = :adj
-                    """), {"adj": adj_id}).mappings().fetchone()
-                    # Principal: pela referência
-                    sb_row = conn.execute(text(f"""
-                        SELECT {cols}
-                          FROM LogTransp.F_CON_SALES_BOOKING_DATA
-                         WHERE FAROL_REFERENCE = :ref
-                    """), {"ref": farol_ref}).mappings().fetchone()
-                    if rc_row and sb_row:
-                        st.markdown("#### 🔎 Pós-aprovação (comparação de campos)")
-                        for f in fields:
-                            st.caption(f"{f}: RC='{rc_row.get(f)}' → SB='{sb_row.get(f)}'")
-                except Exception as _:
-                    pass
-
-            tx.commit()
-            st.success(f"✅ Status atualizado com sucesso para {farol_ref}!")
-            # Limpa o cache para refletir as mudanças na interface
-            st.cache_data.clear()
-            st.rerun()
-            
-        except Exception as e:
-            if 'tx' in locals():
-                tx.rollback()
-            st.error(f"❌ Erro ao atualizar status: {str(e)}")
-        finally:
-            if 'conn' in locals():
-                conn.close()
 
     # Interface de botões de status para linha selecionada
     # Verifica seleções em ambas as abas
@@ -1703,7 +1541,7 @@ def exibir_history():
         # Obtém informações da linha selecionada (usar diretamente a série selecionada para evitar divergência de índice)
         selected_row = selected.iloc[0]
         farol_ref = selected_row.get("Farol Reference") or selected_row.get("FAROL_REFERENCE")
-        adjustment_id = selected_row.get("Adjustment ID")
+        adjustment_id = df_show.loc[selected_row.name, "ADJUSTMENT_ID"]
         
         # Obtém o status da linha selecionada na tabela F_CON_RETURN_CARRIERS (prioriza leitura por UUID)
         selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
@@ -1800,11 +1638,11 @@ def exibir_history():
                                     st.markdown("#### 📋 Justificativas do New Adjustment")
                                     col_a, col_b, col_c = st.columns([1, 1, 1])
                                     with col_a:
-                                        area_new_adj = st.selectbox("Booking Adjustment Area", [""] + Booking_adj_area, key="area_new_adjustment")
+                                        area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
                                     with col_b:
-                                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason, key="reason_new_adjustment")
+                                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
                                     with col_c:
-                                        responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility, key="responsibility_new_adjustment")
+                                        responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
                                     
                                     comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
                                     
@@ -1875,7 +1713,7 @@ def exibir_history():
                                     st.session_state.pop("new_adjustment_reason", None)
                                     st.session_state.pop("new_adjustment_responsibility", None)
                                     st.session_state.pop("new_adjustment_comment", None)
-                                st.rerun()
+                                # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
                         
                         with subcol2:
                             if st.button("❌ Cancelar", 
@@ -1927,7 +1765,7 @@ def exibir_history():
             st.session_state["current_page"] = "main"
             st.rerun()
 
-    # Seção de anexos (toggle)
+    # Seção de anexos (toggle) 
     
     if st.session_state.get("history_show_attachments", False):
         st.markdown("---")

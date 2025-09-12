@@ -1682,9 +1682,11 @@ def insert_container_release_if_not_exists(farol_reference, container_data):
     finally:
         conn.close()
 
-def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
+def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.DataFrame:
     """Busca dados da F_CON_RETURN_CARRIERS por ADJUSTMENT_ID."""
-    conn = get_database_connection()
+    manage_connection = conn is None
+    if manage_connection:
+        conn = get_database_connection()
     try:
         query = text(
             """
@@ -1713,6 +1715,10 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
@@ -1728,116 +1734,152 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str) -> pd.DataFrame:
             df.columns = [str(c).upper() for c in df.columns]
         return df
     finally:
-        conn.close()
+        if manage_connection and conn:
+            conn.close()
 
-def update_sales_booking_from_return_carriers(adjustment_id: str) -> bool:
-    """
-    Atualiza a tabela F_CON_SALES_BOOKING_DATA com os dados da linha aprovada
-    da tabela F_CON_RETURN_CARRIERS, baseado no ADJUSTMENT_ID.
+
+def _normalize_value(val):
+    """Converts pandas/numpy types to native Python types for DB compatibility."""
+    try:
+        import numpy as np
+        import pandas as pd
+
+        if pd.isna(val):
+            return None
+        if isinstance(val, pd.Timestamp):
+            return val.to_pydatetime()
+        if isinstance(val, (np.integer, np.int64)):
+            return int(val)
+        if isinstance(val, (np.floating, np.float64)):
+            return float(val)
+        if isinstance(val, (np.bool_, np.bool)):
+            return bool(val)
+    except (ImportError, AttributeError):
+        pass
     
-    :param adjustment_id: ID do ajuste aprovado
-    :return: True se a atualização foi bem-sucedida, False caso contrário
+    if hasattr(val, 'item'):
+        try:
+            return val.item()
+        except (ValueError, TypeError):
+            pass
+
+    return val
+
+def approve_carrier_return(adjustment_id: str, related_reference: str, justification: dict) -> bool:
+    """
+    Executes the full approval process for a 'Received from Carrier' record within a single transaction.
+    This includes fetching Ellox data, updating the return carrier record, and propagating changes to the main sales/booking table.
+
+    :param adjustment_id: The ADJUSTMENT_ID of the F_CON_RETURN_CARRIERS record to approve.
+    :param related_reference: The ID of the related record from the 'Other Status' tab, or 'New Adjustment'.
+    :param justification: A dict with justification fields for 'New Adjustment' cases.
+    :return: True if successful, False otherwise.
     """
     conn = get_database_connection()
+    tx = conn.begin()
     try:
-        # Busca os dados da linha aprovada
-        return_carrier_data = get_return_carriers_by_adjustment_id(adjustment_id)
-        print(f"DEBUG: get_return_carriers_by_adjustment_id({adjustment_id}) returned {len(return_carrier_data)} rows")
+        # 1. Lock the target row to prevent race conditions and hangs
+        try:
+            lock_query = text("SELECT 1 FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adj_id FOR UPDATE NOWAIT")
+            conn.execute(lock_query, {"adj_id": adjustment_id})
+        except Exception as e:
+            if "ORA-00054" in str(e):
+                st.error("❌ This record is currently locked by another process. Please try again in a moment.")
+                tx.rollback()
+                return False
+            raise # Re-raise other unexpected errors
+
+        # 2. Fetch latest Ellox data
+        elox_update_values = {}
+        vessel_name = conn.execute(text("SELECT B_VESSEL_NAME FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adj_id"), {"adj_id": adjustment_id}).scalar()
+        if vessel_name:
+            monitoring_query = text("""
+                SELECT * FROM (
+                    SELECT * FROM F_ELLOX_TERMINAL_MONITORINGS
+                    WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+                    ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+                ) WHERE ROWNUM = 1
+            """)
+            latest_monitoring_record = conn.execute(monitoring_query, {"vessel_name": vessel_name}).mappings().fetchone()
+            if latest_monitoring_record:
+                st.success("✅ Latest Ellox monitoring record found.")
+                column_mapping = {
+                    'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 'DATA_DEADLINE': 'B_DATA_DEADLINE',
+                    'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                    'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
+                    'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                    'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
+                }
+                for elox_col, return_col in column_mapping.items():
+                    if elox_col.lower() in latest_monitoring_record and latest_monitoring_record[elox_col.lower()] is not None:
+                        elox_update_values[return_col] = latest_monitoring_record[elox_col.lower()]
+
+        # 3. Prepare and execute the UPDATE on F_CON_RETURN_CARRIERS
+        update_params = {"adjustment_id": adjustment_id, "user_update": "System"}
+        update_params.update(elox_update_values)
+
+        set_clauses = [f"{col} = :{col}" for col in elox_update_values.keys()]
+        set_clauses.append("B_BOOKING_STATUS = 'Booking Approved'")
+        set_clauses.append("USER_UPDATE = :user_update")
+        set_clauses.append("DATE_UPDATE = SYSDATE")
+
+        if related_reference == "New Adjustment":
+            update_params.update(justification)
+            set_clauses.extend(["Linked_Reference = 'New Adjustment'", "AREA = :area", "REQUEST_REASON = :request_reason", "ADJUSTMENTS_OWNER = :adjustments_owner", "COMMENTS = :comments"])
+        else:
+            update_params["linked_ref"] = related_reference
+            set_clauses.append("Linked_Reference = :linked_ref")
+
+        update_query_str = f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {', '.join(set_clauses)} WHERE ADJUSTMENT_ID = :adjustment_id"
+        conn.execute(text(update_query_str), update_params)
+
+        # 4. Fetch the newly updated data from F_CON_RETURN_CARRIERS to propagate to the main table
+        return_carrier_data = get_return_carriers_by_adjustment_id(adjustment_id, conn)
         if return_carrier_data.empty:
-            print("DEBUG: return_carrier_data is empty")
-            return False
-        
+            raise Exception("Failed to retrieve return carrier data after update.")
+
         row = return_carrier_data.iloc[0]
         farol_reference = row.get("FAROL_REFERENCE")
-        print(f"DEBUG: farol_reference={farol_reference}")
-        print(f"DEBUG: row data keys: {list(row.keys())}")
-        print(f"DEBUG: S_QUANTITY_OF_CONTAINERS value: '{row.get('S_QUANTITY_OF_CONTAINERS')}' (type: {type(row.get('S_QUANTITY_OF_CONTAINERS'))})")
-        
         if not farol_reference:
-            print("DEBUG: farol_reference is empty")
-            return False
-        
-        # Prepara os campos para atualização (apenas valores não nulos/nem vazios)
-        update_fields = {}
+            raise Exception("Farol Reference not found in return carrier data.")
 
-        def add_if_present(field_name):
-            val = row.get(field_name)
-            try:
-                import pandas as _pd
-                import numpy as np
-                if val is None or (_pd.isna(val)):
-                    return
-                # Converte tipos numpy para tipos Python nativos para compatibilidade com Oracle
-                if isinstance(val, np.integer):
-                    val = int(val)
-                elif isinstance(val, np.floating):
-                    val = float(val)
-                elif isinstance(val, np.bool_):
-                    val = bool(val)
-            except Exception:
+        # 5. Prepare and execute the UPDATE on F_CON_SALES_BOOKING_DATA
+        main_update_fields = {"farol_reference": farol_reference, "farol_status": "Booking Approved"}
+        fields_to_propagate = [
+            "S_SPLITTED_BOOKING_REFERENCE", "S_PLACE_OF_RECEIPT", "S_QUANTITY_OF_CONTAINERS",
+            "S_PORT_OF_LOADING_POL", "S_PORT_OF_DELIVERY_POD", "S_FINAL_DESTINATION",
+            "B_BOOKING_REFERENCE", "B_TRANSHIPMENT_PORT", "B_TERMINAL", "B_VESSEL_NAME",
+            "B_VOYAGE_CODE", "B_VOYAGE_CARRIER", "B_DATA_DRAFT_DEADLINE", "B_DATA_DEADLINE",
+            "B_DATA_ESTIMATIVA_SAIDA_ETD", "B_DATA_ESTIMATIVA_CHEGADA_ETA", "B_DATA_ABERTURA_GATE",
+            "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
+        ]
+        for field in fields_to_propagate:
+            if field in row and row[field] is not None:
+                val = _normalize_value(row[field])
                 if val is None:
-                    return
-            # Normaliza strings vazias
-            if isinstance(val, str) and val.strip() == "":
-                return
-            update_fields[field_name] = val
+                    continue
+                if isinstance(val, str) and val.strip() == "":
+                    continue
+                main_update_fields[field] = val
 
-        # Campos S_ (Sales)
-        add_if_present("S_SPLITTED_BOOKING_REFERENCE")
-        add_if_present("S_PLACE_OF_RECEIPT")
-        add_if_present("S_QUANTITY_OF_CONTAINERS")
-        add_if_present("S_PORT_OF_LOADING_POL")
-        add_if_present("S_PORT_OF_DELIVERY_POD")
-        add_if_present("S_FINAL_DESTINATION")
-        
-        # Campos B_ (Booking)
-        add_if_present("B_BOOKING_REFERENCE")
-        add_if_present("B_TRANSHIPMENT_PORT")
-        add_if_present("B_TERMINAL")
-        add_if_present("B_VESSEL_NAME")
-        add_if_present("B_VOYAGE_CODE")
-        add_if_present("B_VOYAGE_CARRIER")
-        add_if_present("B_DATA_DRAFT_DEADLINE")
-        add_if_present("B_DATA_DEADLINE")
-        add_if_present("B_DATA_ESTIMATIVA_SAIDA_ETD")
-        add_if_present("B_DATA_ESTIMATIVA_CHEGADA_ETA")
-        add_if_present("B_DATA_ABERTURA_GATE")
-        add_if_present("B_DATA_PARTIDA_ATD")
-        add_if_present("B_DATA_CHEGADA_ATA")
-        add_if_present("B_DATA_ESTIMATIVA_ATRACACAO_ETB")
-        add_if_present("B_DATA_ATRACACAO_ATB")
-        
-        # Se não há campos para atualizar, retorna True (não é erro)
-        if not update_fields:
-            return True
-        
-        # Constrói a query de atualização dinamicamente
-        set_clause = ", ".join([f"{field} = :{field}" for field in update_fields.keys()])
-        update_query = text(f"""
-            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-            SET {set_clause}
-            WHERE FAROL_REFERENCE = :farol_reference
-        """)
-        
-        # Adiciona o farol_reference aos parâmetros
-        update_fields["farol_reference"] = farol_reference
-        
-        # Executa a atualização
-        result = conn.execute(update_query, update_fields)
-        conn.commit()
-        # Log leve em console para depuração
-        print(f"update_sales_booking_from_return_carriers: fields={list(update_fields.keys())}, rowcount={getattr(result,'rowcount',None)}, farol={farol_reference}")
-        
-        return getattr(result, "rowcount", 0) > 0
-        
+        main_set_clause = ", ".join([f"{field} = :{field}" for field in main_update_fields.keys() if field != 'farol_reference'])
+        main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
+        conn.execute(main_update_query, main_update_fields)
+
+        # 6. Commit transaction
+        tx.commit()
+        st.success(f"✅ Record {farol_reference} approved and updated successfully.")
+        return True
+
     except Exception as e:
-        if 'conn' in locals():
-            conn.rollback()
-        print(f"Erro ao atualizar F_CON_SALES_BOOKING_DATA: {e}")
+        if 'tx' in locals() and tx.is_active:
+            tx.rollback()
+        st.error(f"❌ A critical error occurred during the approval process: {e}")
         return False
     finally:
-        if 'conn' in locals():
+        if 'conn' in locals() and not conn.closed:
             conn.close()
+
 
 def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
     """
