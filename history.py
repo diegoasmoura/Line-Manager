@@ -1166,6 +1166,74 @@ def exibir_history():
                 del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
         st.session_state[last_active_tab_key] = active_tab
 
+    # Função para calcular largura dinâmica das colunas baseada no conteúdo
+    def calculate_column_width(df, column_name):
+        """Calcula largura dinâmica baseada no conteúdo e título da coluna"""
+        if column_name not in df.columns:
+            return "small"
+        
+        # Largura baseada no título
+        title_length = len(column_name)
+        
+        # Largura baseada no conteúdo (máximo de 10 amostras para performance)
+        sample_size = min(10, len(df))
+        if sample_size > 0:
+            content_lengths = df[column_name].dropna().astype(str).str.len()
+            max_content_length = content_lengths.max() if len(content_lengths) > 0 else 0
+        else:
+            max_content_length = 0
+        
+        # Calcula largura total necessária
+        total_length = max(title_length, max_content_length)
+        
+        # Define largura baseada no tamanho total (mais conservadora)
+        if total_length <= 12:
+            return "small"
+        elif total_length <= 20:
+            return "medium"
+        else:
+            return "large"  # Apenas para colunas muito longas
+    
+    # Função para gerar configuração dinâmica de colunas
+    def generate_dynamic_column_config(df, hide_status=False):
+        """Gera configuração de colunas com larguras dinâmicas"""
+        config = {
+            "ADJUSTMENT_ID": None,  # Sempre oculta
+            "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
+        }
+        
+        # Gera configuração para cada coluna
+        for col in df.columns:
+            if col in config:
+                continue
+                
+            # Oculta Status apenas se solicitado (aba Returns Awaiting Review)
+            if col == "Status" and hide_status:
+                config[col] = None
+                continue
+            
+            # Larguras específicas para colunas específicas
+            if col == "Status":
+                width = "medium"
+            elif col in ["Voyage Code", "Quantity of Containers", "Port Terminal City", "Splitted Farol Reference"]:
+                width = "medium"
+            elif any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate"]):
+                width = "medium"  # Todas as colunas de data são medium
+            elif "booking" in col.lower():
+                width = "medium"  # Todas as colunas relacionadas a booking são medium
+            else:
+                width = calculate_column_width(df, col)
+            
+            # Determina o tipo de coluna baseado no nome
+            if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate"]):
+                config[col] = st.column_config.DatetimeColumn(col, width=width)
+            elif col in ["Quantity of Containers"]:
+                config[col] = st.column_config.NumberColumn(col, width=width)
+            else:
+                config[col] = st.column_config.TextColumn(col, width=width)
+                
+        return config
+
     # Função para processar e configurar DataFrame
     def process_dataframe(df_to_process):
         """Processa um DataFrame aplicando aliases e configurações"""
@@ -1431,10 +1499,8 @@ def exibir_history():
     df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
     edited_df_other = None
     if df_other_processed is not None and active_tab == other_label:
-        column_config = {
-            "ADJUSTMENT_ID": None, # Oculta a coluna
-            "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
-        }
+        # Gera configuração dinâmica baseada no conteúdo (Status visível)
+        column_config = generate_dynamic_column_config(df_other_processed, hide_status=False)
         edited_df_other = st.data_editor(
             df_other_processed,
             use_container_width=True,
@@ -1463,12 +1529,8 @@ def exibir_history():
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
     edited_df_received = None
     if df_received_processed is not None and active_tab == received_label:
-        column_config = {
-            "ADJUSTMENT_ID": None, # Oculta a coluna
-            "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
-            # Oculta a coluna Status nesta aba conforme solicitado
-            "Status": None,
-        }
+        # Gera configuração dinâmica baseada no conteúdo (Status oculto)
+        column_config = generate_dynamic_column_config(df_received_processed, hide_status=True)
         edited_df_received = st.data_editor(
             df_received_processed,
             use_container_width=True,
