@@ -1196,21 +1196,23 @@ def exibir_history():
         key=active_tab_key
     )
 
-    # Se detectarmos troca de aba, acionamos flags para limpar seleções da outra
+    # Se detectarmos troca de aba, limpamos as seleções das outras abas
     prev_tab = st.session_state.get(last_active_tab_key)
     if prev_tab != active_tab:
         if active_tab == other_label:
-            # Limpamos seleção das outras abas
-            st.session_state[f"clear_received_selection_{farol_reference}"] = True
-            st.session_state[f"clear_voyages_selection_{farol_reference}"] = True
+            # Limpamos seleção da aba "Returns Awaiting Review"
+            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
         elif active_tab == received_label:
-            # Limpamos seleção das outras abas
-            st.session_state[f"clear_other_selection_{farol_reference}"] = True
-            st.session_state[f"clear_voyages_selection_{farol_reference}"] = True
+            # Limpamos seleção da aba "Request Timeline"
+            if f"history_other_status_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_other_status_editor_{farol_reference}"]
         else:  # voyages_label
-            # Limpamos seleção das outras abas
-            st.session_state[f"clear_other_selection_{farol_reference}"] = True
-            st.session_state[f"clear_received_selection_{farol_reference}"] = True
+            # Limpamos seleções de ambas as abas
+            if f"history_other_status_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_other_status_editor_{farol_reference}"]
+            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
         st.session_state[last_active_tab_key] = active_tab
 
     # Função para processar e configurar DataFrame
@@ -1490,6 +1492,10 @@ def exibir_history():
             disabled=df_other_processed.columns.drop(["Selecionar"]),
             key=f"history_other_status_editor_{farol_reference}"
         )
+        
+        # Aviso imediato para seleção múltipla
+        if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() > 1:
+            st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
 
     # Conteúdo da "aba" Retornos do Armador
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
@@ -1509,6 +1515,10 @@ def exibir_history():
             disabled=df_received_processed.columns.drop(["Selecionar"]),
             key=f"history_received_carrier_editor_{farol_reference}"
         )
+        
+        # Aviso imediato para seleção múltipla
+        if "Selecionar" in edited_df_received.columns and (edited_df_received["Selecionar"] == True).sum() > 1:
+            st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
 
     # Conteúdo da aba "Histórico de Viagens" 
     if active_tab == voyages_label:
@@ -1709,8 +1719,12 @@ def exibir_history():
     # Determina qual DataFrame usar baseado na aba ativa
     if edited_df_other is not None and not edited_df_other.empty:
         selected = edited_df_other[edited_df_other["Selecionar"] == True]
+        # Regra: apenas uma seleção permitida por vez (apenas bloqueia ações; aviso já é exibido abaixo da grade)
+        # Nenhum rerun aqui para permitir a visualização do aviso sob a grade
     elif edited_df_received is not None and not edited_df_received.empty:
         selected = edited_df_received[edited_df_received["Selecionar"] == True]
+        # Regra: apenas uma seleção permitida por vez (apenas bloqueia ações; aviso já é exibido abaixo da grade)
+        # Nenhum rerun aqui para permitir a visualização do aviso sob a grade
     else:
         selected = pd.DataFrame()
 
