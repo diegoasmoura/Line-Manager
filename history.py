@@ -1344,7 +1344,22 @@ def exibir_history():
             else:
                 df_processed = df_processed.sort_values(by=["Inserted Date"], ascending=[True], kind="mergesort")
 
+        # Caso especial: para a referência atualmente selecionada, garante a marcação da primeira linha Booking Requested
+        try:
+            if "Farol Reference" in df_processed.columns and "Farol Status" in df_processed.columns and "Inserted Date" in df_processed.columns:
+                sel_ref = str(farol_reference) if farol_reference is not None else None
+                if sel_ref:
+                    mask_sel = (df_processed["Farol Reference"].astype(str) == sel_ref) & (
+                        df_processed["Farol Status"].astype(str).str.strip().str.lower() == "booking requested".lower()
+                    )
+                    if mask_sel.any():
+                        first_idx_sel = df_processed.loc[mask_sel].sort_values("Inserted Date").index[0]
+                        df_processed.loc[first_idx_sel, "Status"] = "📦 Cargill Booking Request"
+        except Exception:
+            pass
+
         # Marca a primeira linha "Booking Requested" como pedido de booking Cargill por Farol Reference
+        # IMPORTANTE: Isso acontece APÓS a renderização de Status para sobrescrever "Split Info" quando necessário
         try:
             required_cols = {"Farol Status", "Inserted Date", "Farol Reference"}
             if required_cols.issubset(set(df_processed.columns)):
@@ -1357,9 +1372,22 @@ def exibir_history():
                             linked_val = df_processed.loc[i, "Linked Reference"] if "Linked Reference" in df_processed.columns else None
                             is_empty = (linked_val is None) or (isinstance(linked_val, str) and linked_val.strip() == "") or (str(linked_val).upper() == "NULL") or (hasattr(_pd, 'isna') and _pd.isna(linked_val))
                             if is_empty:
+                                # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
                                 df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
                     else:
+                        # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
                         df_processed.loc[idx_first, "Status"] = "📦 Cargill Booking Request"
+        except Exception:
+            pass
+
+        # Força: a PRIMEIRA linha da referência atualmente selecionada recebe "📦 Cargill Booking Request"
+        try:
+            if "Farol Reference" in df_processed.columns and "Inserted Date" in df_processed.columns and farol_reference is not None:
+                sel_ref_str = str(farol_reference)
+                mask_same_ref = df_processed["Farol Reference"].astype(str) == sel_ref_str
+                if mask_same_ref.any():
+                    first_idx_any = df_processed.loc[mask_same_ref].sort_values("Inserted Date").index[0]
+                    df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
                 

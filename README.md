@@ -768,6 +768,25 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.6 - History UI & Status (Setembro 2025)
+- Ordenação da grade do History por "Inserted Date" (mais antigo → mais novo). Empate é resolvido pela raiz da `Farol Reference` e depois pelo sufixo numérico (.1, .2, ...), garantindo a ordem: `FR_..._0001`, `FR_..._0001.1`, `FR_..._0001.2`.
+- Coluna `Status` com ícones e prioridades:
+  - "📄 Split": linhas de split detectadas por `S_SPLITTED_BOOKING_REFERENCE` ou padrão `.n`. Em acesso via `Shipments` com uma referência base (ex.: `FR_25.09_0001`), seus splits (`FR_25.09_0001.1`, `FR_25.09_0001.2`, `...`) são rotulados como Split.
+  - "🚢 Carrier Return (Linked)" ou "🚢 Carrier Return (New Adjustment)": quando `Linked Reference` está preenchido; tem prioridade sobre `P_STATUS`.
+  - `P_STATUS` diferenciado: "🛠️ Adjusts (Cargill)" e "🚢 Adjusts Carrier".
+  - Fallback técnico: "⚙️ ..." quando sem categorização.
+- Regra "📦 Cargill Booking Request":
+  - Para cada `Farol Reference`, a primeira linha com `Farol Status = Booking Requested` é marcada como "📦 Cargill Booking Request".
+  - Acesso direto a um split (ex.: abrir `FR_25.09_0001.1` no Ticket Journey) marca a primeira linha "Booking Requested" dessa própria referência como "📦 Cargill Booking Request" (não "Split"). Splits do split (ex.: `FR_25.09_0001.1.1`) continuam como "📄 Split".
+- `Splitted Farol Reference`: é preenchida automaticamente para referências com sufixo `.n` quando vazia, para padronizar a detecção e exibição de splits.
+- `Linked Reference`:
+  - Não é mais preenchida automaticamente em inserções; passa a ser definida somente na aprovação.
+  - Novo formato hierárquico por referência: `FR_..._0001-R01`, `-R02`, ...; opção especial "New Adjustment" para ajustes do carrier sem pedido prévio.
+- Separação das abas do History:
+  - "📋 Request Timeline": todos os registros exceto `Received from Carrier`.
+  - "📨 Returns Awaiting Review": somente `Received from Carrier`.
+- Estabilidade de UI: eliminação de loops de `st.rerun()` (uma única rerenderização por ação) e mensagens de feedback claras em aprovações/atualizações.
+
 ### 📌 v3.5 - Correções de Importação (Setembro 2025)
 - **🐛 Correções Críticas de ImportError:**
   - **Função `get_split_data_by_farol_reference`:** Adicionada função ausente no `database.py` (linha 1005) que estava sendo importada em `shipments_split.py`. A função busca dados unificados da tabela `F_CON_SALES_BOOKING_DATA` para operações de split e ajustes.

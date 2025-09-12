@@ -107,6 +107,16 @@ O sistema carrega opções da tabela `F_CON_GLOBAL_VARIABLES` para dropdowns. Ga
 
 Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de exibição e limpeza de valores antes de salvar no banco.
 
+### v3.6 - History UI & Status (resumo)
+- Ordenação por "Inserted Date" ascendente; empate resolvido por raiz da `Farol Reference` e sufixo `.n`.
+- Coluna `Status` com prioridades: 
+  - "📄 Split" para linhas de split (via coluna `S_SPLITTED_BOOKING_REFERENCE` ou padrão `.n`).
+  - "🚢 Carrier Return (Linked|New Adjustment)" quando `Linked Reference` está preenchido.
+  - `P_STATUS` diferenciado: "🛠️ Adjusts (Cargill)" e "🚢 Adjusts Carrier"; fallback técnico "⚙️".
+- Regra especial "📦 Cargill Booking Request": a primeira linha com `Farol Status = Booking Requested` por referência recebe este rótulo. Em acesso direto a um split (ex.: `FR_..._0001.1`), a primeira linha dessa própria referência é marcada como "📦 Cargill Booking Request"; splits do split (ex.: `.1.1`) seguem como "📄 Split".
+- `Splitted Farol Reference` é preenchida automaticamente quando vazia para referências com sufixo `.n`.
+- `Linked Reference` somente é definida na aprovação; formato hierárquico `FR_...-R01`, `-R02`, ... e opção especial "New Adjustment".
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.
