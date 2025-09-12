@@ -1738,6 +1738,29 @@ def exibir_history():
         # Nenhum rerun aqui para permitir a visualização do aviso sob a grade
     else:
         selected = pd.DataFrame()
+    
+    # Limpa status pendente quando a seleção muda
+    if len(selected) == 1:
+        current_adjustment_id = selected.iloc[0]["ADJUSTMENT_ID"]
+        last_adjustment_id = st.session_state.get(f"last_selected_adjustment_id_{farol_reference}")
+        
+        if last_adjustment_id is not None and last_adjustment_id != current_adjustment_id:
+            # Seleção mudou, limpa status pendente
+            if f"pending_status_change_{farol_reference}" in st.session_state:
+                del st.session_state[f"pending_status_change_{farol_reference}"]
+            if "pending_status_change" in st.session_state:
+                del st.session_state["pending_status_change"]
+        
+        # Atualiza o ID da seleção atual
+        st.session_state[f"last_selected_adjustment_id_{farol_reference}"] = current_adjustment_id
+    else:
+        # Nenhuma linha selecionada, limpa status pendente
+        if f"pending_status_change_{farol_reference}" in st.session_state:
+            del st.session_state[f"pending_status_change_{farol_reference}"]
+        if "pending_status_change" in st.session_state:
+            del st.session_state["pending_status_change"]
+        if f"last_selected_adjustment_id_{farol_reference}" in st.session_state:
+            del st.session_state[f"last_selected_adjustment_id_{farol_reference}"]
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
@@ -1803,34 +1826,34 @@ def exibir_history():
             
             with subcol1:
                 if st.button("Booking Approved", 
-                            key="status_booking_approved",
+                            key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
-                    st.session_state["pending_status_change"] = "Booking Approved"
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
                     st.rerun()
             
             with subcol2:
                 if st.button("Booking Rejected", 
-                            key="status_booking_rejected",
+                            key=f"status_booking_rejected_{farol_reference}",
                             type="secondary",
                             disabled=disable_rejected):
-                    st.session_state["pending_status_change"] = "Booking Rejected"
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
                     st.rerun()
 
             with subcol3:
                 if st.button("Booking Cancelled", 
-                            key="status_booking_cancelled",
+                            key=f"status_booking_cancelled_{farol_reference}",
                             type="secondary",
                             disabled=disable_cancelled):
-                    st.session_state["pending_status_change"] = "Booking Cancelled"
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
                     st.rerun()
             
             with subcol4:
                 if st.button("Adjustment Requested", 
-                            key="status_adjustment_requested",
+                            key=f"status_adjustment_requested_{farol_reference}",
                             type="secondary",
                             disabled=disable_adjustment):
-                    st.session_state["pending_status_change"] = "Adjustment Requested"
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
                     st.rerun()
         
         # Mensagem informativa sobre botões desabilitados
@@ -1849,7 +1872,7 @@ def exibir_history():
                 st.info(f"ℹ️ **Botões desabilitados:** {', '.join(disabled_buttons)} (Status atual: {farol_status})")
             
         # Confirmação quando há status pendente
-        pending_status = st.session_state.get("pending_status_change")
+        pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
         if pending_status:
             st.markdown("---")
             st.warning(f"**Confirmar alteração para:** {pending_status}")
@@ -2086,7 +2109,7 @@ def exibir_history():
                         apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
                         
                         # Limpa o status pendente e dados de New Adjustment
-                        st.session_state.pop("pending_status_change", None)
+                        st.session_state.pop(f"pending_status_change_{farol_reference}", None)
                         if related_reference == "New Adjustment":
                             st.session_state.pop("new_adjustment_area", None)
                             st.session_state.pop("new_adjustment_reason", None)
@@ -2099,7 +2122,7 @@ def exibir_history():
                                 key="cancel_status_change",
                                 type="secondary"):
                         # Limpa o status pendente e dados de New Adjustment
-                        st.session_state.pop("pending_status_change", None)
+                        st.session_state.pop(f"pending_status_change_{farol_reference}", None)
                         st.session_state.pop("new_adjustment_area", None)
                         st.session_state.pop("new_adjustment_reason", None)
                         st.session_state.pop("new_adjustment_responsibility", None)
