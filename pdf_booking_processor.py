@@ -3048,7 +3048,8 @@ def display_pdf_validation_interface(processed_data):
                 "Voyage Carrier": carrier,
                 "Voyage Code": voyage,
                 "Vessel Name": vessel_name,
-                "Splitted Booking Reference": booking_reference,
+                # Não é split neste fluxo de PDF; manter vazio
+                "Splitted Booking Reference": "",
                 "Quantity of Containers": int(quantity),
                 "Port of Loading POL": pol,
                 "Port of Delivery POD": pod,

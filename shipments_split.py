@@ -172,7 +172,7 @@ def show_split_form():
             "Place of Receipt",
             "Final Destination",
             "Transhipment Port",
-            "Port Terminal City",
+            "Terminal",  # Alterado de "Port Terminal City" para "Terminal" para corresponder ao df_split
             "Voyage Carrier",
             "Voyage Code",
             "Booking Reference",

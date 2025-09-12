@@ -1466,6 +1466,14 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                     else:
                         db_data[db_key] = value
                 else:
+                    # Normaliza S_SPLITTED_BOOKING_REFERENCE: só aceita Farol Reference (FR_..). Caso contrário, mantém vazio
+                    if db_key == "S_SPLITTED_BOOKING_REFERENCE":
+                        try:
+                            val_str = str(value).strip()
+                            if not val_str or not val_str.startswith("FR_"):
+                                value = ""
+                        except Exception:
+                            value = ""
                     db_data[db_key] = value
         
         # Campos obrigatórios e padrões
@@ -1473,15 +1481,11 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         db_data["USER_INSERT"] = user_insert
         db_data["ADJUSTMENT_ID"] = str(uuid.uuid4())
         
-        # Gera Linked Reference no novo formato hierárquico se tiver Farol Reference
-        farol_ref = db_data.get("FAROL_REFERENCE")
-        if farol_ref and "LINKED_REFERENCE" not in db_data:
-            try:
-                from history import get_next_linked_reference_number
-                db_data["LINKED_REFERENCE"] = get_next_linked_reference_number(farol_ref)
-            except Exception:
-                # Fallback para formato legacy se houver problema
-                db_data["LINKED_REFERENCE"] = "New Adjustment"
+        # NÃO gerar Linked Reference automaticamente na inserção.
+        # Regra de negócio: LINKED_REFERENCE só deve ser preenchido no momento da aprovação.
+        # Portanto, removemos qualquer geração automática aqui.
+        if "LINKED_REFERENCE" in db_data and (db_data["LINKED_REFERENCE"] is None or str(db_data["LINKED_REFERENCE"]).strip() == ""):
+            db_data.pop("LINKED_REFERENCE", None)
         
         # Campos de ajuste (se fornecidos)
         if area:
