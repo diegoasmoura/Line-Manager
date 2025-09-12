@@ -128,7 +128,7 @@ def get_file_type(uploaded_file):
 
 def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
     """
-    Salva um anexo na tabela F_CON_ANEXOS.
+    Salva um anexo na tabela F_CON_ANEXOS. 
     
     Args:
         farol_reference: Referência do Farol
@@ -902,25 +902,17 @@ def exibir_history():
         "ADJUSTMENTS_OWNER",
     ]
 
-    # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna, mas não na exibição
+    # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna
     internal_cols = display_cols + ["ADJUSTMENT_ID"]
     df_show = df[[c for c in internal_cols if c in df.columns]].copy()
     
-    # Cria uma cópia para exibição sem ADJUSTMENT_ID
-    df_display = df_show.drop(columns=["ADJUSTMENT_ID"], errors="ignore")
-    
     # Adiciona coluna de seleção ao df_display
+    df_display = df_show.copy()
     df_display.insert(0, "Selecionar", False)
     
     # Separa os dados em duas abas baseado no status
     df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
     df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
-    
-    # Função para limpar seleções entre abas (não mais usada, mas mantida para compatibilidade)
-    def clear_tab_selections():
-        """Limpa todas as seleções dos data_editors para evitar conflitos entre abas"""
-        # Esta função não é mais usada, mas mantida para compatibilidade
-        pass
     
     # Rótulos das "abas"
     other_label = f"📋 Request Timeline ({len(df_other_status)} records)"
@@ -1029,10 +1021,10 @@ def exibir_history():
         st.session_state[last_active_tab_key] = active_tab
 
     # Função para processar e configurar DataFrame
-    def process_dataframe(df_to_process, df_show_ref):
+    def process_dataframe(df_to_process):
         """Processa um DataFrame aplicando aliases e configurações"""
         if df_to_process.empty:
-            return df_to_process, df_show_ref
+            return df_to_process
 
         # Aplica aliases iguais aos da grade principal quando disponíveis
         mapping_main = get_column_mapping()
@@ -1055,28 +1047,24 @@ def exibir_history():
             return label
 
         custom_overrides = {
-            "ID": "ID",  # Campo ID visível
+            "ID": "ID",
             "FAROL_REFERENCE": "Farol Reference",
-            "B_BOOKING_REFERENCE": "Booking",  # Nova coluna de Booking Reference
-            "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
-            "LINKED_REFERENCE": "Linked Reference",  # Campo para referência relacionada
+            "B_BOOKING_REFERENCE": "Booking",
+            "ADJUSTMENT_ID": "ADJUSTMENT_ID",
+            "LINKED_REFERENCE": "Linked Reference",
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
-            # Remover prefixos B_/P_ dos rótulos solicitados (padronizados com shipments_mapping)
             "B_DATA_ABERTURA_GATE": "Data Abertura Gate",
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
-            "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",  # Nome corrigido
-            # Aliases para campos de data (padronizados)
+            "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",
             "B_DATA_DRAFT_DEADLINE": "Data Draft Deadline",
             "B_DATA_DEADLINE": "Data Deadline",
             "B_DATA_ESTIMATIVA_SAIDA_ETD": "Data Estimativa Saída ETD",
             "B_DATA_ESTIMATIVA_CHEGADA_ETA": "Data Estimativa Chegada ETA",
-            # Alias para Voyage Code
             "B_VOYAGE_CODE": "Voyage Code",
-            # Padronização adicional conforme pedido
             "B_VESSEL_NAME": "Vessel Name",
             "B_VOYAGE_CARRIER": "Voyage Carrier",
             "B_TRANSHIPMENT_PORT": "Transhipment Port",
@@ -1093,7 +1081,7 @@ def exibir_history():
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
         
-        return df_processed, df_show_ref
+        return df_processed
 
     # Função para exibir grade em uma aba
     def display_tab_content(df_tab, tab_name):
@@ -1103,170 +1091,54 @@ def exibir_history():
             return None
             
         # Processa o DataFrame da aba
-        df_processed, df_show_ref = process_dataframe(df_tab, df_show)
+        df_processed = process_dataframe(df_tab)
         
-        # Converte epoch (ms) para datetime para exibição correta na grade (APÓS os aliases)
-        if "Inserted Date" in df_processed.columns:
-            try:
-                df_processed["Inserted Date"] = pd.to_datetime(df_processed["Inserted Date"], unit="ms", errors="coerce")
-            except Exception:
-                pass
-        
-        # Converte campos de data específicos de epoch (ms) para datetime (APÓS os aliases)
-        date_fields_mapped = {
-            "Draft Deadline": "B_DATA_DRAFT_DEADLINE",
-            "Deadline": "B_DATA_DEADLINE", 
-            "Data Estimativa Saída ETD": "B_DATA_ESTIMATIVA_SAIDA_ETD",
-            "Data Estimativa Chegada ETA": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
-            "ATD": "B_DATA_PARTIDA_ATD",
-            "ATA": "B_DATA_CHEGADA_ATA",
-            "ETB": "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
-            "ATB": "B_DATA_ATRACACAO_ATB",
-            "PDF Print Date": "PDF_BOOKING_EMISSION_DATE"
-        }
-        
-        for mapped_name, original_name in date_fields_mapped.items():
-            if mapped_name in df_processed.columns:
-                try:
-                    original_values = df_show_ref[original_name]
-                    if mapped_name == "PDF Print Date":
-                        # Tenta parse direto de string (YYYY-MM-DD HH:MM[:SS])
-                        df_processed[mapped_name] = pd.to_datetime(original_values, errors="coerce")
-                    else:
-                        # Campos que vêm como epoch ms
-                        df_processed[mapped_name] = pd.to_datetime(original_values, unit="ms", errors="coerce")
-                except Exception:
-                    pass
+        # Converte datas para exibição
+        date_cols = [
+            "Inserted Date", "Data Draft Deadline", "Data Deadline", 
+            "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Booking Emission Date"
+        ]
+        for col in date_cols:
+            if col in df_processed.columns:
+                df_processed[col] = pd.to_datetime(df_processed[col], errors='coerce')
 
-        # Move "Inserted Date" para a primeira coluna e ordena de forma crescente
+        # Ordena pela data de inserção
         if "Inserted Date" in df_processed.columns:
-            # Ordena pela data (crescente)
-            try:
-                df_processed = df_processed.sort_values("Inserted Date", ascending=True)
-            except Exception:
-                pass
+            df_processed = df_processed.sort_values("Inserted Date", ascending=True)
                 
         return df_processed
 
-
-
     # Conteúdo da "aba" Pedidos da Empresa
-    
     df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
     edited_df_other = None
     if df_other_processed is not None and active_tab == other_label:
-        # Configuração das colunas
         column_config = {
-            "Farol Status": st.column_config.TextColumn(
-                "Farol Status", disabled=True
-            )
+            "ADJUSTMENT_ID": None, # Oculta a coluna
+            "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
         }
-        column_config["Selecionar"] = st.column_config.CheckboxColumn(
-            "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
-        )
-        column_config["ID"] = st.column_config.NumberColumn("ID", format="%d", disabled=True)
-        column_config["Linked Reference"] = st.column_config.NumberColumn("Linked Reference", format="%d", disabled=True)
-
-        # Reordena colunas - mantém "Selecionar" como primeira coluna
-        if "Inserted Date" in df_other_processed.columns:
-            other_cols = [c for c in df_other_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Booking", "Linked Reference", "Inserted Date"]]
-            ordered_cols = ["Selecionar", "ID", "Farol Reference", "Booking", "Linked Reference", "Inserted Date"] + other_cols
-            existing_cols = [c for c in ordered_cols if c in df_other_processed.columns]
-            df_other_processed = df_other_processed[existing_cols]
-
-        # Configura colunas para exibição
-        for col in df_other_processed.columns:
-            if col == "Farol Status":
-                continue
-            if col == "Selecionar":
-                continue
-            if col == "Inserted Date":
-                column_config[col] = st.column_config.DatetimeColumn(
-                    "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
-                )
-            elif col in ["Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Print Date"]:
-                column_config[col] = st.column_config.DatetimeColumn(
-                    col, format="YYYY-MM-DD HH:mm", disabled=True
-                )
-            else:
-                column_config[col] = st.column_config.TextColumn(col, disabled=True)
-
-        # Verifica se precisa limpar seleções desta aba
-        clear_other_key = f"clear_other_selection_{farol_reference}"
-        clear_other_multiple_key = f"clear_other_multiple_{farol_reference}"
-        if clear_other_key in st.session_state or clear_other_multiple_key in st.session_state:
-            df_other_processed = df_other_processed.copy()
-            df_other_processed["Selecionar"] = False
-            if clear_other_key in st.session_state:
-                del st.session_state[clear_other_key]
-            if clear_other_multiple_key in st.session_state:
-                del st.session_state[clear_other_multiple_key]
-
         edited_df_other = st.data_editor(
             df_other_processed,
             use_container_width=True,
             hide_index=True,
             column_config=column_config,
-            disabled=False,
+            disabled=df_other_processed.columns.drop(["Selecionar"]),
             key=f"history_other_status_editor_{farol_reference}"
         )
 
     # Conteúdo da "aba" Retornos do Armador
-    
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
     edited_df_received = None
     if df_received_processed is not None and active_tab == received_label:
-        # Configuração das colunas
         column_config = {
-            "Farol Status": st.column_config.TextColumn(
-                "Farol Status", disabled=True
-            )
+            "ADJUSTMENT_ID": None, # Oculta a coluna
+            "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
         }
-        column_config["Selecionar"] = st.column_config.CheckboxColumn(
-            "Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"
-        )
-
-        # Reordena colunas - mantém "Selecionar" como primeira coluna (ID e Linked Reference ocultos na aba Retornos do Armador)
-        if "Inserted Date" in df_received_processed.columns:
-            other_cols = [c for c in df_received_processed.columns if c not in ["Selecionar", "ID", "Farol Reference", "Booking", "Linked Reference", "Inserted Date"]]
-            ordered_cols = ["Selecionar", "Farol Reference", "Booking", "Inserted Date"] + other_cols
-            existing_cols = [c for c in ordered_cols if c in df_received_processed.columns]
-            df_received_processed = df_received_processed[existing_cols]
-
-        # Configura colunas para exibição
-        for col in df_received_processed.columns:
-            if col == "Farol Status":
-                continue
-            if col == "Selecionar":
-                continue
-            if col == "Inserted Date":
-                column_config[col] = st.column_config.DatetimeColumn(
-                    "Inserted Date", format="YYYY-MM-DD HH:mm", disabled=True
-                )
-            elif col in ["Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Print Date"]:
-                column_config[col] = st.column_config.DatetimeColumn(
-                    col, format="YYYY-MM-DD HH:mm", disabled=True
-                )
-            else:
-                column_config[col] = st.column_config.TextColumn(col, disabled=True)
-
-        # Verifica se precisa limpar seleções desta aba
-        clear_received_key = f"clear_received_selection_{farol_reference}"
-        clear_received_multiple_key = f"clear_received_multiple_{farol_reference}"
-        if clear_received_key in st.session_state or clear_received_multiple_key in st.session_state:
-            df_received_processed = df_received_processed.copy()
-            df_received_processed["Selecionar"] = False
-            if clear_received_key in st.session_state:
-                del st.session_state[clear_received_key]
-            if clear_received_multiple_key in st.session_state:
-                del st.session_state[clear_received_multiple_key]
-
         edited_df_received = st.data_editor(
             df_received_processed,
             use_container_width=True,
             hide_index=True,
             column_config=column_config,
-            disabled=False,
+            disabled=df_received_processed.columns.drop(["Selecionar"]),
             key=f"history_received_carrier_editor_{farol_reference}"
         )
 
@@ -1467,14 +1339,12 @@ def exibir_history():
 
 
     # Determina qual DataFrame usar baseado na aba ativa
-    # Por padrão, usa o primeiro DataFrame disponível
-    if edited_df_other is not None:
-        edited_df = edited_df_other
-    elif edited_df_received is not None:
-        edited_df = edited_df_received
+    if edited_df_other is not None and not edited_df_other.empty:
+        selected = edited_df_other[edited_df_other["Selecionar"] == True]
+    elif edited_df_received is not None and not edited_df_received.empty:
+        selected = edited_df_received[edited_df_received["Selecionar"] == True]
     else:
-        # Fallback para DataFrame vazio
-        edited_df = pd.DataFrame()
+        selected = pd.DataFrame()
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
@@ -1497,235 +1367,178 @@ def exibir_history():
 
 
     # Interface de botões de status para linha selecionada
-    # Verifica seleções em ambas as abas
-    selected_other = edited_df_other[edited_df_other["Selecionar"] == True] if edited_df_other is not None else pd.DataFrame()
-    selected_received = edited_df_received[edited_df_received["Selecionar"] == True] if edited_df_received is not None else pd.DataFrame()
-    
-    # Se há seleções em ambas as abas, limpa automaticamente a seleção da aba "other" (prioriza "received")
-    if len(selected_other) > 0 and len(selected_received) > 0:
-        # Limpa a seleção da aba "other" automaticamente usando uma chave de controle
-        clear_other_key = f"clear_other_selection_{farol_reference}"
-        if clear_other_key not in st.session_state:
-            st.session_state[clear_other_key] = True
-            st.rerun()
-    
-    # Verificação adicional: se há múltiplas seleções na mesma aba, limpa todas
-    if len(selected_other) > 1:
-        clear_other_multiple_key = f"clear_other_multiple_{farol_reference}"
-        if clear_other_multiple_key not in st.session_state:
-            st.session_state[clear_other_multiple_key] = True
-            st.rerun()
-    
-    if len(selected_received) > 1:
-        clear_received_multiple_key = f"clear_received_multiple_{farol_reference}"
-        if clear_received_multiple_key not in st.session_state:
-            st.session_state[clear_received_multiple_key] = True
-            st.rerun()
-    
-    # Determina qual seleção usar (prioriza "received" se ambas tiverem seleção)
-    if len(selected_other) > 0 and len(selected_received) > 0:
-        selected = selected_received
-        selected_df = edited_df_received
-    else:
-        selected = selected_other if not selected_other.empty else selected_received
-        selected_df = edited_df_other if not selected_other.empty else edited_df_received
-    
-    if len(selected) > 1:
-        st.warning("⚠️ Selecione apenas uma linha para aplicar mudanças.")
-    
-    # Interface de botões de status para linha selecionada
     if len(selected) == 1:
         st.markdown("---")
 
-        
-        # Obtém informações da linha selecionada (usar diretamente a série selecionada para evitar divergência de índice)
+        # Obtém informações da linha selecionada
         selected_row = selected.iloc[0]
-        farol_ref = selected_row.get("Farol Reference") or selected_row.get("FAROL_REFERENCE")
-        adjustment_id = df_show.loc[selected_row.name, "ADJUSTMENT_ID"]
+        farol_ref = selected_row.get("Farol Reference")
+        adjustment_id = selected_row["ADJUSTMENT_ID"]
         
         # Obtém o status da linha selecionada na tabela F_CON_RETURN_CARRIERS (prioriza leitura por UUID)
         selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
         
-        # Obtém o status atual da tabela principal F_CON_SALES_BOOKING_DATA
-        current_status = get_current_status_from_main_table(farol_ref)
+        # Botões de status com layout elegante
+        st.markdown("#### 🔄 Select New Status:")
         
+        # Botões de status alinhados à esquerda
+        col1, col2 = st.columns([2, 3])
+        
+        with col1:
+            # Botões de status com espaçamento reduzido
+            subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
+            
+            with subcol1:
+                if st.button("Booking Approved", 
+                            key="status_booking_approved",
+                            type="secondary"):
+                    st.session_state["pending_status_change"] = "Booking Approved"
+                    st.rerun()
+            
+            with subcol2:
+                if st.button("Booking Rejected", 
+                            key="status_booking_rejected",
+                            type="secondary"):
+                    st.session_state["pending_status_change"] = "Booking Rejected"
+                    st.rerun()
 
+            with subcol3:
+                if st.button("Booking Cancelled", 
+                            key="status_booking_cancelled",
+                            type="secondary"):
+                    st.session_state["pending_status_change"] = "Booking Cancelled"
+                    st.rerun()
+            
+            with subcol4:
+                if st.button("Adjustment Requested", 
+                            key="status_adjustment_requested",
+                            type="secondary"):
+                    st.session_state["pending_status_change"] = "Adjustment Requested"
+                    st.rerun()
         
-        # Verifica se o status da linha selecionada é "Booking Requested" - se for, não permite alterações
-        if selected_row_status == "Booking Requested":
-            st.warning("⚠️ **Esta etapa não pode ser alterada pelo usuário**")
-            st.info(f"📋 O status '{selected_row_status}' é uma etapa protegida do sistema")
-        else:
-            # Botões de status com layout elegante
-            st.markdown("#### 🔄 Select New Status:")
+        # Confirmação quando há status pendente
+        pending_status = st.session_state.get("pending_status_change")
+        if pending_status:
+            st.markdown("---")
+            st.warning(f"**Confirmar alteração para:** {pending_status}")
             
-            # Botões de status alinhados à esquerda
-            col1, col2 = st.columns([2, 3])
-            
-            with col1:
-                # Botões de status com espaçamento reduzido
-                subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
+            # Validação especial para itens "Received from Carrier" sendo aprovados
+            related_reference = None
+            if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
+                st.info("📋 **Este item é um retorno do armador. Antes de aprovar, informe a referência da aba relacionada:**")
                 
+                # Busca referências disponíveis na aba 'Other Status'
+                available_refs = get_available_references_for_relation()
+                
+                if available_refs:
+                    # Cria opções para o selectbox
+                    ref_options = [f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}" for ref in available_refs]
+                    ref_options.insert(0, "Selecione uma referência...")
+                    ref_options.append("New Adjustment")  # Opção para ajuste sem referência prévia
+                    
+                    selected_ref = st.selectbox(
+                        "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
+                        options=ref_options,
+                        key="related_reference_select"
+                    )
+                    
+                    if selected_ref and selected_ref != "Selecione uma referência...":
+                        if selected_ref == "New Adjustment":
+                            related_reference = "New Adjustment"
+                            st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                            
+                            # Campos de justificativa obrigatórios para New Adjustment
+                            st.markdown("#### 📋 Justificativas do New Adjustment")
+                            col_a, col_b, col_c = st.columns([1, 1, 1])
+                            with col_a:
+                                area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
+                            with col_b:
+                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
+                            with col_c:
+                                responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
+                            
+                            comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
+                            
+                            # Armazena os valores no session_state para usar na confirmação
+                            st.session_state["new_adjustment_area"] = area_new_adj
+                            st.session_state["new_adjustment_reason"] = reason_new_adj
+                            st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
+                            st.session_state["new_adjustment_comment"] = comment_new_adj
+                        else:
+                            # Extrai o ID da opção selecionada
+                            related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
+                        
+                            # Mostra detalhes da linha selecionada
+                            selected_ref_data = next((ref for ref in available_refs if str(ref['ID']) == related_reference), None)
+                            if selected_ref_data:
+                                st.info(f"📋 **Linha selecionada:** ID {selected_ref_data['ID']} | {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']}")
+                else:
+                    st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
+                    related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
+            
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                subcol1, subcol2 = st.columns(2, gap="small")
                 with subcol1:
-                    if st.button("Booking Approved", 
-                                key="status_booking_approved",
-                                type="secondary"):
-                        if current_status != "Booking Approved":
-                            st.session_state["pending_status_change"] = "Booking Approved"
-                        st.rerun()
+                    # Desabilita o botão se for "Received from Carrier" e não tiver referência
+                    can_confirm = True
+                    validation_message = ""
+                    if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
+                        can_confirm = related_reference is not None and str(related_reference).strip() != ""
+                        
+                        # Validação adicional para New Adjustment
+                        if related_reference == "New Adjustment":
+                            area_val = st.session_state.get("new_adjustment_area", "")
+                            reason_val = st.session_state.get("new_adjustment_reason", "")
+                            responsibility_val = st.session_state.get("new_adjustment_responsibility", "")
+                            
+                            if not area_val or not reason_val or not responsibility_val:
+                                can_confirm = False
+                                validation_message = "⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar."
+                    
+                    # Exibe mensagem de validação se houver
+                    if validation_message:
+                        st.warning(validation_message)
+                    
+                    if st.button("✅ Confirmar", 
+                                key="confirm_status_change",
+                                type="primary",
+                                disabled=not can_confirm):
+                        # Prepara os parâmetros de justificativa para New Adjustment
+                        area_param = None
+                        reason_param = None
+                        responsibility_param = None
+                        comment_param = None
+                        
+                        if related_reference == "New Adjustment":
+                            area_param = st.session_state.get("new_adjustment_area")
+                            reason_param = st.session_state.get("new_adjustment_reason")
+                            responsibility_param = st.session_state.get("new_adjustment_responsibility")
+                            comment_param = st.session_state.get("new_adjustment_comment")
+                        
+                        # Executa a mudança de status
+                        apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
+                        
+                        # Limpa o status pendente e dados de New Adjustment
+                        st.session_state.pop("pending_status_change", None)
+                        if related_reference == "New Adjustment":
+                            st.session_state.pop("new_adjustment_area", None)
+                            st.session_state.pop("new_adjustment_reason", None)
+                            st.session_state.pop("new_adjustment_responsibility", None)
+                            st.session_state.pop("new_adjustment_comment", None)
+                        # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
                 
                 with subcol2:
-                    if st.button("Booking Rejected", 
-                                key="status_booking_rejected",
+                    if st.button("❌ Cancelar", 
+                                key="cancel_status_change",
                                 type="secondary"):
-                        if current_status != "Booking Rejected":
-                            st.session_state["pending_status_change"] = "Booking Rejected"
+                        # Limpa o status pendente e dados de New Adjustment
+                        st.session_state.pop("pending_status_change", None)
+                        st.session_state.pop("new_adjustment_area", None)
+                        st.session_state.pop("new_adjustment_reason", None)
+                        st.session_state.pop("new_adjustment_responsibility", None)
+                        st.session_state.pop("new_adjustment_comment", None)
                         st.rerun()
-
-                with subcol3:
-                    if st.button("Booking Cancelled", 
-                                key="status_booking_cancelled",
-                                type="secondary"):
-                        if current_status != "Booking Cancelled":
-                            st.session_state["pending_status_change"] = "Booking Cancelled"
-                        st.rerun()
-                
-                with subcol4:
-                    if st.button("Adjustment Requested", 
-                                key="status_adjustment_requested",
-                                type="secondary"):
-                        if current_status != "Adjustment Requested":
-                            st.session_state["pending_status_change"] = "Adjustment Requested"
-                        st.rerun()
-            
-            # Confirmação quando há status pendente
-            pending_status = st.session_state.get("pending_status_change")
-            if pending_status:
-                # Se o status pendente é igual ao status atual, limpa automaticamente
-                if pending_status == current_status:
-                    st.session_state.pop("pending_status_change", None)
-                    st.rerun()
-                else:
-                    st.markdown("---")
-                    st.warning(f"**Confirmar alteração para:** {pending_status}")
-                    
-                    # Validação especial para itens "Received from Carrier" sendo aprovados
-                    related_reference = None
-                    if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
-                        st.info("📋 **Este item é um retorno do armador. Antes de aprovar, informe a referência da aba relacionada:**")
-                        
-                        # Busca referências disponíveis na aba 'Other Status'
-                        available_refs = get_available_references_for_relation()
-                        
-                        if available_refs:
-                            # Cria opções para o selectbox
-                            ref_options = [f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}" for ref in available_refs]
-                            ref_options.insert(0, "Selecione uma referência...")
-                            ref_options.append("New Adjustment")  # Opção para ajuste sem referência prévia
-                            
-                            selected_ref = st.selectbox(
-                                "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
-                                options=ref_options,
-                                key="related_reference_select"
-                            )
-                            
-                            if selected_ref and selected_ref != "Selecione uma referência...":
-                                if selected_ref == "New Adjustment":
-                                    related_reference = "New Adjustment"
-                                    st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
-                                    
-                                    # Campos de justificativa obrigatórios para New Adjustment
-                                    st.markdown("#### 📋 Justificativas do New Adjustment")
-                                    col_a, col_b, col_c = st.columns([1, 1, 1])
-                                    with col_a:
-                                        area_new_adj = st.selectbox("Booking Adjustment Area", [""] + Booking_adj_area, key="area_new_adjustment")
-                                    with col_b:
-                                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason, key="reason_new_adjustment")
-                                    with col_c:
-                                        responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility, key="responsibility_new_adjustment")
-                                    
-                                    comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
-                                    
-                                    # Armazena os valores no session_state para usar na confirmação
-                                    st.session_state["new_adjustment_area"] = area_new_adj
-                                    st.session_state["new_adjustment_reason"] = reason_new_adj
-                                    st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
-                                    st.session_state["new_adjustment_comment"] = comment_new_adj
-                                else:
-                                    # Extrai o ID da opção selecionada
-                                    related_reference = selected_ref.split(" | ")[0].replace("ID: ", "")
-                                
-                                    # Mostra detalhes da linha selecionada
-                                    selected_ref_data = next((ref for ref in available_refs if str(ref['ID']) == related_reference), None)
-                                    if selected_ref_data:
-                                        st.info(f"📋 **Linha selecionada:** ID {selected_ref_data['ID']} | {selected_ref_data['FAROL_REFERENCE']} | {selected_ref_data['B_BOOKING_STATUS']}")
-                        else:
-                            st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
-                            related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
-                    
-                    col1, col2 = st.columns([1, 3])
-                    with col1:
-                        subcol1, subcol2 = st.columns(2, gap="small")
-                        with subcol1:
-                            # Desabilita o botão se for "Received from Carrier" e não tiver referência
-                            can_confirm = True
-                            validation_message = ""
-                            if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
-                                can_confirm = related_reference is not None and str(related_reference).strip() != ""
-                                
-                                # Validação adicional para New Adjustment
-                                if related_reference == "New Adjustment":
-                                    area_val = st.session_state.get("new_adjustment_area", "")
-                                    reason_val = st.session_state.get("new_adjustment_reason", "")
-                                    responsibility_val = st.session_state.get("new_adjustment_responsibility", "")
-                                    
-                                    if not area_val or not reason_val or not responsibility_val:
-                                        can_confirm = False
-                                        validation_message = "⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar."
-                            
-                            # Exibe mensagem de validação se houver
-                            if validation_message:
-                                st.warning(validation_message)
-                            
-                            if st.button("✅ Confirmar", 
-                                        key="confirm_status_change",
-                                        type="primary",
-                                        disabled=not can_confirm):
-                                # Prepara os parâmetros de justificativa para New Adjustment
-                                area_param = None
-                                reason_param = None
-                                responsibility_param = None
-                                comment_param = None
-                                
-                                if related_reference == "New Adjustment":
-                                    area_param = st.session_state.get("new_adjustment_area")
-                                    reason_param = st.session_state.get("new_adjustment_reason")
-                                    responsibility_param = st.session_state.get("new_adjustment_responsibility")
-                                    comment_param = st.session_state.get("new_adjustment_comment")
-                                
-                                # Executa a mudança de status
-                                apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
-                                
-                                # Limpa o status pendente e dados de New Adjustment
-                                st.session_state.pop("pending_status_change", None)
-                                if related_reference == "New Adjustment":
-                                    st.session_state.pop("new_adjustment_area", None)
-                                    st.session_state.pop("new_adjustment_reason", None)
-                                    st.session_state.pop("new_adjustment_responsibility", None)
-                                    st.session_state.pop("new_adjustment_comment", None)
-                                # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
-                        
-                        with subcol2:
-                            if st.button("❌ Cancelar", 
-                                        key="cancel_status_change",
-                                        type="secondary"):
-                                # Limpa o status pendente e dados de New Adjustment
-                                st.session_state.pop("pending_status_change", None)
-                                st.session_state.pop("new_adjustment_area", None)
-                                st.session_state.pop("new_adjustment_reason", None)
-                                st.session_state.pop("new_adjustment_responsibility", None)
-                                st.session_state.pop("new_adjustment_comment", None)
-                                st.rerun()
             
 
     else:
@@ -1765,7 +1578,7 @@ def exibir_history():
             st.session_state["current_page"] = "main"
             st.rerun()
 
-    # Seção de anexos (toggle) 
+    # Seção de anexos (toggle)
     
     if st.session_state.get("history_show_attachments", False):
         st.markdown("---")
