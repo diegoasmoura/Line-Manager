@@ -244,6 +244,14 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - ⚠️ **Avisos**: Aparecem diretamente abaixo da grade da aba ativa
 - 🔄 **Persistência**: Mensagens persistem após recarregamento da página
 
+**Desabilitação Inteligente de Botões:**
+- 🚫 **Booking Approved**: Desabilitado se Farol Status = "Booking Approved"
+- 🚫 **Booking Rejected**: Desabilitado se Farol Status = "Booking Rejected"
+- 🚫 **Booking Cancelled**: Desabilitado se Farol Status = "Booking Cancelled"
+- 🚫 **Adjustment Requested**: Desabilitado se Farol Status = "Adjustment Requested"
+- 🔄 **Limpeza Automática**: Status pendente é limpo ao mudar seleção de linha
+- 🎯 **Rastreamento por ID**: Usa ADJUSTMENT_ID para detectar mudanças de seleção
+
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
 - Extração automática de dados
@@ -819,7 +827,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - "📨 Returns Awaiting Review": somente `Received from Carrier`.
 - Estabilidade de UI: eliminação de loops de `st.rerun()` (uma única rerenderização por ação) e mensagens de feedback claras em aprovações/atualizações.
 
-#### 🎯 **Regras de Seleção e Interface (v3.6.1)**
+#### 🎯 **Regras de Seleção e Interface (v3.6.2)**
 - **Seleção Única Obrigatória**: Apenas 1 linha pode ser selecionada por vez em qualquer aba
 - **Avisos Contextuais**: Alertas específicos para linhas "📦 Cargill Booking Request", "🛠️ Cargill (Adjusts)" e "📄 Split Info" na aba Request Timeline
 - **Limpeza Automática**: Seleções são limpas automaticamente ao trocar de abas
@@ -827,6 +835,15 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **Mensagens Persistentes**: Feedback de sucesso/erro persiste após recarregamento da página
 - **Dropdown Inteligente**: Filtra referências por Farol Reference exata e ordena cronologicamente
 - **Correção de Nomenclatura**: "Adjusts (Cargill)" renomeado para "Cargill (Adjusts)" em toda a interface
+- **Desabilitação Inteligente de Botões**: Botões são desabilitados baseado no Farol Status atual da linha selecionada
+- **Limpeza de Status Pendente**: Status pendente é limpo automaticamente ao mudar seleção de linha
+
+#### 🎯 **Melhorias de Interface (v3.6.2)**
+- **Desabilitação Inteligente**: Botões de status são automaticamente desabilitados quando o Farol Status da linha selecionada já corresponde ao status do botão
+- **Limpeza Automática de Seleções**: Status pendente é limpo automaticamente quando o usuário muda a seleção de linha
+- **Rastreamento por ID**: Sistema usa ADJUSTMENT_ID para detectar mudanças precisas de seleção
+- **Interface Limpa**: Removidas mensagens informativas desnecessárias e seção de diagnóstico da API
+- **Chaves Específicas**: Session state usa chaves específicas por Farol Reference para evitar conflitos
 
 ### 📌 v3.5 - Correções de Importação (Setembro 2025)
 - **🐛 Correções Críticas de ImportError:**

@@ -1114,55 +1114,6 @@ def exibir_history():
     # Busca dados de monitoramento relacionados aos navios desta referência
     df_voyage_monitoring = get_voyage_monitoring_for_reference(farol_reference)
 
-    # Diagnóstico rápido da API Voyage Timeline para a referência atual
-    with st.expander("🛠️ Diagnóstico - API Voyage Timeline", expanded=False):
-        # Último registro em F_CON_RETURN_CARRIERS
-        try:
-            latest_rc = df.sort_values("ROW_INSERTED_DATE", ascending=False).iloc[0]
-        except Exception:
-            latest_rc = None
-
-        if latest_rc is not None:
-            vname = str(latest_rc.get("B_VESSEL_NAME", "")).strip()
-            vcode = str(latest_rc.get("B_VOYAGE_CODE", "")).strip()
-            terminal_name = str(latest_rc.get("B_TERMINAL", "")).strip()
-            st.markdown("**Último registro em F_CON_RETURN_CARRIERS (resumo):**")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.text(f"Vessel Name: {vname or '-'}")
-                st.text(f"Voyage Code: {vcode or '-'}")
-            with c2:
-                st.text(f"Port Terminal City: {terminal_name or '-'}")
-                st.text(f"Status: {latest_rc.get('B_BOOKING_STATUS', '-')}")
-            with c3:
-                st.text(f"Inserted: {latest_rc.get('ROW_INSERTED_DATE', '-')}")
-
-            # Contagem atual em F_ELLOX_TERMINAL_MONITORINGS
-            try:
-                conn = get_database_connection()
-                cnt = conn.execute(text("""
-                    SELECT COUNT(*) FROM F_ELLOX_TERMINAL_MONITORINGS 
-                    WHERE UPPER(NAVIO) = UPPER(:vname)
-                """), {"vname": vname}).scalar() or 0
-                conn.close()
-            except Exception:
-                cnt = 0
-
-            st.info(f"Registros em F_ELLOX_TERMINAL_MONITORINGS para NAVIO='{vname}': {cnt}")
-
-            # Botão para coletar/atualizar monitoramento agora
-            col_a, col_b = st.columns([1, 3])
-            with col_a:
-                if st.button("🔄 Coletar/Atualizar Voyage Monitoring agora", key=f"collect_vm_{farol_reference}"):
-                    try:
-                        from pdf_booking_processor import collect_voyage_monitoring_data
-                        collect_voyage_monitoring_data(vname, terminal_name, vcode)
-                        st.success("✅ Solicitação de coleta enviada. Reabra este diagnóstico em alguns segundos.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Falha ao acionar coleta: {str(e)}")
-        else:
-            st.info("Nenhum registro em F_CON_RETURN_CARRIERS para diagnóstico.")
     # Contagem de combinações distintas (Navio + Viagem + Terminal)
     try:
         if df_voyage_monitoring is not None and not df_voyage_monitoring.empty:
@@ -1856,20 +1807,6 @@ def exibir_history():
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
                     st.rerun()
         
-        # Mensagem informativa sobre botões desabilitados
-        if any([disable_approved, disable_rejected, disable_cancelled, disable_adjustment]):
-            disabled_buttons = []
-            if disable_approved:
-                disabled_buttons.append("Booking Approved")
-            if disable_rejected:
-                disabled_buttons.append("Booking Rejected")
-            if disable_cancelled:
-                disabled_buttons.append("Booking Cancelled")
-            if disable_adjustment:
-                disabled_buttons.append("Adjustment Requested")
-            
-            if disabled_buttons:
-                st.info(f"ℹ️ **Botões desabilitados:** {', '.join(disabled_buttons)} (Status atual: {farol_status})")
             
         # Confirmação quando há status pendente
         pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
