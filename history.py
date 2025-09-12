@@ -1305,7 +1305,7 @@ def exibir_history():
         # Adiciona ícones na coluna de Status (origem do ajuste), com prioridade:
         # 1) Linhas de Split → "📄 Split"
         # 2) Linked Reference presente → "🚢 Carrier Return (Linked|New Adjustment)"
-        # 3) P_STATUS categorizado → "🛠️ Adjusts (Cargill)" / "🚢 Adjusts Carrier" / fallback
+        # 3) P_STATUS categorizado → "🛠️ Cargill (Adjusts)" / "🚢 Adjusts Carrier" / fallback
         try:
             has_status = "Status" in df_processed.columns
             has_linked = "Linked Reference" in df_processed.columns
@@ -1345,7 +1345,7 @@ def exibir_history():
                         return "⚙️"
                     low = txt.lower()
                     if low == "adjusts cargill":
-                        return "🛠️ Adjusts (Cargill)"
+                        return "🛠️ Cargill (Adjusts)"
                     if low == "adjusts carrier":
                         return "🚢 Adjusts Carrier"
                     return f"⚙️ {txt}"
@@ -1505,6 +1505,8 @@ def exibir_history():
                 st.warning("⚠️ **Atenção:** Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
             elif status == "📄 Split Info":
                 st.warning("⚠️ **Atenção:** Esta linha representa informações de divisão (Split Info). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
+            elif status == "🛠️ Cargill (Adjusts)":
+                st.warning("⚠️ **Atenção:** Esta linha representa um ajuste da Cargill (Cargill Adjusts). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
 
     # Conteúdo da "aba" Retornos do Armador
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
@@ -1835,10 +1837,10 @@ def exibir_history():
                 available_refs = get_available_references_for_relation(farol_ref)
                 
                 if available_refs:
-                    # Filtra somente Status desejados na UI: 📦 Cargill Booking Request ou 🛠️ Adjusts (Cargill)
+                    # Filtra somente Status desejados na UI: 📦 Cargill Booking Request ou 🛠️ Cargill (Adjusts)
                     # Regras equivalentes nos dados:
                     # - 📦 Cargill Booking Request: primeiras inserções de Booking Requested (sem Linked_Reference)
-                    # - 🛠️ Adjusts (Cargill): P_STATUS = 'Adjusts Cargill'
+                    # - 🛠️ Cargill (Adjusts): P_STATUS = 'Adjusts Cargill'
                     def _is_empty(value):
                         try:
                             if value is None:
@@ -1857,8 +1859,8 @@ def exibir_history():
                         b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
                         linked = ref.get('LINKED_REFERENCE')
 
-                        # Apenas 📦 Cargill Booking Request (Primeiras inserções Booking Requested sem Linked)
-                        if b_status == 'Booking Requested' and _is_empty(linked):
+                        # Inclui 📦 Cargill Booking Request e 🛠️ Cargill (Adjusts) sem Linked
+                        if (b_status == 'Booking Requested' and _is_empty(linked)) or (b_status == 'Adjustment Requested' and _is_empty(linked)):
                             filtered.append(ref)
 
                     # Ordena por dia crescente e, dentro do mesmo dia, horário decrescente (HH:MM mais recente primeiro)
@@ -1919,7 +1921,7 @@ def exibir_history():
                                 return False
 
                         if p_status.lower() == 'adjusts cargill':
-                            status_display = 'Adjusts (Cargill)'
+                            status_display = 'Cargill (Adjusts)'
                         elif b_status == 'Booking Requested' and _is_empty_local(linked):
                             status_display = 'Cargill Booking Request'
                         else:
@@ -2001,7 +2003,7 @@ def exibir_history():
                                 linked_sel = selected_ref_data.get('LINKED_REFERENCE')
 
                                 if p_status_sel.lower() == 'adjusts cargill':
-                                    status_display_sel = 'Adjusts (Cargill)'
+                                    status_display_sel = 'Cargill (Adjusts)'
                                 elif b_status_sel == 'Booking Requested' and ((linked_sel is None) or (isinstance(linked_sel, str) and linked_sel.strip() in ('', 'NULL'))):
                                     status_display_sel = 'Cargill Booking Request'
                                 else:

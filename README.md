@@ -224,12 +224,13 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 
 **📋 Request Timeline:**
 - ⚠️ **Cargill Booking Request**: "Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
+- ⚠️ **Cargill (Adjusts)**: "Esta linha representa um ajuste da Cargill (Cargill Adjusts). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 - ⚠️ **Split Info**: "Esta linha representa informações de divisão (Split Info). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 
 **📨 Returns Awaiting Review:**
 - ✅ **Ações permitidas**: Booking Approved, Booking Rejected, Booking Cancelled
 - 🔗 **Linking obrigatório**: Para "Booking Approved", deve selecionar uma referência relacionada no dropdown
-- 📋 **Filtros do dropdown**: Mostra apenas "Cargill Booking Request" (Booking Requested + Linked_Reference vazio)
+- 📋 **Filtros do dropdown**: Mostra "Cargill Booking Request" e "Cargill (Adjusts)" (Booking Requested/Adjustment Requested + Linked_Reference vazio)
 
 **Comportamento do Dropdown de Referências:**
 - 🎯 **Filtro por Farol Reference**: Mostra apenas referências da mesma Farol Reference acessada
@@ -820,11 +821,12 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 #### 🎯 **Regras de Seleção e Interface (v3.6.1)**
 - **Seleção Única Obrigatória**: Apenas 1 linha pode ser selecionada por vez em qualquer aba
-- **Avisos Contextuais**: Alertas específicos para linhas "📦 Cargill Booking Request" e "📄 Split Info" na aba Request Timeline
+- **Avisos Contextuais**: Alertas específicos para linhas "📦 Cargill Booking Request", "🛠️ Cargill (Adjusts)" e "📄 Split Info" na aba Request Timeline
 - **Limpeza Automática**: Seleções são limpas automaticamente ao trocar de abas
 - **Validação de Ações**: Área de botões só aparece quando exatamente 1 linha está selecionada
 - **Mensagens Persistentes**: Feedback de sucesso/erro persiste após recarregamento da página
 - **Dropdown Inteligente**: Filtra referências por Farol Reference exata e ordena cronologicamente
+- **Correção de Nomenclatura**: "Adjusts (Cargill)" renomeado para "Cargill (Adjusts)" em toda a interface
 
 ### 📌 v3.5 - Correções de Importação (Setembro 2025)
 - **🐛 Correções Críticas de ImportError:**
