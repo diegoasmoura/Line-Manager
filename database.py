@@ -1374,45 +1374,7 @@ def insert_return_carrier_from_ui(ui_row: dict, user_insert: str | None = None, 
         farol_reference = ui_row.get("Farol Reference")
         # Normalizações de tipos/valores
         def norm(val):
-            try:
-                import numpy as np  # type: ignore
-            except Exception:
-                np = None  # type: ignore
-            try:
-                import pandas as pd  # type: ignore
-            except Exception:
-                pd = None  # type: ignore
-            # Trata NaN/NaT
-            if pd is not None:
-                try:
-                    if not isinstance(val, (str, bytes)) and pd.isna(val):
-                        return None
-                except Exception:
-                    pass
-            # Converte numpy escalares
-            if np is not None and isinstance(val, (getattr(np, 'integer', ()), getattr(np, 'floating', ()), getattr(np, 'bool_', ()))):
-                try:
-                    if isinstance(val, getattr(np, 'integer', ())):
-                        return int(val)
-                    if isinstance(val, getattr(np, 'floating', ())) and not (val != val):
-                        return float(val)
-                    if isinstance(val, getattr(np, 'bool_', ())) :
-                        return bool(val)
-                except Exception:
-                    pass
-            # Converte pandas.Timestamp
-            if hasattr(val, 'to_pydatetime'):
-                try:
-                    return val.to_pydatetime()
-                except Exception:
-                    pass
-            # Fallback .item()
-            if hasattr(val, 'item') and not isinstance(val, (bytes, bytearray)):
-                try:
-                    return val.item()
-                except Exception:
-                    pass
-            return val
+            return _normalize_value(val)
 
         def convert_date_string(date_str):
             """Converte string de data (YYYY-MM-DD ou YYYY-MM-DD HH:MM[:SS] [UTC|UT]) para datetime"""

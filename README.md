@@ -1,9 +1,6 @@
 # 🏗️ Farol - Sistema de Gerenciamento de Embarques
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.31+-red.svg)](https://streamlit.io)
-[![Oracle](https://img.shields.io/badge/Database-Oracle-orange.svg)](https://oracle.com)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org) [![Streamlit](https://img.shields.io/badge/Streamlit-1.31+-red.svg)](https://streamlit.io) [![Oracle](https://img.shields.io/badge/Database-Oracle-orange.svg)](https://oracle.com) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Sistema completo de gerenciamento de embarques marítimos com interface web intuitiva, desenvolvido em Python com Streamlit e integração com banco de dados Oracle.
 
@@ -209,11 +206,11 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Justificativas obrigatórias
 
 ### 📜 `history.py`
-**Histórico e aprovações**
-- Visualização completa do histórico
-- Sistema de aprovação de retornos
-- Gestão de anexos e documentos
-- Processamento de PDFs de booking
+**Interface de Histórico e Aprovações**
+- Apresenta a interface com as abas "📋 Request Timeline", "📨 Returns Awaiting Review" e "📅 Voyage Timeline".
+- Orquestra a exibição do histórico de alterações (`F_CON_RETURN_CARRIERS`) e do histórico de monitoramento de viagens (`F_ELLOX_TERMINAL_MONITORINGS`).
+- Contém a lógica da interface de usuário para o fluxo de aprovação de retornos do carrier, coletando os dados necessários e invocando a lógica de negócio que foi centralizada em `database.py`.
+- Gerencia a seção de upload e visualização de anexos para cada referência.
 
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
@@ -265,19 +262,6 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
   - "👁️ Visualizar Monitoramento": POST `/api/terminalmonitorings` e `/api/shipownermonitorings`
 - Formatação e validação de CNPJ; checagem prévia de existência (`check_company_exists`)
 - Autenticação automática (sem chave manual no sidebar) e indicador 🟢/🟡/🔴
-
-### 🕘 `history.py`
-**Histórico e aprovações + Monitoramento Ellox**
-- Abas: "📋 History", "📨 Carrier Returns" e nova aba "🚢 Histórico de Viagens"
-- A aba "🚢 Histórico de Viagens" exibe dados locais de monitoramento (Ellox) relacionados à referência selecionada
-- A alimentação é automática ao validar um PDF, via `collect_voyage_monitoring_data` (ver `pdf_booking_processor.py`)
-- Função de busca: `get_voyage_monitoring_for_reference(farol_reference)` com busca case-insensitive por navio
-
-#### Melhorias recentes na aba "Histórico de Viagens"
-- Tabela posicionada acima dos botões, alinhada às demais abas
-- Removidos título/emoji redundantes e textos de debug acima da tabela
-- Datas numéricas (epoch em ms) convertidas para `DD/MM/YYYY HH:MM` e exibidas como texto
-- Removida limitação de exibição (`.head(10)`), passando a mostrar todos os registros
 
 ### 🚢 `ellox_api.py`
 **Cliente da API Ellox**
@@ -660,7 +644,7 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - Conferir logs de extração
 
 4. **Problemas com API Ellox**
-   - **🔴 API Desconectada**: 
+   - **🔴 API Desconectada**:
      - Verificar credenciais (email/senha)
      - Testar conectividade de rede
      - Confirmar URL base: `https://apidtz.comexia.digital`

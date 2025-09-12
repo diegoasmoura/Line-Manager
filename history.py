@@ -1638,11 +1638,11 @@ def exibir_history():
                                     st.markdown("#### 📋 Justificativas do New Adjustment")
                                     col_a, col_b, col_c = st.columns([1, 1, 1])
                                     with col_a:
-                                        area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
+                                        area_new_adj = st.selectbox("Booking Adjustment Area", [""] + Booking_adj_area, key="area_new_adjustment")
                                     with col_b:
-                                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
+                                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason, key="reason_new_adjustment")
                                     with col_c:
-                                        responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
+                                        responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility, key="responsibility_new_adjustment")
                                     
                                     comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
                                     
