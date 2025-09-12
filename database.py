@@ -1611,8 +1611,12 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             update_params.update(justification)
             set_clauses.extend(["Linked_Reference = 'New Adjustment'", "AREA = :area", "REQUEST_REASON = :request_reason", "ADJUSTMENTS_OWNER = :adjustments_owner", "COMMENTS = :comments"])
         else:
-            # related_reference agora é a string completa da seleção (FR_XX.XX_XXXX | Status | Data Hora)
-            update_params["linked_ref"] = related_reference
+            # related_reference deve ser apenas a Farol Reference (sem ícones/descrições)
+            try:
+                # Se vier no formato "FR_... | ... | ...", pegamos só a primeira parte
+                update_params["linked_ref"] = str(related_reference).split(" | ")[0]
+            except Exception:
+                update_params["linked_ref"] = related_reference
             set_clauses.append("Linked_Reference = :linked_ref")
 
         update_query_str = f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {', '.join(set_clauses)} WHERE ADJUSTMENT_ID = :adjustment_id"

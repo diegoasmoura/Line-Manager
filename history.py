@@ -215,7 +215,7 @@ def get_available_references_for_relation(farol_reference=None):
         if farol_reference:
             # Lista somente a própria referência (exata), na aba Other Status
             query = text("""
-                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE B_BOOKING_STATUS != 'Received from Carrier'
                   AND UPPER(FAROL_REFERENCE) = UPPER(:farol_reference)
@@ -226,7 +226,7 @@ def get_available_references_for_relation(farol_reference=None):
         else:
             # Comportamento legado: somente originais (não-split) de todas as referências
             query = text("""
-                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE B_BOOKING_STATUS != 'Received from Carrier'
                   AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
@@ -825,6 +825,22 @@ def display_attachments_section(farol_reference):
 
 def exibir_history():
     st.header("📜 Return Carriers History")
+    # Exibe mensagens persistentes da última ação (flash)
+    try:
+        _flash = st.session_state.pop("history_flash", None)
+        if _flash:
+            level = _flash.get("type", "info")
+            msg = _flash.get("msg", "")
+            if level == "success":
+                st.success(msg)
+            elif level == "error":
+                st.error(msg)
+            elif level == "warning":
+                st.warning(msg)
+            else:
+                st.info(msg)
+    except Exception:
+        pass
     
     # Botão para atualizar registros antigos sem Linked Reference
     col_update, col_spacer = st.columns([3, 7])
@@ -1419,6 +1435,19 @@ def exibir_history():
                     df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
+
+        # Reordenar colunas: "Selecionar" primeiro (se existir) e "Status" como segunda coluna
+        try:
+            preferred = []
+            if "Selecionar" in df_processed.columns:
+                preferred.append("Selecionar")
+            if "Status" in df_processed.columns:
+                preferred.append("Status")
+            others = [c for c in df_processed.columns if c not in preferred]
+            if preferred:
+                df_processed = df_processed[preferred + others]
+        except Exception:
+            pass
                 
         return df_processed
 
@@ -1446,6 +1475,8 @@ def exibir_history():
         column_config = {
             "ADJUSTMENT_ID": None, # Oculta a coluna
             "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
+            # Oculta a coluna Status nesta aba conforme solicitado
+            "Status": None,
         }
         edited_df_received = st.data_editor(
             df_received_processed,
@@ -1662,23 +1693,35 @@ def exibir_history():
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
-        if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
-            justification = {
-                            "area": area,
-                            "request_reason": reason,
-                            "adjustments_owner": responsibility,
-                "comments": comment
-            }
-            if approve_carrier_return(adjustment_id, related_reference, justification):
-                st.success("✅ Approval successful!")
-            st.cache_data.clear()
-            st.rerun()
-        elif new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
-            if update_record_status(adjustment_id, new_status):
-                st.cache_data.clear()
-            st.rerun()
-        else:
-            st.warning(f"Status change to '{new_status}' is not handled by this logic yet.")
+        try:
+            if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
+                justification = {
+                    "area": area,
+                    "request_reason": reason,
+                    "adjustments_owner": responsibility,
+                    "comments": comment
+                }
+                result = approve_carrier_return(adjustment_id, related_reference, justification)
+                if result:
+                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Falha ao aprovar. Verifique os campos e tente novamente.")
+                return
+            elif new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
+                result = update_record_status(adjustment_id, new_status)
+                if result:
+                    st.session_state["history_flash"] = {"type": "success", "msg": f"✅ Status atualizado para '{new_status}'."}
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Não foi possível atualizar o status.")
+                return
+            else:
+                st.warning(f"Status change to '{new_status}' is not handled by this logic yet.")
+        except Exception as e:
+            st.error(f"❌ Erro inesperado ao aplicar alteração: {str(e)}")
     
     
     # Interface de botões de status para linha selecionada
@@ -1746,6 +1789,37 @@ def exibir_history():
                 available_refs = get_available_references_for_relation(farol_ref)
                 
                 if available_refs:
+                    # Filtra somente Status desejados na UI: 📦 Cargill Booking Request ou 🛠️ Adjusts (Cargill)
+                    # Regras equivalentes nos dados:
+                    # - 📦 Cargill Booking Request: primeiras inserções de Booking Requested (sem Linked_Reference)
+                    # - 🛠️ Adjusts (Cargill): P_STATUS = 'Adjusts Cargill'
+                    def _is_empty(value):
+                        try:
+                            if value is None:
+                                return True
+                            if isinstance(value, str):
+                                v = value.strip()
+                                return v == '' or v.upper() == 'NULL'
+                            import pandas as _pd
+                            return _pd.isna(value)
+                        except Exception:
+                            return False
+
+                    filtered = []
+                    for ref in available_refs:
+                        p_status = str(ref.get('P_STATUS', '') or '').strip()
+                        b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                        linked = ref.get('LINKED_REFERENCE')
+
+                        # 🛠️ Adjusts (Cargill)
+                        if p_status.lower() == 'adjusts cargill':
+                            filtered.append(ref)
+                            continue
+
+                        # 📦 Cargill Booking Request → inferimos como as primeiras inserções Booking Requested sem Linked
+                        if b_status == 'Booking Requested' and _is_empty(linked):
+                            filtered.append(ref)
+
                     # Ordena por dia crescente e, dentro do mesmo dia, horário decrescente (HH:MM mais recente primeiro)
                     def sort_by_date(ref):
                         try:
@@ -1753,12 +1827,11 @@ def exibir_history():
                             dt = pd.to_datetime(date_val, errors='coerce')
                             if pd.isna(dt):
                                 return (pd.Timestamp('1900-01-01').date(), 0)
-                            # dt.value = nanosegundos desde epoch; negativo para ordem decrescente de horário
                             return (dt.date(), -int(getattr(dt, 'value', 0)))
                         except Exception:
                             return (pd.Timestamp('1900-01-01').date(), 0)
 
-                    available_refs = sorted(available_refs, key=sort_by_date)
+                    available_refs = sorted(filtered, key=sort_by_date)
                     
                     # Cria opções para o selectbox com formato limpo
                     ref_options = []
@@ -1787,8 +1860,31 @@ def exibir_history():
                                     date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
                             else:
                                 date_str = 'N/A'
-                        
-                        option_text = f"{ref['FAROL_REFERENCE']} | {date_str} | {ref['B_BOOKING_STATUS']}"
+                        # Define o status a exibir como segunda coluna
+                        p_status = str(ref.get('P_STATUS', '') or '').strip()
+                        b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                        linked = ref.get('LINKED_REFERENCE')
+
+                        def _is_empty_local(value):
+                            try:
+                                if value is None:
+                                    return True
+                                if isinstance(value, str):
+                                    v = value.strip()
+                                    return v == '' or v.upper() == 'NULL'
+                                import pandas as _pd
+                                return _pd.isna(value)
+                            except Exception:
+                                return False
+
+                        if p_status.lower() == 'adjusts cargill':
+                            status_display = '🛠️ Adjusts (Cargill)'
+                        elif b_status == 'Booking Requested' and _is_empty_local(linked):
+                            status_display = '📦 Cargill Booking Request'
+                        else:
+                            status_display = b_status or p_status or 'Status'
+
+                        option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
                         ref_options.append(option_text)
                     
                     ref_options.insert(0, "Selecione uma referência...")
@@ -1830,8 +1926,8 @@ def exibir_history():
                             # Busca o registro correspondente pela Farol Reference
                             selected_ref_data = next((ref for ref in available_refs if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
                             if selected_ref_data:
-                                # Salva a string completa como Linked Reference
-                                related_reference = selected_ref
+                                # Salva apenas a Farol Reference (sem ícones/descrições) como Linked Reference
+                                related_reference = farol_ref_from_selection
                                 
                                 # Formata a data para exibição com hora e minuto
                                 inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')
@@ -1858,7 +1954,19 @@ def exibir_history():
                                     else:
                                         date_str = 'N/A'
                                 
-                                st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {date_str} | {selected_ref_data['B_BOOKING_STATUS']}")
+                                # Exibe com o mesmo padrão (Status como segunda coluna)
+                                p_status_sel = str(selected_ref_data.get('P_STATUS', '') or '').strip()
+                                b_status_sel = str(selected_ref_data.get('B_BOOKING_STATUS', '') or '').strip()
+                                linked_sel = selected_ref_data.get('LINKED_REFERENCE')
+
+                                if p_status_sel.lower() == 'adjusts cargill':
+                                    status_display_sel = '🛠️ Adjusts (Cargill)'
+                                elif b_status_sel == 'Booking Requested' and ((linked_sel is None) or (isinstance(linked_sel, str) and linked_sel.strip() in ('', 'NULL'))):
+                                    status_display_sel = '📦 Cargill Booking Request'
+                                else:
+                                    status_display_sel = b_status_sel or p_status_sel or 'Status'
+
+                                st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {status_display_sel} | {date_str}")
                             else:
                                 st.error("❌ Erro ao encontrar a referência selecionada")
                 else:
