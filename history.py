@@ -1791,36 +1791,62 @@ def exibir_history():
         col1, col2 = st.columns([2, 3])
         
         with col1:
+            # Determina quais botões desabilitar baseado no Farol Status atual
+            farol_status = selected_row.get("Farol Status", "")
+            disable_approved = farol_status == "Booking Approved"
+            disable_rejected = farol_status == "Booking Rejected"
+            disable_cancelled = farol_status == "Booking Cancelled"
+            disable_adjustment = farol_status == "Adjustment Requested"
+            
             # Botões de status com espaçamento reduzido
             subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
             
             with subcol1:
                 if st.button("Booking Approved", 
                             key="status_booking_approved",
-                            type="secondary"):
+                            type="secondary",
+                            disabled=disable_approved):
                     st.session_state["pending_status_change"] = "Booking Approved"
                     st.rerun()
             
             with subcol2:
                 if st.button("Booking Rejected", 
                             key="status_booking_rejected",
-                            type="secondary"):
+                            type="secondary",
+                            disabled=disable_rejected):
                     st.session_state["pending_status_change"] = "Booking Rejected"
                     st.rerun()
 
             with subcol3:
                 if st.button("Booking Cancelled", 
                             key="status_booking_cancelled",
-                            type="secondary"):
+                            type="secondary",
+                            disabled=disable_cancelled):
                     st.session_state["pending_status_change"] = "Booking Cancelled"
                     st.rerun()
             
             with subcol4:
                 if st.button("Adjustment Requested", 
                             key="status_adjustment_requested",
-                            type="secondary"):
+                            type="secondary",
+                            disabled=disable_adjustment):
                     st.session_state["pending_status_change"] = "Adjustment Requested"
                     st.rerun()
+        
+        # Mensagem informativa sobre botões desabilitados
+        if any([disable_approved, disable_rejected, disable_cancelled, disable_adjustment]):
+            disabled_buttons = []
+            if disable_approved:
+                disabled_buttons.append("Booking Approved")
+            if disable_rejected:
+                disabled_buttons.append("Booking Rejected")
+            if disable_cancelled:
+                disabled_buttons.append("Booking Cancelled")
+            if disable_adjustment:
+                disabled_buttons.append("Adjustment Requested")
+            
+            if disabled_buttons:
+                st.info(f"ℹ️ **Botões desabilitados:** {', '.join(disabled_buttons)} (Status atual: {farol_status})")
             
         # Confirmação quando há status pendente
         pending_status = st.session_state.get("pending_status_change")
