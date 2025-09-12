@@ -1231,9 +1231,9 @@ def exibir_history():
             if col in df_processed.columns:
                 df_processed[col] = pd.to_datetime(df_processed[col], errors='coerce')
 
-        # Ordena pela data de inserção
+        # Ordena somente por Inserted Date (ascendente: mais antigo → mais novo)
         if "Inserted Date" in df_processed.columns:
-            df_processed = df_processed.sort_values("Inserted Date", ascending=True)
+            df_processed = df_processed.sort_values(by=["Inserted Date"], ascending=[True])
                 
         return df_processed
 
