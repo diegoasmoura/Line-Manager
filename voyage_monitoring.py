@@ -141,8 +141,8 @@ def get_farol_references_details(vessel_name, voyage_code, terminal):
     """Busca detalhes dos Farol References para uma combinação específica"""
     try:
         with get_database_connection() as conn:
-            # Query para buscar Farol References por Vessel + Voyage (sem filtro de Terminal)
-            query = """
+            # Primeiro tenta busca exata por Vessel + Voyage
+            query_exact = """
             SELECT 
                 r.FAROL_REFERENCE,
                 r.B_BOOKING_REFERENCE,
@@ -161,28 +161,67 @@ def get_farol_references_details(vessel_name, voyage_code, terminal):
             ORDER BY r.ROW_INSERTED_DATE DESC
             """
             
-            result = conn.execute(text(query), {
+            result = conn.execute(text(query_exact), {
                 'vessel_name': vessel_name,
                 'voyage_code': voyage_code
             })
             rows = result.fetchall()
             
-            if not rows:
-                return pd.DataFrame()
-            
-            # Converte para DataFrame
-            df = pd.DataFrame(rows)
-            
-            # Normaliza nomes das colunas para maiúsculas
-            df.columns = [col.upper() for col in df.columns]
-            
-            # Converte colunas de data para datetime
-            date_columns = [col for col in df.columns if 'DATA' in col or 'DATE' in col]
-            for col in date_columns:
-                if col in df.columns:
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-            
-            return df
+            if rows:
+                # Converte para DataFrame
+                df = pd.DataFrame(rows)
+                
+                # Normaliza nomes das colunas para maiúsculas
+                df.columns = [col.upper() for col in df.columns]
+                
+                # Converte colunas de data para datetime
+                date_columns = [col for col in df.columns if 'DATA' in col or 'DATE' in col]
+                for col in date_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                return df
+            else:
+                # Se não encontrar correspondência exata, busca apenas por Voyage Code
+                query_voyage = """
+                SELECT 
+                    r.FAROL_REFERENCE,
+                    r.B_BOOKING_REFERENCE,
+                    r.B_BOOKING_STATUS,
+                    r.P_STATUS,
+                    r.B_VESSEL_NAME,
+                    r.B_VOYAGE_CODE,
+                    r.B_TERMINAL,
+                    r.B_DATA_ESTIMATIVA_SAIDA_ETD,
+                    r.B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                    r.ROW_INSERTED_DATE
+                FROM LogTransp.F_CON_RETURN_CARRIERS r
+                WHERE UPPER(TRIM(r.B_VOYAGE_CODE)) = UPPER(TRIM(:voyage_code))
+                AND r.FAROL_REFERENCE IS NOT NULL
+                ORDER BY r.ROW_INSERTED_DATE DESC
+                """
+                
+                result = conn.execute(text(query_voyage), {
+                    'voyage_code': voyage_code
+                })
+                rows = result.fetchall()
+                
+                if rows:
+                    # Converte para DataFrame
+                    df = pd.DataFrame(rows)
+                    
+                    # Normaliza nomes das colunas para maiúsculas
+                    df.columns = [col.upper() for col in df.columns]
+                    
+                    # Converte colunas de data para datetime
+                    date_columns = [col for col in df.columns if 'DATA' in col or 'DATE' in col]
+                    for col in date_columns:
+                        if col in df.columns:
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                    
+                    return df
+                else:
+                    return pd.DataFrame()
             
     except Exception as e:
         st.error(f"Erro ao buscar detalhes dos Farol References: {str(e)}")
@@ -382,8 +421,40 @@ def format_farol_references(farol_refs):
             formatted_refs.append(f"📋 {i}. {ref}")
         return "\n".join(formatted_refs)
 
+def get_dropdown_options():
+    """Busca opções para dropdowns do banco de dados"""
+    try:
+        with get_database_connection() as conn:
+            # Busca navios únicos da tabela F_ELLOX_SHIPS (convertendo para maiúsculas)
+            vessel_query = text("""
+                SELECT DISTINCT UPPER(TRIM(NOME)) as NOME
+                FROM F_ELLOX_SHIPS 
+                WHERE NOME IS NOT NULL AND ATIVO = 'Y'
+                ORDER BY UPPER(TRIM(NOME))
+            """)
+            vessel_result = conn.execute(vessel_query).fetchall()
+            vessel_options = [row[0] for row in vessel_result] if vessel_result else []
+            
+            # Busca terminais únicos da tabela F_ELLOX_TERMINALS (convertendo para maiúsculas)
+            terminal_query = text("""
+                SELECT DISTINCT UPPER(TRIM(NOME)) as NOME
+                FROM F_ELLOX_TERMINALS 
+                WHERE NOME IS NOT NULL AND ATIVO = 'Y'
+                ORDER BY UPPER(TRIM(NOME))
+            """)
+            terminal_result = conn.execute(terminal_query).fetchall()
+            terminal_options = [row[0] for row in terminal_result] if terminal_result else []
+            
+            return vessel_options, terminal_options
+    except Exception as e:
+        st.error(f"Erro ao buscar opções dos dropdowns: {str(e)}")
+        return [], []
+
 def generate_column_config(df):
     """Gera configuração de colunas com larguras dinâmicas seguindo o padrão do sistema"""
+    
+    # Busca opções para dropdowns
+    vessel_options, terminal_options = get_dropdown_options()
     
     # Mapeamento de colunas para títulos em português (seguindo padrão do sistema)
     column_titles = {
@@ -421,12 +492,29 @@ def generate_column_config(df):
         title = column_titles.get(col, col.replace("_", " ").title())
         
         # Larguras específicas para colunas específicas
-        if col in ["VESSEL_NAME", "VOYAGE_CODE", "TERMINAL", "AGENCY"]:
+        if col in ["VESSEL_NAME", "TERMINAL"]:
+            width = None  # Largura automática para Vessel Name e Terminal
+        elif col in ["VOYAGE_CODE", "AGENCY"]:
             width = None  # Largura automática baseada no conteúdo
         else:
             width = "medium"
         
-        if any(date_keyword in col.lower() for date_keyword in ["data", "date"]):
+        # Configuração específica para dropdowns
+        if col == "VESSEL_NAME" and vessel_options:
+            config[col] = st.column_config.SelectboxColumn(
+                title, 
+                options=vessel_options,
+                width=width,
+                help="Selecione um navio da lista"
+            )
+        elif col == "TERMINAL" and terminal_options:
+            config[col] = st.column_config.SelectboxColumn(
+                title, 
+                options=terminal_options,
+                width=width,
+                help="Selecione um terminal da lista"
+            )
+        elif any(date_keyword in col.lower() for date_keyword in ["data", "date"]):
             config[col] = st.column_config.DatetimeColumn(title, width=width)
         else:
             config[col] = st.column_config.TextColumn(title, width=width)
@@ -596,6 +684,7 @@ def exibir_voyage_monitoring():
                 st.info(f"📊 **Total de Farol References:** {len(display_details)}")
             else:
                 st.warning("⚠️ Nenhum Farol Reference encontrado para esta combinação.")
+                st.info("💡 **Dica:** Os dados da API Ellox podem estar mais atualizados que os dados históricos de booking. Tente buscar por outros navios com o mesmo código de viagem.")
             
             st.markdown("---")
     
