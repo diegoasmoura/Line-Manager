@@ -137,6 +137,57 @@ def display_api_details_modal():
             st.session_state.show_api_details = False
             st.rerun()
 
+def get_farol_references_details(vessel_name, voyage_code, terminal):
+    """Busca detalhes dos Farol References para uma combinação específica"""
+    try:
+        with get_database_connection() as conn:
+            # Query para buscar Farol References por Vessel + Voyage (sem filtro de Terminal)
+            query = """
+            SELECT 
+                r.FAROL_REFERENCE,
+                r.B_BOOKING_REFERENCE,
+                r.B_BOOKING_STATUS,
+                r.P_STATUS,
+                r.B_VESSEL_NAME,
+                r.B_VOYAGE_CODE,
+                r.B_TERMINAL,
+                r.B_DATA_ESTIMATIVA_SAIDA_ETD,
+                r.B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                r.ROW_INSERTED_DATE
+            FROM LogTransp.F_CON_RETURN_CARRIERS r
+            WHERE UPPER(TRIM(r.B_VESSEL_NAME)) = UPPER(TRIM(:vessel_name))
+            AND UPPER(TRIM(r.B_VOYAGE_CODE)) = UPPER(TRIM(:voyage_code))
+            AND r.FAROL_REFERENCE IS NOT NULL
+            ORDER BY r.ROW_INSERTED_DATE DESC
+            """
+            
+            result = conn.execute(text(query), {
+                'vessel_name': vessel_name,
+                'voyage_code': voyage_code
+            })
+            rows = result.fetchall()
+            
+            if not rows:
+                return pd.DataFrame()
+            
+            # Converte para DataFrame
+            df = pd.DataFrame(rows)
+            
+            # Normaliza nomes das colunas para maiúsculas
+            df.columns = [col.upper() for col in df.columns]
+            
+            # Converte colunas de data para datetime
+            date_columns = [col for col in df.columns if 'DATA' in col or 'DATE' in col]
+            for col in date_columns:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+            
+            return df
+            
+    except Exception as e:
+        st.error(f"Erro ao buscar detalhes dos Farol References: {str(e)}")
+        return pd.DataFrame()
+
 def get_voyage_monitoring_with_farol_references():
     """
     Busca o último registro de cada combinação única (Vessel + Voyage + Terminal) de monitoramento da Ellox.
@@ -314,6 +365,23 @@ def calculate_column_width(df, column_name):
     else:
         return "large"
 
+def format_farol_references(farol_refs):
+    """Formata Farol References para exibição expandida"""
+    if not farol_refs or pd.isna(farol_refs) or str(farol_refs).strip() == "":
+        return "📋 Nenhuma referência"
+    
+    # Divide as referências por vírgula e formata cada uma
+    refs_list = [ref.strip() for ref in str(farol_refs).split(',') if ref.strip()]
+    
+    if len(refs_list) == 1:
+        return f"📋 {refs_list[0]}"
+    else:
+        # Formata múltiplas referências com quebras de linha
+        formatted_refs = []
+        for i, ref in enumerate(refs_list, 1):
+            formatted_refs.append(f"📋 {i}. {ref}")
+        return "\n".join(formatted_refs)
+
 def generate_column_config(df):
     """Gera configuração de colunas com larguras dinâmicas seguindo o padrão do sistema"""
     
@@ -341,7 +409,7 @@ def generate_column_config(df):
     
     config = {
         "ID": None,  # Sempre oculta
-        "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para editar", pinned="left"),
+        "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para ver detalhes dos Farol References", pinned="left"),
     }
     
     for col in df.columns:
@@ -457,6 +525,15 @@ def exibir_voyage_monitoring():
         st.subheader(f"📊 Último Registro por Combinação ({len(df)} combinações únicas)")
         display_df = df
     
+    # Aplica formatação especial para Farol References
+    if not display_df.empty and "FAROL_REFERENCES" in display_df.columns:
+        display_df = display_df.copy()
+        display_df["FAROL_REFERENCES"] = display_df["FAROL_REFERENCES"].apply(format_farol_references)
+    
+    # Adiciona coluna de seleção se não existir
+    if "Selecionar" not in display_df.columns:
+        display_df["Selecionar"] = False
+    
     # Configuração das colunas
     column_config = generate_column_config(display_df)
     
@@ -469,49 +546,125 @@ def exibir_voyage_monitoring():
         key="voyage_monitoring_editor"
     )
     
-    # Verifica se há alterações
-    if not edited_df.equals(df):
-        # Identifica linhas alteradas
-        changed_rows = edited_df[~edited_df.index.isin(df.index) | ~edited_df.equals(df)]
+    # Verifica se há linhas selecionadas
+    selected_rows = edited_df[edited_df["Selecionar"] == True]
+    
+    if not selected_rows.empty:
+        st.divider()
+        st.subheader("📋 Detalhes dos Farol References Selecionados")
         
-        if not changed_rows.empty:
-            st.subheader("📝 Alterações Detectadas")
+        # Processa cada linha selecionada
+        for idx, row in selected_rows.iterrows():
+            vessel_name = row["VESSEL_NAME"]
+            voyage_code = row["VOYAGE_CODE"]
+            terminal = row["TERMINAL"]
             
-            # Mostra apenas as linhas alteradas
-            st.dataframe(changed_rows, use_container_width=True)
+            st.markdown(f"**🚢 {vessel_name} | {voyage_code} | {terminal}**")
             
-            # Botão para salvar alterações
-            col1, col2, col3 = st.columns([1, 1, 2])
+            # Busca detalhes dos Farol References
+            details_df = get_farol_references_details(vessel_name, voyage_code, terminal)
             
-            with col1:
-                if st.button("💾 Salvar Alterações", type="primary"):
-                    success_count = 0
-                    total_changes = 0
-                    
-                    for idx, row in changed_rows.iterrows():
-                        if idx in df.index:  # Linha existente sendo editada
-                            original_row = df.loc[idx]
-                            updates = {}
-                            
-                            # Compara cada coluna para identificar mudanças
-                            for col in df.columns:
-                                if col not in ["ID", "SELECIONAR", "FAROL_REFERENCES"]:  # Exclui colunas não editáveis
-                                    if pd.isna(original_row[col]) and pd.isna(row[col]):
-                                        continue
-                                    elif original_row[col] != row[col]:
-                                        updates[col] = row[col]
-                            
-                            if updates:
-                                total_changes += 1
-                                if update_voyage_monitoring_data(row["ID"], updates):
-                                    success_count += 1
-                    
-                    if total_changes > 0:
-                        st.success(f"✅ {success_count}/{total_changes} alterações salvas com sucesso!")
-                        st.rerun()
+            if not details_df.empty:
+                # Formata os dados para exibição
+                display_details = details_df.copy()
+                
+                # Mapeia colunas para títulos em português
+                column_mapping = {
+                    "FAROL_REFERENCE": "Farol Reference",
+                    "B_BOOKING_REFERENCE": "Booking Reference",
+                    "B_BOOKING_STATUS": "Booking Status",
+                    "P_STATUS": "Status",
+                    "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
+                    "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
+                    "ROW_INSERTED_DATE": "Data Inserção"
+                }
+                
+                # Renomeia colunas
+                display_details = display_details.rename(columns=column_mapping)
+                
+                # Seleciona apenas as colunas mapeadas
+                display_columns = list(column_mapping.values())
+                display_details = display_details[display_columns]
+                
+                # Configuração das colunas para exibição
+                details_config = {}
+                for col in display_details.columns:
+                    if col in ["ETD", "ETA", "Data Inserção"]:
+                        details_config[col] = st.column_config.DatetimeColumn(col, width="medium")
                     else:
-                        st.warning("⚠️ Nenhuma alteração válida foi detectada.")
+                        details_config[col] = st.column_config.TextColumn(col, width="medium")
+                
+                # Exibe a tabela de detalhes
+                st.dataframe(
+                    display_details,
+                    column_config=details_config,
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                st.info(f"📊 **Total de Farol References:** {len(display_details)}")
+            else:
+                st.warning("⚠️ Nenhum Farol Reference encontrado para esta combinação.")
             
-            with col2:
-                if st.button("🔄 Cancelar"):
+            st.markdown("---")
+    
+    # Verifica se há alterações
+    # Compara apenas as colunas editáveis (excluindo a coluna de seleção)
+    editable_columns = [col for col in edited_df.columns if col != "Selecionar"]
+    edited_df_editable = edited_df[editable_columns]
+    df_editable = df[editable_columns]
+    
+    # Verifica se há alterações comparando valores das colunas editáveis
+    has_changes = False
+    changed_rows = []
+    
+    for idx in edited_df_editable.index:
+        if idx in df_editable.index:
+            # Compara linha por linha
+            edited_row = edited_df_editable.loc[idx]
+            original_row = df_editable.loc[idx]
+            
+            # Verifica se há diferenças (ignorando NaN)
+            if not edited_row.equals(original_row):
+                has_changes = True
+                changed_rows.append((idx, edited_row))
+    
+    if has_changes:
+        st.subheader("📝 Alterações Detectadas")
+        st.info(f"🔍 {len(changed_rows)} linha(s) com alterações detectadas")
+        
+        # Botão para salvar alterações
+        col1, col2, col3 = st.columns([1, 1, 2])
+        
+        with col1:
+            if st.button("💾 Salvar Alterações", type="primary"):
+                success_count = 0
+                total_changes = 0
+                
+                for idx, row in changed_rows:
+                    if idx in df.index:  # Linha existente sendo editada
+                        original_row = df.loc[idx]
+                        updates = {}
+                        
+                        # Compara cada coluna para identificar mudanças
+                        for col in df.columns:
+                            if col not in ["ID", "SELECIONAR", "FAROL_REFERENCES"]:  # Exclui colunas não editáveis
+                                if pd.isna(original_row[col]) and pd.isna(row[col]):
+                                    continue
+                                elif original_row[col] != row[col]:
+                                    updates[col] = row[col]
+                        
+                        if updates:
+                            total_changes += 1
+                            if update_voyage_monitoring_data(row["ID"], updates):
+                                success_count += 1
+                
+                if total_changes > 0:
+                    st.success(f"✅ {success_count}/{total_changes} alterações salvas com sucesso!")
                     st.rerun()
+                else:
+                    st.warning("⚠️ Nenhuma alteração válida foi detectada.")
+        
+        with col2:
+            if st.button("🔄 Cancelar"):
+                st.rerun()

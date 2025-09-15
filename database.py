@@ -1062,6 +1062,44 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
     finally:
         conn.close()
  
+def insert_container_release_if_not_exists(farol_reference, default_values=None):
+    """Insere um registro na tabela F_CON_CARGO_LOADING_CONTAINER_RELEASE se não existir"""
+    if default_values is None:
+        default_values = {}
+    
+    conn = get_database_connection()
+    try:
+        # Verifica se já existe um registro para este Farol Reference
+        check_query = text("""
+            SELECT COUNT(*) as count 
+            FROM LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE 
+            WHERE l_farol_reference = :farol_reference
+        """)
+        
+        result = conn.execute(check_query, {"farol_reference": farol_reference}).fetchone()
+        
+        if result[0] == 0:  # Se não existe, insere um novo registro
+            # Valores padrão para inserção
+            insert_data = {
+                "l_farol_reference": farol_reference,
+                "l_farol_status": default_values.get("l_farol_status", "Booking Requested"),
+                "l_expected_container_release_start_date": None,
+                "l_expected_container_release_end_date": None,
+                "l_actual_container_release_date": None,
+                "l_container_release_issue_responsibility": None,
+                "l_shore_container_release_different": None,
+                "l_container_release_farol": None
+            }
+            
+            # Atualiza com valores fornecidos
+            insert_data.update(default_values)
+            
+            # Insere o registro
+            insert_table("LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE", insert_data, conn)
+            
+    finally:
+        conn.close()
+
 #Função utilizada para atualizar os dados da tabela de booking
 def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada no arquivo booking_new.py
     from datetime import datetime
