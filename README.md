@@ -261,6 +261,26 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - 🔄 **Limpeza Automática**: Status pendente é limpo ao mudar seleção de linha
 - 🎯 **Rastreamento por ID**: Usa ADJUSTMENT_ID para detectar mudanças de seleção
 
+### 🚢 `voyage_monitoring.py`
+**Gerenciamento de Monitoramento de Viagens**
+- Interface dedicada para visualizar e editar dados de monitoramento da API Ellox
+- **Últimos 10 Registros**: Exibe apenas os 10 registros mais recentes e atualizados pela API
+- **Dados Efetivos**: Mostra apenas registros com `DATA_ATUALIZACAO IS NOT NULL` (API executada com sucesso)
+- Exibe dados unificados de navios, viagens e terminais com Farol References associados
+- Edição inline de dados de monitoramento com validação automática
+- Filtros avançados por navio, terminal e presença de Farol References
+- Estatísticas em tempo real de navios, viagens, terminais e referências
+- Resolução de problemas quando a API Ellox está indisponível
+- Atualização automática de timestamps ao modificar dados
+
+#### 🎯 **Funcionalidades Principais**
+- **Visualização Focada**: Mostra apenas os 10 registros mais recentes da API Ellox
+- **Dados Confiáveis**: Filtra apenas registros efetivamente coletados pela API
+- **Edição Inline**: Modificação direta de dados de monitoramento na interface
+- **Filtros Dinâmicos**: Filtros por navio, terminal e status de Farol References
+- **Validação de Dados**: Verificação automática de alterações antes de salvar
+- **Estatísticas**: Métricas em tempo real sobre o volume de dados
+
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
 - Extração automática de dados
@@ -816,6 +836,16 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.8 - Voyage Monitoring Management (Setembro 2025)
+- **🚢 Nova Aba "Voyage Monitoring"**: Interface dedicada para gerenciar dados de monitoramento da API Ellox
+- **Últimos 10 Registros**: Exibe apenas os 10 registros mais recentes e atualizados pela API Ellox
+- **Dados Efetivos da API**: Mostra apenas registros que foram efetivamente coletados com sucesso (DATA_ATUALIZACAO IS NOT NULL)
+- **Visualização Unificada**: Exibe dados de navios, viagens e terminais com Farol References associados
+- **Edição Inline**: Permite editar dados de monitoramento diretamente na interface
+- **Filtros Avançados**: Filtros por navio, terminal e presença de Farol References
+- **Estatísticas em Tempo Real**: Métricas de navios, viagens, terminais e referências
+- **Resolução de Problemas de API**: Permite gerenciar dados mesmo quando a API Ellox está indisponível
 
 ### 📌 v3.7 - New Adjustment & Interface (Setembro 2025)
 - **🆕 New Adjustment - Regras Especiais**: Implementada opção "New Adjustment" para ajustes do carrier sem referência prévia da empresa
