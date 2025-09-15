@@ -375,27 +375,16 @@ def generate_column_config(df):
 def exibir_voyage_monitoring():
     """Exibe a interface principal de gerenciamento de monitoramento de viagens"""
     # Layout com título e botão de status da API na mesma linha
-    col1, col2 = st.columns([4, 1])
+    col1, col2 = st.columns([3, 1])
     
     with col1:
         st.title("🚢 Voyage Monitoring Management")
     
     with col2:
         # Exibir indicador de status da API na mesma linha do título
+        st.markdown("<br>", unsafe_allow_html=True)  # Espaçamento para alinhar com o título
         display_api_status_inline()
     
-    st.markdown("""
-    <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 1rem; margin-bottom: 1.5rem; border-radius: 0 8px 8px 0;">
-        <h4 style="margin: 0 0 0.5rem 0; color: #007bff;">📊 Último Registro por Combinação (Vessel + Voyage + Terminal)</h4>
-        <p style="margin: 0; color: #6c757d; font-size: 0.9em;">
-            Esta tela exibe o <strong>último registro de cada combinação única</strong> de navio, viagem e terminal. 
-            Não mostra histórico - apenas o estado mais atual de cada combinação.
-            <br><br>
-            <strong>📋 Colunas principais:</strong> Vessel Name, Voyage Code, Terminal (sempre preenchidas)<br>
-            <strong>📊 Colunas de dados:</strong> Preenchidas apenas se houver dados da API Ellox
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
     
     # Carrega os dados
     with st.spinner("🔄 Carregando dados de monitoramento..."):
