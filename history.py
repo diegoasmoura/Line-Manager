@@ -21,6 +21,10 @@ Booking_adj_area = df_udc[df_udc["grupo"] == "Booking Adj Area"]["dado"].dropna(
 Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["dado"].dropna().unique().tolist()
 Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
 
+# Opções específicas para New Adjustment no history.py
+Booking_adj_reason_car = df_udc[df_udc["grupo"] == "Booking Adj Request Reason Car"]["dado"].dropna().unique().tolist()
+Booking_adj_responsibility_car = df_udc[df_udc["grupo"] == "Booking Adj Responsibility Car"]["dado"].dropna().unique().tolist()
+
 def get_next_linked_reference_number(farol_reference=None):
     """
     Obtém o próximo número sequencial para Linked_Reference.
@@ -1998,21 +2002,33 @@ def exibir_history():
                             st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
                             
                             # Campos de justificativa obrigatórios para New Adjustment
-                            st.markdown("#### 📋 Justificativas do New Adjustment")
-                            col_a, col_b, col_c = st.columns([1, 1, 1])
-                            with col_a:
-                                area_new_adj = st.selectbox("Booking Adjustment Area", [""].extend(Booking_adj_area), key="area_new_adjustment")
-                            with col_b:
-                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""].extend(Booking_adj_reason), key="reason_new_adjustment")
-                            with col_c:
-                                responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""].extend(Booking_adj_responsibility), key="responsibility_new_adjustment")
+                            st.markdown("#### 📋 Justificativas do Armador - New Adjustment")
+                            
+                            # Preenche automaticamente o campo Responsibility se houver apenas uma opção
+                            auto_responsibility = None
+                            if len(Booking_adj_responsibility_car) == 1:
+                                auto_responsibility = Booking_adj_responsibility_car[0]
+                            elif len(Booking_adj_responsibility_car) > 1:
+                                col_a, col_b = st.columns([1, 1])
+                                with col_a:
+                                    reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
+                                with col_b:
+                                    responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility_car, key="responsibility_new_adjustment")
+                            else:
+                                # Fallback se não houver opções
+                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
+                                responsibility_new_adj = None
+                                st.warning("⚠️ Nenhuma opção de responsabilidade disponível")
+                            
+                            # Se não foi criado o selectbox, cria apenas o de reason
+                            if 'reason_new_adj' not in locals():
+                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
                             
                             comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
                             
                             # Armazena os valores no session_state para usar na confirmação
-                            st.session_state["new_adjustment_area"] = area_new_adj
                             st.session_state["new_adjustment_reason"] = reason_new_adj
-                            st.session_state["new_adjustment_responsibility"] = responsibility_new_adj
+                            st.session_state["new_adjustment_responsibility"] = auto_responsibility if auto_responsibility else responsibility_new_adj
                             st.session_state["new_adjustment_comment"] = comment_new_adj
                         else:
                             # Extrai a Farol Reference da opção selecionada (formato limpo)
@@ -2081,13 +2097,15 @@ def exibir_history():
                         
                         # Validação adicional para New Adjustment
                         if related_reference == "New Adjustment":
-                            area_val = st.session_state.get("new_adjustment_area", "")
                             reason_val = st.session_state.get("new_adjustment_reason", "")
                             responsibility_val = st.session_state.get("new_adjustment_responsibility", "")
                             
-                            if not area_val or not reason_val or not responsibility_val:
+                            if not reason_val:
                                 can_confirm = False
-                                validation_message = "⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar."
+                                validation_message = "⚠️ Preencha o campo de justificativa (Reason) antes de confirmar."
+                            elif not responsibility_val:
+                                can_confirm = False
+                                validation_message = "⚠️ Campo de responsabilidade não foi preenchido automaticamente. Verifique a configuração."
                     
                     # Exibe mensagem de validação se houver
                     if validation_message:
@@ -2104,7 +2122,6 @@ def exibir_history():
                         comment_param = None
                         
                         if related_reference == "New Adjustment":
-                            area_param = st.session_state.get("new_adjustment_area")
                             reason_param = st.session_state.get("new_adjustment_reason")
                             responsibility_param = st.session_state.get("new_adjustment_responsibility")
                             comment_param = st.session_state.get("new_adjustment_comment")
@@ -2115,7 +2132,6 @@ def exibir_history():
                         # Limpa o status pendente e dados de New Adjustment
                         st.session_state.pop(f"pending_status_change_{farol_reference}", None)
                         if related_reference == "New Adjustment":
-                            st.session_state.pop("new_adjustment_area", None)
                             st.session_state.pop("new_adjustment_reason", None)
                             st.session_state.pop("new_adjustment_responsibility", None)
                             st.session_state.pop("new_adjustment_comment", None)
@@ -2127,7 +2143,6 @@ def exibir_history():
                                 type="secondary"):
                         # Limpa o status pendente e dados de New Adjustment
                         st.session_state.pop(f"pending_status_change_{farol_reference}", None)
-                        st.session_state.pop("new_adjustment_area", None)
                         st.session_state.pop("new_adjustment_reason", None)
                         st.session_state.pop("new_adjustment_responsibility", None)
                         st.session_state.pop("new_adjustment_comment", None)

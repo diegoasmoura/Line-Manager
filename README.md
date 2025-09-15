@@ -231,12 +231,21 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - ✅ **Ações permitidas**: Booking Approved, Booking Rejected, Booking Cancelled
 - 🔗 **Linking obrigatório**: Para "Booking Approved", deve selecionar uma referência relacionada no dropdown
 - 📋 **Filtros do dropdown**: Mostra "Cargill Booking Request" e "Cargill (Adjusts)" (Booking Requested/Adjustment Requested + Linked_Reference vazio)
+- 🆕 **New Adjustment**: Opção especial para ajustes do carrier sem referência prévia da empresa
 
 **Comportamento do Dropdown de Referências:**
 - 🎯 **Filtro por Farol Reference**: Mostra apenas referências da mesma Farol Reference acessada
 - 📅 **Ordenação cronológica**: Mais antigo primeiro, mesmo dia ordenado por hora (descendente)
 - 🏷️ **Formato de exibição**: "FR_... | DD/MM/YYYY HH:MM | Status" (sem ícones)
 - 🚫 **Exclusões**: Não mostra "Carrier Return (Linked)" nem registros já linkados
+
+**🆕 New Adjustment - Regras Especiais:**
+- 📋 **Título**: "Justificativas do Armador - New Adjustment"
+- 🚫 **Campo removido**: "Booking Adjustment Area" não é exibido (não necessário)
+- ⚙️ **Preenchimento automático**: "Booking Adjustment Responsibility" é preenchido automaticamente se houver apenas 1 opção
+- 📝 **Campos obrigatórios**: Apenas "Booking Adjustment Request Reason" e "Comentários"
+- 🎯 **Opções específicas**: Usa "Booking Adj Request Reason Car" e "Booking Adj Responsibility Car" (diferente do split)
+- ✅ **Validação**: Só exige preenchimento do "Reason" pelo usuário
 
 **Mensagens de Feedback:**
 - ✅ **Sucesso**: "✅ Approval successful!" / "✅ Status atualizado para 'X'."
@@ -807,6 +816,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.7 - New Adjustment & Interface (Setembro 2025)
+- **🆕 New Adjustment - Regras Especiais**: Implementada opção "New Adjustment" para ajustes do carrier sem referência prévia da empresa
+- **Campos Diferenciados**: "New Adjustment" usa opções específicas "Booking Adj Request Reason Car" e "Booking Adj Responsibility Car" (diferente do split)
+- **Preenchimento Automático**: Campo "Booking Adjustment Responsibility" é preenchido automaticamente quando há apenas 1 opção disponível
+- **Interface Simplificada**: Removido campo "Booking Adjustment Area" e título atualizado para "Justificativas do Armador - New Adjustment"
+- **Validação Otimizada**: Apenas campo "Reason" é obrigatório para preenchimento manual pelo usuário
+- **Correção de Mapeamento**: Campo "Data Estimativa Saída ETD" do PDF agora é corretamente mapeado para "Data Estimativa Saída ETD" em vez de "Data Deadline"
 
 ### 📌 v3.6 - History UI & Status (Setembro 2025)
 - Ordenação da grade do History por "Inserted Date" (mais antigo → mais novo). Empate é resolvido pela raiz da `Farol Reference` e depois pelo sufixo numérico (.1, .2, ...), garantindo a ordem: `FR_..._0001`, `FR_..._0001.1`, `FR_..._0001.2`.
