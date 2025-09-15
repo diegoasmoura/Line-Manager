@@ -409,6 +409,7 @@ def generate_column_config(df):
     
     config = {
         "ID": None,  # Sempre oculta
+        "FAROL_REFERENCES": None,  # Ocultar coluna Farol References
         "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para ver detalhes dos Farol References", pinned="left"),
     }
     
@@ -419,19 +420,8 @@ def generate_column_config(df):
         # Obtém o título em português ou usa o nome da coluna
         title = column_titles.get(col, col.replace("_", " ").title())
         
-        # Larguras específicas para colunas específicas
-        if col == "VESSEL_NAME":
-            width = "large"
-        elif col == "VOYAGE_CODE":
-            width = "medium"
-        elif col == "TERMINAL":
-            width = "large"
-        elif col == "FAROL_REFERENCES":
-            width = "large"
-        elif any(date_keyword in col.lower() for date_keyword in ["data", "date"]):
-            width = "medium"
-        else:
-            width = calculate_column_width(df, col)
+        # Largura uniforme para todas as colunas
+        width = "medium"
         
         if any(date_keyword in col.lower() for date_keyword in ["data", "date"]):
             config[col] = st.column_config.DatetimeColumn(title, width=width)
@@ -525,10 +515,7 @@ def exibir_voyage_monitoring():
         st.subheader(f"📊 Último Registro por Combinação ({len(df)} combinações únicas)")
         display_df = df
     
-    # Aplica formatação especial para Farol References
-    if not display_df.empty and "FAROL_REFERENCES" in display_df.columns:
-        display_df = display_df.copy()
-        display_df["FAROL_REFERENCES"] = display_df["FAROL_REFERENCES"].apply(format_farol_references)
+    # Formatação removida - coluna FAROL_REFERENCES não é mais exibida
     
     # Adiciona coluna de seleção se não existir
     if "Selecionar" not in display_df.columns:
@@ -542,7 +529,8 @@ def exibir_voyage_monitoring():
         display_df,
         column_config=column_config,
         use_container_width=True,
-        num_rows="dynamic",
+        num_rows="fixed",
+        hide_index=True,
         key="voyage_monitoring_editor"
     )
     
