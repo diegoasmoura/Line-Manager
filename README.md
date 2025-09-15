@@ -264,8 +264,12 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 ### 🚢 `voyage_monitoring.py`
 **Gerenciamento de Monitoramento de Viagens**
 - Interface dedicada para visualizar e editar dados de monitoramento da API Ellox
-- **Últimos 10 Registros**: Exibe apenas os 10 registros mais recentes e atualizados pela API
-- **Dados Efetivos**: Mostra apenas registros com `DATA_ATUALIZACAO IS NOT NULL` (API executada com sucesso)
+- **Último Registro por Combinação**: Exibe apenas o último registro de cada combinação única (Vessel + Voyage + Terminal)
+- **Sem Histórico**: Não mostra histórico completo - apenas o estado mais atual de cada combinação
+- **Colunas Principais Sempre Preenchidas**: Vessel Name, Voyage Code, Terminal sempre preenchidas
+- **Colunas de Dados Condicionais**: Outras colunas preenchidas apenas se houver dados da API Ellox
+- **Botão de Status da API**: Indicador visual do status da API Ellox no canto superior direito
+- **Modal de Detalhes da API**: Expander com informações detalhadas, configurações e teste de conectividade
 - Exibe dados unificados de navios, viagens e terminais com Farol References associados
 - Edição inline de dados de monitoramento com validação automática
 - Filtros avançados por navio, terminal e presença de Farol References
@@ -274,8 +278,12 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Atualização automática de timestamps ao modificar dados
 
 #### 🎯 **Funcionalidades Principais**
-- **Visualização Focada**: Mostra apenas os 10 registros mais recentes da API Ellox
-- **Dados Confiáveis**: Filtra apenas registros efetivamente coletados pela API
+- **Visualização Única**: Mostra apenas o último registro de cada combinação única
+- **Sem Histórico**: Foco no estado atual, não no histórico completo
+- **Colunas Garantidas**: Vessel Name, Voyage Code, Terminal sempre preenchidas
+- **Dados Condicionais**: Outras colunas preenchidas apenas com dados da API
+- **Status da API**: Botão indicador com cores (🟢 Online, 🟡 Lenta, 🔴 Erro)
+- **Detalhes da API**: Modal com informações de conectividade e configurações
 - **Edição Inline**: Modificação direta de dados de monitoramento na interface
 - **Filtros Dinâmicos**: Filtros por navio, terminal e status de Farol References
 - **Validação de Dados**: Verificação automática de alterações antes de salvar
@@ -839,8 +847,12 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ### 📌 v3.8 - Voyage Monitoring Management (Setembro 2025)
 - **🚢 Nova Aba "Voyage Monitoring"**: Interface dedicada para gerenciar dados de monitoramento da API Ellox
-- **Últimos 10 Registros**: Exibe apenas os 10 registros mais recentes e atualizados pela API Ellox
-- **Dados Efetivos da API**: Mostra apenas registros que foram efetivamente coletados com sucesso (DATA_ATUALIZACAO IS NOT NULL)
+- **Último Registro por Combinação**: Exibe apenas o último registro de cada combinação única (Vessel + Voyage + Terminal)
+- **Sem Histórico**: Não mostra histórico completo - apenas o estado mais atual de cada combinação
+- **Colunas Principais Sempre Preenchidas**: Vessel Name, Voyage Code, Terminal sempre preenchidas
+- **Colunas de Dados Condicionais**: Outras colunas preenchidas apenas se houver dados da API Ellox
+- **Botão de Status da API**: Indicador visual do status da API Ellox similar à tela Tracking
+- **Modal de Detalhes da API**: Expander com informações detalhadas, configurações e teste de conectividade
 - **Visualização Unificada**: Exibe dados de navios, viagens e terminais com Farol References associados
 - **Edição Inline**: Permite editar dados de monitoramento diretamente na interface
 - **Filtros Avançados**: Filtros por navio, terminal e presença de Farol References

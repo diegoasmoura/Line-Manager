@@ -3,54 +3,213 @@ import pandas as pd
 from database import get_database_connection
 from sqlalchemy import text
 import traceback
+from ellox_api import get_default_api_client
+
+def get_api_status_indicator():
+    """
+    Retorna indicador visual do status da API para exibição
+    
+    Returns:
+        Tuple com (status_text, status_color, status_icon)
+    """
+    # Inicializar cliente com credenciais padrão
+    client = get_default_api_client()
+    
+    if not client.authenticated:
+        return ("API Desconectada", "red", "🔴")
+    
+    # Testar conexão
+    try:
+        test_result = client.test_connection()
+        
+        if test_result.get("success"):
+            response_time = test_result.get("response_time", 0)
+            if response_time < 1.0:
+                return (f"API Online ({response_time:.2f}s)", "green", "🟢")
+            else:
+                return (f"API Lenta ({response_time:.2f}s)", "orange", "🟡")
+        else:
+            error = test_result.get("error", "Erro desconhecido")
+            return (f"API Erro: {error}", "red", "🔴")
+            
+    except Exception as e:
+        return (f"Erro no Teste: {str(e)}", "red", "🔴")
+
+def display_api_status_inline():
+    """Exibe indicador de status da API inline (para ficar na mesma linha do título)"""
+    status_text, status_color, status_icon = get_api_status_indicator()
+    
+    # Botão de status da API compacto
+    if st.button(
+        f"{status_icon} {status_text}",
+        help="Clique para ver detalhes da API Ellox",
+        type="secondary" if status_color == "green" else "primary",
+        key="api_status_inline"
+    ):
+        # Abrir modal/expander com detalhes
+        st.session_state.show_api_details = True
+    
+    # Mostrar detalhes se solicitado
+    if st.session_state.get("show_api_details", False):
+        display_api_details_modal()
+
+def display_api_status():
+    """Exibe indicador de status da API no canto superior direito"""
+    status_text, status_color, status_icon = get_api_status_indicator()
+    
+    # Criar um container no topo da página para o botão
+    col1, col2, col3 = st.columns([6, 2, 1])
+    
+    with col3:
+        # Botão de status da API
+        if st.button(
+            f"{status_icon} {status_text}",
+            help="Clique para ver detalhes da API Ellox",
+            type="secondary" if status_color == "green" else "primary"
+        ):
+            # Abrir modal/expander com detalhes
+            st.session_state.show_api_details = True
+    
+    # Mostrar detalhes se solicitado
+    if st.session_state.get("show_api_details", False):
+        display_api_details_modal()
+
+def display_api_details_modal():
+    """Exibe modal com detalhes da API e configurações"""
+    st.markdown("---")
+    
+    with st.expander("🔧 Status da API Ellox", expanded=True):
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("### 📋 Status Detalhado")
+            
+            # Obter status atual
+            client = get_default_api_client()
+            
+            # Informações básicas
+            st.info(f"**URL Base:** `{client.base_url}`")
+            st.info(f"**Email:** `{client.email}`")
+            st.info(f"**Senha:** `{'*' * len(client.password) if client.password else 'Não configurada'}`")
+            
+            # Status de autenticação
+            if client.authenticated:
+                st.success("✅ **Autenticado com sucesso**")
+                if client.api_key:
+                    st.code(f"Token: {client.api_key[:20]}...")
+            else:
+                st.error("❌ **Falha na autenticação**")
+            
+            # Teste de conectividade
+            if st.button("🔄 Testar Conectividade"):
+                with st.spinner("Testando..."):
+                    test_result = client.test_connection()
+                    
+                    if test_result.get("success"):
+                        st.success(f"✅ **Conectado!** Tempo: {test_result.get('response_time', 0):.2f}s")
+                    else:
+                        st.error(f"❌ **Erro:** {test_result.get('error', 'Desconhecido')}")
+        
+        with col2:
+            st.markdown("### 📊 Estatísticas")
+            
+            # Estatísticas da API
+            try:
+                # Teste rápido para obter estatísticas
+                test_result = client.test_connection()
+                if test_result.get("success"):
+                    response_time = test_result.get("response_time", 0)
+                    st.metric("Tempo de Resposta", f"{response_time:.2f}s")
+                    
+                    if response_time < 1.0:
+                        st.success("🟢 Excelente")
+                    elif response_time < 3.0:
+                        st.warning("🟡 Aceitável")
+                    else:
+                        st.error("🔴 Lento")
+                else:
+                    st.error("❌ Indisponível")
+            except:
+                st.error("❌ Erro no teste")
+        
+        # Botão para fechar
+        if st.button("❌ Fechar Detalhes"):
+            st.session_state.show_api_details = False
+            st.rerun()
 
 def get_voyage_monitoring_with_farol_references():
     """
-    Busca os 10 registros mais recentes e atualizados de monitoramento da Ellox com Farol References associados.
+    Busca o último registro de cada combinação única (Vessel + Voyage + Terminal) de monitoramento da Ellox.
+    Se não houver dados da API, mostra apenas as 3 primeiras colunas preenchidas e as outras vazias.
     Retorna DataFrame com colunas de monitoramento + Farol References relacionados.
     """
     try:
         conn = get_database_connection()
         
-        # Query principal que busca os 10 registros mais recentes e atualizados
+        # Query principal que busca o último registro de cada combinação única
         query = text("""
-            SELECT DISTINCT
-                m.ID,
-                m.NAVIO as Vessel_Name,
-                m.VIAGEM as Voyage_Code,
-                m.TERMINAL as Terminal,
-                m.AGENCIA as Agency,
-                m.DATA_DEADLINE as Data_Deadline,
-                m.DATA_DRAFT_DEADLINE as Data_Draft_Deadline,
-                m.DATA_ABERTURA_GATE as Data_Abertura_Gate,
-                m.DATA_ABERTURA_GATE_REEFER as Data_Abertura_Gate_Reefer,
-                m.DATA_ESTIMATIVA_SAIDA as Data_Estimativa_Saida,
-                m.DATA_ESTIMATIVA_CHEGADA as Data_Estimativa_Chegada,
-                m.DATA_ATUALIZACAO as Data_Atualizacao,
-                m.CNPJ_TERMINAL as CNPJ_Terminal,
-                m.DATA_CHEGADA as Data_Chegada,
-                m.DATA_ESTIMATIVA_ATRACACAO as Data_Estimativa_Atracacao,
-                m.DATA_ATRACACAO as Data_Atracacao,
-                m.DATA_PARTIDA as Data_Partida,
-                m.ROW_INSERTED_DATE as Row_Inserted_Date,
+            WITH latest_monitoring AS (
+                SELECT 
+                    m.ID,
+                    m.NAVIO as Vessel_Name,
+                    m.VIAGEM as Voyage_Code,
+                    m.TERMINAL as Terminal,
+                    m.AGENCIA as Agency,
+                    m.DATA_DEADLINE as Data_Deadline,
+                    m.DATA_DRAFT_DEADLINE as Data_Draft_Deadline,
+                    m.DATA_ABERTURA_GATE as Data_Abertura_Gate,
+                    m.DATA_ABERTURA_GATE_REEFER as Data_Abertura_Gate_Reefer,
+                    m.DATA_ESTIMATIVA_SAIDA as Data_Estimativa_Saida,
+                    m.DATA_ESTIMATIVA_CHEGADA as Data_Estimativa_Chegada,
+                    m.DATA_ATUALIZACAO as Data_Atualizacao,
+                    m.CNPJ_TERMINAL as CNPJ_Terminal,
+                    m.DATA_CHEGADA as Data_Chegada,
+                    m.DATA_ESTIMATIVA_ATRACACAO as Data_Estimativa_Atracacao,
+                    m.DATA_ATRACACAO as Data_Atracacao,
+                    m.DATA_PARTIDA as Data_Partida,
+                    m.ROW_INSERTED_DATE as Row_Inserted_Date,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY UPPER(m.NAVIO), UPPER(m.VIAGEM), UPPER(m.TERMINAL) 
+                        ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
+                    ) as rn
+                FROM F_ELLOX_TERMINAL_MONITORINGS m
+            )
+            SELECT 
+                lm.ID,
+                lm.Vessel_Name,
+                lm.Voyage_Code,
+                lm.Terminal,
+                lm.Agency,
+                lm.Data_Deadline,
+                lm.Data_Draft_Deadline,
+                lm.Data_Abertura_Gate,
+                lm.Data_Abertura_Gate_Reefer,
+                lm.Data_Estimativa_Saida,
+                lm.Data_Estimativa_Chegada,
+                lm.Data_Atualizacao,
+                lm.CNPJ_Terminal,
+                lm.Data_Chegada,
+                lm.Data_Estimativa_Atracacao,
+                lm.Data_Atracacao,
+                lm.Data_Partida,
+                lm.Row_Inserted_Date,
                 LISTAGG(DISTINCT r.FAROL_REFERENCE, ', ') WITHIN GROUP (ORDER BY r.FAROL_REFERENCE) as Farol_References
-            FROM F_ELLOX_TERMINAL_MONITORINGS m
+            FROM latest_monitoring lm
             LEFT JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
-                UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME) 
-                AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
-                AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
+                UPPER(lm.Vessel_Name) = UPPER(r.B_VESSEL_NAME) 
+                AND UPPER(lm.Voyage_Code) = UPPER(r.B_VOYAGE_CODE)
+                AND UPPER(lm.Terminal) = UPPER(r.B_TERMINAL)
                 AND r.FAROL_REFERENCE IS NOT NULL
             )
-            WHERE m.DATA_ATUALIZACAO IS NOT NULL  -- Apenas registros que foram atualizados pela API
+            WHERE lm.rn = 1  -- Apenas o último registro de cada combinação
             GROUP BY 
-                m.ID, m.NAVIO, m.VIAGEM, m.TERMINAL, m.AGENCIA,
-                m.DATA_DEADLINE, m.DATA_DRAFT_DEADLINE, m.DATA_ABERTURA_GATE,
-                m.DATA_ABERTURA_GATE_REEFER, m.DATA_ESTIMATIVA_SAIDA,
-                m.DATA_ESTIMATIVA_CHEGADA, m.DATA_ATUALIZACAO, m.CNPJ_TERMINAL,
-                m.DATA_CHEGADA, m.DATA_ESTIMATIVA_ATRACACAO, m.DATA_ATRACACAO,
-                m.DATA_PARTIDA, m.ROW_INSERTED_DATE
-            ORDER BY m.DATA_ATUALIZACAO DESC
-            FETCH FIRST 10 ROWS ONLY
+                lm.ID, lm.Vessel_Name, lm.Voyage_Code, lm.Terminal, lm.Agency,
+                lm.Data_Deadline, lm.Data_Draft_Deadline, lm.Data_Abertura_Gate,
+                lm.Data_Abertura_Gate_Reefer, lm.Data_Estimativa_Saida,
+                lm.Data_Estimativa_Chegada, lm.Data_Atualizacao, lm.CNPJ_Terminal,
+                lm.Data_Chegada, lm.Data_Estimativa_Atracacao, lm.Data_Atracacao,
+                lm.Data_Partida, lm.Row_Inserted_Date
+            ORDER BY NVL(lm.Data_Atualizacao, lm.Row_Inserted_Date) DESC
         """)
         
         result = conn.execute(query).mappings().fetchall()
@@ -156,7 +315,30 @@ def calculate_column_width(df, column_name):
         return "large"
 
 def generate_column_config(df):
-    """Gera configuração de colunas com larguras dinâmicas"""
+    """Gera configuração de colunas com larguras dinâmicas seguindo o padrão do sistema"""
+    
+    # Mapeamento de colunas para títulos em português (seguindo padrão do sistema)
+    column_titles = {
+        "VESSEL_NAME": "Vessel Name",
+        "VOYAGE_CODE": "Voyage Code", 
+        "TERMINAL": "Terminal",
+        "AGENCY": "Agency",
+        "DATA_DEADLINE": "Data Deadline",
+        "DATA_DRAFT_DEADLINE": "Data Draft Deadline",
+        "DATA_ABERTURA_GATE": "Data Abertura Gate",
+        "DATA_ABERTURA_GATE_REEFER": "Data Abertura Gate Reefer",
+        "DATA_ESTIMATIVA_SAIDA": "Data Estimativa Saída",
+        "DATA_ESTIMATIVA_CHEGADA": "Data Estimativa Chegada",
+        "DATA_ATUALIZACAO": "Data Atualização",
+        "CNPJ_TERMINAL": "CNPJ Terminal",
+        "DATA_CHEGADA": "Data Chegada",
+        "DATA_ESTIMATIVA_ATRACACAO": "Data Estimativa Atracação",
+        "DATA_ATRACACAO": "Data Atracação",
+        "DATA_PARTIDA": "Data Partida",
+        "ROW_INSERTED_DATE": "Row Inserted Date",
+        "FAROL_REFERENCES": "Farol References"
+    }
+    
     config = {
         "ID": None,  # Sempre oculta
         "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para editar", pinned="left"),
@@ -165,6 +347,9 @@ def generate_column_config(df):
     for col in df.columns:
         if col in config:
             continue
+        
+        # Obtém o título em português ou usa o nome da coluna
+        title = column_titles.get(col, col.replace("_", " ").title())
         
         # Larguras específicas para colunas específicas
         if col == "VESSEL_NAME":
@@ -181,24 +366,33 @@ def generate_column_config(df):
             width = calculate_column_width(df, col)
         
         if any(date_keyword in col.lower() for date_keyword in ["data", "date"]):
-            config[col] = st.column_config.DatetimeColumn(col, width=width)
+            config[col] = st.column_config.DatetimeColumn(title, width=width)
         else:
-            config[col] = st.column_config.TextColumn(col, width=width)
+            config[col] = st.column_config.TextColumn(title, width=width)
     
     return config
 
 def exibir_voyage_monitoring():
     """Exibe a interface principal de gerenciamento de monitoramento de viagens"""
-    st.title("🚢 Voyage Monitoring Management")
+    # Layout com título e botão de status da API na mesma linha
+    col1, col2 = st.columns([4, 1])
+    
+    with col1:
+        st.title("🚢 Voyage Monitoring Management")
+    
+    with col2:
+        # Exibir indicador de status da API na mesma linha do título
+        display_api_status_inline()
     
     st.markdown("""
     <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 1rem; margin-bottom: 1.5rem; border-radius: 0 8px 8px 0;">
-        <h4 style="margin: 0 0 0.5rem 0; color: #007bff;">📊 Dados de Monitoramento Mais Recentes (API Ellox)</h4>
+        <h4 style="margin: 0 0 0.5rem 0; color: #007bff;">📊 Último Registro por Combinação (Vessel + Voyage + Terminal)</h4>
         <p style="margin: 0; color: #6c757d; font-size: 0.9em;">
-            Esta tela exibe os <strong>10 registros mais recentes e atualizados</strong> coletados com sucesso da API Ellox. 
-            Aqui você pode visualizar e editar informações de navios, viagens e terminais, incluindo os Farol References associados.
+            Esta tela exibe o <strong>último registro de cada combinação única</strong> de navio, viagem e terminal. 
+            Não mostra histórico - apenas o estado mais atual de cada combinação.
             <br><br>
-            <strong>✅ Apenas dados efetivamente coletados pela API são exibidos.</strong>
+            <strong>📋 Colunas principais:</strong> Vessel Name, Voyage Code, Terminal (sempre preenchidas)<br>
+            <strong>📊 Colunas de dados:</strong> Preenchidas apenas se houver dados da API Ellox
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -208,17 +402,78 @@ def exibir_voyage_monitoring():
         df = get_voyage_monitoring_with_farol_references()
     
     if df.empty:
-        st.info("📋 Nenhum registro de monitoramento atualizado pela API Ellox encontrado. Os dados aparecerão aqui quando a API for executada com sucesso.")
+        st.info("📋 Nenhuma combinação única de navio, viagem e terminal encontrada. Os dados aparecerão aqui quando houver registros de monitoramento.")
         return
     
-    st.subheader(f"📊 Últimos 10 Registros Atualizados pela API Ellox ({len(df)} registros)")
+    # Estatísticas em colunas - PARTE SUPERIOR
+    st.subheader("📈 Estatísticas")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total de Navios", len(df["VESSEL_NAME"].unique()))
+    
+    with col2:
+        st.metric("Total de Viagens", len(df["VOYAGE_CODE"].unique()))
+    
+    with col3:
+        st.metric("Total de Terminais", len(df["TERMINAL"].unique()))
+    
+    with col4:
+        total_farol_refs = df["FAROL_REFERENCES"].str.count(",").sum() + len(df[df["FAROL_REFERENCES"].notna()])
+        st.metric("Total de Farol References", int(total_farol_refs))
+    
+    # Filtros - PARTE SUPERIOR
+    st.subheader("🔍 Filtros")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        vessel_filter = st.selectbox(
+            "Filtrar por Navio",
+            ["Todos"] + sorted(df["VESSEL_NAME"].dropna().unique().tolist())
+        )
+    
+    with col2:
+        terminal_filter = st.selectbox(
+            "Filtrar por Terminal",
+            ["Todos"] + sorted(df["TERMINAL"].dropna().unique().tolist())
+        )
+    
+    with col3:
+        has_farol_refs = st.selectbox(
+            "Farol References",
+            ["Todos", "Com Referências", "Sem Referências"]
+        )
+    
+    # Aplica filtros
+    filtered_df = df.copy()
+    
+    if vessel_filter != "Todos":
+        filtered_df = filtered_df[filtered_df["VESSEL_NAME"] == vessel_filter]
+    
+    if terminal_filter != "Todos":
+        filtered_df = filtered_df[filtered_df["TERMINAL"] == terminal_filter]
+    
+    if has_farol_refs == "Com Referências":
+        filtered_df = filtered_df[filtered_df["FAROL_REFERENCES"].notna()]
+    elif has_farol_refs == "Sem Referências":
+        filtered_df = filtered_df[filtered_df["FAROL_REFERENCES"].isna()]
+    
+    # Exibe dados filtrados
+    if len(filtered_df) != len(df):
+        st.subheader(f"📊 Resultados Filtrados ({len(filtered_df)} registros)")
+        display_df = filtered_df
+    else:
+        st.subheader(f"📊 Último Registro por Combinação ({len(df)} combinações únicas)")
+        display_df = df
     
     # Configuração das colunas
-    column_config = generate_column_config(df)
+    column_config = generate_column_config(display_df)
     
     # Data editor
     edited_df = st.data_editor(
-        df,
+        display_df,
         column_config=column_config,
         use_container_width=True,
         num_rows="dynamic",
@@ -271,62 +526,3 @@ def exibir_voyage_monitoring():
             with col2:
                 if st.button("🔄 Cancelar"):
                     st.rerun()
-    
-    # Estatísticas
-    st.subheader("📈 Estatísticas")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total de Navios", len(df["VESSEL_NAME"].unique()))
-    
-    with col2:
-        st.metric("Total de Viagens", len(df["VOYAGE_CODE"].unique()))
-    
-    with col3:
-        st.metric("Total de Terminais", len(df["TERMINAL"].unique()))
-    
-    with col4:
-        total_farol_refs = df["FAROL_REFERENCES"].str.count(",").sum() + len(df[df["FAROL_REFERENCES"].notna()])
-        st.metric("Total de Farol References", int(total_farol_refs))
-    
-    # Filtros
-    st.subheader("🔍 Filtros")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        vessel_filter = st.selectbox(
-            "Filtrar por Navio",
-            ["Todos"] + sorted(df["VESSEL_NAME"].dropna().unique().tolist())
-        )
-    
-    with col2:
-        terminal_filter = st.selectbox(
-            "Filtrar por Terminal",
-            ["Todos"] + sorted(df["TERMINAL"].dropna().unique().tolist())
-        )
-    
-    with col3:
-        has_farol_refs = st.selectbox(
-            "Farol References",
-            ["Todos", "Com Referências", "Sem Referências"]
-        )
-    
-    # Aplica filtros
-    filtered_df = df.copy()
-    
-    if vessel_filter != "Todos":
-        filtered_df = filtered_df[filtered_df["VESSEL_NAME"] == vessel_filter]
-    
-    if terminal_filter != "Todos":
-        filtered_df = filtered_df[filtered_df["TERMINAL"] == terminal_filter]
-    
-    if has_farol_refs == "Com Referências":
-        filtered_df = filtered_df[filtered_df["FAROL_REFERENCES"].notna()]
-    elif has_farol_refs == "Sem Referências":
-        filtered_df = filtered_df[filtered_df["FAROL_REFERENCES"].isna()]
-    
-    if len(filtered_df) != len(df):
-        st.subheader(f"📊 Resultados Filtrados ({len(filtered_df)} registros)")
-        st.dataframe(filtered_df, use_container_width=True)
