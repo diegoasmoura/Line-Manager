@@ -420,8 +420,11 @@ def generate_column_config(df):
         # Obtém o título em português ou usa o nome da coluna
         title = column_titles.get(col, col.replace("_", " ").title())
         
-        # Largura uniforme para todas as colunas
-        width = "medium"
+        # Larguras específicas para colunas específicas
+        if col in ["VESSEL_NAME", "VOYAGE_CODE", "TERMINAL", "AGENCY"]:
+            width = None  # Largura automática baseada no conteúdo
+        else:
+            width = "medium"
         
         if any(date_keyword in col.lower() for date_keyword in ["data", "date"]):
             config[col] = st.column_config.DatetimeColumn(title, width=width)
