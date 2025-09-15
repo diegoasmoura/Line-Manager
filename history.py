@@ -1195,7 +1195,7 @@ def exibir_history():
             return "large"  # Apenas para colunas muito longas
     
     # Função para gerar configuração dinâmica de colunas
-    def generate_dynamic_column_config(df, hide_status=False):
+    def generate_dynamic_column_config(df, hide_status=False, hide_linked_reference=False):
         """Gera configuração de colunas com larguras dinâmicas"""
         config = {
             "ADJUSTMENT_ID": None,  # Sempre oculta
@@ -1209,6 +1209,11 @@ def exibir_history():
                 
             # Oculta Status apenas se solicitado (aba Returns Awaiting Review)
             if col == "Status" and hide_status:
+                config[col] = None
+                continue
+                
+            # Oculta Linked Reference apenas se solicitado (aba Returns Awaiting Review)
+            if col == "Linked Reference" and hide_linked_reference:
                 config[col] = None
                 continue
             
@@ -1529,8 +1534,8 @@ def exibir_history():
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
     edited_df_received = None
     if df_received_processed is not None and active_tab == received_label:
-        # Gera configuração dinâmica baseada no conteúdo (Status oculto)
-        column_config = generate_dynamic_column_config(df_received_processed, hide_status=True)
+        # Gera configuração dinâmica baseada no conteúdo (Status e Linked Reference ocultos)
+        column_config = generate_dynamic_column_config(df_received_processed, hide_status=True, hide_linked_reference=True)
         edited_df_received = st.data_editor(
             df_received_processed,
             use_container_width=True,

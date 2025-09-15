@@ -1430,7 +1430,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Transhipment Port": "B_TRANSHIPMENT_PORT",
             "Terminal": "B_TERMINAL",
             "Port Terminal City": "B_TERMINAL",
-            "Requested Deadline Start Date": "B_DATA_DEADLINE",
+            "Requested Deadline Start Date": "B_DATA_ESTIMATIVA_SAIDA_ETD",
             "Requested Deadline End Date": "B_DATA_DRAFT_DEADLINE",
             "Required Arrival Date": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
             "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE",
