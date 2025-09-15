@@ -1222,16 +1222,14 @@ def exibir_history():
                 continue
             
             # Larguras específicas para colunas específicas
-            if col == "Status":
-                width = "medium"
-            elif col in ["Voyage Code", "Quantity of Containers", "Port Terminal City", "Splitted Farol Reference"]:
-                width = "medium"
-            elif any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate"]):
-                width = "medium"  # Todas as colunas de data são medium
-            elif "booking" in col.lower():
-                width = "medium"  # Todas as colunas relacionadas a booking são medium
+            # Identifica a última coluna (excluindo colunas ocultas)
+            visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Selecionar"] and not (c == "Status" and hide_status) and not (c == "Linked Reference" and hide_linked_reference)]
+            is_last_column = col == visible_columns[-1] if visible_columns else False
+            
+            if col == "Status" or is_last_column:
+                width = None  # Largura automática para Status e última coluna
             else:
-                width = calculate_column_width(df, col)
+                width = "medium"  # Todas as outras colunas são medium
             
             # Determina o tipo de coluna baseado no nome
             if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate"]):
