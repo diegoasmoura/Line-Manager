@@ -3151,16 +3151,7 @@ def save_pdf_booking_data(validated_data):
         if success:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
             st.info("📋 Status definido como: **Received from Carrier**")
-            
-            # Coleta dados de monitoramento da viagem
-            try:
-                collect_voyage_monitoring_data(
-                    validated_data.get("Vessel Name"),
-                    validated_data.get("Port Terminal City"),
-                    validated_data.get("Voyage Code", "")
-                )
-            except Exception as e:
-                st.warning(f"⚠️ Não foi possível coletar dados de monitoramento: {str(e)}")
+            st.info("ℹ️ **Voyage Monitoring:** Os dados de monitoramento serão coletados automaticamente durante a aprovação do registro.")
             
             # Salva também o PDF como anexo
             if pdf_file:

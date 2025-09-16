@@ -913,17 +913,20 @@ def exibir_voyage_monitoring():
                     
                     
                     
-                    # Botões do formulário
-                    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+                    # Botões do formulário (colunas iguais + espaçador à direita)
+                    col_btn1, col_btn2, col_btn3, col_btn4, col_spacer = st.columns([2, 2, 2, 2, 8], gap="small")
                     
-                    with col1:
-                        save_clicked = st.form_submit_button("💾 Salvar", type="primary")
+                    with col_btn1:
+                        save_clicked = st.form_submit_button("💾 Salvar", type="primary", use_container_width=True)
                     
-                    with col2:
-                        consult_clicked = st.form_submit_button("🔎 Consultar")
+                    with col_btn2:
+                        consult_clicked = st.form_submit_button("🔎 Consultar", use_container_width=True)
                     
-                    with col3:
-                        cancel_clicked = st.form_submit_button("❌ Cancelar")
+                    with col_btn3:
+                        reset_clicked = st.form_submit_button("🔄 Reset", help="Limpar dados da API e voltar aos valores originais", use_container_width=True)
+                    
+                    with col_btn4:
+                        cancel_clicked = st.form_submit_button("❌ Cancelar", use_container_width=True)
                     
                     # Processa ações do formulário
                     if consult_clicked:
@@ -940,136 +943,149 @@ def exibir_voyage_monitoring():
                             st.error("❌ Preencha os campos obrigatórios: Vessel Name, Voyage Code e Terminal")
                         else:
                             # Consulta DIRETAMENTE na API Ellox (sem consultar banco)
-                            try:
-                                api_client = get_default_api_client()
-                                api_test = api_client.test_connection()
-                                if not api_test.get("success"):
-                                    st.error("❌ API Ellox indisponível no momento. Tente novamente mais tarde.")
-                                    return
-                                st.info("🟢 API Ellox disponível")
+                            with st.spinner("🔍 Consultando API Ellox... Aguarde..."):
+                                try:
+                                    api_client = get_default_api_client()
+                                    api_test = api_client.test_connection()
+                                    if not api_test.get("success"):
+                                        st.error("❌ API Ellox indisponível no momento. Tente novamente mais tarde.")
+                                        return
+                                    st.info("🟢 API Ellox disponível")
 
-                                # 1) Resolver CNPJ do terminal pelo nome via API
-                                cnpj_terminal = None
-                                terms_resp = api_client._make_api_request("/api/terminals")
-                                if terms_resp.get("success"):
-                                    for term in terms_resp.get("data", []):
-                                        nome_term = term.get("nome") or term.get("name") or ""
-                                        if str(nome_term).strip().upper() == str(new_terminal).strip().upper() or str(new_terminal).strip().upper() in str(nome_term).strip().upper():
-                                            cnpj_terminal = term.get("cnpj")
-                                            break
-                                if not cnpj_terminal:
-                                    st.warning("🟠 Terminal não localizado na API pelos nomes retornados.")
-                                    return
-
-                                # 2) Pular verificação de voyages (pode dar timeout) e ir direto para monitoramento
-                                st.info("ℹ️ Tentando buscar dados de monitoramento diretamente...")
-
-                                # 3) Buscar dados de monitoramento via API (requer CNPJ do cliente)
-                                cnpj_client = st.session_state.get("monitoring_cnpj_client")
-                                if not cnpj_client:
-                                    # CNPJ padrão pré-configurado
-                                    cnpj_client_default = "60.498.706/0001-57"
-                                    st.info(f"ℹ️ Voyage confirmada na API. CNPJ do cliente pré-configurado: `{cnpj_client_default}`")
-                                    
-                                    # Campo para configurar CNPJ do cliente (já preenchido)
-                                    from tracking import format_cnpj, validate_cnpj_format
-                                    cnpj_client_raw = st.text_input(
-                                        "CNPJ do Cliente",
-                                        value=cnpj_client_default,
-                                        placeholder="00.000.000/0000-00 ou 00000000000000",
-                                        key=f"cnpj_client_input_{idx}",
-                                        help="CNPJ da empresa que está solicitando o monitoramento (já pré-configurado)"
-                                    )
-                                    
-                                    if cnpj_client_raw:
-                                        # Formatação automática do CNPJ
-                                        cnpj_client = format_cnpj(cnpj_client_raw)
-                                        if cnpj_client != cnpj_client_raw:
-                                            st.info(f"🔄 **CNPJ formatado automaticamente:** `{cnpj_client}`")
-                                        
-                                        if not validate_cnpj_format(cnpj_client):
-                                            st.error("❌ CNPJ deve ter exatamente 14 dígitos")
-                                            return
-                                        else:
-                                            st.success(f"✅ CNPJ válido: `{cnpj_client}`")
-                                            # Salva o CNPJ no session_state para uso futuro
-                                            st.session_state["monitoring_cnpj_client"] = cnpj_client
-                                    else:
+                                    # 1) Resolver CNPJ do terminal pelo nome via API
+                                    cnpj_terminal = None
+                                    terms_resp = api_client._make_api_request("/api/terminals")
+                                    if terms_resp.get("success"):
+                                        for term in terms_resp.get("data", []):
+                                            nome_term = term.get("nome") or term.get("name") or ""
+                                            if str(nome_term).strip().upper() == str(new_terminal).strip().upper() or str(new_terminal).strip().upper() in str(nome_term).strip().upper():
+                                                cnpj_terminal = term.get("cnpj")
+                                                break
+                                    if not cnpj_terminal:
+                                        st.warning("🟠 Terminal não localizado na API pelos nomes retornados.")
                                         return
 
-                                mon_resp = api_client.view_vessel_monitoring(cnpj_client, cnpj_terminal, new_vessel, new_voyage)
-                                if not mon_resp.get("success") or not mon_resp.get("data"):
-                                    st.warning("⚠️ Voyage confirmada na API, mas nenhum dado de monitoramento foi retornado para atualização.")
-                                    return
+                                    # 2) Pular verificação de voyages (pode dar timeout) e ir direto para monitoramento
+                                    st.info("ℹ️ Tentando buscar dados de monitoramento diretamente...")
 
-                                # 4) Extrair datas do payload retornado e atualizar a linha
-                                data_list = mon_resp.get("data", [])
-                                
-                                # Debug: mostrar quantos registros foram encontrados
-                                if isinstance(data_list, list):
-                                    st.info(f"ℹ️ Encontrados {len(data_list)} registros de monitoramento na API")
-                                elif isinstance(data_list, dict):
-                                    st.info("ℹ️ Dados de monitoramento recebidos como dicionário")
-                                
-                                # Se data é uma lista, pegar o primeiro registro
-                                if isinstance(data_list, list) and len(data_list) > 0:
-                                    payload = data_list[0]  # Primeiro registro da lista
-                                elif isinstance(data_list, dict):
-                                    payload = data_list  # Já é um dicionário
-                                else:
-                                    st.warning("⚠️ Formato de dados inesperado da API")
-                                    return
-                                
-                                def g(key):
-                                    if isinstance(payload, dict):
-                                        for k in payload.keys():
-                                            if str(k).lower() == key.lower():
-                                                return payload[k]
-                                    return None
+                                    # 3) Buscar dados de monitoramento via API (requer CNPJ do cliente)
+                                    cnpj_client = st.session_state.get("monitoring_cnpj_client")
+                                    if not cnpj_client:
+                                        # CNPJ padrão pré-configurado
+                                        cnpj_client_default = "60.498.706/0001-57"
+                                        st.info(f"ℹ️ Voyage confirmada na API. CNPJ do cliente pré-configurado: `{cnpj_client_default}`")
+                                        
+                                        # Campo para configurar CNPJ do cliente (já preenchido)
+                                        from tracking import format_cnpj, validate_cnpj_format
+                                        cnpj_client_raw = st.text_input(
+                                            "CNPJ do Cliente",
+                                            value=cnpj_client_default,
+                                            placeholder="00.000.000/0000-00 ou 00000000000000",
+                                            key=f"cnpj_client_input_{idx}",
+                                            help="CNPJ da empresa que está solicitando o monitoramento (já pré-configurado)"
+                                        )
+                                        
+                                        if cnpj_client_raw:
+                                            # Formatação automática do CNPJ
+                                            cnpj_client = format_cnpj(cnpj_client_raw)
+                                            if cnpj_client != cnpj_client_raw:
+                                                st.info(f"🔄 **CNPJ formatado automaticamente:** `{cnpj_client}`")
+                                            
+                                            if not validate_cnpj_format(cnpj_client):
+                                                st.error("❌ CNPJ deve ter exatamente 14 dígitos")
+                                                return
+                                            else:
+                                                st.success(f"✅ CNPJ válido: `{cnpj_client}`")
+                                                # Salva o CNPJ no session_state para uso futuro
+                                                st.session_state["monitoring_cnpj_client"] = cnpj_client
+                                        else:
+                                            return
 
-                                updates = {}
-                                mapping = {
-                                    "DATA_DEADLINE": ["data_deadline"],
-                                    "DATA_DRAFT_DEADLINE": ["data_draft_deadline"],
-                                    "DATA_ABERTURA_GATE": ["data_abertura_gate"],
-                                    "DATA_ABERTURA_GATE_REEFER": ["data_abertura_gate_reefer"],
-                                    "DATA_ESTIMATIVA_SAIDA": ["data_estimativa_saida", "etd"],
-                                    "DATA_ESTIMATIVA_CHEGADA": ["data_estimativa_chegada", "eta"],
-                                    "DATA_ESTIMATIVA_ATRACACAO": ["data_estimativa_atracacao", "etb"],
-                                    "DATA_ATRACACAO": ["data_atracacao", "atb"],
-                                    "DATA_PARTIDA": ["data_partida", "atd"],
-                                    "DATA_CHEGADA": ["data_chegada", "ata"],
-                                    "DATA_ATUALIZACAO": ["data_atualizacao", "last_update", "updated_at"]
-                                }
-                                import pandas as _pd
-                                for db_col, keys in mapping.items():
-                                    val = None
-                                    for k in keys:
-                                        val = g(k)
-                                        if val is not None:
-                                            break
-                                    if val is None:
-                                        continue
-                                    try:
-                                        updates[db_col] = _pd.to_datetime(val)
-                                    except Exception:
-                                        updates[db_col] = val
-
-                                if updates:
-                                    # Salvar os dados da API no session_state para preencher os campos
-                                    campos_atualizados = list(updates.keys())
+                                    mon_resp = api_client.view_vessel_monitoring(cnpj_client, cnpj_terminal, new_vessel, new_voyage)
                                     
-                                    # Armazenar os dados da API no session_state para uso posterior
-                                    st.session_state[f"api_data_{idx}"] = updates
-                                    st.session_state[f"api_data_loaded_{idx}"] = True
+                                    if not mon_resp.get("success") or not mon_resp.get("data"):
+                                        st.warning("⚠️ Voyage confirmada na API, mas nenhum dado de monitoramento foi retornado para atualização.")
+                                        return
+
+                                    # 4) Extrair datas do payload retornado e atualizar a linha
+                                    data_list = mon_resp.get("data", [])
                                     
-                                    st.success(f"✅ Dados consultados na API! ({len(campos_atualizados)} campos: {', '.join(campos_atualizados)})")
-                                    st.info("💡 Os dados foram carregados. A página será recarregada para preencher os campos automaticamente.")
-                                    st.rerun()
-                                else:
-                                    st.info("ℹ️ Nenhuma informação de data disponível na API para preencher")
-                            except Exception as e:
-                                st.error(f"❌ Erro na consulta direta à API: {str(e)}")
+                                    # Debug: mostrar quantos registros foram encontrados
+                                    if isinstance(data_list, list):
+                                        st.info(f"ℹ️ Encontrados {len(data_list)} registros de monitoramento na API")
+                                    elif isinstance(data_list, dict):
+                                        st.info("ℹ️ Dados de monitoramento recebidos como dicionário")
+                                    
+                                    # Se data é uma lista, pegar o primeiro registro
+                                    if isinstance(data_list, list) and len(data_list) > 0:
+                                        payload = data_list[0]  # Primeiro registro da lista
+                                    elif isinstance(data_list, dict):
+                                        payload = data_list  # Já é um dicionário
+                                    else:
+                                        st.warning("⚠️ Formato de dados inesperado da API")
+                                        return
+                                    
+                                    def g(key):
+                                        if isinstance(payload, dict):
+                                            for k in payload.keys():
+                                                if str(k).lower() == key.lower():
+                                                    return payload[k]
+                                        return None
+
+                                    updates = {}
+                                    mapping = {
+                                        "DATA_DEADLINE": ["data_deadline"],
+                                        "DATA_DRAFT_DEADLINE": ["data_draft_deadline"],
+                                        "DATA_ABERTURA_GATE": ["data_abertura_gate"],
+                                        "DATA_ABERTURA_GATE_REEFER": ["data_abertura_gate_reefer"],
+                                        "DATA_ESTIMATIVA_SAIDA": ["data_estimativa_saida", "etd"],
+                                        "DATA_ESTIMATIVA_CHEGADA": ["data_estimativa_chegada", "eta"],
+                                        "DATA_ESTIMATIVA_ATRACACAO": ["data_estimativa_atracacao", "etb"],
+                                        "DATA_ATRACACAO": ["data_atracacao", "atb"],
+                                        "DATA_PARTIDA": ["data_partida", "atd"],
+                                        "DATA_CHEGADA": ["data_chegada", "ata"],
+                                        "DATA_ATUALIZACAO": ["data_atualizacao", "last_update", "updated_at"]
+                                    }
+                                    import pandas as _pd
+                                    for db_col, keys in mapping.items():
+                                        val = None
+                                        for k in keys:
+                                            val = g(k)
+                                            if val is not None:
+                                                break
+                                        if val is None:
+                                            continue
+                                        try:
+                                            updates[db_col] = _pd.to_datetime(val)
+                                        except Exception:
+                                            updates[db_col] = val
+
+                                    if updates:
+                                        # Salvar os dados da API no session_state para preencher os campos
+                                        campos_atualizados = list(updates.keys())
+                                        
+                                        # Armazenar os dados da API no session_state para uso posterior
+                                        st.session_state[f"api_data_{idx}"] = updates
+                                        st.session_state[f"api_data_loaded_{idx}"] = True
+                                        
+                                        st.success(f"✅ Dados consultados na API! ({len(campos_atualizados)} campos: {', '.join(campos_atualizados)})")
+                                        st.info("💡 Os dados foram carregados. A página será recarregada para preencher os campos automaticamente.")
+                                        st.rerun()
+                                    else:
+                                        st.info("ℹ️ Nenhuma informação de data disponível na API para preencher")
+                                except Exception as e:
+                                    st.error(f"❌ Erro na consulta direta à API: {str(e)}")
+
+                    if reset_clicked:
+                        # Limpar dados da API do session_state
+                        if f"api_data_loaded_{idx}" in st.session_state:
+                            del st.session_state[f"api_data_loaded_{idx}"]
+                        if f"api_data_{idx}" in st.session_state:
+                            del st.session_state[f"api_data_{idx}"]
+                        
+                        st.success("🔄 Dados da API foram limpos! Os campos voltaram aos valores originais do banco de dados.")
+                        st.info("💡 A página será recarregada para mostrar os valores originais.")
+                        st.rerun()
 
                     if save_clicked:
                         # Prepara dados para atualização

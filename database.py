@@ -1593,6 +1593,215 @@ def _normalize_value(val):
 
     return val
 
+def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True) -> dict:
+    """
+    Valida e coleta dados de monitoramento da viagem usando a API Ellox.
+    
+    Args:
+        vessel_name: Nome do navio
+        voyage_code: Código da viagem  
+        terminal: Nome do terminal
+        
+    Returns:
+        dict: {"success": bool, "data": dict/None, "message": str, "requires_manual": bool}
+    """
+    try:
+        from ellox_api import get_default_api_client
+        import pandas as pd
+        
+        # 1. Verificar se os dados já existem no banco
+        conn = get_database_connection()
+        
+        existing_query = text("""
+            SELECT COUNT(*) as count
+            FROM F_ELLOX_TERMINAL_MONITORINGS 
+            WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+            AND UPPER(VIAGEM) = UPPER(:voyage_code)
+            AND UPPER(TERMINAL) = UPPER(:terminal)
+        """)
+        
+        existing_count = conn.execute(existing_query, {
+            "vessel_name": vessel_name,
+            "voyage_code": voyage_code, 
+            "terminal": terminal
+        }).scalar()
+        
+        conn.close()
+        
+        if existing_count > 0:
+            return {
+                "success": True,
+                "data": None,
+                "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
+                "requires_manual": False
+            }
+        
+        # 2. Tentar obter dados da API Ellox
+        api_client = get_default_api_client()
+        
+        # Testar conexão
+        api_test = api_client.test_connection()
+        if not api_test.get("success"):
+            return {
+                "success": False,
+                "data": None,
+                "message": "❌ API Ellox indisponível no momento",
+                "requires_manual": True
+            }
+        
+        # 3. Resolver CNPJ do terminal
+        cnpj_terminal = None
+        terms_resp = api_client._make_api_request("/api/terminals")
+        if terms_resp.get("success"):
+            for term in terms_resp.get("data", []):
+                nome_term = term.get("nome") or term.get("name") or ""
+                if str(nome_term).strip().upper() == str(terminal).strip().upper() or str(terminal).strip().upper() in str(nome_term).strip().upper():
+                    cnpj_terminal = term.get("cnpj")
+                    break
+        
+        if not cnpj_terminal:
+            return {
+                "success": False,
+                "data": None,
+                "message": f"🟠 Terminal '{terminal}' não localizado na API",
+                "requires_manual": True
+            }
+        
+        # 4. Buscar dados de monitoramento
+        cnpj_client = "60.498.706/0001-57"  # CNPJ Cargill padrão
+        mon_resp = api_client.view_vessel_monitoring(cnpj_client, cnpj_terminal, vessel_name, voyage_code)
+        
+        if not mon_resp.get("success") or not mon_resp.get("data"):
+            return {
+                "success": False,
+                "data": None,
+                "message": f"⚠️ Nenhum dado de monitoramento encontrado na API para {vessel_name} - {voyage_code}",
+                "requires_manual": True
+            }
+        
+        # 5. Processar dados da API
+        data_list = mon_resp.get("data", [])
+        
+        if isinstance(data_list, list) and len(data_list) > 0:
+            payload = data_list[0]
+        elif isinstance(data_list, dict):
+            payload = data_list
+        else:
+            return {
+                "success": False,
+                "data": None,
+                "message": "⚠️ Formato de dados inesperado da API",
+                "requires_manual": True
+            }
+        
+        # 6. Mapear e converter dados
+        def get_api_value(key):
+            if isinstance(payload, dict):
+                for k in payload.keys():
+                    if str(k).lower() == key.lower():
+                        return payload[k]
+            return None
+        
+        api_data = {}
+        mapping = {
+            "data_deadline": "DATA_DEADLINE",
+            "data_draft_deadline": "DATA_DRAFT_DEADLINE", 
+            "data_abertura_gate": "DATA_ABERTURA_GATE",
+            "data_abertura_gate_reefer": "DATA_ABERTURA_GATE_REEFER",
+            "data_estimativa_saida": "DATA_ESTIMATIVA_SAIDA",
+            "etd": "DATA_ESTIMATIVA_SAIDA",
+            "data_estimativa_chegada": "DATA_ESTIMATIVA_CHEGADA",
+            "eta": "DATA_ESTIMATIVA_CHEGADA",
+            "data_estimativa_atracacao": "DATA_ESTIMATIVA_ATRACACAO",
+            "etb": "DATA_ESTIMATIVA_ATRACACAO",
+            "data_atracacao": "DATA_ATRACACAO",
+            "atb": "DATA_ATRACACAO",
+            "data_partida": "DATA_PARTIDA",
+            "atd": "DATA_PARTIDA",
+            "data_chegada": "DATA_CHEGADA",
+            "ata": "DATA_CHEGADA",
+            "data_atualizacao": "DATA_ATUALIZACAO",
+            "last_update": "DATA_ATUALIZACAO",
+            "updated_at": "DATA_ATUALIZACAO"
+        }
+        
+        # Processar cada coluna do banco de dados separadamente
+        db_columns_processed = set()
+        for api_key, db_col in mapping.items():
+            if db_col not in db_columns_processed:
+                val = get_api_value(api_key)
+                if val is not None:
+                    try:
+                        api_data[db_col] = pd.to_datetime(val)
+                        db_columns_processed.add(db_col)
+                    except Exception:
+                        api_data[db_col] = val
+                        db_columns_processed.add(db_col)
+        
+        if not api_data:
+            return {
+                "success": False,
+                "data": None,
+                "message": "ℹ️ Nenhuma data válida encontrada na API",
+                "requires_manual": True
+            }
+        
+        # 7. Salvar dados no banco (apenas se solicitado)
+        if not save_to_db:
+            return {
+                "success": True,
+                "data": api_data,
+                "message": f"✅ Dados de monitoramento encontrados na API ({len(api_data)} campos)",
+                "requires_manual": False,
+                "cnpj_terminal": cnpj_terminal,
+                "agencia": payload.get("agencia", "")
+            }
+
+        try:
+            monitoring_data = {
+                "NAVIO": vessel_name,
+                "VIAGEM": voyage_code,
+                "TERMINAL": terminal,
+                "CNPJ_TERMINAL": cnpj_terminal,
+                "AGENCIA": payload.get("agencia", ""),
+                **api_data
+            }
+            
+            # Usar a função existente para salvar
+            df_monitoring = pd.DataFrame([monitoring_data])
+            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+            
+            if processed_count > 0:
+                return {
+                    "success": True,
+                    "data": api_data,
+                    "message": f"✅ Dados de monitoramento coletados da API e salvos ({len(api_data)} campos)",
+                    "requires_manual": False
+                }
+            else:
+                return {
+                    "success": False,
+                    "data": None,
+                    "message": "❌ Erro ao salvar dados de monitoramento",
+                    "requires_manual": True
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "data": None,
+                "message": f"❌ Erro ao salvar monitoramento: {str(e)}",
+                "requires_manual": True
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "data": None,
+            "message": f"❌ Erro na validação da API: {str(e)}",
+            "requires_manual": True
+        }
+
 def approve_carrier_return(adjustment_id: str, related_reference: str, justification: dict) -> bool:
     """
     Executes the full approval process for a 'Received from Carrier' record within a single transaction.
@@ -1617,30 +1826,72 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 return False
             raise # Re-raise other unexpected errors
 
-        # 2. Fetch latest Ellox data
+        # 2. Validar e coletar dados de monitoramento da viagem (usar buffer, se existir)
+        vessel_name_result = conn.execute(text("SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adj_id"), {"adj_id": adjustment_id}).mappings().fetchone()
+        
         elox_update_values = {}
-        vessel_name = conn.execute(text("SELECT B_VESSEL_NAME FROM LogTransp.F_CON_RETURN_CARRIERS WHERE ADJUSTMENT_ID = :adj_id"), {"adj_id": adjustment_id}).scalar()
-        if vessel_name:
-            monitoring_query = text("""
-                SELECT * FROM (
-                    SELECT * FROM F_ELLOX_TERMINAL_MONITORINGS
-                    WHERE UPPER(NAVIO) = UPPER(:vessel_name)
-                    ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
-                ) WHERE ROWNUM = 1
-            """ )
-            latest_monitoring_record = conn.execute(monitoring_query, {"vessel_name": vessel_name}).mappings().fetchone()
-            if latest_monitoring_record:
-                st.success("✅ Latest Ellox monitoring record found.")
-                column_mapping = {
-                    'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 'DATA_DEADLINE': 'B_DATA_DEADLINE',
-                    'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
-                    'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
-                    'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
-                    'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
-                }
-                for elox_col, return_col in column_mapping.items():
-                    if elox_col.lower() in latest_monitoring_record and latest_monitoring_record[elox_col.lower()] is not None:
-                        elox_update_values[return_col] = latest_monitoring_record[elox_col.lower()]
+        voyage_validation_result = None
+        
+        if vessel_name_result:
+            vessel_name = vessel_name_result.get("b_vessel_name")
+            voyage_code = vessel_name_result.get("b_voyage_code") or ""
+            terminal = vessel_name_result.get("b_terminal") or ""
+            
+            if vessel_name and terminal:
+                # Se houver buffer prévio no session_state, utiliza; senão, apenas valida (sem salvar ainda)
+                api_buf_key = f"voyage_api_buffer_{adjustment_id}"
+                api_buf = st.session_state.get(api_buf_key)
+                if not api_buf:
+                    voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                    if voyage_validation_result.get("success"):
+                        api_buf = {
+                            "NAVIO": vessel_name,
+                            "VIAGEM": voyage_code,
+                            "TERMINAL": terminal,
+                            "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
+                            "AGENCIA": voyage_validation_result.get("agencia", ""),
+                        }
+                        for k, v in (voyage_validation_result.get("data") or {}).items():
+                            api_buf[k] = v
+                        st.session_state[api_buf_key] = api_buf
+                    elif voyage_validation_result.get("requires_manual"):
+                        st.warning(voyage_validation_result.get("message", ""))
+                        st.session_state["voyage_manual_entry_required"] = {
+                            "adjustment_id": adjustment_id,
+                            "vessel_name": vessel_name,
+                            "voyage_code": voyage_code,
+                            "terminal": terminal,
+                            "message": voyage_validation_result.get("message", "")
+                        }
+                    else:
+                        st.error(voyage_validation_result.get("message", ""))
+
+                # Se existe buffer, persiste em F_ELLOX_TERMINAL_MONITORINGS agora (no momento da confirmação)
+                if api_buf:
+                    try:
+                        df_monitoring = pd.DataFrame([api_buf])
+                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                        if processed_count > 0:
+                            st.success("✅ Dados de monitoramento prontos para atualização do registro.")
+                            # Preenche valores para refletir no retorno
+                            column_mapping = {
+                                'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
+                                'DATA_DEADLINE': 'B_DATA_DEADLINE',
+                                'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
+                                'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                                'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
+                                'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
+                                'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
+                                'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                                'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
+                            }
+                            for src, dst in column_mapping.items():
+                                if src in api_buf and api_buf[src] is not None:
+                                    elox_update_values[dst] = api_buf[src]
+                        # Limpa o buffer após persistir
+                        st.session_state.pop(api_buf_key, None)
+                    except Exception as e:
+                        st.error(f"❌ Erro ao persistir dados de monitoramento: {str(e)}")
 
         # 3. Prepare and execute the UPDATE on F_CON_RETURN_CARRIERS
         update_params = {"adjustment_id": adjustment_id, "user_update": "System"}

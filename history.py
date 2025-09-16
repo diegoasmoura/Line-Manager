@@ -496,6 +496,28 @@ def get_file_icon(mime_type, file_name):
     else:
         return "📎"
 
+def get_main_table_data(farol_ref):
+    """Busca dados específicos da tabela principal F_CON_SALES_BOOKING_DATA"""
+    try:
+        conn = get_database_connection()
+        # Usando os mesmos nomes de coluna das outras funções que funcionam
+        query = text("""
+            SELECT 
+                S_QUANTITY_OF_CONTAINERS,
+                B_VOYAGE_CARRIER,
+                ROW_INSERTED_DATE
+            FROM LogTransp.F_CON_SALES_BOOKING_DATA
+            WHERE FAROL_REFERENCE = :farol_reference
+        """)
+        result = conn.execute(query, {"farol_reference": farol_ref}).mappings().fetchone()
+        conn.close()
+        return result
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+        st.error(f"❌ Erro na consulta: {str(e)}")
+        return None
+
 def display_attachments_section(farol_reference):
     """
     Exibe a seção de anexos para um Farol Reference específico.
@@ -906,28 +928,6 @@ def exibir_history():
     main_status = get_current_status_from_main_table(farol_reference) or "-"
     
     # Busca dados da tabela principal F_CON_SALES_BOOKING_DATA em vez do último registro
-    def get_main_table_data(farol_ref):
-        """Busca dados específicos da tabela principal F_CON_SALES_BOOKING_DATA"""
-        try:
-            conn = get_database_connection()
-            # Usando os mesmos nomes de coluna das outras funções que funcionam
-            query = text("""
-                SELECT 
-                    S_QUANTITY_OF_CONTAINERS,
-                    B_VOYAGE_CARRIER,
-                    ROW_INSERTED_DATE
-                FROM LogTransp.F_CON_SALES_BOOKING_DATA
-                WHERE FAROL_REFERENCE = :farol_reference
-            """)
-            result = conn.execute(query, {"farol_reference": farol_ref}).mappings().fetchone()
-            conn.close()
-            return result
-        except Exception as e:
-            if 'conn' in locals():
-                conn.close()
-            st.error(f"❌ Erro na consulta: {str(e)}")
-            return None
-    
     main_data = get_main_table_data(farol_reference)
     
     if main_data:
@@ -936,7 +936,7 @@ def exibir_history():
         
         qty = main_data.get("s_quantity_of_containers", 0)
         try:
-            qty = int(qty) if qty is not None and pd.notna(qty) else 0
+            qty = int(qty) if qty is not None and not pd.isna(qty) else 0
         except (ValueError, TypeError):
             qty = 0
         
@@ -1768,30 +1768,96 @@ def exibir_history():
             # Seleção mudou, limpa status pendente
             if f"pending_status_change_{farol_reference}" in st.session_state:
                 del st.session_state[f"pending_status_change_{farol_reference}"]
+            # Limpa qualquer gatilho/flag de formulário manual pendente ao trocar a seleção
+            if "voyage_manual_entry_required" in st.session_state:
+                del st.session_state["voyage_manual_entry_required"]
+            # Limpa aviso de sucesso da API
+            if "voyage_success_notice" in st.session_state:
+                del st.session_state["voyage_success_notice"]
+            # Limpa possíveis triggers por ajuste anterior
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("manual_related_ref_value_") or str(k).startswith("manual_trigger_"):
+                    try:
+                        del st.session_state[k]
+                    except Exception:
+                        pass
             if "pending_status_change" in st.session_state:
                 del st.session_state["pending_status_change"]
         
         # Atualiza o ID da seleção atual
         st.session_state[f"last_selected_adjustment_id_{farol_reference}"] = current_adjustment_id
     else:
-        # Nenhuma linha selecionada, limpa status pendente
+        # Nenhuma linha selecionada, limpa status e avisos/flags
         if f"pending_status_change_{farol_reference}" in st.session_state:
             del st.session_state[f"pending_status_change_{farol_reference}"]
         if "pending_status_change" in st.session_state:
             del st.session_state["pending_status_change"]
         if f"last_selected_adjustment_id_{farol_reference}" in st.session_state:
             del st.session_state[f"last_selected_adjustment_id_{farol_reference}"]
+        if "voyage_manual_entry_required" in st.session_state:
+            del st.session_state["voyage_manual_entry_required"]
+        if "voyage_success_notice" in st.session_state:
+            del st.session_state["voyage_success_notice"]
 
     # Função para aplicar mudanças de status (declarada antes do uso)
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
         try:
             if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
+                # 1. Primeiro validar dados de voyage monitoring ANTES de aprovar
+                from database import validate_and_collect_voyage_monitoring
+                
+                # Buscar dados do navio, viagem e terminal
+                conn = get_database_connection()
+                vessel_data = conn.execute(text("""
+                    SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
+                    FROM LogTransp.F_CON_RETURN_CARRIERS 
+                    WHERE ADJUSTMENT_ID = :adj_id
+                """), {"adj_id": adjustment_id}).mappings().fetchone()
+                conn.close()
+                
+                if vessel_data:
+                    vessel_name = vessel_data.get("b_vessel_name")
+                    voyage_code = vessel_data.get("b_voyage_code") or ""
+                    terminal = vessel_data.get("b_terminal") or ""
+                    
+                    if vessel_name and terminal:
+                        # Validar dados de monitoramento da viagem (sem salvar ainda)
+                        voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                        
+                        # Se requer entrada manual, definir no session_state e NÃO aprovar ainda
+                        if voyage_validation_result.get("requires_manual"):
+                            st.warning(voyage_validation_result.get("message", ""))
+                            st.session_state["voyage_manual_entry_required"] = {
+                                "adjustment_id": adjustment_id,
+                                "vessel_name": vessel_name,
+                                "voyage_code": voyage_code,
+                                "terminal": terminal,
+                                "message": voyage_validation_result.get("message", ""),
+                                "pending_approval": True,  # Flag para indicar que está pendente de aprovação
+                                "justification": {
+                                    "area": area,
+                                    "request_reason": reason,
+                                    "adjustments_owner": responsibility,
+                                    "comments": comment
+                                },
+                                "related_reference": related_reference
+                            }
+                            st.info("ℹ️ **Formulário manual de voyage monitoring será exibido abaixo.** Preencha os dados e clique em 'Salvar Dados Manuais' para continuar com a aprovação.")
+                            return
+                        elif voyage_validation_result.get("success"):
+                            st.info(voyage_validation_result.get("message", ""))
+                        else:
+                            st.error(voyage_validation_result.get("message", ""))
+                            return
+                
+                # 2. Se chegou até aqui, prosseguir com aprovação normal
                 justification = {
                     "area": area,
                     "request_reason": reason,
                     "adjustments_owner": responsibility,
                     "comments": comment
                 }
+                from database import approve_carrier_return
                 result = approve_carrier_return(adjustment_id, related_reference, justification)
                 if result:
                     st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
@@ -1849,6 +1915,70 @@ def exibir_history():
                             key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
+                    # Validação imediata da API (somente setar flag; não exibir formulário sem o flag)
+                    if selected_row_status == "Received from Carrier":
+                        # Buscar dados do navio, viagem e terminal
+                        conn = get_database_connection()
+                        vessel_data = conn.execute(text("""
+                            SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
+                            FROM LogTransp.F_CON_RETURN_CARRIERS 
+                            WHERE ADJUSTMENT_ID = :adj_id
+                        """), {"adj_id": adjustment_id}).mappings().fetchone()
+                        conn.close()
+                        
+                        if vessel_data:
+                            vessel_name = vessel_data.get("b_vessel_name")
+                            voyage_code = vessel_data.get("b_voyage_code") or ""
+                            terminal = vessel_data.get("b_terminal") or ""
+                            
+                            if vessel_name and terminal:
+                                # Validar dados de monitoramento da viagem IMEDIATAMENTE (sem salvar)
+                                from database import validate_and_collect_voyage_monitoring
+                                voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                                
+                                # Se requer entrada manual, definir no session_state e mostrar formulário
+                                if voyage_validation_result.get("requires_manual"):
+                                    st.session_state["voyage_manual_entry_required"] = {
+                                        "adjustment_id": adjustment_id,
+                                        "vessel_name": vessel_name,
+                                        "voyage_code": voyage_code,
+                                        "terminal": terminal,
+                                        "message": voyage_validation_result.get("message", ""),
+                                        "pending_approval": True
+                                    }
+                                    st.rerun()
+                                elif voyage_validation_result.get("success"):
+                                    # Armazenar dados da API em buffer para usar na confirmação
+                                    api_buf = {
+                                        "NAVIO": vessel_name,
+                                        "VIAGEM": voyage_code,
+                                        "TERMINAL": terminal,
+                                        "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
+                                        "AGENCIA": voyage_validation_result.get("agencia", ""),
+                                    }
+                                    # Inclui datas da API
+                                    for k, v in (voyage_validation_result.get("data") or {}).items():
+                                        api_buf[k] = v
+                                    st.session_state[f"voyage_api_buffer_{adjustment_id}"] = api_buf
+                                    
+                                    # Alerta estruturado (via flash) quando a API retorna dados/encontra a combinação
+                                    api_fields = voyage_validation_result.get("data") or {}
+                                    try:
+                                        fields_count = len(api_fields)
+                                    except Exception:
+                                        fields_count = 0
+                                    campos_txt = f" Campos atualizados: {fields_count}." if fields_count > 0 else ""
+                                    msg = (
+                                        f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
+                                        f"Foram encontrados dados de monitoramento na API Ellox para a combinação **🚢 {vessel_name} | {voyage_code} | {terminal}**.{campos_txt} "
+                                        f"Os campos foram preenchidos automaticamente. Continue com a aprovação."
+                                    )
+                                    st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                else:
+                                    st.error(voyage_validation_result.get("message", ""))
+                                    st.rerun()
+                    
+                    # Se chegou até aqui, prosseguir com fluxo normal
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
                     st.rerun()
             
@@ -1877,65 +2007,420 @@ def exibir_history():
                     st.rerun()
         
             
-        # Confirmação quando há status pendente
-        pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
-        if pending_status:
+        # Verificar se é necessário cadastro manual de voyage monitoring
+        voyage_manual_required = st.session_state.get("voyage_manual_entry_required")
+        voyage_success_notice = st.session_state.get("voyage_success_notice")
+        # Exibe o formulário manual SOMENTE quando foi explicitamente disparado pelo clique em "Booking Approved"
+        # (flag pending_approval = True) e pertence à mesma linha selecionada
+        if (
+            voyage_manual_required
+            and voyage_manual_required.get("adjustment_id") == adjustment_id
+            and bool(voyage_manual_required.get("pending_approval", False))
+        ):
             st.markdown("---")
-            st.warning(f"**Confirmar alteração para:** {pending_status}")
             
-            # Validação especial para itens "Received from Carrier" sendo aprovados
-            related_reference = None
-            if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
-                st.info("📋 **Este item é um retorno do armador. Antes de aprovar, informe a referência da aba relacionada:**")
+            vessel_name = voyage_manual_required.get("vessel_name", "")
+            voyage_code = voyage_manual_required.get("voyage_code", "")
+            terminal = voyage_manual_required.get("terminal", "")
+            
+            st.warning(f"⚠️ **Cadastro Manual de Voyage Monitoring Necessário**\n\nNão foram encontrados dados de monitoramento na API Ellox para a combinação **🚢 {vessel_name} | {voyage_code} | {terminal}**. Preencha os dados manualmente abaixo para continuar com a aprovação.")
+            
+            
+            # Formulário similar ao voyage_monitoring.py
+            with st.form(f"voyage_manual_form_{adjustment_id}"):
+                st.subheader("📋 Cadastrar Dados de Monitoramento Manualmente")
                 
-                # Busca referências disponíveis na aba 'Other Status' restringindo à mesma Farol Reference
-                available_refs = get_available_references_for_relation(farol_ref)
+                # Função auxiliar para converter datetime de forma segura (reutilizada do voyage_monitoring.py)
+                def safe_datetime_to_date(dt_value):
+                    if dt_value is not None and str(dt_value) != 'NaT' and hasattr(dt_value, 'date'):
+                        try:
+                            return dt_value.date()
+                        except:
+                            return None
+                    return None
                 
-                if available_refs:
-                    # Filtra somente Status desejados na UI: 📦 Cargill Booking Request ou 🛠️ Cargill (Adjusts)
-                    # Regras equivalentes nos dados:
-                    # - 📦 Cargill Booking Request: primeiras inserções de Booking Requested (sem Linked_Reference)
-                    # - 🛠️ Cargill (Adjusts): P_STATUS = 'Adjusts Cargill'
-                    def _is_empty(value):
+                def safe_datetime_to_time(dt_value):
+                    if dt_value is not None and str(dt_value) != 'NaT' and hasattr(dt_value, 'time'):
                         try:
-                            if value is None:
-                                return True
-                            if isinstance(value, str):
-                                v = value.strip()
-                                return v == '' or v.upper() == 'NULL'
-                            import pandas as _pd
-                            return _pd.isna(value)
-                        except Exception:
-                            return False
-
-                    filtered = []
-                    for ref in available_refs:
-                        p_status = str(ref.get('P_STATUS', '') or '').strip()
-                        b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                        linked = ref.get('LINKED_REFERENCE')
-
-                        # Inclui 📦 Cargill Booking Request e 🛠️ Cargill (Adjusts) sem Linked
-                        if (b_status == 'Booking Requested' and _is_empty(linked)) or (b_status == 'Adjustment Requested' and _is_empty(linked)):
-                            filtered.append(ref)
-
-                    # Ordena por dia crescente e, dentro do mesmo dia, horário decrescente (HH:MM mais recente primeiro)
-                    def sort_by_date(ref):
-                        try:
-                            date_val = ref.get('ROW_INSERTED_DATE')
-                            dt = pd.to_datetime(date_val, errors='coerce')
-                            if pd.isna(dt):
-                                return (pd.Timestamp('1900-01-01').date(), 0)
-                            return (dt.date(), -int(getattr(dt, 'value', 0)))
-                        except Exception:
-                            return (pd.Timestamp('1900-01-01').date(), 0)
-
-                    available_refs = sorted(filtered, key=sort_by_date)
+                            return dt_value.time()
+                        except:
+                            return None
+                    return None
+                
+                # Datas importantes
+                st.markdown("#### Datas Importantes")
+                
+                # Primeira linha: Data Deadline e Data Draft Deadline
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    col_deadline_date, col_deadline_time = st.columns([2, 1])
+                    with col_deadline_date:
+                        manual_deadline_date = st.date_input("⏳ Data Deadline", value=None, key=f"manual_deadline_date_{adjustment_id}", help="Data limite para entrega de documentos")
+                    with col_deadline_time:
+                        manual_deadline_time = st.time_input("Hora", value=None, key=f"manual_deadline_time_{adjustment_id}", help="Hora limite para entrega de documentos")
+                
+                with col2:
+                    col_draft_date, col_draft_time = st.columns([2, 1])
+                    with col_draft_date:
+                        manual_draft_date = st.date_input("📝 Data Draft Deadline", value=None, key=f"manual_draft_date_{adjustment_id}", help="Data limite para entrega do draft")
+                    with col_draft_time:
+                        manual_draft_time = st.time_input("Hora", value=None, key=f"manual_draft_time_{adjustment_id}", help="Hora limite para entrega do draft")
+                
+                # Segunda linha: Data Abertura Gate e Data Abertura Gate Reefer
+                col4, col5 = st.columns(2)
+                
+                with col4:
+                    col_gate_date, col_gate_time = st.columns([2, 1])
+                    with col_gate_date:
+                        manual_gate_date = st.date_input("🚪 Data Abertura Gate", value=None, key=f"manual_gate_date_{adjustment_id}", help="Data de abertura do gate para recebimento de cargas")
+                    with col_gate_time:
+                        manual_gate_time = st.time_input("Hora", value=None, key=f"manual_gate_time_{adjustment_id}", help="Hora de abertura do gate para recebimento de cargas")
+                
+                with col5:
+                    col_reefer_date, col_reefer_time = st.columns([2, 1])
+                    with col_reefer_date:
+                        manual_reefer_date = st.date_input("🧊 Data Abertura Gate Reefer", value=None, key=f"manual_reefer_date_{adjustment_id}", help="Data de abertura do gate para cargas refrigeradas")
+                    with col_reefer_time:
+                        manual_reefer_time = st.time_input("Hora", value=None, key=f"manual_reefer_time_{adjustment_id}", help="Hora de abertura do gate para cargas refrigeradas")
+                
+                # Datas de navegação
+                st.markdown("#### Datas de Navegação")
+                
+                # Primeira linha: ETD e ETA
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    col_etd_date, col_etd_time = st.columns([2, 1])
+                    with col_etd_date:
+                        manual_etd_date = st.date_input("🚢 Data Estimativa Saída (ETD)", value=None, key=f"manual_etd_date_{adjustment_id}", help="Data estimada de saída do porto")
+                    with col_etd_time:
+                        manual_etd_time = st.time_input("Hora", value=None, key=f"manual_etd_time_{adjustment_id}", help="Hora estimada de saída do porto")
+                
+                with col2:
+                    col_eta_date, col_eta_time = st.columns([2, 1])
+                    with col_eta_date:
+                        manual_eta_date = st.date_input("🎯 Data Estimativa Chegada (ETA)", value=None, key=f"manual_eta_date_{adjustment_id}", help="Data estimada de chegada ao porto")
+                    with col_eta_time:
+                        manual_eta_time = st.time_input("Hora", value=None, key=f"manual_eta_time_{adjustment_id}", help="Hora estimada de chegada ao porto")
+                
+                # Segunda linha: ETB e ATB
+                col4, col5 = st.columns(2)
+                
+                with col4:
+                    col_etb_date, col_etb_time = st.columns([2, 1])
+                    with col_etb_date:
+                        manual_etb_date = st.date_input("🛳️ Data Estimativa Atracação (ETB)", value=None, key=f"manual_etb_date_{adjustment_id}", help="Data estimada de atracação no cais")
+                    with col_etb_time:
+                        manual_etb_time = st.time_input("Hora", value=None, key=f"manual_etb_time_{adjustment_id}", help="Hora estimada de atracação no cais")
+                
+                with col5:
+                    col_atb_date, col_atb_time = st.columns([2, 1])
+                    with col_atb_date:
+                        manual_atb_date = st.date_input("✅ Data Atracação (ATB)", value=None, key=f"manual_atb_date_{adjustment_id}", help="Data real de atracação no cais")
+                    with col_atb_time:
+                        manual_atb_time = st.time_input("Hora", value=None, key=f"manual_atb_time_{adjustment_id}", help="Hora real de atracação no cais")
+                
+                # Chegada e Partida
+                st.markdown("#### Chegada e Partida")
+                
+                # Layout com 2 colunas
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    col_atd_date, col_atd_time = st.columns([2, 1])
+                    with col_atd_date:
+                        manual_atd_date = st.date_input("📤 Data Partida (ATD)", value=None, key=f"manual_atd_date_{adjustment_id}", help="Data real de partida do porto")
+                    with col_atd_time:
+                        manual_atd_time = st.time_input("Hora", value=None, key=f"manual_atd_time_{adjustment_id}", help="Hora real de partida do porto")
+                
+                with col2:
+                    col_ata_date, col_ata_time = st.columns([2, 1])
+                    with col_ata_date:
+                        manual_ata_date = st.date_input("📥 Data Chegada (ATA)", value=None, key=f"manual_ata_date_{adjustment_id}", help="Data real de chegada ao porto")
+                    with col_ata_time:
+                        manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
+                
+                # Botões do formulário
+                col_save, col_skip = st.columns([1, 1])
+                
+                with col_save:
+                    save_manual_clicked = st.form_submit_button("💾 Salvar Dados Manuais", type="primary")
+                
+                with col_skip:
+                    skip_manual_clicked = st.form_submit_button("⏭️ Pular e Continuar Aprovação")
+                
+                if save_manual_clicked:
+                    # Preparar dados para inserção
+                    from datetime import datetime
                     
-                    # Cria opções para o selectbox com formato limpo
-                    ref_options = []
-                    for ref in available_refs:
-                        # Formata a data de inserção com hora e minuto
-                        inserted_date = ref.get('ROW_INSERTED_DATE', '')
+                    monitoring_data = {
+                        "NAVIO": vessel_name,
+                        "VIAGEM": voyage_code,
+                        "TERMINAL": terminal,
+                        "AGENCIA": "",  # Pode ser deixado vazio para entrada manual
+                        "CNPJ_TERMINAL": "",  # Pode ser resolvido posteriormente
+                    }
+                    
+                    # Adicionar datas se foram informadas
+                    if manual_deadline_date and manual_deadline_time:
+                        monitoring_data["DATA_DEADLINE"] = datetime.combine(manual_deadline_date, manual_deadline_time)
+                    
+                    if manual_draft_date and manual_draft_time:
+                        monitoring_data["DATA_DRAFT_DEADLINE"] = datetime.combine(manual_draft_date, manual_draft_time)
+                    
+                    if manual_gate_date and manual_gate_time:
+                        monitoring_data["DATA_ABERTURA_GATE"] = datetime.combine(manual_gate_date, manual_gate_time)
+                    
+                    if manual_reefer_date and manual_reefer_time:
+                        monitoring_data["DATA_ABERTURA_GATE_REEFER"] = datetime.combine(manual_reefer_date, manual_reefer_time)
+                    
+                    if manual_etd_date and manual_etd_time:
+                        monitoring_data["DATA_ESTIMATIVA_SAIDA"] = datetime.combine(manual_etd_date, manual_etd_time)
+                    
+                    if manual_eta_date and manual_eta_time:
+                        monitoring_data["DATA_ESTIMATIVA_CHEGADA"] = datetime.combine(manual_eta_date, manual_eta_time)
+                    
+                    if manual_etb_date and manual_etb_time:
+                        monitoring_data["DATA_ESTIMATIVA_ATRACACAO"] = datetime.combine(manual_etb_date, manual_etb_time)
+                    
+                    if manual_atb_date and manual_atb_time:
+                        monitoring_data["DATA_ATRACACAO"] = datetime.combine(manual_atb_date, manual_atb_time)
+                    
+                    if manual_atd_date and manual_atd_time:
+                        monitoring_data["DATA_PARTIDA"] = datetime.combine(manual_atd_date, manual_atd_time)
+                    
+                    if manual_ata_date and manual_ata_time:
+                        monitoring_data["DATA_CHEGADA"] = datetime.combine(manual_ata_date, manual_ata_time)
+                    
+                    # Salvar no banco usando a função existente
+                    try:
+                        from database import upsert_terminal_monitorings_from_dataframe
+                        df_monitoring = pd.DataFrame([monitoring_data])
+                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                        
+                        if processed_count > 0:
+                            st.success("✅ Dados de monitoramento salvos com sucesso!")
+                            
+                            # Se há aprovação pendente, completar a aprovação
+                            if voyage_manual_required.get("pending_approval", False):
+                                st.info("🔄 Completando aprovação...")
+                                
+                                # Obter dados da justificativa (valores padrão)
+                                justification = {
+                                    "area": "Booking",
+                                    "request_reason": "Voyage Monitoring",
+                                    "adjustments_owner": "System",
+                                    "comments": "Dados de monitoramento inseridos manualmente"
+                                }
+                                related_reference = "New Adjustment"
+                                
+                                # Completar aprovação
+                                from database import approve_carrier_return
+                                result = approve_carrier_return(adjustment_id, related_reference, justification)
+                                
+                                if result:
+                                    st.success("✅ Aprovação concluída com sucesso!")
+                                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful with manual voyage data!"}
+                                else:
+                                    st.error("❌ Erro ao completar aprovação")
+                            
+                            # Limpar o flag de entrada manual
+                            if "voyage_manual_entry_required" in st.session_state:
+                                del st.session_state["voyage_manual_entry_required"]
+                            
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error("❌ Erro ao salvar dados de monitoramento")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao salvar: {str(e)}")
+                
+                if skip_manual_clicked:
+                    # Se há aprovação pendente, completar a aprovação sem dados de monitoramento
+                    if voyage_manual_required.get("pending_approval", False):
+                        st.info("🔄 Completando aprovação sem dados de monitoramento...")
+                        
+                        # Obter dados da justificativa (valores padrão)
+                        justification = {
+                            "area": "Booking",
+                            "request_reason": "Voyage Monitoring",
+                            "adjustments_owner": "System",
+                            "comments": "Aprovação sem dados de monitoramento"
+                        }
+                        related_reference = "New Adjustment"
+                        
+                        # Completar aprovação
+                        from database import approve_carrier_return
+                        result = approve_carrier_return(adjustment_id, related_reference, justification)
+                        
+                        if result:
+                            st.success("✅ Aprovação concluída com sucesso!")
+                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful without voyage data!"}
+                        else:
+                            st.error("❌ Erro ao completar aprovação")
+                    
+                    # Limpar o flag de entrada manual
+                    if "voyage_manual_entry_required" in st.session_state:
+                        del st.session_state["voyage_manual_entry_required"]
+                    
+                    st.cache_data.clear()
+                    st.rerun()
+        
+            # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
+
+        # Exibe aviso de sucesso (mesma posição) quando a API encontrou dados, mas antes de confirmar aprovação
+        if voyage_success_notice and voyage_success_notice.get("adjustment_id") == adjustment_id:
+            st.markdown("---")
+            st.success(voyage_success_notice.get("message", ""))
+
+        # --- Seleção de Referência (SEMPRE após as mensagens, antes da confirmação) ---
+        # Aparece para "Received from Carrier" quando há status pendente OU quando há formulário manual
+        related_reference = None  # Inicializa a variável
+        pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
+        voyage_manual_required = st.session_state.get("voyage_manual_entry_required")
+        
+        # Mostra seleção de referência se:
+        # 1. Há pending_status (aprovação normal) OU
+        # 2. Há voyage_manual_required para este adjustment_id (formulário manual ativo)
+        show_reference_selection = (
+            selected_row_status == "Received from Carrier" and 
+            (pending_status or (voyage_manual_required and voyage_manual_required.get("adjustment_id") == adjustment_id))
+        )
+        
+        if show_reference_selection:
+            st.markdown("---")
+            st.markdown("#### 🔗 Referência Relacionada")
+            try:
+                available_refs = get_available_references_for_relation(farol_ref)
+            except Exception:
+                available_refs = []
+
+            ref_options = ["Selecione uma referência..."]
+            if available_refs:
+                def _is_empty_local(value):
+                    try:
+                        if value is None:
+                            return True
+                        if isinstance(value, str):
+                            v = value.strip()
+                            return v == '' or v.upper() == 'NULL'
+                        import pandas as _pd
+                        return _pd.isna(value)
+                    except Exception:
+                        return False
+
+                filtered = []
+                for ref in available_refs:
+                    p_status = str(ref.get('P_STATUS', '') or '').strip()
+                    b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                    linked = ref.get('LINKED_REFERENCE')
+                    if (b_status == 'Booking Requested' and _is_empty_local(linked)) or (b_status == 'Adjustment Requested' and _is_empty_local(linked)):
+                        filtered.append(ref)
+
+                def sort_by_date(ref):
+                    try:
+                        date_val = ref.get('ROW_INSERTED_DATE')
+                        dt = pd.to_datetime(date_val, errors='coerce')
+                        if pd.isna(dt):
+                            return (pd.Timestamp('1900-01-01').date(), 0)
+                        return (dt.date(), -int(getattr(dt, 'value', 0)))
+                    except Exception:
+                        return (pd.Timestamp('1900-01-01').date(), 0)
+
+                filtered = sorted(filtered, key=sort_by_date)
+
+                for ref in filtered:
+                    inserted_date = ref.get('ROW_INSERTED_DATE', '')
+                    if inserted_date and hasattr(inserted_date, 'strftime'):
+                        date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                    else:
+                        date_str_raw = str(inserted_date) if inserted_date else ''
+                        if len(date_str_raw) >= 16:
+                            try:
+                                parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                if len(parts) == 2:
+                                    date_part = parts[0].split('-')
+                                    time_part = parts[1][:5]
+                                    if len(date_part) == 3:
+                                        date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                    else:
+                                        date_str = date_str_raw[:16]
+                                else:
+                                    date_str = date_str_raw[:16]
+                            except:
+                                date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                        else:
+                            date_str = 'N/A'
+
+                    p_status = str(ref.get('P_STATUS', '') or '').strip()
+                    b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                    linked = ref.get('LINKED_REFERENCE')
+
+                    if p_status.lower() == 'adjusts cargill':
+                        status_display = 'Cargill (Adjusts)'
+                    elif b_status == 'Booking Requested' and _is_empty_local(linked):
+                        status_display = 'Cargill Booking Request'
+                    else:
+                        status_display = b_status or p_status or 'Status'
+
+                    option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
+                    ref_options.append(option_text)
+
+            ref_options.append("🆕 New Adjustment")
+
+            selected_ref = st.selectbox(
+                "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
+                options=ref_options,
+                key="related_reference_select"
+            )
+
+            if selected_ref and selected_ref != "Selecione uma referência...":
+                if selected_ref == "🆕 New Adjustment":
+                    related_reference = "New Adjustment"
+                    st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                    
+                    # Campos de justificativa obrigatórios para New Adjustment
+                    st.markdown("#### 📋 Justificativas do Armador - New Adjustment")
+                    
+                    # Preenche automaticamente o campo Responsibility se houver apenas uma opção
+                    auto_responsibility = None
+                    if len(Booking_adj_responsibility_car) == 1:
+                        auto_responsibility = Booking_adj_responsibility_car[0]
+                    elif len(Booking_adj_responsibility_car) > 1:
+                        col_a, col_b = st.columns([1, 1])
+                        with col_a:
+                            reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
+                        with col_b:
+                            responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility_car, key="responsibility_new_adjustment")
+                    else:
+                        # Fallback se não houver opções
+                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
+                        responsibility_new_adj = None
+                        st.warning("⚠️ Nenhuma opção de responsabilidade disponível")
+                    
+                    # Se não foi criado o selectbox, cria apenas o de reason
+                    if 'reason_new_adj' not in locals():
+                        reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
+                    
+                    comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
+                    
+                    # Armazena os valores no session_state para usar na confirmação
+                    st.session_state["new_adjustment_reason"] = reason_new_adj
+                    st.session_state["new_adjustment_responsibility"] = auto_responsibility if auto_responsibility else responsibility_new_adj
+                    st.session_state["new_adjustment_comment"] = comment_new_adj
+                else:
+                    # Extrai a Farol Reference da opção selecionada (formato limpo)
+                    farol_ref_from_selection = selected_ref.split(" | ")[0]
+                    
+                    # Busca o registro correspondente pela Farol Reference
+                    selected_ref_data = next((ref for ref in filtered if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
+                    if selected_ref_data:
+                        # Salva a chave completa (sem ícones) como Linked Reference
+                        related_reference = selected_ref
+                        
+                        # Formata a data para exibição com hora e minuto
+                        inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')
                         if inserted_date and hasattr(inserted_date, 'strftime'):
                             date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
                         else:
@@ -1958,130 +2443,40 @@ def exibir_history():
                                     date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
                             else:
                                 date_str = 'N/A'
-                        # Define o status a exibir como segunda coluna
-                        p_status = str(ref.get('P_STATUS', '') or '').strip()
-                        b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                        linked = ref.get('LINKED_REFERENCE')
+                        
+                        # Exibe com o mesmo padrão (Status como segunda coluna)
+                        p_status_sel = str(selected_ref_data.get('P_STATUS', '') or '').strip()
+                        b_status_sel = str(selected_ref_data.get('B_BOOKING_STATUS', '') or '').strip()
+                        linked_sel = selected_ref_data.get('LINKED_REFERENCE')
 
-                        def _is_empty_local(value):
-                            try:
-                                if value is None:
-                                    return True
-                                if isinstance(value, str):
-                                    v = value.strip()
-                                    return v == '' or v.upper() == 'NULL'
-                                import pandas as _pd
-                                return _pd.isna(value)
-                            except Exception:
-                                return False
-
-                        if p_status.lower() == 'adjusts cargill':
-                            status_display = 'Cargill (Adjusts)'
-                        elif b_status == 'Booking Requested' and _is_empty_local(linked):
-                            status_display = 'Cargill Booking Request'
+                        if p_status_sel.lower() == 'adjusts cargill':
+                            status_display_sel = 'Cargill (Adjusts)'
+                        elif b_status_sel == 'Booking Requested' and ((linked_sel is None) or (isinstance(linked_sel, str) and linked_sel.strip() in ('', 'NULL'))):
+                            status_display_sel = 'Cargill Booking Request'
                         else:
-                            status_display = b_status or p_status or 'Status'
+                            status_display_sel = b_status_sel or p_status_sel or 'Status'
 
-                        option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
-                        ref_options.append(option_text)
-                    
-                    ref_options.insert(0, "Selecione uma referência...")
-                    ref_options.append("🆕 New Adjustment")  # Opção para ajuste sem referência prévia
-                    
-                    selected_ref = st.selectbox(
-                        "Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':",
-                        options=ref_options,
-                        key="related_reference_select"
-                    )
-                    
-                    if selected_ref and selected_ref != "Selecione uma referência...":
-                        if selected_ref == "🆕 New Adjustment":
-                            related_reference = "New Adjustment"
-                            st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
-                            
-                            # Campos de justificativa obrigatórios para New Adjustment
-                            st.markdown("#### 📋 Justificativas do Armador - New Adjustment")
-                            
-                            # Preenche automaticamente o campo Responsibility se houver apenas uma opção
-                            auto_responsibility = None
-                            if len(Booking_adj_responsibility_car) == 1:
-                                auto_responsibility = Booking_adj_responsibility_car[0]
-                            elif len(Booking_adj_responsibility_car) > 1:
-                                col_a, col_b = st.columns([1, 1])
-                                with col_a:
-                                    reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
-                                with col_b:
-                                    responsibility_new_adj = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility_car, key="responsibility_new_adjustment")
-                            else:
-                                # Fallback se não houver opções
-                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
-                                responsibility_new_adj = None
-                                st.warning("⚠️ Nenhuma opção de responsabilidade disponível")
-                            
-                            # Se não foi criado o selectbox, cria apenas o de reason
-                            if 'reason_new_adj' not in locals():
-                                reason_new_adj = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason_car, key="reason_new_adjustment")
-                            
-                            comment_new_adj = st.text_area("Comentários", key="comment_new_adjustment")
-                            
-                            # Armazena os valores no session_state para usar na confirmação
-                            st.session_state["new_adjustment_reason"] = reason_new_adj
-                            st.session_state["new_adjustment_responsibility"] = auto_responsibility if auto_responsibility else responsibility_new_adj
-                            st.session_state["new_adjustment_comment"] = comment_new_adj
-                        else:
-                            # Extrai a Farol Reference da opção selecionada (formato limpo)
-                            # Formato: "FR_25.09_0001 | 12/09/2025 17:25 | Booking Requested"
-                            farol_ref_from_selection = selected_ref.split(" | ")[0]
-                            
-                            # Busca o registro correspondente pela Farol Reference
-                            selected_ref_data = next((ref for ref in available_refs if ref['FAROL_REFERENCE'] == farol_ref_from_selection), None)
-                            if selected_ref_data:
-                                # Salva a chave completa (sem ícones) como Linked Reference
-                                related_reference = selected_ref
-                                
-                                # Formata a data para exibição com hora e minuto
-                                inserted_date = selected_ref_data.get('ROW_INSERTED_DATE', '')
-                                if inserted_date and hasattr(inserted_date, 'strftime'):
-                                    date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
-                                else:
-                                    # Para strings, tenta extrair data e hora
-                                    date_str_raw = str(inserted_date) if inserted_date else ''
-                                    if len(date_str_raw) >= 16:  # YYYY-MM-DD HH:MM:SS ou similar
-                                        try:
-                                            # Converte formato YYYY-MM-DD HH:MM:SS para DD/MM/YYYY HH:MM
-                                            parts = date_str_raw[:16].replace(' ', 'T').split('T')
-                                            if len(parts) == 2:
-                                                date_part = parts[0].split('-')
-                                                time_part = parts[1][:5]  # HH:MM
-                                                if len(date_part) == 3:
-                                                    date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
-                                                else:
-                                                    date_str = date_str_raw[:16]
-                                            else:
-                                                date_str = date_str_raw[:16]
-                                        except:
-                                            date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
-                                    else:
-                                        date_str = 'N/A'
-                                
-                                # Exibe com o mesmo padrão (Status como segunda coluna)
-                                p_status_sel = str(selected_ref_data.get('P_STATUS', '') or '').strip()
-                                b_status_sel = str(selected_ref_data.get('B_BOOKING_STATUS', '') or '').strip()
-                                linked_sel = selected_ref_data.get('LINKED_REFERENCE')
+                        st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {status_display_sel} | {date_str}")
+                    else:
+                        st.error("❌ Erro ao encontrar a referência selecionada")
 
-                                if p_status_sel.lower() == 'adjusts cargill':
-                                    status_display_sel = 'Cargill (Adjusts)'
-                                elif b_status_sel == 'Booking Requested' and ((linked_sel is None) or (isinstance(linked_sel, str) and linked_sel.strip() in ('', 'NULL'))):
-                                    status_display_sel = 'Cargill Booking Request'
-                                else:
-                                    status_display_sel = b_status_sel or p_status_sel or 'Status'
+        # Confirmação quando há status pendente OU formulário manual ativo
+        manual_active = bool(voyage_manual_required and voyage_manual_required.get("adjustment_id") == adjustment_id)
+        current_status_to_confirm = pending_status or ("Booking Approved" if manual_active else None)
+        if current_status_to_confirm:
+            st.markdown("---")
+            
+            # Validação especial para itens "Received from Carrier" sendo aprovados
+            if selected_row_status == "Received from Carrier" and current_status_to_confirm == "Booking Approved" and not manual_active:
+                # Alerta único combinando a confirmação e a orientação da referência
+                st.warning(
+                    f"**Confirmar alteração para:** {current_status_to_confirm}\n\n"
+                    "📋 **Este item é um retorno do armador. Antes de aprovar, informe a referência da aba relacionada:**"
+                )
+            else:
+                # Caso geral: apenas a confirmação
+                st.warning(f"**Confirmar alteração para:** {current_status_to_confirm}")
 
-                                st.info(f"📋 **Linha selecionada:** {selected_ref_data['FAROL_REFERENCE']} | {status_display_sel} | {date_str}")
-                            else:
-                                st.error("❌ Erro ao encontrar a referência selecionada")
-                else:
-                    st.warning("⚠️ Nenhuma referência disponível encontrada na aba 'Other Status'")
-                    related_reference = st.text_input("Digite o ID da referência relacionada:", key="manual_related_reference")
             
             col1, col2 = st.columns([1, 3])
             with col1:
@@ -2090,7 +2485,7 @@ def exibir_history():
                     # Desabilita o botão se for "Received from Carrier" e não tiver referência
                     can_confirm = True
                     validation_message = ""
-                    if selected_row_status == "Received from Carrier" and pending_status == "Booking Approved":
+                    if selected_row_status == "Received from Carrier" and current_status_to_confirm == "Booking Approved":
                         can_confirm = related_reference is not None and str(related_reference).strip() != ""
                         
                         # Validação adicional para New Adjustment
@@ -2125,7 +2520,7 @@ def exibir_history():
                             comment_param = st.session_state.get("new_adjustment_comment")
                         
                         # Executa a mudança de status
-                        apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
+                        apply_status_change(farol_ref, adjustment_id, current_status_to_confirm, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
                         
                         # Limpa o status pendente e dados de New Adjustment
                         st.session_state.pop(f"pending_status_change_{farol_reference}", None)

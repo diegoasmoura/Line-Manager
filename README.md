@@ -625,13 +625,90 @@ Retorna viagens disponíveis para um navio e terminal. Útil para sugerir voyage
 - Visualizar (ShipOwner): `POST /api/shipownermonitorings`
 Observação: alguns CNPJs de clientes só são aceitos se estiverem na base interna de `companies` da Ellox. Utilize a verificação prévia via `check_company_exists`.
 
-#### Integração automática com PDFs
-- Ao validar um PDF na tela de histórico, o sistema:
-  1. Identifica `Vessel Name` e `Port Terminal City`
-  2. Resolve o `CNPJ` do terminal via `F_ELLOX_TERMINALS` (com padronização `standardize_terminal_name`)
-  3. Consulta a API (`view_vessel_monitoring`) com `cnpj_client`, `cnpj_terminal`, `nome_navio` e `viagem_navio` (opcional)
-  4. Persiste o retorno como snapshot em `F_ELLOX_TERMINAL_MONITORINGS`
-  5. Exibe na nova aba "🚢 Histórico de Viagens"
+#### 🔄 Integração com Voyage Timeline durante Aprovação
+
+**Nova Abordagem (Otimizada)**: A validação e coleta de dados de monitoramento agora acontece durante a **aprovação** do registro na aba "Returns Awaiting Review", ao invés do processamento do PDF.
+
+##### 📋 Fluxo de Aprovação com Voyage Monitoring
+
+```mermaid
+graph TD
+    A[PDF Processado → Status: Received from Carrier] --> B[Usuário clica 'Booking Approved']
+    B --> C[Sistema valida dados da API Ellox]
+    C --> D{API encontra dados?}
+    D -->|Sim| E[Dados salvos automaticamente em F_ELLOX_TERMINAL_MONITORINGS]
+    D -->|Não| F[Formulário manual de cadastro aparece]
+    F --> G[Usuário preenche dados manualmente]
+    G --> H[Dados salvos em F_ELLOX_TERMINAL_MONITORINGS]
+    E --> I[Aprovação concluída + Dados propagados]
+    H --> I
+    I --> J[Voyage Timeline atualizado automaticamente]
+    
+    style C fill:#87CEEB
+    style E fill:#90EE90
+    style F fill:#FFE4B5
+    style J fill:#98FB98
+```
+
+##### 🎯 Vantagens da Nova Abordagem
+
+- **⚡ Performance**: Processamento de PDF mais rápido (sem chamadas API)
+- **🎯 Precisão**: Validação no momento da aprovação garante dados mais atuais
+- **🔧 Flexibilidade**: Formulário manual quando API não encontra dados
+- **📊 Controle**: Usuário pode revisar/ajustar dados antes da aprovação final
+
+##### 🛠️ Implementação Técnica
+
+**1. Durante o Processamento do PDF:**
+```python
+# ❌ ANTES: Coletava dados imediatamente
+collect_voyage_monitoring_data(vessel_name, terminal, voyage_code)
+
+# ✅ AGORA: Apenas salva com status "Received from Carrier"
+save_pdf_data(validated_data, status="Received from Carrier")
+st.info("ℹ️ Dados de monitoramento serão coletados durante a aprovação")
+```
+
+**2. Durante a Aprovação:**
+```python
+# Validação automática da API
+result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal)
+
+if result["requires_manual"]:
+    # Exibe formulário manual
+    st.warning("⚠️ Cadastro Manual de Voyage Monitoring Necessário")
+    display_manual_voyage_form(vessel_name, voyage_code, terminal)
+else:
+    # Dados coletados automaticamente
+    st.success("✅ Dados de monitoramento coletados da API")
+```
+
+**3. Formulário Manual (quando necessário):**
+- Interface idêntica ao `voyage_monitoring.py`
+- Campos para todas as datas importantes (ETD, ETA, Deadlines, etc.)
+- Opção de "Pular e Continuar" se dados não estão disponíveis
+- Salvamento direto em `F_ELLOX_TERMINAL_MONITORINGS`
+
+##### 📝 Casos de Uso
+
+**Coleta Automática (Ideal):**
+- ✅ API Ellox disponível
+- ✅ Terminal encontrado na API
+- ✅ Voyage existe no sistema Ellox
+- ✅ Dados de monitoramento disponíveis
+
+**Cadastro Manual (Fallback):**
+- ⚠️ API Ellox indisponível
+- ⚠️ Terminal não encontrado na API
+- ⚠️ Voyage não existe no sistema Ellox
+- ⚠️ Dados de monitoramento não disponíveis
+
+##### 🔧 Localização no Código
+
+- **Validação API**: `database.py` → `validate_and_collect_voyage_monitoring()`
+- **Aprovação**: `database.py` → `approve_carrier_return()` (modificado)
+- **Formulário Manual**: `history.py` → seção "voyage_manual_entry_required"
+- **PDF Processing**: `pdf_booking_processor.py` → `save_pdf_booking_data()` (simplificado)
 
 #### 🚀 Consulta Direta à API Ellox (Estratégia Otimizada)
 
