@@ -658,25 +658,8 @@ def exibir_voyage_monitoring():
             # Modo de edição
             if st.session_state.get(f"edit_mode_{idx}", False):
                 st.markdown("---")
-                # Título e botão de teste da API na mesma linha
-                col_title, col_test_api = st.columns([3, 1])
-                with col_title:
-                    st.subheader("✏️ Editar Dados da Linha")
-                with col_test_api:
-                    st.markdown("**Teste API**")
-                    if st.button("🔍 Testar API Ellox", key=f"test_api_{idx}", help="Testar conectividade com a API Ellox"):
-                        with st.spinner("Testando API Ellox..."):
-                            try:
-                                api_client = get_default_api_client()
-                                result = api_client.test_connection()
-                                if result.get("success", False):
-                                    response_time = result.get("response_time", 0)
-                                    st.success(f"✅ API conectada! Tempo de resposta: {response_time:.2f}s")
-                                else:
-                                    error_msg = result.get("error", "Erro desconhecido")
-                                    st.error(f"❌ Erro na API: {error_msg}")
-                            except Exception as e:
-                                st.error(f"❌ Erro na API: {str(e)}")
+                # Título do modo de edição
+                st.subheader("✏️ Editar Dados da Linha")
                 
                 # Formulário de edição
                 with st.form(f"edit_form_{idx}"):
@@ -879,12 +862,15 @@ def exibir_voyage_monitoring():
                     
                     
                     # Botões do formulário
-                    col1, col2, col3 = st.columns([1, 1, 2])
+                    col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
                     
                     with col1:
                         save_clicked = st.form_submit_button("💾 Salvar", type="primary")
                     
                     with col2:
+                        consult_clicked = st.form_submit_button("🔎 Consultar")
+                    
+                    with col3:
                         cancel_clicked = st.form_submit_button("❌ Cancelar")
                     
                     # Processa ações do formulário
