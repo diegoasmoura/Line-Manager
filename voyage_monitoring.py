@@ -744,6 +744,15 @@ def exibir_voyage_monitoring():
                         else:
                             new_terminal = st.text_input("Terminal", value=current_terminal, key=f"edit_terminal_{idx}", help="Nome do terminal")
                     
+                    # Verificar se os campos obrigatórios foram alterados (apenas para exibir mensagem)
+                    vessel_changed = new_vessel != current_vessel
+                    voyage_changed = new_voyage != row["VOYAGE_CODE"]
+                    terminal_changed = new_terminal != current_terminal
+                    
+                    # Só mostrar mensagem se não há dados da API carregados
+                    if (vessel_changed or voyage_changed or terminal_changed) and not st.session_state.get(f"api_data_loaded_{idx}", False):
+                        st.info("🔄 Campos obrigatórios alterados. Clique em 'Consultar' para buscar novos dados.")
+                    
                     # Segunda linha: Data Atualização, Data Inserção
                     col_data_atualizacao, col_data_insercao = st.columns([1, 1])
                     with col_data_atualizacao:
@@ -768,22 +777,57 @@ def exibir_voyage_monitoring():
                     # Datas importantes
                     st.subheader("Datas Importantes")
                     
+                    # Mostrar indicador se dados da API foram carregados
+                    if st.session_state.get(f"api_data_loaded_{idx}", False):
+                        st.info("🔄 **Dados da API carregados** - Os campos abaixo foram preenchidos automaticamente com dados atualizados da API Ellox")
+                    
+                    # Função auxiliar para obter valor da API ou do banco
+                    def get_field_value(field_name, default_value=None):
+                        # Verificar se há dados da API carregados
+                        if st.session_state.get(f"api_data_loaded_{idx}", False):
+                            api_data = st.session_state.get(f"api_data_{idx}", {})
+                            if field_name in api_data:
+                                api_value = api_data[field_name]
+                                # Verificar se o valor não é NaT ou None
+                                if api_value is not None and str(api_value) != 'NaT' and str(api_value) != 'None':
+                                    return api_value
+                        return default_value
+                    
+                    # Função auxiliar para converter datetime para date/time de forma segura
+                    def safe_datetime_to_date(dt_value):
+                        if dt_value is not None and str(dt_value) != 'NaT' and hasattr(dt_value, 'date'):
+                            try:
+                                return dt_value.date()
+                            except:
+                                return None
+                        return None
+                    
+                    def safe_datetime_to_time(dt_value):
+                        if dt_value is not None and str(dt_value) != 'NaT' and hasattr(dt_value, 'time'):
+                            try:
+                                return dt_value.time()
+                            except:
+                                return None
+                        return None
+                    
                     # Primeira linha: Data Deadline e Data Draft Deadline
                     col1, col2 = st.columns(2)
                     
                     with col1:
                         col_deadline_date, col_deadline_time = st.columns([2, 1])
                         with col_deadline_date:
-                            new_deadline_date = st.date_input("⏳ Data Deadline", value=safe_datetime_value(row.get("DATA_DEADLINE")).date() if safe_datetime_value(row.get("DATA_DEADLINE")) else None, key=f"edit_deadline_date_{idx}", help="Data limite para entrega de documentos")
+                            deadline_value = get_field_value("DATA_DEADLINE", safe_datetime_value(row.get("DATA_DEADLINE")))
+                            new_deadline_date = st.date_input("⏳ Data Deadline", value=safe_datetime_to_date(deadline_value), key=f"edit_deadline_date_{idx}", help="Data limite para entrega de documentos")
                         with col_deadline_time:
-                            new_deadline_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_DEADLINE")).time() if safe_datetime_value(row.get("DATA_DEADLINE")) else None, key=f"edit_deadline_time_{idx}", help="Hora limite para entrega de documentos")
+                            new_deadline_time = st.time_input("Hora", value=safe_datetime_to_time(deadline_value), key=f"edit_deadline_time_{idx}", help="Hora limite para entrega de documentos")
                     
                     with col2:
                         col_draft_date, col_draft_time = st.columns([2, 1])
                         with col_draft_date:
-                            new_draft_date = st.date_input("📝 Data Draft Deadline", value=safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")).date() if safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")) else None, key=f"edit_draft_date_{idx}", help="Data limite para entrega do draft")
+                            draft_value = get_field_value("DATA_DRAFT_DEADLINE", safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")))
+                            new_draft_date = st.date_input("📝 Data Draft Deadline", value=safe_datetime_to_date(draft_value), key=f"edit_draft_date_{idx}", help="Data limite para entrega do draft")
                         with col_draft_time:
-                            new_draft_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")).time() if safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")) else None, key=f"edit_draft_time_{idx}", help="Hora limite para entrega do draft")
+                            new_draft_time = st.time_input("Hora", value=safe_datetime_to_time(draft_value), key=f"edit_draft_time_{idx}", help="Hora limite para entrega do draft")
                     
                     # Segunda linha: Data Abertura Gate e Data Abertura Gate Reefer
                     col4, col5 = st.columns(2)
@@ -791,16 +835,18 @@ def exibir_voyage_monitoring():
                     with col4:
                         col_gate_date, col_gate_time = st.columns([2, 1])
                         with col_gate_date:
-                            new_gate_date = st.date_input("🚪 Data Abertura Gate", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE")).date() if safe_datetime_value(row.get("DATA_ABERTURA_GATE")) else None, key=f"edit_gate_date_{idx}", help="Data de abertura do gate para recebimento de cargas")
+                            gate_value = get_field_value("DATA_ABERTURA_GATE", safe_datetime_value(row.get("DATA_ABERTURA_GATE")))
+                            new_gate_date = st.date_input("🚪 Data Abertura Gate", value=safe_datetime_to_date(gate_value), key=f"edit_gate_date_{idx}", help="Data de abertura do gate para recebimento de cargas")
                         with col_gate_time:
-                            new_gate_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE")).time() if safe_datetime_value(row.get("DATA_ABERTURA_GATE")) else None, key=f"edit_gate_time_{idx}", help="Hora de abertura do gate para recebimento de cargas")
+                            new_gate_time = st.time_input("Hora", value=safe_datetime_to_time(gate_value), key=f"edit_gate_time_{idx}", help="Hora de abertura do gate para recebimento de cargas")
                     
                     with col5:
                         col_reefer_date, col_reefer_time = st.columns([2, 1])
                         with col_reefer_date:
-                            new_reefer_date = st.date_input("🧊 Data Abertura Gate Reefer", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")).date() if safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")) else None, key=f"edit_reefer_date_{idx}", help="Data de abertura do gate para cargas refrigeradas")
+                            reefer_value = get_field_value("DATA_ABERTURA_GATE_REEFER", safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")))
+                            new_reefer_date = st.date_input("🧊 Data Abertura Gate Reefer", value=safe_datetime_to_date(reefer_value), key=f"edit_reefer_date_{idx}", help="Data de abertura do gate para cargas refrigeradas")
                         with col_reefer_time:
-                            new_reefer_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")).time() if safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")) else None, key=f"edit_reefer_time_{idx}", help="Hora de abertura do gate para cargas refrigeradas")
+                            new_reefer_time = st.time_input("Hora", value=safe_datetime_to_time(reefer_value), key=f"edit_reefer_time_{idx}", help="Hora de abertura do gate para cargas refrigeradas")
                     
                     # Datas de navegação
                     st.subheader("Datas de Navegação")
@@ -811,16 +857,18 @@ def exibir_voyage_monitoring():
                     with col1:
                         col_etd_date, col_etd_time = st.columns([2, 1])
                         with col_etd_date:
-                            new_etd_date = st.date_input("🚢 Data Estimativa Saída (ETD)", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")).date() if safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")) else None, key=f"edit_etd_date_{idx}", help="Data estimada de saída do porto")
+                            etd_value = get_field_value("DATA_ESTIMATIVA_SAIDA", safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")))
+                            new_etd_date = st.date_input("🚢 Data Estimativa Saída (ETD)", value=safe_datetime_to_date(etd_value), key=f"edit_etd_date_{idx}", help="Data estimada de saída do porto")
                         with col_etd_time:
-                            new_etd_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")).time() if safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")) else None, key=f"edit_etd_time_{idx}", help="Hora estimada de saída do porto")
+                            new_etd_time = st.time_input("Hora", value=safe_datetime_to_time(etd_value), key=f"edit_etd_time_{idx}", help="Hora estimada de saída do porto")
                     
                     with col2:
                         col_eta_date, col_eta_time = st.columns([2, 1])
                         with col_eta_date:
-                            new_eta_date = st.date_input("🎯 Data Estimativa Chegada (ETA)", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")).date() if safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")) else None, key=f"edit_eta_date_{idx}", help="Data estimada de chegada ao porto")
+                            eta_value = get_field_value("DATA_ESTIMATIVA_CHEGADA", safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")))
+                            new_eta_date = st.date_input("🎯 Data Estimativa Chegada (ETA)", value=safe_datetime_to_date(eta_value), key=f"edit_eta_date_{idx}", help="Data estimada de chegada ao porto")
                         with col_eta_time:
-                            new_eta_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")).time() if safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")) else None, key=f"edit_eta_time_{idx}", help="Hora estimada de chegada ao porto")
+                            new_eta_time = st.time_input("Hora", value=safe_datetime_to_time(eta_value), key=f"edit_eta_time_{idx}", help="Hora estimada de chegada ao porto")
                     
                     # Segunda linha: ETB e ATB
                     col4, col5 = st.columns(2)
@@ -828,16 +876,18 @@ def exibir_voyage_monitoring():
                     with col4:
                         col_etb_date, col_etb_time = st.columns([2, 1])
                         with col_etb_date:
-                            new_etb_date = st.date_input("🛳️ Data Estimativa Atracação (ETB)", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")).date() if safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")) else None, key=f"edit_etb_date_{idx}", help="Data estimada de atracação no cais")
+                            etb_value = get_field_value("DATA_ESTIMATIVA_ATRACACAO", safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")))
+                            new_etb_date = st.date_input("🛳️ Data Estimativa Atracação (ETB)", value=safe_datetime_to_date(etb_value), key=f"edit_etb_date_{idx}", help="Data estimada de atracação no cais")
                         with col_etb_time:
-                            new_etb_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")).time() if safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")) else None, key=f"edit_etb_time_{idx}", help="Hora estimada de atracação no cais")
+                            new_etb_time = st.time_input("Hora", value=safe_datetime_to_time(etb_value), key=f"edit_etb_time_{idx}", help="Hora estimada de atracação no cais")
                     
                     with col5:
                         col_atb_date, col_atb_time = st.columns([2, 1])
                         with col_atb_date:
-                            new_atb_date = st.date_input("✅ Data Atracação (ATB)", value=safe_datetime_value(row.get("DATA_ATRACACAO")).date() if safe_datetime_value(row.get("DATA_ATRACACAO")) else None, key=f"edit_atb_date_{idx}", help="Data real de atracação no cais")
+                            atb_value = get_field_value("DATA_ATRACACAO", safe_datetime_value(row.get("DATA_ATRACACAO")))
+                            new_atb_date = st.date_input("✅ Data Atracação (ATB)", value=safe_datetime_to_date(atb_value), key=f"edit_atb_date_{idx}", help="Data real de atracação no cais")
                         with col_atb_time:
-                            new_atb_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ATRACACAO")).time() if safe_datetime_value(row.get("DATA_ATRACACAO")) else None, key=f"edit_atb_time_{idx}", help="Hora real de atracação no cais")
+                            new_atb_time = st.time_input("Hora", value=safe_datetime_to_time(atb_value), key=f"edit_atb_time_{idx}", help="Hora real de atracação no cais")
                     
                     # Chegada e Partida
                     st.subheader("Chegada e Partida")
@@ -848,16 +898,18 @@ def exibir_voyage_monitoring():
                     with col1:
                         col_atd_date, col_atd_time = st.columns([2, 1])
                         with col_atd_date:
-                            new_atd_date = st.date_input("📤 Data Partida (ATD)", value=safe_datetime_value(row.get("DATA_PARTIDA")).date() if safe_datetime_value(row.get("DATA_PARTIDA")) else None, key=f"edit_atd_date_{idx}", help="Data real de partida do porto")
+                            atd_value = get_field_value("DATA_PARTIDA", safe_datetime_value(row.get("DATA_PARTIDA")))
+                            new_atd_date = st.date_input("📤 Data Partida (ATD)", value=safe_datetime_to_date(atd_value), key=f"edit_atd_date_{idx}", help="Data real de partida do porto")
                         with col_atd_time:
-                            new_atd_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_PARTIDA")).time() if safe_datetime_value(row.get("DATA_PARTIDA")) else None, key=f"edit_atd_time_{idx}", help="Hora real de partida do porto")
+                            new_atd_time = st.time_input("Hora", value=safe_datetime_to_time(atd_value), key=f"edit_atd_time_{idx}", help="Hora real de partida do porto")
                     
                     with col2:
                         col_ata_date, col_ata_time = st.columns([2, 1])
                         with col_ata_date:
-                            new_ata_date = st.date_input("📥 Data Chegada (ATA)", value=safe_datetime_value(row.get("DATA_CHEGADA")).date() if safe_datetime_value(row.get("DATA_CHEGADA")) else None, key=f"edit_ata_date_{idx}", help="Data real de chegada ao porto")
+                            ata_value = get_field_value("DATA_CHEGADA", safe_datetime_value(row.get("DATA_CHEGADA")))
+                            new_ata_date = st.date_input("📥 Data Chegada (ATA)", value=safe_datetime_to_date(ata_value), key=f"edit_ata_date_{idx}", help="Data real de chegada ao porto")
                         with col_ata_time:
-                            new_ata_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_CHEGADA")).time() if safe_datetime_value(row.get("DATA_CHEGADA")) else None, key=f"edit_ata_time_{idx}", help="Hora real de chegada ao porto")
+                            new_ata_time = st.time_input("Hora", value=safe_datetime_to_time(ata_value), key=f"edit_ata_time_{idx}", help="Hora real de chegada ao porto")
                     
                     
                     
@@ -874,6 +926,151 @@ def exibir_voyage_monitoring():
                         cancel_clicked = st.form_submit_button("❌ Cancelar")
                     
                     # Processa ações do formulário
+                    if consult_clicked:
+                        # Limpar dados da API se campos foram alterados
+                        if vessel_changed or voyage_changed or terminal_changed:
+                            if f"api_data_loaded_{idx}" in st.session_state:
+                                del st.session_state[f"api_data_loaded_{idx}"]
+                            if f"api_data_{idx}" in st.session_state:
+                                del st.session_state[f"api_data_{idx}"]
+                            st.info("🔄 Campos obrigatórios alterados. Os dados da API foram limpos.")
+                        
+                        # Validação de obrigatórios
+                        if not new_vessel or not new_voyage or not new_terminal:
+                            st.error("❌ Preencha os campos obrigatórios: Vessel Name, Voyage Code e Terminal")
+                        else:
+                            # Consulta DIRETAMENTE na API Ellox (sem consultar banco)
+                            try:
+                                api_client = get_default_api_client()
+                                api_test = api_client.test_connection()
+                                if not api_test.get("success"):
+                                    st.error("❌ API Ellox indisponível no momento. Tente novamente mais tarde.")
+                                    return
+                                st.info("🟢 API Ellox disponível")
+
+                                # 1) Resolver CNPJ do terminal pelo nome via API
+                                cnpj_terminal = None
+                                terms_resp = api_client._make_api_request("/api/terminals")
+                                if terms_resp.get("success"):
+                                    for term in terms_resp.get("data", []):
+                                        nome_term = term.get("nome") or term.get("name") or ""
+                                        if str(nome_term).strip().upper() == str(new_terminal).strip().upper() or str(new_terminal).strip().upper() in str(nome_term).strip().upper():
+                                            cnpj_terminal = term.get("cnpj")
+                                            break
+                                if not cnpj_terminal:
+                                    st.warning("🟠 Terminal não localizado na API pelos nomes retornados.")
+                                    return
+
+                                # 2) Pular verificação de voyages (pode dar timeout) e ir direto para monitoramento
+                                st.info("ℹ️ Tentando buscar dados de monitoramento diretamente...")
+
+                                # 3) Buscar dados de monitoramento via API (requer CNPJ do cliente)
+                                cnpj_client = st.session_state.get("monitoring_cnpj_client")
+                                if not cnpj_client:
+                                    # CNPJ padrão pré-configurado
+                                    cnpj_client_default = "60.498.706/0001-57"
+                                    st.info(f"ℹ️ Voyage confirmada na API. CNPJ do cliente pré-configurado: `{cnpj_client_default}`")
+                                    
+                                    # Campo para configurar CNPJ do cliente (já preenchido)
+                                    from tracking import format_cnpj, validate_cnpj_format
+                                    cnpj_client_raw = st.text_input(
+                                        "CNPJ do Cliente",
+                                        value=cnpj_client_default,
+                                        placeholder="00.000.000/0000-00 ou 00000000000000",
+                                        key=f"cnpj_client_input_{idx}",
+                                        help="CNPJ da empresa que está solicitando o monitoramento (já pré-configurado)"
+                                    )
+                                    
+                                    if cnpj_client_raw:
+                                        # Formatação automática do CNPJ
+                                        cnpj_client = format_cnpj(cnpj_client_raw)
+                                        if cnpj_client != cnpj_client_raw:
+                                            st.info(f"🔄 **CNPJ formatado automaticamente:** `{cnpj_client}`")
+                                        
+                                        if not validate_cnpj_format(cnpj_client):
+                                            st.error("❌ CNPJ deve ter exatamente 14 dígitos")
+                                            return
+                                        else:
+                                            st.success(f"✅ CNPJ válido: `{cnpj_client}`")
+                                            # Salva o CNPJ no session_state para uso futuro
+                                            st.session_state["monitoring_cnpj_client"] = cnpj_client
+                                    else:
+                                        return
+
+                                mon_resp = api_client.view_vessel_monitoring(cnpj_client, cnpj_terminal, new_vessel, new_voyage)
+                                if not mon_resp.get("success") or not mon_resp.get("data"):
+                                    st.warning("⚠️ Voyage confirmada na API, mas nenhum dado de monitoramento foi retornado para atualização.")
+                                    return
+
+                                # 4) Extrair datas do payload retornado e atualizar a linha
+                                data_list = mon_resp.get("data", [])
+                                
+                                # Debug: mostrar quantos registros foram encontrados
+                                if isinstance(data_list, list):
+                                    st.info(f"ℹ️ Encontrados {len(data_list)} registros de monitoramento na API")
+                                elif isinstance(data_list, dict):
+                                    st.info("ℹ️ Dados de monitoramento recebidos como dicionário")
+                                
+                                # Se data é uma lista, pegar o primeiro registro
+                                if isinstance(data_list, list) and len(data_list) > 0:
+                                    payload = data_list[0]  # Primeiro registro da lista
+                                elif isinstance(data_list, dict):
+                                    payload = data_list  # Já é um dicionário
+                                else:
+                                    st.warning("⚠️ Formato de dados inesperado da API")
+                                    return
+                                
+                                def g(key):
+                                    if isinstance(payload, dict):
+                                        for k in payload.keys():
+                                            if str(k).lower() == key.lower():
+                                                return payload[k]
+                                    return None
+
+                                updates = {}
+                                mapping = {
+                                    "DATA_DEADLINE": ["data_deadline"],
+                                    "DATA_DRAFT_DEADLINE": ["data_draft_deadline"],
+                                    "DATA_ABERTURA_GATE": ["data_abertura_gate"],
+                                    "DATA_ABERTURA_GATE_REEFER": ["data_abertura_gate_reefer"],
+                                    "DATA_ESTIMATIVA_SAIDA": ["data_estimativa_saida", "etd"],
+                                    "DATA_ESTIMATIVA_CHEGADA": ["data_estimativa_chegada", "eta"],
+                                    "DATA_ESTIMATIVA_ATRACACAO": ["data_estimativa_atracacao", "etb"],
+                                    "DATA_ATRACACAO": ["data_atracacao", "atb"],
+                                    "DATA_PARTIDA": ["data_partida", "atd"],
+                                    "DATA_CHEGADA": ["data_chegada", "ata"],
+                                    "DATA_ATUALIZACAO": ["data_atualizacao", "last_update", "updated_at"]
+                                }
+                                import pandas as _pd
+                                for db_col, keys in mapping.items():
+                                    val = None
+                                    for k in keys:
+                                        val = g(k)
+                                        if val is not None:
+                                            break
+                                    if val is None:
+                                        continue
+                                    try:
+                                        updates[db_col] = _pd.to_datetime(val)
+                                    except Exception:
+                                        updates[db_col] = val
+
+                                if updates:
+                                    # Salvar os dados da API no session_state para preencher os campos
+                                    campos_atualizados = list(updates.keys())
+                                    
+                                    # Armazenar os dados da API no session_state para uso posterior
+                                    st.session_state[f"api_data_{idx}"] = updates
+                                    st.session_state[f"api_data_loaded_{idx}"] = True
+                                    
+                                    st.success(f"✅ Dados consultados na API! ({len(campos_atualizados)} campos: {', '.join(campos_atualizados)})")
+                                    st.info("💡 Os dados foram carregados. A página será recarregada para preencher os campos automaticamente.")
+                                    st.rerun()
+                                else:
+                                    st.info("ℹ️ Nenhuma informação de data disponível na API para preencher")
+                            except Exception as e:
+                                st.error(f"❌ Erro na consulta direta à API: {str(e)}")
+
                     if save_clicked:
                         # Prepara dados para atualização
                         updates = {}
