@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from database import get_database_connection
 from sqlalchemy import text
 import traceback
@@ -630,9 +631,9 @@ def exibir_voyage_monitoring():
     
     if not selected_rows.empty:
         st.divider()
-        st.subheader("📋 Detalhes dos Farol References Selecionados")
+        st.subheader("📋 Ações para Linha Selecionada")
         
-        # Processa cada linha selecionada
+        # Processa cada linha selecionada (deve ser apenas uma)
         for idx, row in selected_rows.iterrows():
             vessel_name = row["VESSEL_NAME"]
             voyage_code = row["VOYAGE_CODE"]
@@ -640,111 +641,402 @@ def exibir_voyage_monitoring():
             
             st.markdown(f"**🚢 {vessel_name} | {voyage_code} | {terminal}**")
             
-            # Busca detalhes dos Farol References
-            details_df = get_farol_references_details(vessel_name, voyage_code, terminal)
+            # Botões de ação
+            col1, col2, col3 = st.columns([1, 1, 2])
             
-            if not details_df.empty:
-                # Formata os dados para exibição
-                display_details = details_df.copy()
+            with col1:
+                if st.button("✏️ Editar Dados", key=f"edit_data_{idx}", type="primary"):
+                    st.session_state[f"edit_mode_{idx}"] = True
+                    st.session_state[f"editing_row_{idx}"] = row.to_dict()
+                    st.rerun()
+            
+            with col2:
+                if st.button("📋 Ver Farol References", key=f"view_refs_{idx}"):
+                    st.session_state[f"view_refs_mode_{idx}"] = True
+                    st.rerun()
+            
+            # Modo de edição
+            if st.session_state.get(f"edit_mode_{idx}", False):
+                st.markdown("---")
+                # Título e botão de teste da API na mesma linha
+                col_title, col_test_api = st.columns([3, 1])
+                with col_title:
+                    st.subheader("✏️ Editar Dados da Linha")
+                with col_test_api:
+                    st.markdown("**Teste API**")
+                    if st.button("🔍 Testar API Ellox", key=f"test_api_{idx}", help="Testar conectividade com a API Ellox"):
+                        with st.spinner("Testando API Ellox..."):
+                            try:
+                                api_client = get_default_api_client()
+                                result = api_client.test_connection()
+                                if result.get("success", False):
+                                    response_time = result.get("response_time", 0)
+                                    st.success(f"✅ API conectada! Tempo de resposta: {response_time:.2f}s")
+                                else:
+                                    error_msg = result.get("error", "Erro desconhecido")
+                                    st.error(f"❌ Erro na API: {error_msg}")
+                            except Exception as e:
+                                st.error(f"❌ Erro na API: {str(e)}")
                 
-                # Mapeia colunas para títulos em português
-                column_mapping = {
-                    "FAROL_REFERENCE": "Farol Reference",
-                    "B_BOOKING_REFERENCE": "Booking Reference",
-                    "B_BOOKING_STATUS": "Booking Status",
-                    "P_STATUS": "Status",
-                    "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
-                    "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
-                    "ROW_INSERTED_DATE": "Data Inserção"
-                }
+                # Formulário de edição
+                with st.form(f"edit_form_{idx}"):
+                    # Função helper para converter datas de forma segura
+                    def safe_date_value(date_val):
+                        if pd.isna(date_val) or date_val is None:
+                            return None
+                        try:
+                            if hasattr(date_val, 'date'):
+                                return date_val.date()
+                            elif isinstance(date_val, str):
+                                return pd.to_datetime(date_val).date()
+                            return date_val
+                        except:
+                            return None
+                    
+                    # Função helper para converter datetime de forma segura
+                    def safe_datetime_value(datetime_val):
+                        if pd.isna(datetime_val) or datetime_val is None:
+                            return None
+                        try:
+                            if hasattr(datetime_val, 'to_pydatetime'):
+                                return datetime_val.to_pydatetime()
+                            elif isinstance(datetime_val, str):
+                                return pd.to_datetime(datetime_val)
+                            return datetime_val
+                        except:
+                            return None
+                    
+                    # Função helper para converter string datetime para comparação
+                    def parse_datetime_string(dt_str):
+                        if not dt_str or dt_str.strip() == "":
+                            return None
+                        try:
+                            return pd.to_datetime(dt_str)
+                        except:
+                            return None
+                    
+                    # Função helper para comparar datetime strings
+                    def compare_datetime_strings(str1, str2):
+                        dt1 = parse_datetime_string(str1)
+                        dt2 = parse_datetime_string(str2)
+                        if dt1 is None and dt2 is None:
+                            return True
+                        if dt1 is None or dt2 is None:
+                            return False
+                        return dt1 == dt2
+                    
+                    # Informações básicas
+                    st.subheader("📋 Informações Básicas")
+                    
+                    # Layout com 3 colunas ocupando toda a largura
+                    col_vessel, col_voyage, col_terminal = st.columns([3, 1, 2])
+                    with col_vessel:
+                        new_vessel = st.text_input("Vessel Name", value=row["VESSEL_NAME"], key=f"edit_vessel_{idx}", help="Nome do navio (pode ser longo)")
+                    with col_voyage:
+                        new_voyage = st.text_input("Voyage Code", value=row["VOYAGE_CODE"], key=f"edit_voyage_{idx}", help="Código da viagem (geralmente curto)")
+                    with col_terminal:
+                        new_terminal = st.text_input("Terminal", value=row["TERMINAL"], key=f"edit_terminal_{idx}", help="Nome do terminal")
+                    
+                    # Segunda linha: Data Atualização, Data Inserção
+                    col_data_atualizacao, col_data_insercao = st.columns([1, 1])
+                    with col_data_atualizacao:
+                        st.markdown("**Data Atualização**")
+                        col_atualizacao_date, col_atualizacao_time = st.columns([2, 1])
+                        with col_atualizacao_date:
+                            st.text_input("Data", value=safe_datetime_value(row.get("DATA_ATUALIZACAO")).strftime("%Y-%m-%d") if safe_datetime_value(row.get("DATA_ATUALIZACAO")) else "", disabled=True, help="Data da última atualização (somente leitura)")
+                        with col_atualizacao_time:
+                            st.text_input("Hora", value=safe_datetime_value(row.get("DATA_ATUALIZACAO")).strftime("%H:%M") if safe_datetime_value(row.get("DATA_ATUALIZACAO")) else "", disabled=True, help="Hora da última atualização (somente leitura)")
+                    with col_data_insercao:
+                        st.markdown("**Data Inserção**")
+                        col_insercao_date, col_insercao_time = st.columns([2, 1])
+                        with col_insercao_date:
+                            st.text_input("Data", value=safe_datetime_value(row.get("ROW_INSERTED_DATE")).strftime("%Y-%m-%d") if safe_datetime_value(row.get("ROW_INSERTED_DATE")) else "", disabled=True, help="Data de inserção do registro (somente leitura)")
+                        with col_insercao_time:
+                            st.text_input("Hora", value=safe_datetime_value(row.get("ROW_INSERTED_DATE")).strftime("%H:%M") if safe_datetime_value(row.get("ROW_INSERTED_DATE")) else "", disabled=True, help="Hora de inserção do registro (somente leitura)")
+                    
+                    # Campos ocultos para Agency, CNPJ Terminal, Data Atualização e Data Inserção (coletados no background)
+                    new_agency = row.get("AGENCY", "")
+                    new_cnpj = row.get("CNPJ_TERMINAL", "")
+                    new_data_atualizacao = safe_datetime_value(row.get("DATA_ATUALIZACAO"))
+                    new_row_inserted = safe_datetime_value(row.get("ROW_INSERTED_DATE"))
+                    
+                    # Datas importantes
+                    st.subheader("📅 Datas Importantes")
+                    
+                    # Primeira linha: Data Deadline e Data Draft Deadline
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**Data Deadline**")
+                        col_deadline_date, col_deadline_time = st.columns([2, 1])
+                        with col_deadline_date:
+                            new_deadline_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_DEADLINE")).date() if safe_datetime_value(row.get("DATA_DEADLINE")) else None, key=f"edit_deadline_date_{idx}", help="Data limite para entrega de documentos")
+                        with col_deadline_time:
+                            new_deadline_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_DEADLINE")).time() if safe_datetime_value(row.get("DATA_DEADLINE")) else None, key=f"edit_deadline_time_{idx}", help="Hora limite para entrega de documentos")
+                    
+                    with col2:
+                        st.markdown("**Data Draft Deadline**")
+                        col_draft_date, col_draft_time = st.columns([2, 1])
+                        with col_draft_date:
+                            new_draft_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")).date() if safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")) else None, key=f"edit_draft_date_{idx}", help="Data limite para entrega do draft")
+                        with col_draft_time:
+                            new_draft_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")).time() if safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")) else None, key=f"edit_draft_time_{idx}", help="Hora limite para entrega do draft")
+                    
+                    # Segunda linha: Data Abertura Gate e Data Abertura Gate Reefer
+                    col4, col5 = st.columns(2)
+                    
+                    with col4:
+                        st.markdown("**Data Abertura Gate**")
+                        col_gate_date, col_gate_time = st.columns([2, 1])
+                        with col_gate_date:
+                            new_gate_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE")).date() if safe_datetime_value(row.get("DATA_ABERTURA_GATE")) else None, key=f"edit_gate_date_{idx}", help="Data de abertura do gate para recebimento de cargas")
+                        with col_gate_time:
+                            new_gate_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE")).time() if safe_datetime_value(row.get("DATA_ABERTURA_GATE")) else None, key=f"edit_gate_time_{idx}", help="Hora de abertura do gate para recebimento de cargas")
+                    
+                    with col5:
+                        st.markdown("**Data Abertura Gate Reefer**")
+                        col_reefer_date, col_reefer_time = st.columns([2, 1])
+                        with col_reefer_date:
+                            new_reefer_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")).date() if safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")) else None, key=f"edit_reefer_date_{idx}", help="Data de abertura do gate para cargas refrigeradas")
+                        with col_reefer_time:
+                            new_reefer_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")).time() if safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")) else None, key=f"edit_reefer_time_{idx}", help="Hora de abertura do gate para cargas refrigeradas")
+                    
+                    # Datas de navegação
+                    st.subheader("🚢 Datas de Navegação")
+                    
+                    # Primeira linha: ETD e ETA
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**Data Estimativa Saída (ETD)**")
+                        col_etd_date, col_etd_time = st.columns([2, 1])
+                        with col_etd_date:
+                            new_etd_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")).date() if safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")) else None, key=f"edit_etd_date_{idx}", help="Data estimada de saída do porto")
+                        with col_etd_time:
+                            new_etd_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")).time() if safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")) else None, key=f"edit_etd_time_{idx}", help="Hora estimada de saída do porto")
+                    
+                    with col2:
+                        st.markdown("**Data Estimativa Chegada (ETA)**")
+                        col_eta_date, col_eta_time = st.columns([2, 1])
+                        with col_eta_date:
+                            new_eta_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")).date() if safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")) else None, key=f"edit_eta_date_{idx}", help="Data estimada de chegada ao porto")
+                        with col_eta_time:
+                            new_eta_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")).time() if safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")) else None, key=f"edit_eta_time_{idx}", help="Hora estimada de chegada ao porto")
+                    
+                    # Segunda linha: ETB e ATB
+                    col4, col5 = st.columns(2)
+                    
+                    with col4:
+                        st.markdown("**Data Estimativa Atracação (ETB)**")
+                        col_etb_date, col_etb_time = st.columns([2, 1])
+                        with col_etb_date:
+                            new_etb_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")).date() if safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")) else None, key=f"edit_etb_date_{idx}", help="Data estimada de atracação no cais")
+                        with col_etb_time:
+                            new_etb_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")).time() if safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")) else None, key=f"edit_etb_time_{idx}", help="Hora estimada de atracação no cais")
+                    
+                    with col5:
+                        st.markdown("**Data Atracação (ATB)**")
+                        col_atb_date, col_atb_time = st.columns([2, 1])
+                        with col_atb_date:
+                            new_atb_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_ATRACACAO")).date() if safe_datetime_value(row.get("DATA_ATRACACAO")) else None, key=f"edit_atb_date_{idx}", help="Data real de atracação no cais")
+                        with col_atb_time:
+                            new_atb_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_ATRACACAO")).time() if safe_datetime_value(row.get("DATA_ATRACACAO")) else None, key=f"edit_atb_time_{idx}", help="Hora real de atracação no cais")
+                    
+                    # Chegada e Partida
+                    st.subheader("🚢 Chegada e Partida")
+                    
+                    # Layout com 2 colunas (sem colunas vazias)
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**Data Chegada (ATA)**")
+                        col_ata_date, col_ata_time = st.columns([2, 1])
+                        with col_ata_date:
+                            new_ata_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_CHEGADA")).date() if safe_datetime_value(row.get("DATA_CHEGADA")) else None, key=f"edit_ata_date_{idx}", help="Data real de chegada ao porto")
+                        with col_ata_time:
+                            new_ata_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_CHEGADA")).time() if safe_datetime_value(row.get("DATA_CHEGADA")) else None, key=f"edit_ata_time_{idx}", help="Hora real de chegada ao porto")
+                    
+                    with col2:
+                        st.markdown("**Data Partida (ATD)**")
+                        col_atd_date, col_atd_time = st.columns([2, 1])
+                        with col_atd_date:
+                            new_atd_date = st.date_input("Data", value=safe_datetime_value(row.get("DATA_PARTIDA")).date() if safe_datetime_value(row.get("DATA_PARTIDA")) else None, key=f"edit_atd_date_{idx}", help="Data real de partida do porto")
+                        with col_atd_time:
+                            new_atd_time = st.time_input("Hora", value=safe_datetime_value(row.get("DATA_PARTIDA")).time() if safe_datetime_value(row.get("DATA_PARTIDA")) else None, key=f"edit_atd_time_{idx}", help="Hora real de partida do porto")
+                    
+                    # Dicas das siglas (no final)
+                    st.info("""
+                    💡 **Dicas das Siglas:**
+                    - **ETD/ETA**: Datas estimadas (Estimated)
+                    - **ATB/ATA/ATD**: Datas reais (Actual)
+                    - **ETB**: Atracação estimada no cais
+                    - **ATB**: Atracação real no cais
+                    """)
+                    
+                    # Botões do formulário
+                    col1, col2, col3 = st.columns([1, 1, 2])
+                    
+                    with col1:
+                        save_clicked = st.form_submit_button("💾 Salvar", type="primary")
+                    
+                    with col2:
+                        cancel_clicked = st.form_submit_button("❌ Cancelar")
+                    
+                    # Processa ações do formulário
+                    if save_clicked:
+                        # Prepara dados para atualização
+                        updates = {}
+                        
+                        # Informações básicas
+                        if new_vessel != row["VESSEL_NAME"]:
+                            updates["VESSEL_NAME"] = new_vessel
+                        if new_voyage != row["VOYAGE_CODE"]:
+                            updates["VOYAGE_CODE"] = new_voyage
+                        if new_terminal != row["TERMINAL"]:
+                            updates["TERMINAL"] = new_terminal
+                        if new_agency != row.get("AGENCY", ""):
+                            updates["AGENCY"] = new_agency
+                        if new_cnpj != row.get("CNPJ_TERMINAL", ""):
+                            updates["CNPJ_TERMINAL"] = new_cnpj
+                        
+                        # Datas importantes (campos separados)
+                        if new_deadline_date or new_deadline_time:
+                            new_deadline_dt = datetime.combine(new_deadline_date, new_deadline_time) if new_deadline_date and new_deadline_time else None
+                            current_deadline = safe_datetime_value(row.get("DATA_DEADLINE"))
+                            if new_deadline_dt != current_deadline:
+                                updates["DATA_DEADLINE"] = new_deadline_dt
+                        
+                        if new_draft_date or new_draft_time:
+                            new_draft_dt = datetime.combine(new_draft_date, new_draft_time) if new_draft_date and new_draft_time else None
+                            current_draft = safe_datetime_value(row.get("DATA_DRAFT_DEADLINE"))
+                            if new_draft_dt != current_draft:
+                                updates["DATA_DRAFT_DEADLINE"] = new_draft_dt
+                        
+                        if new_gate_date or new_gate_time:
+                            new_gate_dt = datetime.combine(new_gate_date, new_gate_time) if new_gate_date and new_gate_time else None
+                            current_gate = safe_datetime_value(row.get("DATA_ABERTURA_GATE"))
+                            if new_gate_dt != current_gate:
+                                updates["DATA_ABERTURA_GATE"] = new_gate_dt
+                        
+                        if new_reefer_date or new_reefer_time:
+                            new_reefer_dt = datetime.combine(new_reefer_date, new_reefer_time) if new_reefer_date and new_reefer_time else None
+                            current_reefer = safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER"))
+                            if new_reefer_dt != current_reefer:
+                                updates["DATA_ABERTURA_GATE_REEFER"] = new_reefer_dt
+                        
+                        # Datas e horas de navio (campos separados)
+                        if new_etd_date and new_etd_time:
+                            new_etd_datetime = datetime.combine(new_etd_date, new_etd_time)
+                            current_etd = safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA"))
+                            if new_etd_datetime != current_etd:
+                                updates["DATA_ESTIMATIVA_SAIDA"] = new_etd_datetime
+                        
+                        if new_eta_date and new_eta_time:
+                            new_eta_datetime = datetime.combine(new_eta_date, new_eta_time)
+                            current_eta = safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA"))
+                            if new_eta_datetime != current_eta:
+                                updates["DATA_ESTIMATIVA_CHEGADA"] = new_eta_datetime
+                        
+                        if new_etb_date and new_etb_time:
+                            new_etb_datetime = datetime.combine(new_etb_date, new_etb_time)
+                            current_etb = safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO"))
+                            if new_etb_datetime != current_etb:
+                                updates["DATA_ESTIMATIVA_ATRACACAO"] = new_etb_datetime
+                        
+                        if new_atb_date and new_atb_time:
+                            new_atb_datetime = datetime.combine(new_atb_date, new_atb_time)
+                            current_atb = safe_datetime_value(row.get("DATA_ATRACACAO"))
+                            if new_atb_datetime != current_atb:
+                                updates["DATA_ATRACACAO"] = new_atb_datetime
+                        
+                        # Datas de chegada e partida (campos separados)
+                        if new_ata_date and new_ata_time:
+                            new_ata_datetime = datetime.combine(new_ata_date, new_ata_time)
+                            current_ata = safe_datetime_value(row.get("DATA_CHEGADA"))
+                            if new_ata_datetime != current_ata:
+                                updates["DATA_CHEGADA"] = new_ata_datetime
+                        
+                        if new_atd_date and new_atd_time:
+                            new_atd_datetime = datetime.combine(new_atd_date, new_atd_time)
+                            current_atd = safe_datetime_value(row.get("DATA_PARTIDA"))
+                            if new_atd_datetime != current_atd:
+                                updates["DATA_PARTIDA"] = new_atd_datetime
+                        
+                        # Datas de sistema não são editáveis (mantidas como estão)
+                        
+                        if updates:
+                            if update_voyage_monitoring_data(row["ID"], updates):
+                                st.success("✅ Dados atualizados com sucesso!")
+                                st.session_state[f"edit_mode_{idx}"] = False
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao atualizar dados")
+                        else:
+                            st.warning("⚠️ Nenhuma alteração detectada")
+                    
+                    if cancel_clicked:
+                        st.session_state[f"edit_mode_{idx}"] = False
+                        st.rerun()
                 
-                # Renomeia colunas
-                display_details = display_details.rename(columns=column_mapping)
+            
+            # Modo de visualização de Farol References
+            if st.session_state.get(f"view_refs_mode_{idx}", False):
+                st.markdown("---")
+                st.subheader("📋 Farol References Relacionados")
                 
-                # Seleciona apenas as colunas mapeadas
-                display_columns = list(column_mapping.values())
-                display_details = display_details[display_columns]
+                # Busca detalhes dos Farol References
+                details_df = get_farol_references_details(vessel_name, voyage_code, terminal)
                 
-                # Configuração das colunas para exibição
-                details_config = {}
-                for col in display_details.columns:
-                    if col in ["ETD", "ETA", "Data Inserção"]:
-                        details_config[col] = st.column_config.DatetimeColumn(col, width="medium")
-                    else:
-                        details_config[col] = st.column_config.TextColumn(col, width="medium")
+                if not details_df.empty:
+                    # Formata os dados para exibição
+                    display_details = details_df.copy()
+                    
+                    # Mapeia colunas para títulos em português
+                    column_mapping = {
+                        "FAROL_REFERENCE": "Farol Reference",
+                        "B_BOOKING_REFERENCE": "Booking Reference",
+                        "B_BOOKING_STATUS": "Booking Status",
+                        "P_STATUS": "Status",
+                        "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
+                        "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
+                        "ROW_INSERTED_DATE": "Data Inserção"
+                    }
+                    
+                    # Renomeia colunas
+                    display_details = display_details.rename(columns=column_mapping)
+                    
+                    # Seleciona apenas as colunas mapeadas
+                    display_columns = list(column_mapping.values())
+                    display_details = display_details[display_columns]
+                    
+                    # Configuração das colunas para exibição
+                    details_config = {}
+                    for col in display_details.columns:
+                        if col in ["ETD", "ETA", "Data Inserção"]:
+                            details_config[col] = st.column_config.DatetimeColumn(col, width="medium")
+                        else:
+                            details_config[col] = st.column_config.TextColumn(col, width="medium")
+                    
+                    # Exibe a tabela de detalhes
+                    st.dataframe(
+                        display_details,
+                        column_config=details_config,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    st.info(f"📊 **Total de Farol References:** {len(display_details)}")
+                else:
+                    st.warning("⚠️ Nenhum Farol Reference encontrado para esta combinação.")
+                    st.info("💡 **Dica:** Os dados da API Ellox podem estar mais atualizados que os dados históricos de booking. Tente buscar por outros navios com o mesmo código de viagem.")
                 
-                # Exibe a tabela de detalhes
-                st.dataframe(
-                    display_details,
-                    column_config=details_config,
-                    use_container_width=True,
-                    hide_index=True
-                )
-                
-                st.info(f"📊 **Total de Farol References:** {len(display_details)}")
-            else:
-                st.warning("⚠️ Nenhum Farol Reference encontrado para esta combinação.")
-                st.info("💡 **Dica:** Os dados da API Ellox podem estar mais atualizados que os dados históricos de booking. Tente buscar por outros navios com o mesmo código de viagem.")
+                # Botão para fechar visualização
+                if st.button("❌ Fechar", key=f"close_refs_{idx}"):
+                    st.session_state[f"view_refs_mode_{idx}"] = False
+                    st.rerun()
             
             st.markdown("---")
     
-    # Verifica se há alterações
-    # Compara apenas as colunas editáveis (excluindo a coluna de seleção)
-    editable_columns = [col for col in edited_df.columns if col != "Selecionar"]
-    edited_df_editable = edited_df[editable_columns]
-    df_editable = df[editable_columns]
-    
-    # Verifica se há alterações comparando valores das colunas editáveis
-    has_changes = False
-    changed_rows = []
-    
-    for idx in edited_df_editable.index:
-        if idx in df_editable.index:
-            # Compara linha por linha
-            edited_row = edited_df_editable.loc[idx]
-            original_row = df_editable.loc[idx]
-            
-            # Verifica se há diferenças (ignorando NaN)
-            if not edited_row.equals(original_row):
-                has_changes = True
-                changed_rows.append((idx, edited_row))
-    
-    if has_changes:
-        st.subheader("📝 Alterações Detectadas")
-        st.info(f"🔍 {len(changed_rows)} linha(s) com alterações detectadas")
-        
-        # Botão para salvar alterações
-        col1, col2, col3 = st.columns([1, 1, 2])
-        
-        with col1:
-            if st.button("💾 Salvar Alterações", type="primary"):
-                success_count = 0
-                total_changes = 0
-                
-                for idx, row in changed_rows:
-                    if idx in df.index:  # Linha existente sendo editada
-                        original_row = df.loc[idx]
-                        updates = {}
-                        
-                        # Compara cada coluna para identificar mudanças
-                        for col in df.columns:
-                            if col not in ["ID", "SELECIONAR", "FAROL_REFERENCES"]:  # Exclui colunas não editáveis
-                                if pd.isna(original_row[col]) and pd.isna(row[col]):
-                                    continue
-                                elif original_row[col] != row[col]:
-                                    updates[col] = row[col]
-                        
-                        if updates:
-                            total_changes += 1
-                            if update_voyage_monitoring_data(row["ID"], updates):
-                                success_count += 1
-                
-                if total_changes > 0:
-                    st.success(f"✅ {success_count}/{total_changes} alterações salvas com sucesso!")
-                    st.rerun()
-                else:
-                    st.warning("⚠️ Nenhuma alteração válida foi detectada.")
-        
-        with col2:
-            if st.button("🔄 Cancelar"):
-                st.rerun()
+    # Informação sobre seleção
+    if selected_rows.empty:
+        st.info("💡 **Dica:** Selecione uma linha para editar dados ou visualizar Farol References relacionados.")
