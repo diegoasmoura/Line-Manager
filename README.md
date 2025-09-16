@@ -710,6 +710,47 @@ else:
 - **Formulário Manual**: `history.py` → seção "voyage_manual_entry_required"
 - **PDF Processing**: `pdf_booking_processor.py` → `save_pdf_booking_data()` (simplificado)
 
+##### 🛠️ Melhorias Técnicas da v3.9
+
+**Função `_parse_iso_datetime` Corrigida:**
+```python
+# ❌ ANTES: Não processava pd.Timestamp
+def _parse_iso_datetime(value):
+    # Apenas strings ISO eram processadas
+    s = str(value).strip()
+    # ... processamento de string
+
+# ✅ AGORA: Suporte completo para pandas
+def _parse_iso_datetime(value):
+    if isinstance(value, pd.Timestamp):
+        if pd.isna(value):
+            return None
+        return value.to_pydatetime().replace(tzinfo=None)
+    # ... resto da função
+```
+
+**Validação de Registros Existentes:**
+```sql
+-- ❌ ANTES: Qualquer registro era considerado "existente"
+SELECT COUNT(*) FROM F_ELLOX_TERMINAL_MONITORINGS 
+WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+
+-- ✅ AGORA: Apenas registros com dados válidos
+SELECT COUNT(*) FROM F_ELLOX_TERMINAL_MONITORINGS 
+WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+AND (DATA_DEADLINE IS NOT NULL 
+     OR DATA_ESTIMATIVA_SAIDA IS NOT NULL 
+     OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL 
+     OR DATA_ABERTURA_GATE IS NOT NULL)
+```
+
+**Indicadores Visuais Específicos:**
+- 🔴 **Falha de Autenticação**: `st.error()` com ícone de cadeado
+- 🟡 **API Indisponível**: `st.warning()` com ícone de rede
+- 🟠 **Terminal Não Encontrado**: `st.info()` com ícone de terminal
+- 🔵 **Voyage Não Encontrada**: `st.warning()` com ícone de navio
+- ⚪ **Erro Geral**: `st.warning()` com ícone genérico
+
 #### 🚀 Consulta Direta à API Ellox (Estratégia Otimizada)
 
 **Problema Identificado**: A consulta tradicional via endpoint `/api/voyages` frequentemente resulta em timeout, especialmente quando há muitos registros ou a API está sobrecarregada.
@@ -1020,7 +1061,28 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - Verificar se credenciais não expiraram
      - Testar manualmente via Postman/curl
 
-6. **Dropdown com nomes duplicados (navios)**
+6. **Problemas com Voyage Monitoring (Resolvidos na v3.9)**
+   - **❌ Campos de Data Salvos como `None`**:
+     - ✅ **Resolvido**: Função `_parse_iso_datetime` corrigida para processar objetos `pd.Timestamp`
+     - **Causa**: Função não reconhecia timestamps do pandas, convertendo para `None`
+     - **Solução**: Adicionado suporte específico para `pd.Timestamp` e `pd.NaT`
+   
+   - **❌ "Dados já existem" para Registros Vazios**:
+     - ✅ **Resolvido**: Validação de registros existentes atualizada
+     - **Causa**: Sistema considerava registros com todas as datas `None` como "existentes"
+     - **Solução**: Verificação agora exige pelo menos uma data válida (`NOT NULL`)
+   
+   - **❌ Voyage Timeline Mostrando "N/A"**:
+     - ✅ **Resolvido**: Dados agora são salvos corretamente na tabela `F_ELLOX_TERMINAL_MONITORINGS`
+     - **Causa**: Campos de data não eram processados corretamente durante o salvamento
+     - **Solução**: Processamento robusto de timestamps e valores `NaT`
+   
+   - **❌ Indicadores Visuais Genéricos**:
+     - ✅ **Resolvido**: Implementados indicadores específicos por tipo de erro da API
+     - **Causa**: Usuário não conseguia distinguir entre diferentes problemas da API
+     - **Solução**: Cores e mensagens específicas para cada tipo de erro (autenticação, conexão, terminal não encontrado, etc.)
+
+7. **Dropdown com nomes duplicados (navios)**
    - Causa comum: o nome extraído do PDF está em caixa alta e não bate exatamente com o nome normalizado do banco
    - Correção: busca case-insensitive e uso da versão do banco; o valor do PDF é normalizado para Title Case apenas se inexistente
    - Observação: listas usam `@st.cache_data(ttl=300)`; o refresh ocorre automaticamente em até 5 minutos
@@ -1068,6 +1130,19 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9 - Correções Críticas de Voyage Monitoring (Setembro 2025)
+- **🔧 Correção da Função `_parse_iso_datetime`**: Função agora processa corretamente objetos `pd.Timestamp` do pandas, resolvendo o problema de campos de data salvos como `None` na tabela `F_ELLOX_TERMINAL_MONITORINGS`
+- **✅ Validação de Registros Existentes**: Corrigida verificação para ignorar registros vazios (sem dados válidos) na tabela de monitoramento, permitindo que a API seja consultada novamente
+- **🎯 Indicadores Visuais de API**: Implementados indicadores visuais específicos para diferentes tipos de problemas da API:
+  - 🔴 **Falha de Autenticação**: Credenciais inválidas ou expiradas
+  - 🟡 **API Indisponível**: Problemas de conectividade de rede
+  - 🟠 **Terminal Não Encontrado**: Terminal não localizado na base da API
+  - 🔵 **Voyage Não Encontrada**: Combinação vessel/voyage/terminal não encontrada
+  - ⚪ **Erro Geral**: Outros problemas de processamento
+- **🔄 Fluxo de Aprovação Otimizado**: Dados de monitoramento agora são coletados e salvos corretamente durante a aprovação de "Booking Approved"
+- **📊 Dados Corretos na Voyage Timeline**: Aba Voyage Timeline agora exibe dados reais da API em vez de "N/A"
+- **🛠️ Tratamento Robusto de Dados**: Melhor processamento de timestamps do pandas e valores `NaT` (Not a Time)
 
 ### 📌 v3.8 - Voyage Monitoring Management (Setembro 2025)
 - **🚢 Nova Aba "Voyage Monitoring"**: Interface dedicada para gerenciar dados de monitoramento da API Ellox
@@ -1333,18 +1408,19 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.5*
+*Sistema de Gerenciamento de Embarques - Versão 3.9*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.000+ linhas Python (atualizado v3.5)
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9)
 - **Módulos**: 15+ módulos especializados  
 - **Carriers Suportados**: 8 carriers principais
 - **Integrações**: Oracle DB + API Ellox
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.5)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9)
 
 ### 🎯 Roadmap Técnico Detalhado
 

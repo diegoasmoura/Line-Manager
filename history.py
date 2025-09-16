@@ -1944,6 +1944,7 @@ def exibir_history():
                                         "voyage_code": voyage_code,
                                         "terminal": terminal,
                                         "message": voyage_validation_result.get("message", ""),
+                                        "error_type": voyage_validation_result.get("error_type", "unknown"),
                                         "pending_approval": True
                                     }
                                     st.rerun()
@@ -1955,6 +1956,13 @@ def exibir_history():
                                         "TERMINAL": terminal,
                                         "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
                                         "AGENCIA": voyage_validation_result.get("agencia", ""),
+                                        # Campos obrigatórios que podem estar faltando
+                                        "DATA_DRAFT_DEADLINE": None,
+                                        "DATA_ABERTURA_GATE_REEFER": None,
+                                        "DATA_CHEGADA": None,
+                                        "DATA_ESTIMATIVA_ATRACACAO": None,
+                                        "DATA_ATRACACAO": None,
+                                        "DATA_PARTIDA": None,
                                     }
                                     # Inclui datas da API
                                     for k, v in (voyage_validation_result.get("data") or {}).items():
@@ -2023,12 +2031,63 @@ def exibir_history():
             voyage_code = voyage_manual_required.get("voyage_code", "")
             terminal = voyage_manual_required.get("terminal", "")
             
-            st.warning(f"⚠️ **Cadastro Manual de Voyage Monitoring Necessário**\n\nNão foram encontrados dados de monitoramento na API Ellox para a combinação **🚢 {vessel_name} | {voyage_code} | {terminal}**. Preencha os dados manualmente abaixo para continuar com a aprovação.")
+            # Determinar tipo de alerta baseado no tipo de erro
+            error_type = voyage_manual_required.get("error_type", "unknown")
+            message = voyage_manual_required.get("message", "")
+            
+            # Status visual da API baseado no tipo de erro
+            col_status, col_message = st.columns([1, 4])
+            
+            with col_status:
+                if error_type == "authentication_failed":
+                    st.markdown("### 🔴 API")
+                    st.markdown("**Não Autenticada**")
+                elif error_type == "connection_failed":
+                    st.markdown("### 🟡 API") 
+                    st.markdown("**Indisponível**")
+                elif error_type == "terminal_not_found":
+                    st.markdown("### 🟠 API")
+                    st.markdown("**Terminal N/E**")
+                elif error_type == "voyage_not_found":
+                    st.markdown("### 🔵 API")
+                    st.markdown("**Voyage N/E**")
+                else:
+                    st.markdown("### ⚪ API")
+                    st.markdown("**Erro Geral**")
+            
+            with col_message:
+                # Exibir alerta apropriado baseado no tipo de erro
+                if error_type == "authentication_failed":
+                    st.error(message)
+                elif error_type == "connection_failed":
+                    st.warning(message)
+                elif error_type == "terminal_not_found":
+                    st.info(message)
+                elif error_type == "voyage_not_found":
+                    st.warning(message)
+                elif error_type == "no_valid_dates":
+                    st.info(message)
+                elif error_type == "data_format_error":
+                    st.warning(message)
+                else:
+                    # Fallback para mensagem genérica
+                    st.warning(f"⚠️ **Cadastro Manual de Voyage Monitoring Necessário**\n\n{message}")
             
             
             # Formulário similar ao voyage_monitoring.py
             with st.form(f"voyage_manual_form_{adjustment_id}"):
-                st.subheader("📋 Cadastrar Dados de Monitoramento Manualmente")
+                # Título do formulário com ícone baseado no tipo de erro
+                if error_type == "authentication_failed":
+                    st.subheader("🔐 Cadastrar Dados de Monitoramento Manualmente")
+                    st.caption("⚠️ **Falha de Autenticação:** Inserção manual necessária devido a credenciais inválidas")
+                elif error_type == "connection_failed":
+                    st.subheader("🌐 Cadastrar Dados de Monitoramento Manualmente") 
+                    st.caption("⚠️ **Conexão Falhou:** Inserção manual necessária devido a problemas de rede")
+                elif error_type == "voyage_not_found":
+                    st.subheader("🔍 Cadastrar Dados de Monitoramento Manualmente")
+                    st.caption("💡 **Voyage Não Encontrada:** Complete os dados abaixo com as informações disponíveis")
+                else:
+                    st.subheader("📋 Cadastrar Dados de Monitoramento Manualmente")
                 
                 # Função auxiliar para converter datetime de forma segura (reutilizada do voyage_monitoring.py)
                 def safe_datetime_to_date(dt_value):

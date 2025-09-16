@@ -1612,12 +1612,17 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         # 1. Verificar se os dados já existem no banco
         conn = get_database_connection()
         
+        # Verificar se há dados VÁLIDOS (não apenas registro vazio)
         existing_query = text("""
             SELECT COUNT(*) as count
             FROM F_ELLOX_TERMINAL_MONITORINGS 
             WHERE UPPER(NAVIO) = UPPER(:vessel_name)
             AND UPPER(VIAGEM) = UPPER(:voyage_code)
             AND UPPER(TERMINAL) = UPPER(:terminal)
+            AND (DATA_DEADLINE IS NOT NULL 
+                OR DATA_ESTIMATIVA_SAIDA IS NOT NULL 
+                OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL 
+                OR DATA_ABERTURA_GATE IS NOT NULL)
         """)
         
         existing_count = conn.execute(existing_query, {
@@ -1639,14 +1644,25 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         # 2. Tentar obter dados da API Ellox
         api_client = get_default_api_client()
         
+        # Verificar autenticação primeiro
+        if not api_client.authenticated:
+            return {
+                "success": False,
+                "data": None,
+                "message": "🔐 **Falha na Autenticação da API Ellox**\n\n❌ As credenciais da API estão inválidas ou expiraram\n\n🔧 Contate o administrador para atualizar as credenciais",
+                "requires_manual": True,
+                "error_type": "authentication_failed"
+            }
+        
         # Testar conexão
         api_test = api_client.test_connection()
         if not api_test.get("success"):
             return {
                 "success": False,
                 "data": None,
-                "message": "❌ API Ellox indisponível no momento",
-                "requires_manual": True
+                "message": "⚠️ **API Ellox Temporariamente Indisponível**\n\n🌐 Não foi possível conectar com o servidor da API\n\n🔄 Tente novamente em alguns minutos",
+                "requires_manual": True,
+                "error_type": "connection_failed"
             }
         
         # 3. Resolver CNPJ do terminal
@@ -1663,8 +1679,9 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": f"🟠 Terminal '{terminal}' não localizado na API",
-                "requires_manual": True
+                "message": f"🔍 **Terminal Não Localizado na API**\n\n🏗️ Terminal '{terminal}' não foi encontrado na base da API\n\n💡 Verifique se o nome do terminal está correto",
+                "requires_manual": True,
+                "error_type": "terminal_not_found"
             }
         
         # 4. Buscar dados de monitoramento
@@ -1675,8 +1692,11 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": f"⚠️ Nenhum dado de monitoramento encontrado na API para {vessel_name} - {voyage_code}",
-                "requires_manual": True
+                "message": f"🔍 **Voyage Não Encontrada na API**\n\n🚢 **{vessel_name} | {voyage_code} | {terminal}** não localizada na base atual\n\n💡 Use o formulário manual abaixo para inserir os dados",
+                "requires_manual": True,
+                "error_type": "voyage_not_found",
+                "cnpj_terminal": cnpj_terminal,
+                "agencia": ""
             }
         
         # 5. Processar dados da API
@@ -1690,8 +1710,9 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": "⚠️ Formato de dados inesperado da API",
-                "requires_manual": True
+                "message": "⚠️ **Formato de Dados Inesperado da API**\n\n📊 A API retornou dados em formato não reconhecido\n\n🔧 Pode ser necessário atualizar a integração",
+                "requires_manual": True,
+                "error_type": "data_format_error"
             }
         
         # 6. Mapear e converter dados
@@ -1742,8 +1763,9 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": "ℹ️ Nenhuma data válida encontrada na API",
-                "requires_manual": True
+                "message": "📅 **Nenhuma Data Válida Encontrada na API**\n\n🔍 A API retornou dados, mas nenhuma data de monitoramento válida foi identificada\n\n💡 Use o formulário manual para inserir as datas",
+                "requires_manual": True,
+                "error_type": "no_valid_dates"
             }
         
         # 7. Salvar dados no banco (apenas se solicitado)
@@ -1872,23 +1894,39 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                         df_monitoring = pd.DataFrame([api_buf])
                         processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
                         if processed_count > 0:
-                            st.success("✅ Dados de monitoramento prontos para atualização do registro.")
-                            # Preenche valores para refletir no retorno
-                            column_mapping = {
-                                'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
-                                'DATA_DEADLINE': 'B_DATA_DEADLINE',
-                                'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
-                                'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
-                                'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
-                                'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
-                                'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
-                                'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
-                                'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
-                            }
-                            for src, dst in column_mapping.items():
-                                if src in api_buf and api_buf[src] is not None:
-                                    elox_update_values[dst] = api_buf[src]
-                        # Limpa o buffer após persistir
+                            st.success("✅ Dados de monitoramento da API salvos no banco.")
+                            
+                            # Buscar dados mais recentes da tabela (como era feito antes)
+                            vessel_name = api_buf.get("NAVIO")
+                            if vessel_name:
+                                monitoring_query = text("""
+                                    SELECT * FROM (
+                                        SELECT * FROM F_ELLOX_TERMINAL_MONITORINGS
+                                        WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+                                        ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+                                    ) WHERE ROWNUM = 1
+                                """)
+                                latest_monitoring_record = conn.execute(monitoring_query, {"vessel_name": vessel_name}).mappings().fetchone()
+                                
+                                if latest_monitoring_record:
+                                    column_mapping = {
+                                        'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
+                                        'DATA_DEADLINE': 'B_DATA_DEADLINE',
+                                        'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
+                                        'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                                        'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
+                                        'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
+                                        'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
+                                        'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                                        'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
+                                    }
+                                    for elox_col, return_col in column_mapping.items():
+                                        if elox_col.lower() in latest_monitoring_record and latest_monitoring_record[elox_col.lower()] is not None:
+                                            elox_update_values[return_col] = latest_monitoring_record[elox_col.lower()]
+                        else:
+                            st.warning("⚠️ Falha ao salvar dados de monitoramento da API.")
+                        
+                        # Limpa o buffer após processar
                         st.session_state.pop(api_buf_key, None)
                     except Exception as e:
                         st.error(f"❌ Erro ao persistir dados de monitoramento: {str(e)}")
@@ -2098,19 +2136,35 @@ def get_return_carrier_status_by_adjustment_id(adjustment_id: str):
 # ELLOX TERMINAL MONITORINGS
 # ============================
 def _parse_iso_datetime(value):
-    """Converte strings ISO (YYYY-MM-DDTHH:MM:SSZ) em datetime. Retorna None se inválido."""
+    """Converte strings ISO ou pandas Timestamp em datetime. Retorna None se inválido."""
     if value is None:
         return None
+    
     try:
-        s = str(value).strip()
-        if s == "":
+        import pandas as pd
+        from datetime import datetime as _dt
+        
+        # Se já é um pandas Timestamp válido, converte para datetime nativo
+        if isinstance(value, pd.Timestamp):
+            if pd.isna(value):
+                return None
+            return value.to_pydatetime().replace(tzinfo=None)
+        
+        # Se é NaT (pandas Not a Time), retorna None
+        if pd.isna(value):
             return None
+        
+        # Para strings, processa como antes
+        s = str(value).strip()
+        if s == "" or s.lower() == 'nat':
+            return None
+            
         # Normaliza: remove Z e troca T por espaço
         s = s.replace("T", " ").replace("Z", "").strip()
+        
         # Tenta formatos comuns
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
             try:
-                from datetime import datetime as _dt
                 return _dt.strptime(s, fmt)
             except Exception:
                 continue
@@ -2227,7 +2281,7 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                     seed = "|".join(seed_parts)
                     digest16 = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16]
                     params["ID"] = int(digest16, 16)
-                except Exception:
+                except Exception as e:
                     # Se falhar, ainda assim pula para evitar PK nula
                     continue
 
