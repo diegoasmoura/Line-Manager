@@ -1649,7 +1649,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": "🔐 **Falha na Autenticação da API Ellox**\n\n❌ As credenciais da API estão inválidas ou expiraram\n\n🔧 Contate o administrador para atualizar as credenciais",
+                "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
                 "requires_manual": True,
                 "error_type": "authentication_failed"
             }
@@ -1660,26 +1660,53 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": "⚠️ **API Ellox Temporariamente Indisponível**\n\n🌐 Não foi possível conectar com o servidor da API\n\n🔄 Tente novamente em alguns minutos",
+                "message": "🟡 API Ellox Temporariamente Indisponível\n\nNão foi possível conectar com o servidor da API. Tente novamente em alguns minutos.",
                 "requires_manual": True,
                 "error_type": "connection_failed"
             }
         
-        # 3. Resolver CNPJ do terminal
+        # 3. Resolver CNPJ do terminal (com normalização)
         cnpj_terminal = None
-        terms_resp = api_client._make_api_request("/api/terminals")
-        if terms_resp.get("success"):
-            for term in terms_resp.get("data", []):
-                nome_term = term.get("nome") or term.get("name") or ""
-                if str(nome_term).strip().upper() == str(terminal).strip().upper() or str(terminal).strip().upper() in str(nome_term).strip().upper():
-                    cnpj_terminal = term.get("cnpj")
-                    break
+        
+        # Aplicar normalização de terminal (como no pdf_booking_processor.py)
+        terminal_normalized = terminal.upper().strip()
+        
+        # Caso especial: Embraport (DP World Santos)
+        # Alguns PDFs trazem "Embraport Empresa Brasileira"; na API é reconhecido como DPW/DP WORLD
+        if "EMBRAPORT" in terminal_normalized or "EMPRESA BRASILEIRA" in terminal_normalized:
+            try:
+                conn = get_database_connection()
+                query = text("""
+                    SELECT CNPJ, NOME
+                    FROM F_ELLOX_TERMINALS
+                    WHERE UPPER(NOME) LIKE '%DPW%'
+                       OR UPPER(NOME) LIKE '%DP WORLD%'
+                       OR UPPER(NOME) LIKE '%EMBRAPORT%'
+                    FETCH FIRST 1 ROWS ONLY
+                """)
+                res = conn.execute(query).mappings().fetchone()
+                conn.close()
+                if res and res.get("cnpj"):
+                    cnpj_terminal = res["cnpj"]
+            except Exception:
+                # mantém fallback se não encontrar
+                pass
+        
+        # Se não encontrou via normalização, buscar na API
+        if not cnpj_terminal:
+            terms_resp = api_client._make_api_request("/api/terminals")
+            if terms_resp.get("success"):
+                for term in terms_resp.get("data", []):
+                    nome_term = term.get("nome") or term.get("name") or ""
+                    if str(nome_term).strip().upper() == str(terminal).strip().upper() or str(terminal).strip().upper() in str(nome_term).strip().upper():
+                        cnpj_terminal = term.get("cnpj")
+                        break
         
         if not cnpj_terminal:
             return {
                 "success": False,
                 "data": None,
-                "message": f"🔍 **Terminal Não Localizado na API**\n\n🏗️ Terminal '{terminal}' não foi encontrado na base da API\n\n💡 Verifique se o nome do terminal está correto",
+                "message": f"🟠 Terminal Não Localizado na API\n\nTerminal '{terminal}' não foi encontrado na base da API. Verifique se o nome do terminal está correto.",
                 "requires_manual": True,
                 "error_type": "terminal_not_found"
             }
@@ -1692,7 +1719,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": f"🔍 **Voyage Não Encontrada na API**\n\n🚢 **{vessel_name} | {voyage_code} | {terminal}** não localizada na base atual\n\n💡 Use o formulário manual abaixo para inserir os dados",
+                "message": f"🔵 Voyage Não Encontrada na API\n\n🚢 {vessel_name} | {voyage_code} | {terminal} não localizada na base atual. Use o formulário manual abaixo para inserir os dados.",
                 "requires_manual": True,
                 "error_type": "voyage_not_found",
                 "cnpj_terminal": cnpj_terminal,
@@ -1710,7 +1737,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": "⚠️ **Formato de Dados Inesperado da API**\n\n📊 A API retornou dados em formato não reconhecido\n\n🔧 Pode ser necessário atualizar a integração",
+                "message": "🟡 Formato de Dados Inesperado da API\n\nA API retornou dados em formato não reconhecido. Pode ser necessário atualizar a integração.",
                 "requires_manual": True,
                 "error_type": "data_format_error"
             }
@@ -1763,7 +1790,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": False,
                 "data": None,
-                "message": "📅 **Nenhuma Data Válida Encontrada na API**\n\n🔍 A API retornou dados, mas nenhuma data de monitoramento válida foi identificada\n\n💡 Use o formulário manual para inserir as datas",
+                "message": "⚪ Nenhuma Data Válida Encontrada na API\n\nA API retornou dados, mas nenhuma data de monitoramento válida foi identificada. Use o formulário manual para inserir as datas.",
                 "requires_manual": True,
                 "error_type": "no_valid_dates"
             }

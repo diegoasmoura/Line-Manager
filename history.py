@@ -1575,11 +1575,23 @@ def exibir_history():
                     with st.container():
                         # Função helper para formatar datas
                         def format_date_safe(date_val):
-                            if date_val and hasattr(date_val, 'strftime'):
-                                return date_val.strftime('%d/%m/%Y %H:%M')
-                            elif date_val:
+                            if date_val is None:
+                                return 'N/A'
+                            
+                            try:
+                                import pandas as pd
+                                # Verificar se é NaT (pandas Not a Time)
+                                if pd.isna(date_val):
+                                    return 'N/A'
+                                
+                                # Se é um pandas Timestamp válido
+                                if hasattr(date_val, 'strftime'):
+                                    return date_val.strftime('%d/%m/%Y %H:%M')
+                                
+                                # Para outros tipos, converter para string
                                 return str(date_val)
-                            return 'N/A'
+                            except Exception:
+                                return 'N/A'
                         
                         # Layout card expandido mantendo o estilo original
                         st.markdown(f"""
@@ -1688,10 +1700,28 @@ def exibir_history():
                                             # Detectar mudança
                                             if current_formatted != previous_formatted:
                                                 update_time = current.get('data_atualizacao')
-                                                if hasattr(update_time, 'strftime'):
-                                                    update_str = update_time.strftime('%d/%m/%Y às %H:%M')
-                                                else:
-                                                    update_str = str(update_time)
+                                                
+                                                # Função helper para formatar data de atualização
+                                                def format_update_time(date_val):
+                                                    if date_val is None:
+                                                        return 'N/A'
+                                                    
+                                                    try:
+                                                        import pandas as pd
+                                                        # Verificar se é NaT (pandas Not a Time)
+                                                        if pd.isna(date_val):
+                                                            return 'N/A'
+                                                        
+                                                        # Se é um pandas Timestamp válido
+                                                        if hasattr(date_val, 'strftime'):
+                                                            return date_val.strftime('%d/%m/%Y às %H:%M')
+                                                        
+                                                        # Para outros tipos, converter para string
+                                                        return str(date_val)
+                                                    except Exception:
+                                                        return 'N/A'
+                                                
+                                                update_str = format_update_time(update_time)
                                                 
                                                 changes.append({
                                                     'field': label,
@@ -1978,8 +2008,8 @@ def exibir_history():
                                     campos_txt = f" Campos atualizados: {fields_count}." if fields_count > 0 else ""
                                     msg = (
                                         f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                        f"Foram encontrados dados de monitoramento na API Ellox para a combinação **🚢 {vessel_name} | {voyage_code} | {terminal}**.{campos_txt} "
-                                        f"Os campos foram preenchidos automaticamente. Continue com a aprovação."
+                                        f"Foram encontrados dados de monitoramento na API\n"
+                                        f"🚢 {vessel_name} | {voyage_code} | {terminal}."
                                     )
                                     st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
                                 else:
@@ -2035,43 +2065,22 @@ def exibir_history():
             error_type = voyage_manual_required.get("error_type", "unknown")
             message = voyage_manual_required.get("message", "")
             
-            # Status visual da API baseado no tipo de erro
-            col_status, col_message = st.columns([1, 4])
-            
-            with col_status:
-                if error_type == "authentication_failed":
-                    st.markdown("### 🔴 API")
-                    st.markdown("**Não Autenticada**")
-                elif error_type == "connection_failed":
-                    st.markdown("### 🟡 API") 
-                    st.markdown("**Indisponível**")
-                elif error_type == "terminal_not_found":
-                    st.markdown("### 🟠 API")
-                    st.markdown("**Terminal N/E**")
-                elif error_type == "voyage_not_found":
-                    st.markdown("### 🔵 API")
-                    st.markdown("**Voyage N/E**")
-                else:
-                    st.markdown("### ⚪ API")
-                    st.markdown("**Erro Geral**")
-            
-            with col_message:
-                # Exibir alerta apropriado baseado no tipo de erro
-                if error_type == "authentication_failed":
-                    st.error(message)
-                elif error_type == "connection_failed":
-                    st.warning(message)
-                elif error_type == "terminal_not_found":
-                    st.info(message)
-                elif error_type == "voyage_not_found":
-                    st.warning(message)
-                elif error_type == "no_valid_dates":
-                    st.info(message)
-                elif error_type == "data_format_error":
-                    st.warning(message)
-                else:
-                    # Fallback para mensagem genérica
-                    st.warning(f"⚠️ **Cadastro Manual de Voyage Monitoring Necessário**\n\n{message}")
+            # Exibir alerta apropriado baseado no tipo de erro
+            if error_type == "authentication_failed":
+                st.error(message)
+            elif error_type == "connection_failed":
+                st.warning(message)
+            elif error_type == "terminal_not_found":
+                st.info(message)
+            elif error_type == "voyage_not_found":
+                st.warning(message)
+            elif error_type == "no_valid_dates":
+                st.info(message)
+            elif error_type == "data_format_error":
+                st.warning(message)
+            else:
+                # Fallback para mensagem genérica
+                st.warning(f"⚠️ Cadastro Manual de Voyage Monitoring Necessário\n\n{message}")
             
             
             # Formulário similar ao voyage_monitoring.py
