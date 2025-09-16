@@ -730,12 +730,36 @@ def exibir_voyage_monitoring():
                     
                     # Layout com 3 colunas ocupando toda a largura
                     col_vessel, col_voyage, col_terminal = st.columns([3, 1, 2])
+                    # Carregar opções de dropdown (navios/terminais) do banco
+                    vessel_options, terminal_options = get_dropdown_options()
                     with col_vessel:
-                        new_vessel = st.text_input("Vessel Name", value=row["VESSEL_NAME"], key=f"edit_vessel_{idx}", help="Nome do navio (pode ser longo)")
+                        current_vessel = str(row["VESSEL_NAME"] or "").strip()
+                        if vessel_options:
+                            vessel_list = vessel_options.copy()
+                            selected_vessel_index = next((i for i, v in enumerate(vessel_list) if str(v).strip().upper() == current_vessel.upper()), None)
+                            if selected_vessel_index is None and current_vessel:
+                                vessel_list.insert(0, current_vessel)
+                                selected_vessel_index = 0
+                            elif selected_vessel_index is None:
+                                selected_vessel_index = 0
+                            new_vessel = st.selectbox("Vessel Name", options=vessel_list, index=selected_vessel_index, key=f"edit_vessel_{idx}", help="Selecione o navio")
+                        else:
+                            new_vessel = st.text_input("Vessel Name", value=current_vessel, key=f"edit_vessel_{idx}", help="Nome do navio (pode ser longo)")
                     with col_voyage:
                         new_voyage = st.text_input("Voyage Code", value=row["VOYAGE_CODE"], key=f"edit_voyage_{idx}", help="Código da viagem (geralmente curto)")
                     with col_terminal:
-                        new_terminal = st.text_input("Terminal", value=row["TERMINAL"], key=f"edit_terminal_{idx}", help="Nome do terminal")
+                        current_terminal = str(row["TERMINAL"] or "").strip()
+                        if terminal_options:
+                            terminal_list = terminal_options.copy()
+                            selected_terminal_index = next((i for i, t in enumerate(terminal_list) if str(t).strip().upper() == current_terminal.upper()), None)
+                            if selected_terminal_index is None and current_terminal:
+                                terminal_list.insert(0, current_terminal)
+                                selected_terminal_index = 0
+                            elif selected_terminal_index is None:
+                                selected_terminal_index = 0
+                            new_terminal = st.selectbox("Terminal", options=terminal_list, index=selected_terminal_index, key=f"edit_terminal_{idx}", help="Selecione o terminal")
+                        else:
+                            new_terminal = st.text_input("Terminal", value=current_terminal, key=f"edit_terminal_{idx}", help="Nome do terminal")
                     
                     # Segunda linha: Data Atualização, Data Inserção
                     col_data_atualizacao, col_data_insercao = st.columns([1, 1])
