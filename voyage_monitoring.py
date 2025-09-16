@@ -725,11 +725,11 @@ def exibir_voyage_monitoring():
                                 selected_vessel_index = 0
                             elif selected_vessel_index is None:
                                 selected_vessel_index = 0
-                            new_vessel = st.selectbox("Vessel Name", options=vessel_list, index=selected_vessel_index, key=f"edit_vessel_{idx}", help="Selecione o navio")
+                            new_vessel = st.selectbox("**:green[Vessel Name]***", options=vessel_list, index=selected_vessel_index, key=f"edit_vessel_{idx}", help="Selecione o navio")
                         else:
                             new_vessel = st.text_input("Vessel Name", value=current_vessel, key=f"edit_vessel_{idx}", help="Nome do navio (pode ser longo)")
                     with col_voyage:
-                        new_voyage = st.text_input("Voyage Code", value=row["VOYAGE_CODE"], key=f"edit_voyage_{idx}", help="Código da viagem (geralmente curto)")
+                        new_voyage = st.text_input("**:green[Voyage Code]***", value=row["VOYAGE_CODE"], key=f"edit_voyage_{idx}", help="Código da viagem (geralmente curto)")
                     with col_terminal:
                         current_terminal = str(row["TERMINAL"] or "").strip()
                         if terminal_options:
@@ -740,7 +740,7 @@ def exibir_voyage_monitoring():
                                 selected_terminal_index = 0
                             elif selected_terminal_index is None:
                                 selected_terminal_index = 0
-                            new_terminal = st.selectbox("Terminal", options=terminal_list, index=selected_terminal_index, key=f"edit_terminal_{idx}", help="Selecione o terminal")
+                            new_terminal = st.selectbox("**:green[Terminal]***", options=terminal_list, index=selected_terminal_index, key=f"edit_terminal_{idx}", help="Selecione o terminal")
                         else:
                             new_terminal = st.text_input("Terminal", value=current_terminal, key=f"edit_terminal_{idx}", help="Nome do terminal")
                     
