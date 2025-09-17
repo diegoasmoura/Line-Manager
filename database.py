@@ -1888,7 +1888,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 'manual_deadline': 'B_DATA_DEADLINE',
                 'manual_draft_deadline': 'B_DATA_DRAFT_DEADLINE',
                 'manual_gate_opening': 'B_DATA_ABERTURA_GATE',
-                'manual_reefer_gate_opening': 'B_DATA_ABERTURA_GATE_REEFER',
+                # B_DATA_ABERTURA_GATE_REEFER só existe em F_ELLOX_TERMINAL_MONITORINGS, não em F_CON_RETURN_CARRIERS
                 'manual_etd': 'B_DATA_ESTIMATIVA_SAIDA_ETD',
                 'manual_eta': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
                 'manual_etb': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
@@ -1961,7 +1961,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                                         'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
                                         'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
                                         'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
-                                        'DATA_ABERTURA_GATE_REEFER': 'B_DATA_ABERTURA_GATE_REEFER',
+                                        # B_DATA_ABERTURA_GATE_REEFER não existe em F_CON_RETURN_CARRIERS
                                         'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
                                         'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
                                         'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
@@ -2019,8 +2019,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             "B_BOOKING_REFERENCE", "B_TRANSHIPMENT_PORT", "B_TERMINAL", "B_VESSEL_NAME",
             "B_VOYAGE_CODE", "B_VOYAGE_CARRIER", "B_DATA_DRAFT_DEADLINE", "B_DATA_DEADLINE",
             "B_DATA_ESTIMATIVA_SAIDA_ETD", "B_DATA_ESTIMATIVA_CHEGADA_ETA", "B_DATA_ABERTURA_GATE",
-            "B_DATA_ABERTURA_GATE_REEFER", "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", 
-            "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
+            "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
         ]
         for field in fields_to_propagate:
             if field in row and row[field] is not None:
@@ -2297,6 +2296,7 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                 c = cols_map.get(key)
                 return row[c] if c in row else None
 
+            from datetime import datetime as _datetime
             params = {
                 "ID": int(g('id')) if g('id') is not None and str(g('id')).strip() != '' else None,
                 "NAVIO": g('navio'),
@@ -2308,7 +2308,8 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                 "DATA_ABERTURA_GATE_REEFER": _parse_iso_datetime(g('data_abertura_gate_reefer')),
                 "DATA_ESTIMATIVA_SAIDA": _parse_iso_datetime(g('data_estimativa_saida')),
                 "DATA_ESTIMATIVA_CHEGADA": _parse_iso_datetime(g('data_estimativa_chegada')),
-                "DATA_ATUALIZACAO": _parse_iso_datetime(g('data_atualizacao')),
+                # Se vier vazio, assume timestamp atual nas entradas manuais
+                "DATA_ATUALIZACAO": _parse_iso_datetime(g('data_atualizacao')) or _datetime.now(),
                 "TERMINAL": g('terminal'),
                 "CNPJ_TERMINAL": g('cnpj_terminal'),
                 "DATA_CHEGADA": _parse_iso_datetime(g('data_chegada')),

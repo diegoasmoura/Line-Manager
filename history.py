@@ -2235,6 +2235,7 @@ def exibir_history():
                         "TERMINAL": terminal,
                         "AGENCIA": "",  # Pode ser deixado vazio para entrada manual
                         "CNPJ_TERMINAL": "",  # Pode ser resolvido posteriormente
+                        "DATA_ATUALIZACAO": datetime.now(),  # Timestamp do salvamento para entradas manuais
                     }
                     
                     # Adicionar datas se foram informadas
