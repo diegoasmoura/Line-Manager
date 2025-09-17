@@ -1658,7 +1658,7 @@ def exibir_history():
                         
                         # Histórico dessa viagem específica em expander
                         voyage_count = len(voyage_records)
-                        if voyage_count > 1:
+                        if voyage_count >= 1:
                             with st.expander(f"📈 Ver histórico ({voyage_count} registros)", expanded=False):
                                 st.markdown("#### 🔄 Alterações Detectadas")
                                 
