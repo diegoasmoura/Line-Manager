@@ -1210,6 +1210,10 @@ def exibir_history():
         for col in df.columns:
             if col in config:
                 continue
+
+            if col == "ID":
+                config[col] = None
+                continue
                 
             # Oculta Status apenas se solicitado (aba Returns Awaiting Review)
             if col == "Status" and hide_status:
@@ -1770,6 +1774,9 @@ def exibir_history():
                                     'row_inserted_date': 'Inserted Date',
                                 }
                                 voyage_display = voyage_display.rename(columns=rename_map_voyage)
+                                id_cols_to_drop = [col for col in voyage_display.columns if col.strip().lower() == 'id']
+                                if id_cols_to_drop:
+                                    voyage_display = voyage_display.drop(columns=id_cols_to_drop)
                                 st.dataframe(voyage_display, use_container_width=True, hide_index=True)
                         
                         # Separador visual entre viagens
