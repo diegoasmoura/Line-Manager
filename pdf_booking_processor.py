@@ -60,14 +60,6 @@ CARRIER_PATTERNS = {
             r"Port\s+of\s+Discharge[\s:]+([A-Z\s,]+)",
             r"POD[\s:]+([A-Z\s,]+)",
         ],
-        "etd": [
-            r"(\d{4}-\d{2}-\d{2})\s+\d{4}-\d{2}-\d{2}",  # Primeira data do padrão MVS
-            r"ETD[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
-        "eta": [
-            r"\d{4}-\d{2}-\d{2}\s+(\d{4}-\d{2}-\d{2})",  # Segunda data do padrão MVS
-            r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
         "cargo_type": [
             r"(?:Customer Cargo|Commodity Description)\s*:\s*(.+?)(?:\n|Service Contract|Price Owner|$)",
         ],
@@ -124,14 +116,6 @@ CARRIER_PATTERNS = {
             r"POD[\s:]+([A-Z\s,]+)",
             r"Discharge\s+Port[\s:]+([A-Z\s,]+)",
         ],
-        "etd": [
-            r"ETD[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-            r"Departure[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
-        "eta": [
-            r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-            r"Arrival[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
         "print_date": [
             r"Print\s*Date[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?)",
             r"Run\s*Date[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?)",
@@ -163,12 +147,6 @@ CARRIER_PATTERNS = {
             r"Port\s+of\s+Discharge[\s:]+([A-Z\s,]+)",
             r"POD[\s:]+([A-Z\s,]+)",
         ],
-        "etd": [
-            r"ETD[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
-        "eta": [
-            r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
     },
     "CMA CGM": {
         "booking_reference": [
@@ -199,12 +177,6 @@ CARRIER_PATTERNS = {
             r"Port\s+of\s+Discharge\s*[:\-]?\s*([A-Z\s,\-]+)",
             r"Discharge\s+Port\s*[:\-]?\s*([A-Z\s,\-]+)",
             r"Final\s+Destination\s*[:\-]?\s*([A-Z\s,\-]+)",
-        ],
-        "etd": [
-            r"ETD\s*[:\-]?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})",
-        ],
-        "eta": [
-            r"ETA\s*[:\-]?\s*(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})",
         ],
         "print_date": [
             r"Printed\s+on\s*[:\-]?\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?)",
@@ -241,14 +213,6 @@ CARRIER_PATTERNS = {
             r"Port\s+of\s+Discharge[\s:]+([A-Z\s,]+)",
             r"POD[\s:]+([A-Z\s,]+)",
             r"Discharge\s+Port[\s:]+([A-Z\s,]+)",
-        ],
-        "etd": [
-            r"ETD[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-            r"Departure[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        ],
-        "eta": [
-            r"ETA[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-            r"Arrival[\s:]+(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
         ],
         "print_date": [
             # Padrão específico Maersk: data na linha após o título
@@ -426,12 +390,7 @@ def extract_maersk_data_old(text_content):
                     data[field] = match.group(1).strip()
                 break
     
-    # Extrair ETD e ETA do padrão MVS (antes de processar POL/POD)
-    mvs_pattern = r"(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})"
-    mvs_match = re.search(mvs_pattern, text_content)
-    if mvs_match:
-        data["etd"] = mvs_match.group(1)
-        data["eta"] = mvs_match.group(2).strip()
+    
     
     # Extrair POL e POD usando padrões mais específicos da Maersk
     # POL (From:) - Função similar ao POD
@@ -796,23 +755,24 @@ def extract_maersk_data(text_content):
     
     # Extrair ETD, ETA, Vessel e Voy
     first_etd, last_eta, first_vessel, first_voy = extract_etd_eta_vessel(text_content)
-    if first_etd:
-        # Converter formato YYYY-MM-DD para DD/MM/YYYY (padrão da ferramenta)
-        try:
-            from datetime import datetime
-            etd_date = datetime.strptime(first_etd, '%Y-%m-%d')
-            data["etd"] = etd_date.strftime('%d/%m/%Y')
-        except:
-            data["etd"] = first_etd  # Fallback para formato original
+    # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
+    # if first_etd:
+    #     # Converter formato YYYY-MM-DD para DD/MM/YYYY (padrão da ferramenta)
+    #     try:
+    #         from datetime import datetime
+    #         etd_date = datetime.strptime(first_etd, '%Y-%m-%d')
+    #         data["etd"] = etd_date.strftime('%d/%m/%Y')
+    #     except:
+    #         data["etd"] = first_etd  # Fallback para formato original
     
-    if last_eta:
-        # Converter formato YYYY-MM-DD para DD/MM/YYYY (padrão da ferramenta)
-        try:
-            from datetime import datetime
-            eta_date = datetime.strptime(last_eta, '%Y-%m-%d')
-            data["eta"] = eta_date.strftime('%d/%m/%Y')
-        except:
-            data["eta"] = last_eta  # Fallback para formato original
+    # if last_eta:
+    #     # Converter formato YYYY-MM-DD para DD/MM/YYYY (padrão da ferramenta)
+    #     try:
+    #         from datetime import datetime
+    #         eta_date = datetime.strptime(last_eta, '%Y-%m-%d')
+    #         data["eta"] = eta_date.strftime('%d/%m/%Y')
+    #     except:
+    #         data["eta"] = last_eta  # Fallback para formato original
     
     if first_vessel:
         data["vessel_name"] = first_vessel
@@ -1033,35 +993,37 @@ def extract_hapag_lloyd_data(text_content):
                 dates_in_line = re.findall(r"(\d{2}-[A-Za-z]{3}-\d{4})", line)
                 vessel_dates.extend(dates_in_line)
         
-        if vessel_dates:
-            # ETD: primeira data de saída (primeira data de todas as viagens)
-            if not data.get("etd"):
-                data["etd"] = vessel_dates[0]
-            # ETA: última data de chegada (última data de todas as viagens)
-            if not data.get("eta"):
-                data["eta"] = vessel_dates[-1]
+        # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
+        # if vessel_dates:
+        #     # ETD: primeira data de saída (primeira data de todas as viagens)
+        #     if not data.get("etd"):
+        #         data["etd"] = vessel_dates[0]
+        #     # ETA: última data de chegada (última data de todas as viagens)
+        #     if not data.get("eta"):
+        #         data["eta"] = vessel_dates[-1]
         
+        # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
         # Fallback: procurar todas as datas DD-MMM-YYYY e filtrar por contexto
-        if not data.get("etd") or not data.get("eta"):
-            all_dates = re.findall(r"(\d{2}-[A-Za-z]{3}-\d{4})", text_content)
-            # Filtrar datas que não são Date of Issue
-            filtered_dates = []
-            for date_str in all_dates:
-                # Pular se for a data de emissão
-                if data.get("pdf_print_date") and date_str in data["pdf_print_date"]:
-                    continue
-                # Pular datas de reserva (Data da Reserva)
-                if re.search(f"Data\\s+da\\s+Reserva.*?{re.escape(date_str)}", text_content, re.IGNORECASE):
-                    continue
-                filtered_dates.append(date_str)
-            
-            if filtered_dates and len(filtered_dates) >= 2:
-                if not data.get("etd"):
-                    # ETD: terceira data (após Date of Issue e Data da Reserva)
-                    data["etd"] = filtered_dates[2] if len(filtered_dates) > 2 else filtered_dates[0]
-                if not data.get("eta"):
-                    # ETA: última data
-                    data["eta"] = filtered_dates[-1]
+        # if not data.get("etd") or not data.get("eta"):
+        #     all_dates = re.findall(r"(\d{2}-[A-Za-z]{3}-\d{4})", text_content)
+        #     # Filtrar datas que não são Date of Issue
+        #     filtered_dates = []
+        #     for date_str in all_dates:
+        #         # Pular se for a data de emissão
+        #         if data.get("pdf_print_date") and date_str in data["pdf_print_date"]:
+        #             continue
+        #         # Pular datas de reserva (Data da Reserva)
+        #         if re.search(f"Data\\s+da\\s+Reserva.*?{re.escape(date_str)}", text_content, re.IGNORECASE):
+        #             continue
+        #         filtered_dates.append(date_str)
+        #     
+        #     if filtered_dates and len(filtered_dates) >= 2:
+        #         if not data.get("etd"):
+        #             # ETD: terceira data (após Date of Issue e Data da Reserva)
+        #             data["etd"] = filtered_dates[2] if len(filtered_dates) > 2 else filtered_dates[0]
+        #         if not data.get("eta"):
+        #             # ETA: última data
+        #             data["eta"] = filtered_dates[-1]
 
     # Lógica especial para POD: sempre procurar HO CHI MINH CITY primeiro (apenas se existir no texto)
     if re.search(r"HO\s+CHI\s+MINH\s+CITY", text_content, re.IGNORECASE):
@@ -1448,25 +1410,25 @@ def extract_msc_data(text_content):
     except Exception:
         pass
 
-    # ETA (MSC) via "DATA PREVISTA DE CHEGADA" em PT
-    try:
-        if not data.get("eta"):
-            m_anchor = re.search(r"DATA\s+PREVISTA\s+DE\s+CHEGADA", text_content, re.IGNORECASE)
-            if m_anchor:
-                tail = text_content[m_anchor.end():]
-                lines = [ln.strip() for ln in tail.split("\n") if ln.strip()][:10]
-                # coletar todas as datas dd/mm/yyyy nas próximas linhas e escolher a última (mais provável ETA)
-                dates = []
-                times = []
-                for ln in lines:
-                    for d in re.findall(r"\b(\d{2}/\d{2}/\d{4})\b", ln):
-                        dates.append(d)
-                    for t in re.findall(r"\b(\d{1,2}:\d{2}(?::\d{2})?\s*[APap]M)\b", ln):
-                        times.append(t)
-                if dates:
-                    data["eta"] = dates[-1]  # última data encontrada
-    except Exception:
-        pass
+    # ETA (MSC) removida - responsabilidade da API ou preenchimento manual
+    # try:
+    #     if not data.get("eta"):
+    #         m_anchor = re.search(r"DATA\s+PREVISTA\s+DE\s+CHEGADA", text_content, re.IGNORECASE)
+    #         if m_anchor:
+    #             tail = text_content[m_anchor.end():]
+    #             lines = [ln.strip() for ln in tail.split("\n") if ln.strip()][:10]
+    #             # coletar todas as datas dd/mm/yyyy nas próximas linhas e escolher a última (mais provável ETA)
+    #             dates = []
+    #             times = []
+    #             for ln in lines:
+    #                 for d in re.findall(r"\b(\d{2}/\d{2}/\d{4})\b", ln):
+    #                     dates.append(d)
+    #                 for t in re.findall(r"\b(\d{1,2}:\d{2}(?::\d{2})?\s*[APap]M)\b", ln):
+    #                     times.append(t)
+    #             if dates:
+    #                 data["eta"] = dates[-1]  # última data encontrada
+    # except Exception:
+    #     pass
 
     # PDF Print Date (MSC) — header com data e hora em linhas separadas
     try:
@@ -1507,12 +1469,13 @@ def extract_msc_data(text_content):
     except Exception:
         pass
 
+    # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
     # Requisito: ETD não deve ser preenchido para MSC
-    if "etd" in data:
-        try:
-            del data["etd"]
-        except Exception:
-            data["etd"] = ""
+    # if "etd" in data:
+    #     try:
+    #         del data["etd"]
+    #     except Exception:
+    #         data["etd"] = ""
     return data
 
 def extract_cma_cgm_data(text_content):
@@ -1583,10 +1546,11 @@ def extract_cma_cgm_data(text_content):
                 parts = [p.strip() for p in tail.split('/') if p.strip()]
                 vessel = parts[0] if parts else None
                 voyage = parts[1] if len(parts) > 1 else None
+        # ETD removido - responsabilidade da API ou preenchimento manual
         # 3) ETD em qualquer lugar do texto
-        etd_m = re.search(r"ETD\s*:?\s*(\d{2}\s+\w+\s+\d{4}|\d{2}/\d{2}/\d{4})", text, re.IGNORECASE)
-        etd = etd_m.group(1) if etd_m else None
-        return vessel, voyage, etd
+        # etd_m = re.search(r"ETD\s*:?\s*(\d{2}\s+\w+\s+\d{4}|\d{2}/\d{2}/\d{4})", text, re.IGNORECASE)
+        # etd = etd_m.group(1) if etd_m else None
+        return vessel, voyage, None  # etd removido
 
     def extract_container_info(text: str):
         # Captura formatos como: "8 x 40'HC", "8x40 HC", "8 × 40'HC"
@@ -1616,14 +1580,15 @@ def extract_cma_cgm_data(text_content):
             data["booking_reference"] = m.group(1).strip()
             break
 
-    # 2) Vessel / Voyage / ETD
+    # 2) Vessel / Voyage (ETD removido)
     vessel, voyage, etd = extract_vessel_voyage_info(text_content)
     if vessel:
         data["vessel_name"] = vessel
     if voyage:
         data["voyage"] = voyage
-    if etd:
-        data["etd"] = etd
+    # ETD removido - responsabilidade da API ou preenchimento manual
+    # if etd:
+    #     data["etd"] = etd
 
     # 3) POL
     # Preferir capturar a primeira linha útil após "Port Of Loading:", ignorando rótulos como "Loading Terminal:"
@@ -1955,23 +1920,24 @@ def extract_cma_cgm_data(text_content):
                 data["port_cut"] = pc
                 break
 
+    # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
     # 9) ETD/ETA suportando dd-MON-YYYY HH:MM em mesma linha ou na linha seguinte
     # ETD (primeira ocorrência)
-    etd_matches = re.findall(r"ETD\s*:?\s*([0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?|[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?)", text_content, re.IGNORECASE | re.MULTILINE)
-    if not etd_matches:
-        m_lbl = re.search(r"ETD\s*:\s*\n\s*([^\n]+)", text_content, re.IGNORECASE)
-        if m_lbl:
-            etd_matches = [m_lbl.group(1).strip()]
-    if etd_matches:
-        data["etd"] = etd_matches[0].strip()
+    # etd_matches = re.findall(r"ETD\s*:?\s*([0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?|[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?)", text_content, re.IGNORECASE | re.MULTILINE)
+    # if not etd_matches:
+    #     m_lbl = re.search(r"ETD\s*:\s*\n\s*([^\n]+)", text_content, re.IGNORECASE)
+    #     if m_lbl:
+    #         etd_matches = [m_lbl.group(1).strip()]
+    # if etd_matches:
+    #     data["etd"] = etd_matches[0].strip()
 
     # ETA (última ocorrência)
-    eta_matches = re.findall(r"ETA\s*:?\s*([0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?|[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?)", text_content, re.IGNORECASE | re.MULTILINE)
-    if not eta_matches:
-        m_lbl = re.finditer(r"ETA\s*:\s*\n\s*([^\n]+)", text_content, re.IGNORECASE)
-        eta_matches = [m.group(1).strip() for m in m_lbl]
-    if eta_matches:
-        data["eta"] = eta_matches[-1].strip()
+    # eta_matches = re.findall(r"ETA\s*:?\s*([0-9]{2}[-/][A-Za-z]{3}[-/][0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?|[0-9]{2}/[0-9]{2}/[0-9]{4}(?:\s+[0-9]{2}:[0-9]{2})?)", text_content, re.IGNORECASE | re.MULTILINE)
+    # if not eta_matches:
+    #     m_lbl = re.finditer(r"ETA\s*:\s*\n\s*([^\n]+)", text_content, re.IGNORECASE)
+    #     eta_matches = [m.group(1).strip() for m in m_lbl]
+    # if eta_matches:
+    #     data["eta"] = eta_matches[-1].strip()
 
     # 10) Booking/Print date (CMA usa frequentemente a palavra 'Run' com data curta)
     # Preferir linha com "Run <dd-MON-yy HH:MM>"
@@ -2095,36 +2061,37 @@ def extract_pil_data(text_content: str):
     if m_ts:
         data["transhipment_port"] = clean_city(m_ts.group(1))
 
+    # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
     # ETA/ETD (Trunk Vessel): capturar ambos especificamente da linha de Trunk Vessel
     # Ex.: "Trunk Vessel : ... ETA/ETD : 26Aug25/28Aug25"
-    m_tv = re.search(r"Trunk\s+Vessel\s*:\s*[^\n]*?ETA/ETD\s*:\s*([0-9A-Za-z]{5,})/([0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
-    if m_tv:
-        data["eta"] = m_tv.group(1).strip()
-        data["etd"] = m_tv.group(2).strip()
-    else:
-        # Fallback: qualquer ETA/ETD
-        m_et = re.search(r"ETA/ETD\s*:\s*([0-9A-Za-z]{5,})/([0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
-        if m_et:
-            data["eta"] = m_et.group(1).strip()
-            data["etd"] = m_et.group(2).strip()
+    # m_tv = re.search(r"Trunk\s+Vessel\s*:\s*[^\n]*?ETA/ETD\s*:\s*([0-9A-Za-z]{5,})/([0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
+    # if m_tv:
+    #     data["eta"] = m_tv.group(1).strip()
+    #     data["etd"] = m_tv.group(2).strip()
+    # else:
+    #     # Fallback: qualquer ETA/ETD
+    #     m_et = re.search(r"ETA/ETD\s*:\s*([0-9A-Za-z]{5,})/([0-9A-Za-z]{5,})", text_content, re.IGNORECASE)
+    #     if m_et:
+    #         data["eta"] = m_et.group(1).strip()
+    #         data["etd"] = m_et.group(2).strip()
 
-    # ETA do Port of Discharging (POC/POD) se existir (buscar após o rótulo, janela limitada)
-    m_pod_label = re.search(r"Port\s+of\s+Discharg\w*\s*:\s*", text_content, re.IGNORECASE)
-    if m_pod_label:
-        start = m_pod_label.end()
-        window = text_content[start:start+1500]
-        m_pod_eta = re.search(r"ETA\s*:\s*([0-9A-Za-z]{5,})", window, re.IGNORECASE)
-        if m_pod_eta and "eta" not in data:
-            data["eta"] = m_pod_eta.group(1).strip()
+    # ETA do Port of Discharging (POC/POD) removida - responsabilidade da API ou preenchimento manual
+    # m_pod_label = re.search(r"Port\s+of\s+Discharg\w*\s*:\s*", text_content, re.IGNORECASE)
+    # if m_pod_label:
+    #     start = m_pod_label.end()
+    #     window = text_content[start:start+1500]
+    #     m_pod_eta = re.search(r"ETA\s*:\s*([0-9A-Za-z]{5,})", window, re.IGNORECASE)
+    #     if m_pod_eta and "eta" not in data:
+    #         data["eta"] = m_pod_eta.group(1).strip()
 
-    # Sobrescrever ETA com a ETA do Place of Delivery (prioridade máxima)
-    m_podl_label = re.search(r"Place\s+of\s+Delivery\s*:\s*", text_content, re.IGNORECASE)
-    if m_podl_label:
-        start = m_podl_label.end()
-        window = text_content[start:start+2000]
-        m_podl_eta = re.search(r"ETA\s*:\s*([0-9A-Za-z]{5,})", window, re.IGNORECASE)
-        if m_podl_eta:
-            data["eta"] = m_podl_eta.group(1).strip()
+    # Sobrescrever ETA com a ETA do Place of Delivery removida - responsabilidade da API ou preenchimento manual
+    # m_podl_label = re.search(r"Place\s+of\s+Delivery\s*:\s*", text_content, re.IGNORECASE)
+    # if m_podl_label:
+    #     start = m_podl_label.end()
+    #     window = text_content[start:start+2000]
+    #     m_podl_eta = re.search(r"ETA\s*:\s*([0-9A-Za-z]{5,})", window, re.IGNORECASE)
+    #     if m_podl_eta:
+    #         data["eta"] = m_podl_eta.group(1).strip()
 
     return data
 
@@ -2245,15 +2212,16 @@ def extract_oocl_data(text_content: str):
         tranship = m_tranship.group(1).strip()
         data["transhipment_port"] = tranship
     
+    # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
     # ETD - "INTENDED VESSEL/VOYAGE: KOTA EBONY 002 E ETD: 04 Aug 2025"
-    m_etd = re.search(r"INTENDED\s+VESSEL/VOYAGE:.*?ETD:\s*(\d{1,2}\s+\w{3}\s+\d{4})", text_content, re.IGNORECASE | re.DOTALL)
-    if m_etd:
-        data["etd"] = m_etd.group(1).strip()
+    # m_etd = re.search(r"INTENDED\s+VESSEL/VOYAGE:.*?ETD:\s*(\d{1,2}\s+\w{3}\s+\d{4})", text_content, re.IGNORECASE | re.DOTALL)
+    # if m_etd:
+    #     data["etd"] = m_etd.group(1).strip()
     
     # ETA - "FINAL DESTINATION: Ho Chi Minh,Vietnam ETA: 06 Sep 2025"
-    m_eta = re.search(r"FINAL\s+DESTINATION:.*?ETA:\s*(\d{1,2}\s+\w{3}\s+\d{4})", text_content, re.IGNORECASE | re.DOTALL)
-    if m_eta:
-        data["eta"] = m_eta.group(1).strip()
+    # m_eta = re.search(r"FINAL\s+DESTINATION:.*?ETA:\s*(\d{1,2}\s+\w{3}\s+\d{4})", text_content, re.IGNORECASE | re.DOTALL)
+    # if m_eta:
+    #     data["eta"] = m_eta.group(1).strip()
     
     return data
 
@@ -2997,27 +2965,28 @@ def display_pdf_validation_interface(processed_data):
             except:
                 return None
         
-        # Quarta linha: ETD e ETA
-        col8, col9 = st.columns(2)
-        with col8:
-            # Para MSC, não usar default se ETD não foi extraído
-            if processed_data.get("carrier") == "MSC" and not processed_data.get("etd"):
-                _etd_default = None
-            else:
-                _etd_default = parse_brazilian_date(processed_data.get("etd")) or datetime.today().date()
-            
-            etd = st.date_input(
-                "Data Estimativa Saída ETD",
-                value=_etd_default,
-                help="Data estimada de partida"
-            )
-        with col9:
-            _eta_default = parse_brazilian_date(processed_data.get("eta")) or datetime.today().date()
-            eta = st.date_input(
-                "Data Estimativa Chegada ETA",
-                value=_eta_default,
-                help="Data estimada de chegada"
-            )
+        # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
+        # Quarta linha: ETD e ETA removidos
+        # col8, col9 = st.columns(2)
+        # with col8:
+        #     # Para MSC, não usar default se ETD não foi extraído
+        #     if processed_data.get("carrier") == "MSC" and not processed_data.get("etd"):
+        #         _etd_default = None
+        #     else:
+        #         _etd_default = parse_brazilian_date(processed_data.get("etd")) or datetime.today().date()
+        #     
+        #     etd = st.date_input(
+        #         "Data Estimativa Saída ETD",
+        #         value=_etd_default,
+        #         help="Data estimada de partida"
+        #     )
+        # with col9:
+        #     _eta_default = parse_brazilian_date(processed_data.get("eta")) or datetime.today().date()
+        #     eta = st.date_input(
+        #         "Data Estimativa Chegada ETA",
+        #         value=_eta_default,
+        #         help="Data estimada de chegada"
+        #     )
         
         # Quinta linha: PDF Print Date
         col10, col_spacer = st.columns([1, 1])
@@ -3058,10 +3027,10 @@ def display_pdf_validation_interface(processed_data):
                 "Transhipment Port": transhipment_port,
                 "Port Terminal City": port_terminal_city,
                 # Preenchimentos padronizados esperados por insert_return_carrier_from_ui
-                # ETD → Requested Deadline Start Date
-                "Requested Deadline Start Date": etd.strftime("%Y-%m-%d") if etd else "",
+                # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
+                "Requested Deadline Start Date": "",  # ETD removido
                 "Requested Deadline End Date": "",
-                "Required Arrival Date": eta.strftime("%Y-%m-%d") if eta else "",
+                "Required Arrival Date": "",  # ETA removido
                 "PDF Booking Emission Date": pdf_print_date
             }
 

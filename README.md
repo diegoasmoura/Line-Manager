@@ -45,9 +45,10 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Processamento automático de PDFs** de booking recebidos por email
 - **Validação inteligente** de dados extraídos
 - **Suporte a múltiplos carriers**: HAPAG-LLOYD, MAERSK, MSC, CMA CGM, COSCO, EVERGREEN, OOCL, PIL
-- **Extração automática** de campos-chave (booking reference, vessel name, voyage, datas, portos)
+- **Extração automática** de campos-chave (booking reference, vessel name, voyage, portos)
 - **Interface de validação** com correção manual de dados
 - **Histórico completo** de documentos por embarque
+- **Datas ETD/ETA**: Responsabilidade da API Ellox ou preenchimento manual (não mais extraídas automaticamente)
  
 #### Padronização de Terminais (PDF → API Ellox)
 
@@ -295,9 +296,9 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
-- Extração automática de dados
+- Extração automática de dados (exceto ETD/ETA)
 - Validação e correção de informações
-- Interface de confirmação
+- Interface de confirmação simplificada
 - Integração com sistema de anexos
 - Dropdowns alimentados pelo banco (navios/terminais) via `F_ELLOX_SHIPS` e `F_ELLOX_TERMINALS`
 - "Nome do Navio": busca case-insensitive e normalização, evitando duplicatas entre valor extraído do PDF e valor do banco
@@ -307,7 +308,8 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - `Voyage do Navio`: campo de texto com sugestões via API exibidas como dica
 - Cache de listas com `@st.cache_data(ttl=300)` para refletir atualizações
 - Removida a validação "navio pertence ao carrier"
- - Coleta automática de monitoramento ao validar o PDF (Ellox): agora a função `collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code)`
+- **ETD/ETA removidos**: Datas não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual
+- Coleta automática de monitoramento ao validar o PDF (Ellox): agora a função `collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code)`
    1) autentica, 2) solicita monitoramento (`POST /api/monitor/navio`, tolera "already exist"), 3) visualiza (`POST /api/terminalmonitorings`), 4) salva na `F_ELLOX_TERMINAL_MONITORINGS`
 
 #### 📎 Attachment Management (PDF Booking) — Passo a passo
@@ -317,12 +319,14 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
    - Tamanho máximo por arquivo: 200 MB
 
 2. **Extração Automática**
-   - O sistema tenta extrair: Booking Reference, Quantity, Vessel Name, Voyage Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal City, ETD, ETA, PDF Print Date
+   - O sistema tenta extrair: Booking Reference, Quantity, Vessel Name, Voyage Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal City, PDF Print Date
    - Nomes de terminais são normalizados para padrão Ellox
+   - **Datas ETD/ETA**: Não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual
 
 3. **Validação e Ajustes**
    - Revise os campos extraídos na tela de validação
    - Ajuste manualmente se necessário (ex.: carrier, voyage, terminal)
+   - **Campos ETD/ETA removidos**: Não aparecem mais no formulário de validação
 
 4. **Confirmação**
    - Ao confirmar, os dados são preparados para persistência
@@ -330,6 +334,7 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 
 5. **Persistência**
    - A função `insert_return_carrier_from_ui` insere um registro em `F_CON_RETURN_CARRIERS` com status `Received from Carrier`
+   - **Campos ETD/ETA**: Não são mais preenchidos automaticamente - responsabilidade da API Ellox ou preenchimento manual
    - Em seguida, é iniciada a coleta de monitoramento Ellox da viagem
 
 6. **Monitoramento da Viagem**
@@ -1134,6 +1139,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9.2 - Remoção da Coleta Automática de ETD/ETA (Setembro 2025)
+- **🔄 Mudança de Responsabilidade**: Datas ETD e ETA não são mais coletadas automaticamente do processamento de PDFs
+- **📋 Formulário Simplificado**: Campos ETD e ETA removidos do formulário de validação de booking
+- **🎯 Nova Abordagem**: Datas ETD/ETA agora são responsabilidade da API Ellox ou preenchimento manual
+- **✅ Carriers Afetados**: Todas as extrações de ETD/ETA foram removidas de HAPAG-LLOYD, MAERSK, MSC, CMA CGM, COSCO, EVERGREEN, OOCL, PIL
+- **🔧 Código Limpo**: Seções de coleta de ETD/ETA comentadas para facilitar manutenção futura
+- **📊 Mapeamento Atualizado**: Campos "Requested Deadline Start Date" e "Required Arrival Date" não são mais preenchidos automaticamente
 
 ### 📌 v3.9.1 - Customização da Voyage Timeline (Setembro 2025)
 - **Customização da Tabela**: Ocultadas as colunas "id", "Agência", "Terminal CNPJ" e "Data Abertura Gate Reefer" da tabela de histórico da Voyage Timeline para uma visualização mais limpa.
