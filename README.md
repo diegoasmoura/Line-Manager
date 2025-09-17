@@ -212,6 +212,10 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Contém a lógica da interface de usuário para o fluxo de aprovação de retornos do carrier, coletando os dados necessários e invocando a lógica de negócio que foi centralizada em `database.py`.
 - Gerencia a seção de upload e visualização de anexos para cada referência.
 
+#### 📅 Voyage Timeline
+- **Exibição do Histórico**: A tabela de histórico de monitoramento de uma viagem agora é exibida mesmo que haja apenas um registro. Anteriormente, a tabela só aparecia se houvesse mais de um registro.
+- **Expansível**: O histórico de cada viagem é apresentado dentro de um painel expansível (`expander`) para manter a interface limpa, mostrando o card principal com os dados mais recentes da viagem.
+
 #### 🎯 **Regras de Seleção e Interface (v3.6+)**
 
 **Regra de Seleção Única:**
