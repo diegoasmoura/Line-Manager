@@ -1774,9 +1774,23 @@ def exibir_history():
                                     'row_inserted_date': 'Inserted Date',
                                 }
                                 voyage_display = voyage_display.rename(columns=rename_map_voyage)
+                                
+                                # Hide ID column
                                 id_cols_to_drop = [col for col in voyage_display.columns if col.strip().lower() == 'id']
                                 if id_cols_to_drop:
                                     voyage_display = voyage_display.drop(columns=id_cols_to_drop)
+
+                                # Define desired column order, hiding Agência and moving Terminal
+                                desired_cols = [
+                                    'Vessel Name', 'Voyage Code', 'Terminal', 'Data Deadline', 
+                                    'Data Draft Deadline', 'Data Abertura Gate', 
+                                    'Data Estimativa Saída ETD', 'Data Estimativa Chegada ETA', 
+                                    'Data Estimativa Atracação ETB', 'Data Atracação ATB', 'Data Partida ATD', 
+                                    'Data Chegada ATA', 'Data Atualização', 'Inserted Date'
+                                ]
+                                existing_cols = [col for col in desired_cols if col in voyage_display.columns]
+                                voyage_display = voyage_display[existing_cols]
+
                                 st.dataframe(voyage_display, use_container_width=True, hide_index=True)
                         
                         # Separador visual entre viagens

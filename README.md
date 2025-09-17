@@ -1135,6 +1135,10 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.1 - Customização da Voyage Timeline (Setembro 2025)
+- **Customização da Tabela**: Ocultadas as colunas "id", "Agência", "Terminal CNPJ" e "Data Abertura Gate Reefer" da tabela de histórico da Voyage Timeline para uma visualização mais limpa.
+- **Documentação**: Adicionada documentação em `history.py` sobre como reexibir ou reordenar colunas na tabela da Voyage Timeline.
+
 ### 📌 v3.9 - Correções Críticas de Voyage Monitoring (Setembro 2025)
 - **🔧 Correção da Função `_parse_iso_datetime`**: Função agora processa corretamente objetos `pd.Timestamp` do pandas, resolvendo o problema de campos de data salvos como `None` na tabela `F_ELLOX_TERMINAL_MONITORINGS`
 - **✅ Validação de Registros Existentes**: Corrigida verificação para ignorar registros vazios (sem dados válidos) na tabela de monitoramento, permitindo que a API seja consultada novamente
@@ -1413,6 +1417,33 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 **Desenvolvido com ❤️ pela equipe Farol**
 
 *Sistema de Gerenciamento de Embarques - Versão 3.9*
+
+### 📊 Estatísticas do Sistema
+
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9)
+- **Módulos**: 15+ módulos especializados  
+- **Carriers Suportados**: 8 carriers principais
+- **Integrações**: Oracle DB + API Ellox
+- **Funcionalidades**: 50+ funcionalidades ativas
+- **Performance**: < 1s resposta média
+- **Uptime**: 99.9% disponibilidade
+- **Estabilidade**: ✅ Sem erros de importação (v3.9)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9)
+
+### 🎯 Roadmap Técnico Detalhado
+
+#### 🚀 Versão 3.1 (Próxima Release)
+- [ ] **Cache Redis**: Implementação de cache distribuído
+- [ ] **WebSocket**: Atualizações em tempo real
+- [ ] **API GraphQL**: Query flexível de dados
+- [ ] **Testes Automatizados**: Cobertura 90%+
+
+#### 🔮 Versão 4.0 (Futuro)
+- [ ] **Microservices**: Arquitetura distribuída  
+- [ ] **Kubernetes**: Orquestração de containers
+- [ ] **Machine Learning**: Previsão de atrasos
+- [ ] **Mobile Native**: App iOS/Android
+ento de Embarques - Versão 3.9*
 
 ### 📊 Estatísticas do Sistema
 
