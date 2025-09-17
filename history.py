@@ -1495,7 +1495,9 @@ def exibir_history():
         return df_processed
 
     # Conteúdo da "aba" Pedidos da Empresa
-    df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
+    df_other_processed = None
+    if active_tab == other_label:
+        df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
     edited_df_other = None
     if df_other_processed is not None and active_tab == other_label:
         # Gera configuração dinâmica baseada no conteúdo (Status visível)
@@ -1525,7 +1527,9 @@ def exibir_history():
                 st.warning("⚠️ **Atenção:** Esta linha representa um ajuste da Cargill (Cargill Adjusts). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
 
     # Conteúdo da "aba" Retornos do Armador
-    df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
+    df_received_processed = None
+    if active_tab == received_label:
+        df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
     edited_df_received = None
     if df_received_processed is not None and active_tab == received_label:
         # Remove colunas ETD/ETA específicas desta aba
@@ -2659,9 +2663,10 @@ def exibir_history():
             
 
     else:
-        # Mensagem quando nenhuma linha está selecionada
-        st.markdown("---")
-        st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis e use 'View Attachments' para adicionar novos arquivos, fazer download individual ou em .zip e excluir anexos do registro selecionado.")
+        # Mensagem somente para abas de tabela (não exibir na "Voyage Timeline")
+        if active_tab != voyages_label:
+            st.markdown("---")
+            st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis e use 'View Attachments' para adicionar novos arquivos, fazer download individual ou em .zip e excluir anexos do registro selecionado.")
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
