@@ -2084,6 +2084,13 @@ def exibir_history():
             
             
             # Formulário similar ao voyage_monitoring.py
+            # Exibir erros persistentes (salvamento e aprovação), se houver
+            _ms_err = st.session_state.get("manual_save_error")
+            if _ms_err and _ms_err.get("adjustment_id") == adjustment_id:
+                st.error(_ms_err.get("message", "❌ Erro ao salvar dados manuais."))
+            _approval_err = st.session_state.get("approval_error")
+            if _approval_err:
+                st.error(_approval_err)
             with st.form(f"voyage_manual_form_{adjustment_id}"):
                 # Título do formulário com ícone baseado no tipo de erro
                 if error_type == "authentication_failed":
@@ -2269,6 +2276,8 @@ def exibir_history():
                         
                         if processed_count > 0:
                             st.success("✅ Dados de monitoramento salvos com sucesso!")
+                            if "manual_save_error" in st.session_state:
+                                del st.session_state["manual_save_error"]
                             
                             # Se há aprovação pendente, completar a aprovação
                             if voyage_manual_required.get("pending_approval", False):
@@ -2283,9 +2292,28 @@ def exibir_history():
                                 }
                                 related_reference = "New Adjustment"
                                 
+                                # Preparar dados manuais para aprovação
+                                manual_data = {
+                                    'manual_deadline': monitoring_data.get("DATA_DEADLINE"),
+                                    'manual_draft_deadline': monitoring_data.get("DATA_DRAFT_DEADLINE"),
+                                    'manual_gate_opening': monitoring_data.get("DATA_ABERTURA_GATE"),
+                                    'manual_reefer_gate_opening': monitoring_data.get("DATA_ABERTURA_GATE_REEFER"),
+                                    'manual_etd': monitoring_data.get("DATA_ESTIMATIVA_SAIDA"),
+                                    'manual_eta': monitoring_data.get("DATA_ESTIMATIVA_CHEGADA"),
+                                    'manual_etb': monitoring_data.get("DATA_ESTIMATIVA_ATRACACAO"),
+                                    'manual_atb': monitoring_data.get("DATA_ATRACACAO"),
+                                    'manual_atd': monitoring_data.get("DATA_PARTIDA"),
+                                    'manual_ata': monitoring_data.get("DATA_CHEGADA"),
+                                }
+                                
                                 # Completar aprovação
                                 from database import approve_carrier_return
-                                result = approve_carrier_return(adjustment_id, related_reference, justification)
+                                try:
+                                    result = approve_carrier_return(adjustment_id, related_reference, justification, manual_data)
+                                except Exception as e:
+                                    st.session_state["approval_error"] = f"❌ Erro crítico durante a aprovação: {str(e)}"
+                                    st.error(st.session_state["approval_error"])
+                                    result = False
                                 
                                 if result:
                                     st.success("✅ Aprovação concluída com sucesso!")
@@ -2300,8 +2328,10 @@ def exibir_history():
                             st.cache_data.clear()
                             st.rerun()
                         else:
+                            st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": "❌ Erro ao salvar dados de monitoramento"}
                             st.error("❌ Erro ao salvar dados de monitoramento")
                     except Exception as e:
+                        st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": f"❌ Erro ao salvar: {str(e)}"}
                         st.error(f"❌ Erro ao salvar: {str(e)}")
                 
                 if skip_manual_clicked:

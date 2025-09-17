@@ -1851,7 +1851,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             "requires_manual": True
         }
 
-def approve_carrier_return(adjustment_id: str, related_reference: str, justification: dict) -> bool:
+def approve_carrier_return(adjustment_id: str, related_reference: str, justification: dict, manual_voyage_data: dict = None) -> bool:
     """
     Executes the full approval process for a 'Received from Carrier' record within a single transaction.
     This includes fetching Ellox data, updating the return carrier record, and propagating changes to the main sales/booking table.
@@ -1881,12 +1881,31 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         elox_update_values = {}
         voyage_validation_result = None
         
+        # Primeiro, verificar se há dados manuais para processar
+        if manual_voyage_data:
+            st.info("ℹ️ Usando dados de monitoramento inseridos manualmente.")
+            column_mapping = {
+                'manual_deadline': 'B_DATA_DEADLINE',
+                'manual_draft_deadline': 'B_DATA_DRAFT_DEADLINE',
+                'manual_gate_opening': 'B_DATA_ABERTURA_GATE',
+                'manual_reefer_gate_opening': 'B_DATA_ABERTURA_GATE_REEFER',
+                'manual_etd': 'B_DATA_ESTIMATIVA_SAIDA_ETD',
+                'manual_eta': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                'manual_etb': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                'manual_atb': 'B_DATA_ATRACACAO_ATB',
+                'manual_atd': 'B_DATA_PARTIDA_ATD',
+                'manual_ata': 'B_DATA_CHEGADA_ATA',
+            }
+            for manual_key, db_col in column_mapping.items():
+                if manual_key in manual_voyage_data and manual_voyage_data[manual_key] is not None:
+                    elox_update_values[db_col] = manual_voyage_data[manual_key]
+        
         if vessel_name_result:
             vessel_name = vessel_name_result.get("b_vessel_name")
             voyage_code = vessel_name_result.get("b_voyage_code") or ""
             terminal = vessel_name_result.get("b_terminal") or ""
             
-            if vessel_name and terminal:
+            if vessel_name and terminal and not manual_voyage_data:
                 # Se houver buffer prévio no session_state, utiliza; senão, apenas valida (sem salvar ainda)
                 api_buf_key = f"voyage_api_buffer_{adjustment_id}"
                 api_buf = st.session_state.get(api_buf_key)
@@ -1942,6 +1961,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                                         'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
                                         'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
                                         'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
+                                        'DATA_ABERTURA_GATE_REEFER': 'B_DATA_ABERTURA_GATE_REEFER',
                                         'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
                                         'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
                                         'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
@@ -1999,7 +2019,8 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             "B_BOOKING_REFERENCE", "B_TRANSHIPMENT_PORT", "B_TERMINAL", "B_VESSEL_NAME",
             "B_VOYAGE_CODE", "B_VOYAGE_CARRIER", "B_DATA_DRAFT_DEADLINE", "B_DATA_DEADLINE",
             "B_DATA_ESTIMATIVA_SAIDA_ETD", "B_DATA_ESTIMATIVA_CHEGADA_ETA", "B_DATA_ABERTURA_GATE",
-            "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
+            "B_DATA_ABERTURA_GATE_REEFER", "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", 
+            "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
         ]
         for field in fields_to_propagate:
             if field in row and row[field] is not None:
@@ -2023,6 +2044,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         if 'tx' in locals() and tx.is_active:
             tx.rollback()
         st.error(f"❌ A critical error occurred during the approval process: {e}")
+        st.session_state["approval_error"] = f"❌ A critical error occurred during the approval process: {e}"
         return False
     finally:
         if 'conn' in locals() and not conn.closed:
