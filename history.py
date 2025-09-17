@@ -1988,7 +1988,6 @@ def exibir_history():
                                         "AGENCIA": voyage_validation_result.get("agencia", ""),
                                         # Campos obrigatórios que podem estar faltando
                                         "DATA_DRAFT_DEADLINE": None,
-                                        "DATA_ABERTURA_GATE_REEFER": None,
                                         "DATA_CHEGADA": None,
                                         "DATA_ESTIMATIVA_ATRACACAO": None,
                                         "DATA_ATRACACAO": None,
@@ -2298,7 +2297,6 @@ def exibir_history():
                                     'manual_deadline': monitoring_data.get("DATA_DEADLINE"),
                                     'manual_draft_deadline': monitoring_data.get("DATA_DRAFT_DEADLINE"),
                                     'manual_gate_opening': monitoring_data.get("DATA_ABERTURA_GATE"),
-                                    'manual_reefer_gate_opening': monitoring_data.get("DATA_ABERTURA_GATE_REEFER"),
                                     'manual_etd': monitoring_data.get("DATA_ESTIMATIVA_SAIDA"),
                                     'manual_eta': monitoring_data.get("DATA_ESTIMATIVA_CHEGADA"),
                                     'manual_etb': monitoring_data.get("DATA_ESTIMATIVA_ATRACACAO"),
