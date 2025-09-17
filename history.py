@@ -868,18 +868,6 @@ def exibir_history():
     except Exception:
         pass
     
-    # Botão para atualizar registros antigos sem Linked Reference
-    col_update, col_spacer = st.columns([3, 7])
-    with col_update:
-        if st.button("🔄 Update Missing Linked References", help="Atualiza registros antigos que não têm Linked Reference definido"):
-            with st.spinner("Atualizando registros..."):
-                updated_count = update_missing_linked_references()
-                if updated_count > 0:
-                    st.success(f"✅ {updated_count} registros atualizados com sucesso!")
-                    st.rerun()
-                else:
-                    st.info("ℹ️ Todos os registros já possuem Linked Reference definido.")
-    
     # Espaçamento após o título
     st.markdown("<br>", unsafe_allow_html=True)
 
