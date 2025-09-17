@@ -212,6 +212,7 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Orquestra a exibição do histórico de alterações (`F_CON_RETURN_CARRIERS`) e do histórico de monitoramento de viagens (`F_ELLOX_TERMINAL_MONITORINGS`).
 - Contém a lógica da interface de usuário para o fluxo de aprovação de retornos do carrier, coletando os dados necessários e invocando a lógica de negócio que foi centralizada em `database.py`.
 - Gerencia a seção de upload e visualização de anexos para cada referência.
+- **Interface Otimizada**: Colunas ETD/ETA (Data Draft Deadline, Data Deadline, Data Estimativa Saída ETD, Data Estimativa Chegada ETA, Data Abertura Gate) são automaticamente ocultas na aba "Returns Awaiting Review" para melhor experiência do usuário.
 
 #### 📅 Voyage Timeline
 - **Exibição do Histórico**: A tabela de histórico de monitoramento de uma viagem agora é exibida mesmo que haja apenas um registro. Anteriormente, a tabela só aparecia se houvesse mais de um registro.
@@ -1147,6 +1148,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **✅ Carriers Afetados**: Todas as extrações de ETD/ETA foram removidas de HAPAG-LLOYD, MAERSK, MSC, CMA CGM, COSCO, EVERGREEN, OOCL, PIL
 - **🔧 Código Limpo**: Seções de coleta de ETD/ETA comentadas para facilitar manutenção futura
 - **📊 Mapeamento Atualizado**: Campos "Requested Deadline Start Date" e "Required Arrival Date" não são mais preenchidos automaticamente
+- **👁️ Interface Otimizada**: Colunas ETD/ETA ocultas na aba "Returns Awaiting Review" para melhor experiência do usuário
 
 ### 📌 v3.9.1 - Customização da Voyage Timeline (Setembro 2025)
 - **Customização da Tabela**: Ocultadas as colunas "id", "Agência", "Terminal CNPJ" e "Data Abertura Gate Reefer" da tabela de histórico da Voyage Timeline para uma visualização mais limpa.

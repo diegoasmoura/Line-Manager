@@ -1540,14 +1540,24 @@ def exibir_history():
     df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
     edited_df_received = None
     if df_received_processed is not None and active_tab == received_label:
+        # Remove colunas ETD/ETA específicas desta aba
+        columns_to_remove = [
+            "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", 
+            "Data Estimativa Chegada ETA", "Data Abertura Gate"
+        ]
+        df_for_display = df_received_processed.drop(
+            columns=[col for col in columns_to_remove if col in df_received_processed.columns],
+            errors='ignore'
+        )
+        
         # Gera configuração dinâmica baseada no conteúdo (Status e Linked Reference ocultos)
-        column_config = generate_dynamic_column_config(df_received_processed, hide_status=True, hide_linked_reference=True)
+        column_config = generate_dynamic_column_config(df_for_display, hide_status=True, hide_linked_reference=True)
         edited_df_received = st.data_editor(
-            df_received_processed,
+            df_for_display,
             use_container_width=True,
             hide_index=True,
             column_config=column_config,
-            disabled=df_received_processed.columns.drop(["Selecionar"]),
+            disabled=df_for_display.columns.drop(["Selecionar"]),
             key=f"history_received_carrier_editor_{farol_reference}"
         )
         
