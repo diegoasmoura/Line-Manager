@@ -1156,6 +1156,8 @@ def exibir_history():
                 del st.session_state[f"history_other_status_editor_{farol_reference}"]
             if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
                 del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
+        # Ao trocar de aba, recolhe a seção de anexos para manter a tela limpa
+        st.session_state["history_show_attachments"] = False
         st.session_state[last_active_tab_key] = active_tab
 
     # Função para calcular largura dinâmica das colunas baseada no conteúdo
@@ -1836,6 +1838,8 @@ def exibir_history():
                         pass
             if "pending_status_change" in st.session_state:
                 del st.session_state["pending_status_change"]
+            # Ao mudar a seleção, recolhe a seção de anexos
+            st.session_state["history_show_attachments"] = False
         
         # Atualiza o ID da seleção atual
         st.session_state[f"last_selected_adjustment_id_{farol_reference}"] = current_adjustment_id
