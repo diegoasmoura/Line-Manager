@@ -777,7 +777,40 @@ def display_attachments_section(farol_reference):
         # Ordena por data/hora (mais recente primeiro)
         dfv = attachments_df.sort_values('upload_date', ascending=False).reset_index(drop=True)
 
-        # Cabeçalho
+        # Paginação
+        page_size = st.selectbox(
+            "Items per page",
+            options=[6, 9, 12],
+            index=1,
+            key=f"att_page_size_{farol_reference}"
+        )
+        import math
+        total_items = len(dfv)
+        total_pages = max(1, math.ceil(total_items / page_size))
+        page_key = f"att_page_{farol_reference}"
+        current_page = st.session_state.get(page_key, 1)
+        if current_page < 1:
+            current_page = 1
+        if current_page > total_pages:
+            current_page = total_pages
+
+        nav_prev, nav_info, nav_next = st.columns([1, 2, 1])
+        with nav_prev:
+            if st.button("⬅️ Prev", disabled=current_page <= 1, key=f"att_prev_{farol_reference}"):
+                st.session_state[page_key] = max(1, current_page - 1)
+                st.rerun()
+        with nav_info:
+            st.caption(f"Page {current_page} of {total_pages} • {total_items} item(s)")
+        with nav_next:
+            if st.button("Next ➡️", disabled=current_page >= total_pages, key=f"att_next_{farol_reference}"):
+                st.session_state[page_key] = min(total_pages, current_page + 1)
+                st.rerun()
+
+        start_idx = (current_page - 1) * page_size
+        end_idx = start_idx + page_size
+        page_df = dfv.iloc[start_idx:end_idx].reset_index(drop=True)
+
+        # Tabela com paginação
         h1, h2, h3, h4, h5, h6 = st.columns([5, 2, 2, 2, 1, 1])
         h1.markdown("**File**")
         h2.markdown("**Type/Ext**")
@@ -786,9 +819,8 @@ def display_attachments_section(farol_reference):
         h5.markdown("**Download**")
         h6.markdown("**Delete**")
 
-        # Linhas
-        for row_index, (_, att) in enumerate(dfv.iterrows()):
-            row_key = f"{farol_reference}_{att['id']}_{row_index}"
+        for row_index, (_, att) in enumerate(page_df.iterrows()):
+            row_key = f"{farol_reference}_{att['id']}_{start_idx + row_index}"
             confirm_key = f"confirm_del_flat_{row_key}"
             c1, c2, c3, c4, c5, c6 = st.columns([5, 2, 2, 2, 1, 1])
             with c1:
@@ -810,7 +842,6 @@ def display_attachments_section(farol_reference):
                         st.session_state[confirm_key] = True
                         st.rerun()
 
-            # Barra de confirmação em linha separada e largura total
             if st.session_state.get(confirm_key, False):
                 wc1, wc2, wc3 = st.columns([6, 1, 1])
                 with wc1:
