@@ -2021,6 +2021,26 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             "B_DATA_ESTIMATIVA_SAIDA_ETD", "B_DATA_ESTIMATIVA_CHEGADA_ETA", "B_DATA_ABERTURA_GATE",
             "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
         ]
+        
+        # Adicionar B_BOOKING_CONFIRMATION_DATE com valor do PDF_BOOKING_EMISSION_DATE
+        if "PDF_BOOKING_EMISSION_DATE" in row and row["PDF_BOOKING_EMISSION_DATE"] is not None:
+            pdf_emission_date = row["PDF_BOOKING_EMISSION_DATE"]
+            # Converter string para datetime se necessário
+            if isinstance(pdf_emission_date, str):
+                try:
+                    from datetime import datetime
+                    # Tenta parsear diferentes formatos de data
+                    if ":" in pdf_emission_date:
+                        if len(pdf_emission_date) > 16:  # Formato com segundos
+                            pdf_emission_date = datetime.strptime(pdf_emission_date, "%Y-%m-%d %H:%M:%S")
+                        else:  # Formato sem segundos
+                            pdf_emission_date = datetime.strptime(pdf_emission_date, "%Y-%m-%d %H:%M")
+                    else:  # Apenas data
+                        pdf_emission_date = datetime.strptime(pdf_emission_date, "%Y-%m-%d")
+                except:
+                    # Se falhar o parse, mantém como string
+                    pass
+            main_update_fields["B_BOOKING_CONFIRMATION_DATE"] = pdf_emission_date
         for field in fields_to_propagate:
             if field in row and row[field] is not None:
                 val = _normalize_value(row[field])
