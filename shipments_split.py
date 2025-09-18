@@ -146,8 +146,7 @@ def show_split_form():
             "Vessel Name": split_dict.get("b_vessel_name"),
             "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
             "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
-            "Required Arrival Date": split_data["s_required_arrival_date"],
-            "Required Arrival Date Expected": split_data["s_required_arrival_date_expected"]
+            "Required Arrival Date Expected": split_data["s_required_arrival_date"]
         }])
        
         new_refs = get_next_farol_refs(selected_farol, num_splits)
@@ -180,7 +179,6 @@ def show_split_form():
             "Vessel Name",
             "Requested Deadline Start Date",
             "Requested Deadline End Date",
-            "Required Arrival Date",
             "Required Arrival Date Expected"
         ]
  
@@ -337,7 +335,7 @@ def show_split_form():
                                             # do último registro aprovado (apenas para Adjustment Requested)
                                             date_fields_to_remove = [
                                                 "Requested Deadline Start Date", "Requested Deadline End Date", 
-                                                "Required Arrival Date", "Required Arrival Date Expected", "B Data Draft Deadline", "B Data Deadline",
+                                                "Required Arrival Date Expected", "B Data Draft Deadline", "B Data Deadline",
                                                 "B Data Estimativa Saida ETD", "B Data Estimativa Chegada ETA",
                                                 "B Data Abertura Gate", "B Data Partida ATD", "B Data Chegada ATA",
                                                 "B Data Estimativa Atracacao ETB", "B Data Atracacao ATB"

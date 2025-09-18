@@ -89,7 +89,7 @@ def show_booking_management_form():
             booking_data["final_destination"] = sales_row.get("Final Destination", "")
             booking_data["dthc"] = sales_row.get("DTHC", "")
             booking_data["requested_shipment_week"] = sales_row.get("Requested Shipment Week", "")
-            booking_data["required_arrival_date"] = sales_row.get("Required Arrival Date", "")
+            booking_data["required_arrival_date"] = sales_row.get("Required Arrival Date Expected", "")
             booking_data["shipment_period_start_date"] = sales_row.get("Shipment Period Start Date", "")
             booking_data["shipment_period_end_date"] = sales_row.get("Shipment Period End Date", "")
  
@@ -136,7 +136,7 @@ def show_booking_management_form():
         # Nova linha: Required Arrival Date, Shipment Period Start Date, Shipment Period End Date
         col_arr, col_start, col_end = st.columns(3)
         with col_arr:
-            st.text_input("Required Arrival Date", value=format_date_only(booking_data.get("required_arrival_date", "")), disabled=True)
+            st.text_input("Required Arrival Date Expected", value=format_date_only(booking_data.get("required_arrival_date", "")), disabled=True)
         with col_start:
             st.text_input("Shipment Period Start Date", value=format_date_only(booking_data.get("shipment_period_start_date", "")), disabled=True)
         with col_end:

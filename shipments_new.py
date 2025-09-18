@@ -33,7 +33,7 @@ form_fields = {
     "Shipment Period End Date": "s_shipment_period_end_date",
     "DTHC Prepaid": "s_dthc_prepaid",
     "Afloat": "s_afloat",
-    "Required Arrival Date": "s_required_arrival_date",
+            "Required Arrival Date Expected": "s_required_arrival_date",
     "Comments Sales": "s_comments"
 }
  
@@ -89,7 +89,7 @@ def show_add_form():
             with col1:
                 values["s_requested_shipment_week"] = st.number_input("**:green[Requested Shipment Week]***", min_value=1, max_value=52, step=1)
             with col2:
-                values["s_required_arrival_date"] = st.date_input("Required Arrival Date", value=None)
+                values["s_required_arrival_date"] = st.date_input("Required Arrival Date Expected", value=None)
 
             col1, col2 = st.columns(2)
             with col1:

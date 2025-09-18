@@ -1373,8 +1373,8 @@ def exibir_history():
                     if main_data and main_data.get("s_required_arrival_date"):
                         required_arrival_dates[farol_ref] = main_data["s_required_arrival_date"]
                 
-                # Adicionar coluna Required Arrival Date
-                df_processed["Required Arrival Date"] = df_processed["Farol Reference"].map(required_arrival_dates)
+                # Adicionar coluna Required Arrival Date Expected
+                df_processed["Required Arrival Date Expected"] = df_processed["Farol Reference"].map(required_arrival_dates)
         except Exception:
             pass
 
@@ -1454,7 +1454,7 @@ def exibir_history():
         # Converte datas para exibição
         date_cols = [
             "Inserted Date", "Data Draft Deadline", "Data Deadline", 
-            "Required Arrival Date", "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
+            "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
             "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Booking Emission Date"
         ]
         for col in date_cols:
@@ -1566,12 +1566,11 @@ def exibir_history():
                 "Final Destination",
                 "Transhipment Port",
                 "Port Terminal City",
-                "Required Arrival Date",
+                "Required Arrival Date Expected",
                 "Requested Deadline Start Date",
                 "Requested Deadline End Date",
                 "Data Draft Deadline",
                 "Data Deadline",
-                "Required Arrival Date Expected",
                 "Data Estimativa Saída ETD",
                 "Data Estimativa Chegada ETA",
                 "Data Abertura Gate",
