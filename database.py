@@ -168,6 +168,7 @@ def get_data_salesData():
         S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+        S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
         S_PARTIAL_ALLOWED                  AS s_partial_allowed,
         S_VIP_PNL_RISK                     AS s_vip_pnl_risk,
         S_PNL_DESTINATION                  AS s_pnl_destination,
@@ -400,6 +401,7 @@ def fetch_shipments_data_sales():
         S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+        S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
         S_PARTIAL_ALLOWED                  AS s_partial_allowed,
         S_VIP_PNL_RISK                     AS s_vip_pnl_risk,
         S_PNL_DESTINATION                  AS s_pnl_destination,
@@ -707,6 +709,7 @@ def add_sales_record(form_values):
             "s_required_arrival_date": "S_REQUIRED_ARRIVAL_DATE",
             "s_requested_deadlines_start_date": "S_REQUESTED_DEADLINE_START_DATE",
             "s_requested_deadlines_end_date": "S_REQUESTED_DEADLINE_END_DATE",
+            "s_required_arrival_date_expected": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
             "s_partial_allowed": "S_PARTIAL_ALLOWED",
             "s_vip_pnl_risk": "S_VIP_PNL_RISK",
             "s_pnl_destination": "S_PNL_DESTINATION",
@@ -1033,7 +1036,8 @@ def get_split_data_by_farol_reference(farol_reference):
             B_VESSEL_NAME AS b_vessel_name,
             S_REQUESTED_DEADLINE_START_DATE AS s_requested_deadlines_start_date,
             S_REQUESTED_DEADLINE_END_DATE AS s_requested_deadlines_end_date,
-            S_REQUIRED_ARRIVAL_DATE AS s_required_arrival_date
+            S_REQUIRED_ARRIVAL_DATE AS s_required_arrival_date,
+            S_REQUIRED_ARRIVAL_DATE_EXPECTED AS s_required_arrival_date_expected
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
         WHERE FAROL_REFERENCE = :ref
         """
@@ -1060,6 +1064,7 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
             S_REQUESTED_DEADLINE_START_DATE   AS requested_cut_off_start_date,
             S_REQUESTED_DEADLINE_END_DATE     AS requested_cut_off_end_date,
             S_REQUIRED_ARRIVAL_DATE           AS required_arrival_date,
+            S_REQUIRED_ARRIVAL_DATE_EXPECTED  AS required_arrival_date_expected,
             S_SHIPMENT_PERIOD_START_DATE      AS shipment_period_start_date,
             S_SHIPMENT_PERIOD_END_DATE        AS shipment_period_end_date,
             S_PORT_OF_LOADING_POL             AS booking_port_of_loading_pol,
