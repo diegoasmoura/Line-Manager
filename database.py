@@ -740,6 +740,16 @@ def add_sales_record(form_values):
         # Removido: criação automática de booking e container release
         # Commit final
         transaction.commit()
+        
+        # Criar snapshot na tabela F_CON_RETURN_CARRIERS para manter as colunas de expectativa interna sincronizadas
+        farol_reference = unified_values.get("FAROL_REFERENCE")
+        if farol_reference:
+            try:
+                upsert_return_carrier_from_unified(farol_reference, user_insert=unified_values.get("USER_INSERT", "system"))
+            except Exception as e:
+                # Log do erro mas não falha toda a operação, pois o registro principal já foi criado
+                print(f"Aviso: Erro ao criar snapshot em F_CON_RETURN_CARRIERS: {e}")
+        
         return True
  
     except Exception as e:
