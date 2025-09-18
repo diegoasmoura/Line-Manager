@@ -331,8 +331,10 @@ def show_split_form():
                                         for i in range(0, 1 + (num_splits or 0)):
                                             ui_row = edited_display.iloc[i].to_dict()
                                             # Mapeia manualmente o nome do campo da UI para o nome da coluna no banco de histórico
+                                            # NÃO remover o campo da UI - a função insert_return_carrier_from_ui precisa dele
                                             if "Required Arrival Date Expected" in ui_row:
-                                                ui_row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = ui_row.pop("Required Arrival Date Expected")
+                                                # Mantém o campo original para a função processar corretamente
+                                                pass
                                             
                                             # Remover campos de data do ui_row para permitir pré-preenchimento
                                             # do último registro aprovado (apenas para Adjustment Requested)
