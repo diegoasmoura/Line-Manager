@@ -38,7 +38,7 @@ def get_column_mapping():
         "s_afloat": "Afloat",
         "s_shipment_period_start_date": "Shipment Period Start Date",
         "s_shipment_period_end_date": "Shipment Period End Date",
-        "s_required_arrival_date": "Required Arrival Date Expected",
+        "s_required_arrival_date_expected": "Required Arrival Date Expected",
         "s_partial_allowed": "Partial Allowed",
         "s_vip_pnl_risk": "VIP PNL Risk",
         "s_pnl_destination": "PNL Destination",

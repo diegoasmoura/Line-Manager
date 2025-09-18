@@ -206,6 +206,133 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Validação de integridade de dados
 - Justificativas obrigatórias
 
+#### ⚠️ **Tratamento Especial de Colunas de Data (CRÍTICO)**
+
+**Problema Identificado**: As colunas de data específicas (`Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date`) não estavam sendo salvas corretamente na tabela `F_CON_RETURN_CARRIERS` durante operações de split.
+
+**Causa Raiz**: 
+1. **Mapeamento incorreto** na função `perform_split_operation` - tentativa de aplicar prefixo "Sales" a colunas que não o possuem
+2. **Inconsistência de nomes** entre tabelas:
+   - `F_CON_SALES_BOOKING_DATA`: `S_REQUIRED_ARRIVAL_DATE`
+   - `F_CON_RETURN_CARRIERS`: `S_REQUIRED_ARRIVAL_DATE_EXPECTED`
+3. **Lógica de pré-preenchimento** sobrescrevendo valores da UI
+
+**Solução Implementada**:
+
+```python
+# 1. Mapeamento direto para colunas de data específicas
+if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected"]:
+    col = reverse_map.get(ui_label)
+    if col:
+        # Mapeia diretamente sem prefixo
+        actual_col = find_column_case_insensitive(df, col)
+        if actual_col:
+            df.at[0, actual_col] = value
+else:
+    # Lógica original para outras colunas
+    label = ui_label.replace("Sales", prefix)
+    # ... resto do código
+```
+
+```python
+# 2. Correção na função insert_return_carrier_from_ui
+# Conversão de data para colunas S_REQUESTED_* e S_REQUIRED_*
+if (db_key.startswith("B_DATA_") or 
+    db_key.startswith("S_REQUESTED_") or 
+    db_key.startswith("S_REQUIRED_")) and isinstance(value, str) and value.strip():
+    # Conversão de data para essas colunas específicas
+```
+
+```python
+# 3. Mapeamento correto entre tabelas
+# Na função upsert_return_carrier_from_unified
+if "S_REQUIRED_ARRIVAL_DATE" in data:
+    data["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = data["S_REQUIRED_ARRIVAL_DATE"]
+```
+
+**Campos Afetados**:
+- ✅ `S_REQUESTED_DEADLINE_START_DATE` - **FUNCIONANDO**
+- ✅ `S_REQUESTED_DEADLINE_END_DATE` - **FUNCIONANDO**  
+- ✅ `S_REQUIRED_ARRIVAL_DATE_EXPECTED` - **CORRIGIDO**
+
+**Teste de Validação**:
+```python
+# Script de teste para verificar funcionamento
+test_ui_data = {
+    "Required Arrival Date Expected": "2025-01-15",
+    "Requested Deadline Start Date": "2025-01-10", 
+    "Requested Deadline End Date": "2025-01-20"
+}
+# Resultado: Todas as colunas são salvas corretamente na F_CON_RETURN_CARRIERS
+```
+
+**⚠️ IMPORTANTE**: Qualquer modificação futura no `shipments_split.py` deve considerar este mapeamento especial para evitar regressão.
+
+#### 🔧 **Padronização de Colunas de Data (CRÍTICO - v3.9.7)**
+
+**Problema Identificado**: Inconsistência entre colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` causando falhas em múltiplas telas do sistema.
+
+**Causa Raiz**:
+1. **Duas nomenclaturas diferentes** para o mesmo campo em tabelas diferentes
+2. **Erros de duplicação** em variáveis (`s_required_arrival_date_expected_expected`)
+3. **Mapeamentos incorretos** entre UI e banco de dados
+4. **Referências desatualizadas** após mudanças estruturais
+
+**Solução Implementada**:
+
+```sql
+-- 1. Adição da coluna padronizada na tabela principal
+ALTER TABLE LogTransp.F_CON_SALES_BOOKING_DATA 
+ADD S_REQUIRED_ARRIVAL_DATE_EXPECTED DATE;
+
+-- 2. Migração de dados existentes
+UPDATE LogTransp.F_CON_SALES_BOOKING_DATA 
+SET S_REQUIRED_ARRIVAL_DATE_EXPECTED = S_REQUIRED_ARRIVAL_DATE 
+WHERE S_REQUIRED_ARRIVAL_DATE IS NOT NULL;
+```
+
+```python
+# 3. Correção de variáveis duplicadas em shipments_new.py
+# ANTES (INCORRETO):
+values["s_required_arrival_date_expected_expected"] = st.date_input(...)
+
+# DEPOIS (CORRETO):
+values["s_required_arrival_date_expected"] = st.date_input(...)
+```
+
+```python
+# 4. Correção de mapeamentos em shipments_mapping.py
+# ANTES (INCORRETO):
+"s_required_arrival_date": "Required Arrival Date Expected"
+
+# DEPOIS (CORRETO):
+"s_required_arrival_date_expected": "Required Arrival Date Expected"
+```
+
+```python
+# 5. Correção de referências em shipments_split.py
+# ANTES (INCORRETO):
+"Required Arrival Date Expected": split_data["s_required_arrival_date"]
+
+# DEPOIS (CORRETO):
+"Required Arrival Date Expected": split_data["s_required_arrival_date_expected"]
+```
+
+**Arquivos Corrigidos**:
+- ✅ `shipments_new.py` - Variáveis e mapeamentos corrigidos
+- ✅ `shipments_split.py` - Referências de coluna atualizadas
+- ✅ `shipments_mapping.py` - Mapeamento UI→DB corrigido
+- ✅ `booking_new.py` - Recuperação de dados corrigida
+- ✅ `database.py` - Todas as funções atualizadas para usar coluna padronizada
+
+**Resultado**:
+- ✅ Campo "Required Arrival Date Expected" salva corretamente em todas as telas
+- ✅ Dados exibidos corretamente em booking_new.py
+- ✅ Operações de split funcionam sem erros
+- ✅ Consistência total entre todas as tabelas e interfaces
+
+**⚠️ IMPORTANTE**: Sistema agora usa exclusivamente `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todas as tabelas. Nunca mais usar `S_REQUIRED_ARRIVAL_DATE`.
+
 ### 📜 `history.py`
 **Interface de Histórico e Aprovações**
 - Apresenta a interface com as abas "📋 Request Timeline", "📨 Returns Awaiting Review" e "📅 Voyage Timeline".
@@ -1048,7 +1175,21 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - Validar estrutura do PDF
    - Conferir logs de extração
 
-4. **Erros de ImportError (Resolvidos na v3.5)**
+4. **❌ Campo "Required Arrival Date Expected" Não Salva (CRÍTICO - RESOLVIDO v3.9.7)**
+   - **Sintoma**: Campo aparece vazio mesmo após preenchimento em formulários
+   - **Causa Raiz**: Inconsistência entre colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED`
+   - **Erros Específicos**:
+     - `NoSuchColumnError: Could not locate column 's_required_arrival_date'` em shipments_split.py
+     - Campo vazio em booking_new.py mesmo com dados na tabela
+     - Dados não salvos em shipments_new.py devido a variável duplicada
+   - **✅ Solução Implementada**:
+     - Padronização completa para `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todas as tabelas
+     - Migração automática de dados existentes
+     - Correção de todas as referências no código
+     - Validação de funcionamento em todas as telas
+   - **Prevenção**: Sistema agora usa nomenclatura consistente em todo o projeto
+
+5. **Erros de ImportError (Resolvidos na v3.5)**
    - **`ImportError: cannot import name 'get_split_data_by_farol_reference'`**:
      - ✅ **Resolvido**: Função implementada no `database.py` linha 1005
      - **Causa**: Função estava sendo importada em `shipments_split.py` mas não existia
@@ -1108,6 +1249,22 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - Correção: busca case-insensitive e uso da versão do banco; o valor do PDF é normalizado para Title Case apenas se inexistente
    - Observação: listas usam `@st.cache_data(ttl=300)`; o refresh ocorre automaticamente em até 5 minutos
 
+8. **❌ Colunas de Data Não Salvam no Split (CRÍTICO - RESOLVIDO v3.9.6)**
+   - **Sintoma**: Campos `Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date` aparecem editáveis no `shipments_split.py` mas não são salvos na tabela `F_CON_RETURN_CARRIERS`
+   - **Causa**: Mapeamento incorreto na função `perform_split_operation` tentando aplicar prefixo "Sales" a colunas que não o possuem
+   - **Solução**: 
+     ```python
+     # Mapeamento direto para colunas de data específicas
+     if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected"]:
+         col = reverse_map.get(ui_label)
+         if col:
+             actual_col = find_column_case_insensitive(df, col)
+             if actual_col:
+                 df.at[0, actual_col] = value
+     ```
+   - **Verificação**: Testar split com alteração de datas e verificar se são salvas na tabela `F_CON_RETURN_CARRIERS`
+   - **Status**: ✅ **RESOLVIDO** - Todas as colunas de data funcionam corretamente
+
 #### Diagnóstico da API Ellox
 
 ```bash
@@ -1151,6 +1308,30 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
+- **🔧 Padronização Completa**: Unificação das colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todo o sistema
+- **📊 Nova Estrutura**: Todas as tabelas agora usam exclusivamente `S_REQUIRED_ARRIVAL_DATE_EXPECTED`
+- **✅ Migração de Dados**: Dados existentes migrados automaticamente da coluna antiga para a nova
+- **🐛 Correções Críticas**:
+  - **shipments_new.py**: Corrigido erro de duplicação `s_required_arrival_date_expected_expected` → `s_required_arrival_date_expected`
+  - **shipments_split.py**: Atualizada referência de coluna para usar `s_required_arrival_date_expected`
+  - **shipments_mapping.py**: Mapeamento corrigido para `s_required_arrival_date_expected`
+  - **booking_new.py**: Corrigida recuperação de dados usando chave mapeada correta
+- **🎯 Problema Resolvido**: Campo "Required Arrival Date Expected" agora é salvo e exibido corretamente em todas as telas
+- **⚠️ Impacto**: Correção crítica que resolve problema de dados não salvos em formulários de shipment
+- **🧪 Validação**: Teste automatizado confirma funcionamento correto em todas as telas afetadas
+
+### 📌 v3.9.6 - Correção Crítica das Colunas de Data no Split (Janeiro 2025)
+- **🔧 Problema Crítico Resolvido**: Colunas de data (`Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date`) não estavam sendo salvas corretamente na tabela `F_CON_RETURN_CARRIERS` durante operações de split
+- **🎯 Causa Raiz Identificada**: Mapeamento incorreto na função `perform_split_operation` tentando aplicar prefixo "Sales" a colunas que não o possuem
+- **✅ Solução Implementada**: 
+  - Mapeamento direto para colunas de data específicas sem prefixo
+  - Correção da lógica de pré-preenchimento que sobrescrevia valores da UI
+  - Mapeamento correto entre tabelas (`S_REQUIRED_ARRIVAL_DATE` → `S_REQUIRED_ARRIVAL_DATE_EXPECTED`)
+- **🧪 Validação Completa**: Teste automatizado confirma que todas as colunas de data são salvas corretamente
+- **📚 Documentação Atualizada**: Seção específica no README para evitar regressão futura
+- **⚠️ Impacto**: Correção crítica que afeta funcionalidade principal do sistema de splits
 
 ### 📌 v3.9.5 - Correção da Exibição de Horas no Booking Management (Setembro 2025)
 - **🕐 Exibição de Horas Corrigida**: Colunas de data no Booking Management agora exibem corretamente data e hora

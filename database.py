@@ -168,7 +168,7 @@ def get_data_salesData():
         S_AFLOAT                           AS s_afloat,
         S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
         S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
-        S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
+        S_REQUIRED_ARRIVAL_DATE_EXPECTED            AS s_required_arrival_date_expected,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
         S_PARTIAL_ALLOWED                  AS s_partial_allowed,
@@ -400,7 +400,7 @@ def fetch_shipments_data_sales():
         S_AFLOAT                           AS s_afloat,
         S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
         S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
-        S_REQUIRED_ARRIVAL_DATE            AS s_required_arrival_date,
+        S_REQUIRED_ARRIVAL_DATE_EXPECTED            AS s_required_arrival_date_expected,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
         S_PARTIAL_ALLOWED                  AS s_partial_allowed,
@@ -707,7 +707,7 @@ def add_sales_record(form_values):
             "s_afloat": "S_AFLOAT",
             "s_shipment_period_start_date": "S_SHIPMENT_PERIOD_START_DATE",
             "s_shipment_period_end_date": "S_SHIPMENT_PERIOD_END_DATE",
-            "s_required_arrival_date": "S_REQUIRED_ARRIVAL_DATE",
+            "s_required_arrival_date_expected": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
             "s_requested_deadlines_start_date": "S_REQUESTED_DEADLINE_START_DATE",
             "s_requested_deadlines_end_date": "S_REQUESTED_DEADLINE_END_DATE",
             "s_partial_allowed": "S_PARTIAL_ALLOWED",
@@ -832,8 +832,14 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         ]:
             df.at[0, ref_key] = new_ref
             for ui_label, value in row.items():
-                label = ui_label.replace("Sales", prefix)
-                col = reverse_map.get(label)
+                # Para colunas de data específicas, usar o mapeamento direto
+                if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected"]:
+                    col = reverse_map.get(ui_label)
+                else:
+                    # Para outras colunas, usar o mapeamento com prefixo
+                    label = ui_label.replace("Sales", prefix)
+                    col = reverse_map.get(label)
+                
                 if col:
                     # Mapeia colunas de forma case-insensitive para corresponder aos nomes reais do DataFrame
                     actual_col = None
@@ -1046,7 +1052,7 @@ def get_split_data_by_farol_reference(farol_reference):
             B_VESSEL_NAME AS b_vessel_name,
             S_REQUESTED_DEADLINE_START_DATE AS s_requested_deadlines_start_date,
             S_REQUESTED_DEADLINE_END_DATE AS s_requested_deadlines_end_date,
-            S_REQUIRED_ARRIVAL_DATE AS s_required_arrival_date
+            S_REQUIRED_ARRIVAL_DATE_EXPECTED AS s_required_arrival_date_expected
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
         WHERE FAROL_REFERENCE = :ref
         """
@@ -1072,7 +1078,7 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
             S_QUANTITY_OF_CONTAINERS          AS sales_quantity_of_containers,
             S_REQUESTED_DEADLINE_START_DATE   AS requested_cut_off_start_date,
             S_REQUESTED_DEADLINE_END_DATE     AS requested_cut_off_end_date,
-            S_REQUIRED_ARRIVAL_DATE           AS required_arrival_date,
+            S_REQUIRED_ARRIVAL_DATE_EXPECTED           AS required_arrival_date,
             S_SHIPMENT_PERIOD_START_DATE      AS shipment_period_start_date,
             S_SHIPMENT_PERIOD_END_DATE        AS shipment_period_end_date,
             S_PORT_OF_LOADING_POL             AS booking_port_of_loading_pol,
@@ -1205,6 +1211,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                 B_DATA_DEADLINE,
                 S_REQUESTED_DEADLINE_START_DATE,
                 S_REQUESTED_DEADLINE_END_DATE,
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
@@ -1229,6 +1236,10 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         # Converte resultado para dicionário e normaliza chaves para MAIÚSCULAS
         row_dict = dict(row)
         data = {k.upper(): v for k, v in row_dict.items()}
+        
+        # Mapeia S_REQUIRED_ARRIVAL_DATE_EXPECTED (unificada) para S_REQUIRED_ARRIVAL_DATE_EXPECTED (carriers)
+        if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in data:
+            data["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = data["S_REQUIRED_ARRIVAL_DATE_EXPECTED"]
         # Garante binds para novos campos mesmo quando não vierem do SELECT
         for k in (
             "B_DATA_PARTIDA_ATD",
@@ -1265,6 +1276,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     B_DATA_DEADLINE = :B_DATA_DEADLINE,
                     S_REQUESTED_DEADLINE_START_DATE = :S_REQUESTED_DEADLINE_START_DATE,
                     S_REQUESTED_DEADLINE_END_DATE = :S_REQUESTED_DEADLINE_END_DATE,
+                    S_REQUIRED_ARRIVAL_DATE_EXPECTED = :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                     B_DATA_ESTIMATIVA_SAIDA_ETD = :B_DATA_ESTIMATIVA_SAIDA_ETD,
                     B_DATA_ESTIMATIVA_CHEGADA_ETA = :B_DATA_ESTIMATIVA_CHEGADA_ETA,
                     B_DATA_ABERTURA_GATE = :B_DATA_ABERTURA_GATE,
@@ -1298,6 +1310,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     B_DATA_DEADLINE,
                     S_REQUESTED_DEADLINE_START_DATE,
                     S_REQUESTED_DEADLINE_END_DATE,
+                    S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                     B_DATA_ESTIMATIVA_SAIDA_ETD,
                     B_DATA_ESTIMATIVA_CHEGADA_ETA,
                     B_DATA_ABERTURA_GATE,
@@ -1322,6 +1335,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     :B_DATA_DEADLINE,
                     :S_REQUESTED_DEADLINE_START_DATE,
                     :S_REQUESTED_DEADLINE_END_DATE,
+                    :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                     :B_DATA_ESTIMATIVA_SAIDA_ETD,
                     :B_DATA_ESTIMATIVA_CHEGADA_ETA,
                     :B_DATA_ABERTURA_GATE,
@@ -1361,7 +1375,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                 B_DATA_DEADLINE,
                 S_REQUESTED_DEADLINE_START_DATE,
                 S_REQUESTED_DEADLINE_END_DATE,
-                S_REQUIRED_ARRIVAL_DATE,
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
@@ -1457,7 +1471,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "B_DATA_DEADLINE": rd.get("B_DATA_DEADLINE"),
             "S_REQUESTED_DEADLINE_START_DATE": rd.get("S_REQUESTED_DEADLINE_START_DATE"),
             "S_REQUESTED_DEADLINE_END_DATE": rd.get("S_REQUESTED_DEADLINE_END_DATE"),
-            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": rd.get("S_REQUIRED_ARRIVAL_DATE"),
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": rd.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"),
             "B_DATA_ESTIMATIVA_SAIDA_ETD": rd.get("B_DATA_ESTIMATIVA_SAIDA_ETD"),
             "B_DATA_ESTIMATIVA_CHEGADA_ETA": rd.get("B_DATA_ESTIMATIVA_CHEGADA_ETA"),
             "B_DATA_ABERTURA_GATE": rd.get("B_DATA_ABERTURA_GATE"),
@@ -1567,7 +1581,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             if ui_key in ui_data and ui_data[ui_key] is not None:
                 value = ui_data[ui_key]
                 # Converte valores especiais
-                if db_key.startswith("B_DATA_") and isinstance(value, str) and value.strip():
+                if (db_key.startswith("B_DATA_") or db_key.startswith("S_REQUESTED_") or db_key.startswith("S_REQUIRED_")) and isinstance(value, str) and value.strip():
                     try:
                         # Tenta converter data se for string
                         from datetime import datetime
@@ -1609,7 +1623,17 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         
         # Aplicar pré-preenchimento de datas do último registro aprovado (apenas se não fornecidas)
         for date_field, date_value in prefill_dates.items():
-            if date_field not in db_data or db_data[date_field] is None:
+            # Só aplica pré-preenchimento se:
+            # 1. A coluna não estiver no db_data OU
+            # 2. O valor for None OU
+            # 3. O valor for uma string vazia (apenas para colunas de data específicas)
+            should_prefill = (
+                date_field not in db_data or 
+                db_data[date_field] is None or
+                (isinstance(db_data[date_field], str) and db_data[date_field].strip() == "")
+            )
+            
+            if should_prefill:
                 db_data[date_field] = date_value
 
         # Campos obrigatórios e padrões
@@ -2163,22 +2187,34 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                     continue
                 main_update_fields[field] = val
 
-        # Mapeamento especial: S_REQUIRED_ARRIVAL_DATE_EXPECTED (carriers) -> S_REQUIRED_ARRIVAL_DATE (principal)
+        # Mapeamento especial: S_REQUIRED_ARRIVAL_DATE_EXPECTED (carriers) -> S_REQUIRED_ARRIVAL_DATE_EXPECTED (principal)
         if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in row and row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] is not None:
             val = _normalize_value(row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"])
             if val is not None and not (isinstance(val, str) and val.strip() == ""):
-                main_update_fields["S_REQUIRED_ARRIVAL_DATE"] = val
+                main_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = val
 
         main_set_clause = ", ".join([f"{field} = :{field}" for field in main_update_fields.keys() if field != 'farol_reference'])
         main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
         conn.execute(main_update_query, main_update_fields)
 
-        # 6. Criar snapshot na tabela F_CON_RETURN_CARRIERS após aprovação
+        # 6. Atualizar colunas de expectativa interna no registro existente da tabela carriers
         try:
-            insert_return_carrier_snapshot(farol_reference, status_override="Booking Approved", user_insert="system")
+            carrier_update_fields = {}
+            if "S_REQUESTED_DEADLINE_START_DATE" in main_update_fields:
+                carrier_update_fields["S_REQUESTED_DEADLINE_START_DATE"] = main_update_fields["S_REQUESTED_DEADLINE_START_DATE"]
+            if "S_REQUESTED_DEADLINE_END_DATE" in main_update_fields:
+                carrier_update_fields["S_REQUESTED_DEADLINE_END_DATE"] = main_update_fields["S_REQUESTED_DEADLINE_END_DATE"]
+            if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in main_update_fields:
+                carrier_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = main_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"]
+            
+            if carrier_update_fields:
+                carrier_set_clause = ", ".join([f"{field} = :{field}" for field in carrier_update_fields.keys()])
+                carrier_update_query = text(f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {carrier_set_clause} WHERE ADJUSTMENT_ID = :adjustment_id")
+                carrier_update_fields["adjustment_id"] = adjustment_id
+                conn.execute(carrier_update_query, carrier_update_fields)
         except Exception as e:
-            # Log do erro mas não falha toda a operação, pois o registro principal já foi atualizado
-            print(f"Aviso: Erro ao criar snapshot em F_CON_RETURN_CARRIERS: {e}")
+            # Log do erro mas não falha toda a operação
+            print(f"Aviso: Erro ao atualizar colunas de expectativa interna: {e}")
 
         # 7. Commit transaction
         tx.commit()

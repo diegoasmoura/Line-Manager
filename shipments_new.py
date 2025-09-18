@@ -33,7 +33,7 @@ form_fields = {
     "Shipment Period End Date": "s_shipment_period_end_date",
     "DTHC Prepaid": "s_dthc_prepaid",
     "Afloat": "s_afloat",
-            "Required Arrival Date Expected": "s_required_arrival_date",
+            "Required Arrival Date Expected": "s_required_arrival_date_expected",
     "Comments Sales": "s_comments"
 }
  
@@ -89,7 +89,7 @@ def show_add_form():
             with col1:
                 values["s_requested_shipment_week"] = st.number_input("**:green[Requested Shipment Week]***", min_value=1, max_value=52, step=1)
             with col2:
-                values["s_required_arrival_date"] = st.date_input("Required Arrival Date Expected", value=None)
+                values["s_required_arrival_date_expected"] = st.date_input("Required Arrival Date Expected", value=None)
 
             col1, col2 = st.columns(2)
             with col1:
@@ -159,14 +159,14 @@ def show_add_form():
                         else:
                             values["s_final_destination"] = ""
                     
-                    # Tratamento da data s_required_arrival_date no formulário manual
-                    if values.get("s_required_arrival_date"):
+                    # Tratamento da data s_required_arrival_date_expected no formulário manual
+                    if values.get("s_required_arrival_date_expected"):
                         try:
                             # Converte para datetime se for uma data válida
-                            if isinstance(values["s_required_arrival_date"], str):
-                                values["s_required_arrival_date"] = pd.to_datetime(values["s_required_arrival_date"])
+                            if isinstance(values["s_required_arrival_date_expected"], str):
+                                values["s_required_arrival_date_expected"] = pd.to_datetime(values["s_required_arrival_date_expected"])
                         except (ValueError, TypeError):
-                            values["s_required_arrival_date"] = None
+                            values["s_required_arrival_date_expected"] = None
 
                     with st.spinner("Processing new shipment, please wait..."):
                         if add_sales_record(values):
@@ -264,7 +264,7 @@ def show_add_form():
                     
                     # Tratamento da coluna LIMITE EMBARQUE - PNL para validar se é uma data válida
                     limite_embarque_val = row.get("LIMITE EMBARQUE - PNL", "")
-                    s_required_arrival_date = None
+                    s_required_arrival_date_expected = None
                     
                     if pd.notna(limite_embarque_val) and str(limite_embarque_val).strip() != "":
                         try:
@@ -272,23 +272,23 @@ def show_add_form():
                             if isinstance(limite_embarque_val, str):
                                 # Se for string, tenta fazer parse
                                 parsed_date = pd.to_datetime(limite_embarque_val)
-                                s_required_arrival_date = parsed_date
+                                s_required_arrival_date_expected = parsed_date
                             elif isinstance(limite_embarque_val, (int, float)):
                                 # Se for número (como 0), ignora
-                                s_required_arrival_date = None
+                                s_required_arrival_date_expected = None
                             else:
                                 # Se for datetime/date, mantém como está
-                                s_required_arrival_date = limite_embarque_val
+                                s_required_arrival_date_expected = limite_embarque_val
                         except (ValueError, TypeError):
                             # Se não conseguir converter, ignora o valor
-                            s_required_arrival_date = None
+                            s_required_arrival_date_expected = None
                     
                     values = {
                         "s_farol_status": "New request",
                         "s_type_of_shipment": "Forecast",
                         "s_quantity_of_containers": hc_val,
                         "s_requested_shipment_week": row.get("Week", ""),
-                        "s_required_arrival_date": s_required_arrival_date,
+                        "s_required_arrival_date_expected": s_required_arrival_date_expected,
                         "s_requested_deadlines_start_date": "",
                         "s_requested_deadlines_end_date": "",
                         "s_shipment_period_start_date": "",

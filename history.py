@@ -505,7 +505,7 @@ def get_main_table_data(farol_ref):
             SELECT 
                 S_QUANTITY_OF_CONTAINERS,
                 B_VOYAGE_CARRIER,
-                S_REQUIRED_ARRIVAL_DATE,
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                 ROW_INSERTED_DATE
             FROM LogTransp.F_CON_SALES_BOOKING_DATA
             WHERE FAROL_REFERENCE = :farol_reference
@@ -1361,22 +1361,7 @@ def exibir_history():
         except Exception:
             pass
         
-        # Adiciona Required Arrival Date Expected da tabela principal para cada linha
-        try:
-            if "Farol Reference" in df_processed.columns:
-                # Buscar Required Arrival Date Expected da tabela principal para cada Farol Reference
-                farol_refs = df_processed["Farol Reference"].dropna().unique()
-                required_arrival_dates = {}
-                
-                for farol_ref in farol_refs:
-                    main_data = get_main_table_data(farol_ref)
-                    if main_data and main_data.get("s_required_arrival_date"):
-                        required_arrival_dates[farol_ref] = main_data["s_required_arrival_date"]
-                
-                # Adicionar coluna Required Arrival Date Expected
-                df_processed["Required Arrival Date Expected"] = df_processed["Farol Reference"].map(required_arrival_dates)
-        except Exception:
-            pass
+        
 
         # Adiciona ícones na coluna de Status (origem do ajuste), com prioridade:
         # 1) Linhas de Split → "📄 Split"
