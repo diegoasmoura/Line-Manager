@@ -1165,7 +1165,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             SELECT 
                 FAROL_REFERENCE,
                 'Booking Requested' AS B_BOOKING_STATUS,
-                NULL AS P_STATUS,
+                'Booking Request - Company' AS P_STATUS,
                 NULL AS P_PDF_NAME,
                 S_SPLITTED_BOOKING_REFERENCE,
                 S_PLACE_OF_RECEIPT,
