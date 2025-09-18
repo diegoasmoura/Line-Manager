@@ -2130,6 +2130,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             "S_PORT_OF_LOADING_POL", "S_PORT_OF_DELIVERY_POD", "S_FINAL_DESTINATION",
             "B_BOOKING_REFERENCE", "B_TRANSHIPMENT_PORT", "B_TERMINAL", "B_VESSEL_NAME",
             "B_VOYAGE_CODE", "B_VOYAGE_CARRIER", "B_DATA_DRAFT_DEADLINE", "B_DATA_DEADLINE",
+            "S_REQUESTED_DEADLINE_START_DATE", "S_REQUESTED_DEADLINE_END_DATE",
             "B_DATA_ESTIMATIVA_SAIDA_ETD", "B_DATA_ESTIMATIVA_CHEGADA_ETA", "B_DATA_ABERTURA_GATE",
             "B_DATA_PARTIDA_ATD", "B_DATA_CHEGADA_ATA", "B_DATA_ESTIMATIVA_ATRACACAO_ETB", "B_DATA_ATRACACAO_ATB"
         ]
@@ -2161,6 +2162,12 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 if isinstance(val, str) and val.strip() == "":
                     continue
                 main_update_fields[field] = val
+
+        # Mapeamento especial: S_REQUIRED_ARRIVAL_DATE_EXPECTED (carriers) -> S_REQUIRED_ARRIVAL_DATE (principal)
+        if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in row and row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] is not None:
+            val = _normalize_value(row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"])
+            if val is not None and not (isinstance(val, str) and val.strip() == ""):
+                main_update_fields["S_REQUIRED_ARRIVAL_DATE"] = val
 
         main_set_clause = ", ".join([f"{field} = :{field}" for field in main_update_fields.keys() if field != 'farol_reference'])
         main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
