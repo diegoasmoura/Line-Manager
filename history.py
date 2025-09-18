@@ -505,6 +505,7 @@ def get_main_table_data(farol_ref):
             SELECT 
                 S_QUANTITY_OF_CONTAINERS,
                 B_VOYAGE_CARRIER,
+                S_REQUIRED_ARRIVAL_DATE,
                 ROW_INSERTED_DATE
             FROM LogTransp.F_CON_SALES_BOOKING_DATA
             WHERE FAROL_REFERENCE = :farol_reference
@@ -1360,6 +1361,23 @@ def exibir_history():
         except Exception:
             pass
         
+        # Adiciona Required Arrival Date da tabela principal para cada linha
+        try:
+            if "Farol Reference" in df_processed.columns:
+                # Buscar Required Arrival Date da tabela principal para cada Farol Reference
+                farol_refs = df_processed["Farol Reference"].dropna().unique()
+                required_arrival_dates = {}
+                
+                for farol_ref in farol_refs:
+                    main_data = get_main_table_data(farol_ref)
+                    if main_data and main_data.get("s_required_arrival_date"):
+                        required_arrival_dates[farol_ref] = main_data["s_required_arrival_date"]
+                
+                # Adicionar coluna Required Arrival Date
+                df_processed["Required Arrival Date"] = df_processed["Farol Reference"].map(required_arrival_dates)
+        except Exception:
+            pass
+
         # Adiciona ícones na coluna de Status (origem do ajuste), com prioridade:
         # 1) Linhas de Split → "📄 Split"
         # 2) Linked Reference presente → "🚢 Carrier Return (Linked|New Adjustment)"
@@ -1436,7 +1454,7 @@ def exibir_history():
         # Converte datas para exibição
         date_cols = [
             "Inserted Date", "Data Draft Deadline", "Data Deadline", 
-            "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
+            "Required Arrival Date", "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
             "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Booking Emission Date"
         ]
         for col in date_cols:
@@ -1548,6 +1566,7 @@ def exibir_history():
                 "Final Destination",
                 "Transhipment Port",
                 "Port Terminal City",
+                "Required Arrival Date",
                 "Requested Deadline Start Date",
                 "Requested Deadline End Date",
                 "Data Draft Deadline",
