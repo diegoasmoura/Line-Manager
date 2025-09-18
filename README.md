@@ -1152,6 +1152,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.5 - Correção da Exibição de Horas no Booking Management (Setembro 2025)
+- **🕐 Exibição de Horas Corrigida**: Colunas de data no Booking Management agora exibem corretamente data e hora
+- **⚙️ Configuração Melhorada**: Adicionado `step=60` para `DatetimeColumn` com melhor controle de edição
+- **🔄 Conversão de Dados**: Implementada conversão explícita para `datetime64[ns]` em `get_data_bookingData()`
+- **📊 Formato Padronizado**: Todas as colunas B_DATA_* agora exibem formato `DD/MM/YYYY HH:mm`
+- **✅ Colunas Afetadas**: B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
+- **🎯 Melhoria na UX**: Usuários agora podem ver e editar horários precisos nas datas de booking
+
 ### 📌 v3.9.4 - Melhoria na Identificação de Origem e Limpeza de Campos (Setembro 2025)
 - **🏷️ P_STATUS Inteligente**: Sistema agora atribui nomes mais claros baseados na origem dos registros
   - `"Booking Request - Company"` → 📋 Booking Request (primeiro registro)
@@ -1462,19 +1470,20 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.9*
+*Sistema de Gerenciamento de Embarques - Versão 3.9.5*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9)
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.5)
 - **Módulos**: 15+ módulos especializados  
 - **Carriers Suportados**: 8 carriers principais
 - **Integrações**: Oracle DB + API Ellox
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.5)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.5)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.5)
 
 ### 🎯 Roadmap Técnico Detalhado
 
@@ -1493,15 +1502,16 @@ ento de Embarques - Versão 3.9*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9)
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.5)
 - **Módulos**: 15+ módulos especializados  
 - **Carriers Suportados**: 8 carriers principais
 - **Integrações**: Oracle DB + API Ellox
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.5)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.5)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.5)
 
 ### 🎯 Roadmap Técnico Detalhado
 
