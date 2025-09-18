@@ -213,6 +213,7 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 - Contém a lógica da interface de usuário para o fluxo de aprovação de retornos do carrier, coletando os dados necessários e invocando a lógica de negócio que foi centralizada em `database.py`.
 - Gerencia a seção de upload e visualização de anexos para cada referência.
 - **Interface Otimizada**: Colunas ETD/ETA (Data Draft Deadline, Data Deadline, Data Estimativa Saída ETD, Data Estimativa Chegada ETA, Data Abertura Gate) são automaticamente ocultas na aba "Returns Awaiting Review" para melhor experiência do usuário.
+- **Status Exibido Inteligente (v3.9.4)**: Sistema gera status visuais baseados na origem dos registros com ícones descritivos (📋 Booking Request, 📄 PDF Document, 🛠️ Adjustment Request).
 
 #### 📅 Voyage Timeline
 - **Exibição do Histórico**: A tabela de histórico de monitoramento de uma viagem agora é exibida mesmo que haja apenas um registro. Anteriormente, a tabela só aparecia se houvesse mais de um registro.
@@ -359,8 +360,17 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 
 #### 🔧 **Funções Principais**
 - **`get_split_data_by_farol_reference(farol_reference)`**: Busca dados unificados para operações de split/adjustments
-- **`insert_return_carrier_from_ui(ui_data, ...)`**: Insere dados na F_CON_RETURN_CARRIERS a partir da UI com mapeamento automático
+- **`insert_return_carrier_from_ui(ui_data, ...)`**: Insere dados na F_CON_RETURN_CARRIERS a partir da UI com mapeamento automático e P_STATUS inteligente
 - **`get_return_carriers_by_adjustment_id(adjustment_id, conn=None)`**: Busca dados de return carriers por ADJUSTMENT_ID
+- **`approve_carrier_return(adjustment_id, ...)`**: Aprovação completa com limpeza de campos de justificativa para PDFs
+
+#### 🏷️ **Sistema P_STATUS Inteligente (v3.9.4)**
+- **Identificação Automática**: P_STATUS é definido automaticamente baseado na origem do registro
+- **Nomes Claros**: 
+  - `"Booking Request - Company"` para primeiro registro
+  - `"PDF Document - Carrier"` para processamento de PDF
+  - `"Adjustment Request - Company"` para ajustes/splits
+- **Limpeza de Campos**: Aprovação de PDF limpa campos Area, Request_Reason, Adjustments_Owner, Comments
 - **`approve_carrier_return(adjustment_id, related_reference, justification)`**: Processo completo de aprovação de retornos
 - **`update_record_status(adjustment_id, new_status)`**: Atualização de status simples
 
@@ -1140,6 +1150,17 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9.4 - Melhoria na Identificação de Origem e Limpeza de Campos (Setembro 2025)
+- **🏷️ P_STATUS Inteligente**: Sistema agora atribui nomes mais claros baseados na origem dos registros
+  - `"Booking Request - Company"` → 📋 Booking Request (primeiro registro)
+  - `"PDF Document - Carrier"` → 📄 PDF Document (aprovação de PDF)
+  - `"Adjustment Request - Company"` → 🛠️ Adjustment Request (ajustes/splits)
+- **🧹 Limpeza de Campos na Aprovação de PDF**: Campos Area, Request_Reason, Adjustments_Owner e Comments ficam vazios (NULL) na aprovação de PDFs
+- **✅ Apenas "New Adjustment"**: Mantém campos de justificativa preenchidos conforme necessário
+- **🔄 Compatibilidade Total**: Sistema funciona com dados antigos e novos sem problemas
+- **📊 Status Exibido Melhorado**: Interface mostra status mais intuitivos e descritivos
+- **🔧 Confirmação Técnica**: Status exibido na interface não tem relação direta com P_STATUS (gerado dinamicamente)
 
 ### 📌 v3.9.3 - Pré-preenchimento Automático de Datas em Ajustes (Setembro 2025)
 - **🔄 Pré-preenchimento Inteligente**: Novos ajustes agora herdam automaticamente as datas do último registro aprovado da mesma Farol Reference

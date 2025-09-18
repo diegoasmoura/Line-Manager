@@ -1400,7 +1400,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "FAROL_REFERENCE": rd.get("FAROL_REFERENCE"),
             "B_BOOKING_STATUS": b_status,
             # Snapshot oriundo do carrier
-            "P_STATUS": "Adjusts Carrier",
+            "P_STATUS": "Booking Request - Company",
             "P_PDF_NAME": None,
             "S_SPLITTED_BOOKING_REFERENCE": rd.get("S_SPLITTED_BOOKING_REFERENCE"),
             "S_PLACE_OF_RECEIPT": rd.get("S_PLACE_OF_RECEIPT"),
@@ -1568,9 +1568,18 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         db_data["B_BOOKING_STATUS"] = status_override or "Adjustment Requested"
         db_data["USER_INSERT"] = user_insert
         db_data["ADJUSTMENT_ID"] = str(uuid.uuid4())
-        # Origem da solicitação: UI (splits/ajustes) → Adjusts Cargill, se não vier definido
+        
+        # Definir P_STATUS baseado na origem da solicitação
         if "P_STATUS" not in db_data or db_data.get("P_STATUS") in (None, "", "NULL"):
-            db_data["P_STATUS"] = "Adjusts Cargill"
+            if user_insert == "PDF_PROCESSOR":
+                # Origem: Processamento de PDF/Documento do carrier
+                db_data["P_STATUS"] = "PDF Document - Carrier"
+            elif status_override == "Adjustment Requested":
+                # Origem: Solicitação de ajuste ou split via shipments_split.py
+                db_data["P_STATUS"] = "Adjustment Request - Company"
+            else:
+                # Fallback para outros casos
+                db_data["P_STATUS"] = "Other Request - Company"
         
         # NÃO gerar Linked Reference automaticamente na inserção.
         # Regra de negócio: LINKED_REFERENCE só deve ser preenchido no momento da aprovação.
@@ -2034,12 +2043,24 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             update_params.update(justification)
             set_clauses.extend(["Linked_Reference = 'New Adjustment'", "AREA = :area", "REQUEST_REASON = :request_reason", "ADJUSTMENTS_OWNER = :adjustments_owner", "COMMENTS = :comments"])
         else:
+            # Para aprovação de PDF/retorno do carrier, limpar campos de justificativa
             # Persistir a chave completa enviada pela UI (sem ícones). Caso ultrapasse 60, truncar com segurança
             ref_str = str(related_reference) if related_reference is not None else ''
             if len(ref_str) > 60:
                 ref_str = ref_str[:60]
             update_params["linked_ref"] = ref_str
-            set_clauses.append("Linked_Reference = :linked_ref")
+            # Limpar campos de justificativa para aprovações de PDF
+            update_params["area_clear"] = None
+            update_params["request_reason_clear"] = None  
+            update_params["adjustments_owner_clear"] = None
+            update_params["comments_clear"] = None
+            set_clauses.extend([
+                "Linked_Reference = :linked_ref",
+                "AREA = :area_clear", 
+                "REQUEST_REASON = :request_reason_clear",
+                "ADJUSTMENTS_OWNER = :adjustments_owner_clear", 
+                "COMMENTS = :comments_clear"
+            ])
 
         update_query_str = f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {', '.join(set_clauses)} WHERE ADJUSTMENT_ID = :adjustment_id"
         conn.execute(text(update_query_str), update_params)

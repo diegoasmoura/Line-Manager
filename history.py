@@ -1396,6 +1396,16 @@ def exibir_history():
                     if not txt:
                         return "⚙️"
                     low = txt.lower()
+                    # Novos nomes mais claros
+                    if low == "booking request - company":
+                        return "📋 Booking Request"
+                    if low == "pdf document - carrier":
+                        return "📄 PDF Document"
+                    if low == "adjustment request - company":
+                        return "🛠️ Adjustment Request"
+                    if low == "other request - company":
+                        return "⚙️ Other Request"
+                    # Compatibilidade com nomes antigos
                     if low == "adjusts cargill":
                         return "🛠️ Cargill (Adjusts)"
                     if low == "adjusts carrier":
