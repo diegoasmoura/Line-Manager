@@ -1512,9 +1512,9 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Transhipment Port": "B_TRANSHIPMENT_PORT",
             "Terminal": "B_TERMINAL",
             "Port Terminal City": "B_TERMINAL",
-            "Requested Deadline Start Date": "B_DATA_ESTIMATIVA_SAIDA_ETD",
-            "Requested Deadline End Date": "B_DATA_DRAFT_DEADLINE",
-            "Required Arrival Date Expected": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+            "Requested Deadline Start Date": "S_REQUESTED_DEADLINE_START_DATE",
+            "Requested Deadline End Date": "S_REQUESTED_DEADLINE_END_DATE",
+            "Required Arrival Date Expected": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
             "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE",
             "PDF Name": "P_PDF_NAME",
         }
@@ -1527,9 +1527,10 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                 # Buscar último registro aprovado da mesma Farol Reference
                 prefill_query = text("""
                     SELECT 
-                        B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, B_DATA_ESTIMATIVA_SAIDA_ETD,
-                        B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_PARTIDA_ATD,
-                        B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
+                        B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, 
+                        S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE, S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                        B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, 
+                        B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
                     FROM LogTransp.F_CON_RETURN_CARRIERS
                     WHERE FAROL_REFERENCE = :farol_ref 
                     AND B_BOOKING_STATUS = 'Booking Approved'
@@ -1542,6 +1543,9 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                     date_fields_mapping = {
                         'B_DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE',
                         'B_DATA_DEADLINE': 'B_DATA_DEADLINE', 
+                        'S_REQUESTED_DEADLINE_START_DATE': 'S_REQUESTED_DEADLINE_START_DATE',
+                        'S_REQUESTED_DEADLINE_END_DATE': 'S_REQUESTED_DEADLINE_END_DATE',
+                        'S_REQUIRED_ARRIVAL_DATE_EXPECTED': 'S_REQUIRED_ARRIVAL_DATE_EXPECTED',
                         'B_DATA_ESTIMATIVA_SAIDA_ETD': 'B_DATA_ESTIMATIVA_SAIDA_ETD',
                         'B_DATA_ESTIMATIVA_CHEGADA_ETA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
                         'B_DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE',
