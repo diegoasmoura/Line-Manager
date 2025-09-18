@@ -229,7 +229,7 @@ def exibir_shipments():
             params.update({"status": "Received from Carrier"})
             sql_rc = text(
                 f"SELECT COUNT(*) AS c FROM LogTransp.F_CON_RETURN_CARRIERS \n"
-                f"WHERE UPPER(status) = UPPER(:status) AND farol_reference IN ({placeholders})"
+                f"WHERE UPPER(B_BOOKING_STATUS) = UPPER(:status) AND farol_reference IN ({placeholders})"
             )
             res = conn.execute(sql_rc, params).fetchone()
             conn.close()
