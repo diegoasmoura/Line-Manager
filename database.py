@@ -281,6 +281,17 @@ def get_data_bookingData():
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
+        
+        # Converter colunas de data/hora para datetime
+        datetime_columns = [
+            'Data Draft Deadline', 'Data Deadline', 'Data Estimativa Saída ETD', 
+            'Data Estimativa Chegada ETA', 'Data Abertura Gate', 'Data Partida ATD', 
+            'Data Chegada ATA', 'Data Estimativa Atracação ETB', 'Data Atracação ATB'
+        ]
+        
+        for col in datetime_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
  
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[

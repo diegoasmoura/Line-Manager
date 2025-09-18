@@ -207,15 +207,15 @@ def drop_downs(data_show, df_udc):
         "Voyage Carrier": "select",
         "Booking Request Date": "date",
         "Booking Confirmation Date": "date",
-        "Data Draft Deadline": "date",
-        "Data Deadline": "date",
-        "Data Estimativa Saída ETD": "date",
-        "Data Estimativa Chegada ETA": "date",
-        "Data Abertura Gate": "date",
-        "Data Partida ATD": "date",
-        "Data Chegada ATA": "date",
-        "Data Estimativa Atracação ETB": "date",
-        "Data Atracação ATB": "date",
+        "Data Draft Deadline": "datetime",
+        "Data Deadline": "datetime",
+        "Data Estimativa Saída ETD": "datetime",
+        "Data Estimativa Chegada ETA": "datetime",
+        "Data Abertura Gate": "datetime",
+        "Data Partida ATD": "datetime",
+        "Data Chegada ATA": "datetime",
+        "Data Estimativa Atracação ETB": "datetime",
+        "Data Atracação ATB": "datetime",
         "Booking Quantity of Containers": "numeric",
         "Freight Rate USD": "numeric",
         "Bogey Sale Price USD": "numeric",
@@ -288,7 +288,8 @@ def drop_downs(data_show, df_udc):
         elif editor_type == "datetime":
             column_config[col] = st.column_config.DatetimeColumn(
                 label=col,
-                format="DD/MM/YYYY HH:mm"
+                format="DD/MM/YYYY HH:mm",
+                step=60  # Passo de 1 minuto para edição
             )
         elif editor_type == "numeric":
             column_config[col] = st.column_config.NumberColumn(
