@@ -1078,6 +1078,7 @@ def exibir_history():
         "B_DATA_DEADLINE",
         "S_REQUESTED_DEADLINE_START_DATE",
         "S_REQUESTED_DEADLINE_END_DATE",
+        "S_REQUIRED_ARRIVAL_DATE",
         "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
         "B_DATA_ESTIMATIVA_SAIDA_ETD",
         "B_DATA_ESTIMATIVA_CHEGADA_ETA",
@@ -1314,6 +1315,7 @@ def exibir_history():
             "B_DATA_DEADLINE": "Data Deadline",
             "S_REQUESTED_DEADLINE_START_DATE": "Requested Deadline Start Date",
             "S_REQUESTED_DEADLINE_END_DATE": "Requested Deadline End Date",
+            "S_REQUIRED_ARRIVAL_DATE": "Required Arrival Date",
             "S_REQUIRED_ARRIVAL_DATE_EXPECTED": "Required Arrival Date Expected",
             "B_DATA_ESTIMATIVA_SAIDA_ETD": "Data Estimativa Saída ETD",
             "B_DATA_ESTIMATIVA_CHEGADA_ETA": "Data Estimativa Chegada ETA",
@@ -1436,7 +1438,7 @@ def exibir_history():
         # Converte datas para exibição
         date_cols = [
             "Inserted Date", "Data Draft Deadline", "Data Deadline", 
-            "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
+            "Required Arrival Date", "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
             "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Booking Emission Date"
         ]
         for col in date_cols:
@@ -1548,10 +1550,11 @@ def exibir_history():
                 "Final Destination",
                 "Transhipment Port",
                 "Port Terminal City",
-                "Data Draft Deadline",
-                "Data Deadline",
+                "Required Arrival Date",
                 "Requested Deadline Start Date",
                 "Requested Deadline End Date",
+                "Data Draft Deadline",
+                "Data Deadline",
                 "Required Arrival Date Expected",
                 "Data Estimativa Saída ETD",
                 "Data Estimativa Chegada ETA",
