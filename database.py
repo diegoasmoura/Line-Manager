@@ -2173,7 +2173,14 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
         conn.execute(main_update_query, main_update_fields)
 
-        # 6. Commit transaction
+        # 6. Criar snapshot na tabela F_CON_RETURN_CARRIERS após aprovação
+        try:
+            insert_return_carrier_snapshot(farol_reference, status_override="Booking Approved", user_insert="system")
+        except Exception as e:
+            # Log do erro mas não falha toda a operação, pois o registro principal já foi atualizado
+            print(f"Aviso: Erro ao criar snapshot em F_CON_RETURN_CARRIERS: {e}")
+
+        # 7. Commit transaction
         tx.commit()
         st.success(f"✅ Record {farol_reference} approved and updated successfully.")
         return True
