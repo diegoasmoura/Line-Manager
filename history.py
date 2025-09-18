@@ -771,112 +771,113 @@ def display_attachments_section(farol_reference):
     attachments_df = get_attachments_for_farol(farol_reference)
 
     st.divider()
-    st.subheader("Attachments")
+    
+    # Seção de anexos retraída por padrão
+    with st.expander("📎 Attachments", expanded=False):
+        if not attachments_df.empty:
+            # Ordena por data/hora (mais recente primeiro)
+            dfv = attachments_df.sort_values('upload_date', ascending=False).reset_index(drop=True)
 
-    if not attachments_df.empty:
-        # Ordena por data/hora (mais recente primeiro)
-        dfv = attachments_df.sort_values('upload_date', ascending=False).reset_index(drop=True)
+            # Paginação
+            page_size = st.selectbox(
+                "Items per page",
+                options=[6, 9, 12],
+                index=1,
+                key=f"att_page_size_{farol_reference}"
+            )
+            import math
+            total_items = len(dfv)
+            total_pages = max(1, math.ceil(total_items / page_size))
+            page_key = f"att_page_{farol_reference}"
+            current_page = st.session_state.get(page_key, 1)
+            if current_page < 1:
+                current_page = 1
+            if current_page > total_pages:
+                current_page = total_pages
 
-        # Paginação
-        page_size = st.selectbox(
-            "Items per page",
-            options=[6, 9, 12],
-            index=1,
-            key=f"att_page_size_{farol_reference}"
-        )
-        import math
-        total_items = len(dfv)
-        total_pages = max(1, math.ceil(total_items / page_size))
-        page_key = f"att_page_{farol_reference}"
-        current_page = st.session_state.get(page_key, 1)
-        if current_page < 1:
-            current_page = 1
-        if current_page > total_pages:
-            current_page = total_pages
+            nav_prev, nav_info, nav_next = st.columns([1, 2, 1])
+            with nav_prev:
+                if st.button("⬅️ Prev", disabled=current_page <= 1, key=f"att_prev_{farol_reference}"):
+                    st.session_state[page_key] = max(1, current_page - 1)
+                    st.rerun()
+            with nav_info:
+                st.caption(f"Page {current_page} of {total_pages} • {total_items} item(s)")
+            with nav_next:
+                if st.button("Next ➡️", disabled=current_page >= total_pages, key=f"att_next_{farol_reference}"):
+                    st.session_state[page_key] = min(total_pages, current_page + 1)
+                    st.rerun()
 
-        nav_prev, nav_info, nav_next = st.columns([1, 2, 1])
-        with nav_prev:
-            if st.button("⬅️ Prev", disabled=current_page <= 1, key=f"att_prev_{farol_reference}"):
-                st.session_state[page_key] = max(1, current_page - 1)
-                st.rerun()
-        with nav_info:
-            st.caption(f"Page {current_page} of {total_pages} • {total_items} item(s)")
-        with nav_next:
-            if st.button("Next ➡️", disabled=current_page >= total_pages, key=f"att_next_{farol_reference}"):
-                st.session_state[page_key] = min(total_pages, current_page + 1)
-                st.rerun()
+            start_idx = (current_page - 1) * page_size
+            end_idx = start_idx + page_size
+            page_df = dfv.iloc[start_idx:end_idx].reset_index(drop=True)
 
-        start_idx = (current_page - 1) * page_size
-        end_idx = start_idx + page_size
-        page_df = dfv.iloc[start_idx:end_idx].reset_index(drop=True)
+            # Tabela com paginação
+            h1, h2, h3, h4, h5, h6 = st.columns([5, 2, 2, 2, 1, 1])
+            h1.markdown("**File**")
+            h2.markdown("**Type/Ext**")
+            h3.markdown("**User**")
+            h4.markdown("**Date**")
+            h5.markdown("**Download**")
+            h6.markdown("**Delete**")
 
-        # Tabela com paginação
-        h1, h2, h3, h4, h5, h6 = st.columns([5, 2, 2, 2, 1, 1])
-        h1.markdown("**File**")
-        h2.markdown("**Type/Ext**")
-        h3.markdown("**User**")
-        h4.markdown("**Date**")
-        h5.markdown("**Download**")
-        h6.markdown("**Delete**")
+            for row_index, (_, att) in enumerate(page_df.iterrows()):
+                row_key = f"{farol_reference}_{att['id']}_{start_idx + row_index}"
+                confirm_key = f"confirm_del_flat_{row_key}"
+                c1, c2, c3, c4, c5, c6 = st.columns([5, 2, 2, 2, 1, 1])
+                with c1:
+                    st.write(att.get('full_file_name', att['file_name']))
+                with c2:
+                    ext = (att.get('file_extension') or '').lower()
+                    st.write(att.get('mime_type') or ext or 'N/A')
+                with c3:
+                    st.write(att.get('uploaded_by', ''))
+                with c4:
+                    st.write(att['upload_date'].strftime('%Y-%m-%d %H:%M') if pd.notna(att['upload_date']) else 'N/A')
+                with c5:
+                    fc, fn, mt = get_attachment_content(att['id'])
+                    st.download_button("⬇️", data=fc or b"", file_name=fn or "file", mime=mt or "application/octet-stream",
+                                       key=f"dl_flat_{row_key}", use_container_width=True, disabled=fc is None)
+                with c6:
+                    if not st.session_state.get(confirm_key, False):
+                        if st.button("🗑️", key=f"del_flat_{row_key}", use_container_width=True):
+                            st.session_state[confirm_key] = True
+                            st.rerun()
 
-        for row_index, (_, att) in enumerate(page_df.iterrows()):
-            row_key = f"{farol_reference}_{att['id']}_{start_idx + row_index}"
-            confirm_key = f"confirm_del_flat_{row_key}"
-            c1, c2, c3, c4, c5, c6 = st.columns([5, 2, 2, 2, 1, 1])
-            with c1:
-                st.write(att.get('full_file_name', att['file_name']))
-            with c2:
-                ext = (att.get('file_extension') or '').lower()
-                st.write(att.get('mime_type') or ext or 'N/A')
-            with c3:
-                st.write(att.get('uploaded_by', ''))
-            with c4:
-                st.write(att['upload_date'].strftime('%Y-%m-%d %H:%M') if pd.notna(att['upload_date']) else 'N/A')
-            with c5:
+                if st.session_state.get(confirm_key, False):
+                    wc1, wc2, wc3 = st.columns([6, 1, 1])
+                    with wc1:
+                        st.warning("⚠️ Are you sure you want to delete?")
+                    with wc2:
+                        if st.button("✅ Yes", key=f"yes_flat_{row_key}", use_container_width=True):
+                            if delete_attachment(att['id'], deleted_by=st.session_state.get('current_user', 'system')):
+                                st.success("✅ Attachment deleted successfully!")
+                            else:
+                                st.error("❌ Error deleting attachment!")
+                            st.session_state[confirm_key] = False
+                            st.rerun()
+                    with wc3:
+                        if st.button("❌ No", key=f"no_flat_{row_key}", use_container_width=True):
+                            st.session_state[confirm_key] = False
+                            st.rerun()
+
+            # Download em lote (zip) - todos
+            from io import BytesIO
+            import zipfile
+            fc_total = []
+            for _, att in dfv.iterrows():
                 fc, fn, mt = get_attachment_content(att['id'])
-                st.download_button("⬇️", data=fc or b"", file_name=fn or "file", mime=mt or "application/octet-stream",
-                                   key=f"dl_flat_{row_key}", use_container_width=True, disabled=fc is None)
-            with c6:
-                if not st.session_state.get(confirm_key, False):
-                    if st.button("🗑️", key=f"del_flat_{row_key}", use_container_width=True):
-                        st.session_state[confirm_key] = True
-                        st.rerun()
-
-            if st.session_state.get(confirm_key, False):
-                wc1, wc2, wc3 = st.columns([6, 1, 1])
-                with wc1:
-                    st.warning("⚠️ Are you sure you want to delete?")
-                with wc2:
-                    if st.button("✅ Yes", key=f"yes_flat_{row_key}", use_container_width=True):
-                        if delete_attachment(att['id'], deleted_by=st.session_state.get('current_user', 'system')):
-                            st.success("✅ Attachment deleted successfully!")
-                        else:
-                            st.error("❌ Error deleting attachment!")
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-                with wc3:
-                    if st.button("❌ No", key=f"no_flat_{row_key}", use_container_width=True):
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-
-        # Download em lote (zip) - todos
-        from io import BytesIO
-        import zipfile
-        fc_total = []
-        for _, att in dfv.iterrows():
-            fc, fn, mt = get_attachment_content(att['id'])
-            if fc and fn:
-                fc_total.append((fn, fc))
-        if fc_total:
-            buf = BytesIO()
-            with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-                for fn, fc in fc_total:
-                    zf.writestr(fn, fc)
-            st.download_button("⬇️ Download all as .zip", data=buf.getvalue(), file_name="attachments.zip",
-                               mime="application/zip", key=f"dl_zip_all_{farol_reference}")
-    else:
-        st.info("📂 No attachments found for this reference.")
-        st.markdown("💡 **Tip:** Use the 'Add New Attachment' section above to upload files related to this Farol Reference.")
+                if fc and fn:
+                    fc_total.append((fn, fc))
+            if fc_total:
+                buf = BytesIO()
+                with zipfile.ZipFile(buf, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+                    for fn, fc in fc_total:
+                        zf.writestr(fn, fc)
+                st.download_button("⬇️ Download all as .zip", data=buf.getvalue(), file_name="attachments.zip",
+                                   mime="application/zip", key=f"dl_zip_all_{farol_reference}")
+        else:
+            st.info("📂 No attachments found for this reference.")
+            st.markdown("💡 **Tip:** Use the 'Add New Attachment' section above to upload files related to this Farol Reference.")
     
     # Interface de validação agora está integrada na aba de processamento de PDF
 
@@ -1553,11 +1554,13 @@ def exibir_history():
             selected_row = edited_df_other[edited_df_other["Selecionar"] == True].iloc[0]
             status = selected_row.get("Status")
             if status == "📦 Cargill Booking Request":
-                st.warning("⚠️ **Atenção:** Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
+                st.info("ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "📄 Split Info":
-                st.warning("⚠️ **Atenção:** Esta linha representa informações de divisão (Split Info). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
+                st.info("ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "🛠️ Cargill (Adjusts)":
-                st.warning("⚠️ **Atenção:** Esta linha representa um ajuste da Cargill (Cargill Adjusts). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores.")
+                st.info("ℹ️ **Ajuste da Cargill:** Esta linha representa ajuste interno. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
+            elif status and "🚢 Carrier Return" in status:
+                st.info("ℹ️ **Retorno do Armador:** Esta linha já foi processada. Para aprovar novos retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
 
     # Conteúdo da "aba" Retornos do Armador
     df_received_processed = None
@@ -1970,7 +1973,8 @@ def exibir_history():
     
     
     # Interface de botões de status para linha selecionada
-    if len(selected) == 1:
+    # REGRA: Botões só aparecem na aba "Returns Awaiting Review" 
+    if len(selected) == 1 and active_tab == received_label:
         st.markdown("---")
 
         # Obtém informações da linha selecionada
@@ -2003,8 +2007,13 @@ def exibir_history():
                             key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
+                    # Mostrar barra de progresso horizontal
+                    progress_bar = st.progress(0, text="🔄 Processando aprovação...")
+                    
                     # Validação imediata da API (somente setar flag; não exibir formulário sem o flag)
                     if selected_row_status == "Received from Carrier":
+                        progress_bar.progress(25, text="🔍 Validando dados da API...")
+                        
                         # Buscar dados do navio, viagem e terminal
                         conn = get_database_connection()
                         vessel_data = conn.execute(text("""
@@ -2015,6 +2024,8 @@ def exibir_history():
                         conn.close()
                         
                         if vessel_data:
+                            progress_bar.progress(50, text="🚢 Consultando dados de monitoramento...")
+                            
                             vessel_name = vessel_data.get("b_vessel_name")
                             voyage_code = vessel_data.get("b_voyage_code") or ""
                             terminal = vessel_data.get("b_terminal") or ""
@@ -2023,6 +2034,8 @@ def exibir_history():
                                 # Validar dados de monitoramento da viagem IMEDIATAMENTE (sem salvar)
                                 from database import validate_and_collect_voyage_monitoring
                                 voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                                
+                                progress_bar.progress(75, text="✅ Finalizando processamento...")
                                 
                                 # Se requer entrada manual, definir no session_state e mostrar formulário
                                 if voyage_validation_result.get("requires_manual"):
@@ -2035,6 +2048,7 @@ def exibir_history():
                                         "error_type": voyage_validation_result.get("error_type", "unknown"),
                                         "pending_approval": True
                                     }
+                                    progress_bar.progress(100, text="✅ Processamento concluído!")
                                     st.rerun()
                                 elif voyage_validation_result.get("success"):
                                     # Armazenar dados da API em buffer para usar na confirmação
@@ -2069,11 +2083,14 @@ def exibir_history():
                                         f"🚢 {vessel_name} | {voyage_code} | {terminal}."
                                     )
                                     st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                    progress_bar.progress(100, text="✅ Processamento concluído!")
                                 else:
                                     st.error(voyage_validation_result.get("message", ""))
+                                    progress_bar.progress(100, text="❌ Erro no processamento!")
                                     st.rerun()
                     
                     # Se chegou até aqui, prosseguir com fluxo normal
+                    progress_bar.progress(100, text="✅ Processamento concluído!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
                     st.rerun()
             
@@ -2082,6 +2099,9 @@ def exibir_history():
                             key=f"status_booking_rejected_{farol_reference}",
                             type="secondary",
                             disabled=disable_rejected):
+                    progress_bar = st.progress(0, text="🔄 Processando rejeição...")
+                    progress_bar.progress(50, text="📝 Atualizando status...")
+                    progress_bar.progress(100, text="✅ Rejeição processada!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
                     st.rerun()
 
@@ -2090,6 +2110,9 @@ def exibir_history():
                             key=f"status_booking_cancelled_{farol_reference}",
                             type="secondary",
                             disabled=disable_cancelled):
+                    progress_bar = st.progress(0, text="🔄 Processando cancelamento...")
+                    progress_bar.progress(50, text="📝 Atualizando status...")
+                    progress_bar.progress(100, text="✅ Cancelamento processado!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
                     st.rerun()
             
@@ -2098,6 +2121,9 @@ def exibir_history():
                             key=f"status_adjustment_requested_{farol_reference}",
                             type="secondary",
                             disabled=disable_adjustment):
+                    progress_bar = st.progress(0, text="🔄 Processando solicitação de ajuste...")
+                    progress_bar.progress(50, text="📝 Atualizando status...")
+                    progress_bar.progress(100, text="✅ Solicitação processada!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
                     st.rerun()
         
@@ -2663,19 +2689,27 @@ def exibir_history():
                                 key="confirm_status_change",
                                 type="primary",
                                 disabled=not can_confirm):
+                        progress_bar = st.progress(0, text="🔄 Confirmando alteração de status...")
+                        
                         # Prepara os parâmetros de justificativa para New Adjustment
                         area_param = None
                         reason_param = None
                         responsibility_param = None
                         comment_param = None
                         
+                        progress_bar.progress(25, text="📋 Preparando dados...")
+                        
                         if related_reference == "New Adjustment":
                             reason_param = st.session_state.get("new_adjustment_reason")
                             responsibility_param = st.session_state.get("new_adjustment_responsibility")
                             comment_param = st.session_state.get("new_adjustment_comment")
                         
+                        progress_bar.progress(50, text="💾 Salvando alterações...")
+                        
                         # Executa a mudança de status
                         apply_status_change(farol_ref, adjustment_id, current_status_to_confirm, selected_row_status, related_reference, area_param, reason_param, responsibility_param, comment_param)
+                        
+                        progress_bar.progress(75, text="🧹 Limpando dados temporários...")
                         
                         # Limpa o status pendente e dados de New Adjustment
                         st.session_state.pop(f"pending_status_change_{farol_reference}", None)
@@ -2683,7 +2717,9 @@ def exibir_history():
                             st.session_state.pop("new_adjustment_reason", None)
                             st.session_state.pop("new_adjustment_responsibility", None)
                             st.session_state.pop("new_adjustment_comment", None)
-                    # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
+                        
+                        progress_bar.progress(100, text="✅ Alteração confirmada!")
+                        # Não precisamos de st.rerun() aqui, pois a função apply_status_change já faz isso
                 
                 with subcol2:
                     if st.button("❌ Cancelar", 
@@ -2701,7 +2737,12 @@ def exibir_history():
         # Mensagem somente para abas de tabela (não exibir na "Voyage Timeline")
         if active_tab != voyages_label:
             st.markdown("---")
-            st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis e use 'View Attachments' para adicionar novos arquivos, fazer download individual ou em .zip e excluir anexos do registro selecionado.")
+            if active_tab == received_label:
+                # Aba "Returns Awaiting Review" - onde botões de ação são permitidos
+                st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis (Booking Approved, Rejected, Cancelled) e use 'View Attachments' para adicionar novos arquivos.")
+            else:
+                # Aba "Request Timeline" - apenas visualização e orientação
+                st.markdown("💡 **Dica:** Esta aba é para visualização do histórico de pedidos. Para aprovar retornos de armadores, use a aba '📨 Returns Awaiting Review'. Use 'View Attachments' para gerenciar arquivos.")
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
