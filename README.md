@@ -232,6 +232,7 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 **📋 Request Timeline:**
 - ⚠️ **Cargill Booking Request**: "Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 - ⚠️ **Cargill (Adjusts)**: "Esta linha representa um ajuste da Cargill (Cargill Adjusts). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
+- ⚠️ **Adjustment Request**: "Esta linha representa uma solicitação de ajuste da empresa (Adjustment Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 - ⚠️ **Split Info**: "Esta linha representa informações de divisão (Split Info). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 
 **📨 Returns Awaiting Review:**

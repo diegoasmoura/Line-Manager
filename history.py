@@ -1569,6 +1569,8 @@ def exibir_history():
                 st.info("ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "🛠️ Cargill (Adjusts)":
                 st.info("ℹ️ **Ajuste da Cargill:** Esta linha representa ajuste interno. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
+            elif status == "🛠️ Adjustment Request":
+                st.info("ℹ️ **Solicitação de Ajuste:** Esta linha representa uma solicitação de ajuste da empresa. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status and "🚢 Carrier Return" in status:
                 st.info("ℹ️ **Retorno do Armador:** Esta linha já foi processada. Para aprovar novos retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
 
