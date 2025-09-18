@@ -1463,7 +1463,13 @@ def exibir_history():
                     )
                     if mask_sel.any():
                         first_idx_sel = df_processed.loc[mask_sel].sort_values("Inserted Date").index[0]
-                        df_processed.loc[first_idx_sel, "Status"] = "📦 Cargill Booking Request"
+                        # Verificar P_STATUS antes de sobrescrever
+                        if "Status" in df_processed.columns:
+                            current_p_status = df_processed.loc[first_idx_sel, "Status"] if "Status" in df_processed.columns else ""
+                            current_p_status_str = str(current_p_status).strip().lower()
+                            # Se não for um dos novos P_STATUS, manter comportamento legado
+                            if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
+                                df_processed.loc[first_idx_sel, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
 
@@ -1481,11 +1487,22 @@ def exibir_history():
                             linked_val = df_processed.loc[i, "Linked Reference"] if "Linked Reference" in df_processed.columns else None
                             is_empty = (linked_val is None) or (isinstance(linked_val, str) and linked_val.strip() == "") or (str(linked_val).upper() == "NULL") or (hasattr(_pd, 'isna') and _pd.isna(linked_val))
                             if is_empty:
+                                # Verificar P_STATUS antes de sobrescrever
+                                current_p_status = df_processed.loc[i, "Status"] if "Status" in df_processed.columns else ""
+                                current_p_status_str = str(current_p_status).strip().lower()
+                                # Se não for um dos novos P_STATUS, manter comportamento legado
+                                if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
+                                    # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
+                                    df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
+                    else:
+                        # Verificar P_STATUS antes de sobrescrever para cada linha
+                        for i in idx_first:
+                            current_p_status = df_processed.loc[i, "Status"] if "Status" in df_processed.columns else ""
+                            current_p_status_str = str(current_p_status).strip().lower()
+                            # Se não for um dos novos P_STATUS, manter comportamento legado
+                            if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
                                 # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
                                 df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
-                    else:
-                        # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                        df_processed.loc[idx_first, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
 
@@ -1496,7 +1513,12 @@ def exibir_history():
                 mask_same_ref = df_processed["Farol Reference"].astype(str) == sel_ref_str
                 if mask_same_ref.any():
                     first_idx_any = df_processed.loc[mask_same_ref].sort_values("Inserted Date").index[0]
-                    df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
+                    # Verificar P_STATUS antes de sobrescrever
+                    current_p_status = df_processed.loc[first_idx_any, "Status"] if "Status" in df_processed.columns else ""
+                    current_p_status_str = str(current_p_status).strip().lower()
+                    # Se não for um dos novos P_STATUS, manter comportamento legado
+                    if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
+                        df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
 
