@@ -1475,6 +1475,44 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "PDF Name": "P_PDF_NAME",
         }
         
+        # PRÉ-PREENCHIMENTO: Buscar datas do último registro aprovado para a mesma Farol Reference
+        prefill_dates = {}
+        if status_override == "Adjustment Requested" and "Farol Reference" in ui_data:
+            farol_ref = ui_data["Farol Reference"]
+            try:
+                # Buscar último registro aprovado da mesma Farol Reference
+                prefill_query = text("""
+                    SELECT 
+                        B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, B_DATA_ESTIMATIVA_SAIDA_ETD,
+                        B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_PARTIDA_ATD,
+                        B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
+                    FROM LogTransp.F_CON_RETURN_CARRIERS
+                    WHERE FAROL_REFERENCE = :farol_ref 
+                    AND B_BOOKING_STATUS = 'Booking Approved'
+                    ORDER BY ROW_INSERTED_DATE DESC
+                    FETCH FIRST 1 ROWS ONLY
+                """)
+                result = conn.execute(prefill_query, {"farol_ref": farol_ref}).mappings().fetchone()
+                if result:
+                    # Mapear campos para pré-preenchimento
+                    date_fields_mapping = {
+                        'B_DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE',
+                        'B_DATA_DEADLINE': 'B_DATA_DEADLINE', 
+                        'B_DATA_ESTIMATIVA_SAIDA_ETD': 'B_DATA_ESTIMATIVA_SAIDA_ETD',
+                        'B_DATA_ESTIMATIVA_CHEGADA_ETA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                        'B_DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE',
+                        'B_DATA_PARTIDA_ATD': 'B_DATA_PARTIDA_ATD',
+                        'B_DATA_CHEGADA_ATA': 'B_DATA_CHEGADA_ATA',
+                        'B_DATA_ESTIMATIVA_ATRACACAO_ETB': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                        'B_DATA_ATRACACAO_ATB': 'B_DATA_ATRACACAO_ATB'
+                    }
+                    for src_field, dest_field in date_fields_mapping.items():
+                        if src_field.lower() in result and result[src_field.lower()] is not None:
+                            prefill_dates[dest_field] = result[src_field.lower()]
+            except Exception as e:
+                # Se falhar, continua sem pré-preenchimento
+                pass
+
         # Converte dados da UI para formato da tabela
         db_data = {}
         for ui_key, db_key in field_mapping.items():
@@ -1521,6 +1559,11 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                             value = value[:200]
                     db_data[db_key] = value
         
+        # Aplicar pré-preenchimento de datas do último registro aprovado (apenas se não fornecidas)
+        for date_field, date_value in prefill_dates.items():
+            if date_field not in db_data or db_data[date_field] is None:
+                db_data[date_field] = date_value
+
         # Campos obrigatórios e padrões
         db_data["B_BOOKING_STATUS"] = status_override or "Adjustment Requested"
         db_data["USER_INSERT"] = user_insert
@@ -2012,7 +2055,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             raise Exception("Farol Reference not found in return carrier data.")
 
         # 5. Prepare and execute the UPDATE on F_CON_SALES_BOOKING_DATA
-        main_update_fields = {"farol_reference": farol_reference, "farol_status": "Booking Approved"}
+        main_update_fields = {"farol_reference": farol_reference, "FAROL_STATUS": "Booking Approved"}
         fields_to_propagate = [
             "S_SPLITTED_BOOKING_REFERENCE", "S_PLACE_OF_RECEIPT", "S_QUANTITY_OF_CONTAINERS",
             "S_PORT_OF_LOADING_POL", "S_PORT_OF_DELIVERY_POD", "S_FINAL_DESTINATION",

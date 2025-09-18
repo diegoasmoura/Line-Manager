@@ -1141,6 +1141,15 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.3 - Pré-preenchimento Automático de Datas em Ajustes (Setembro 2025)
+- **🔄 Pré-preenchimento Inteligente**: Novos ajustes agora herdam automaticamente as datas do último registro aprovado da mesma Farol Reference
+- **📅 Campos Preenchidos**: Sistema copia automaticamente 9 campos de data: Draft Deadline, Deadline, ETD, ETA, Abertura Gate, ATD, ATA, ETB, ATB
+- **⚡ Ativação Automática**: Funcionalidade ativa apenas para `status_override="Adjustment Requested"` criados via shipments_split.py
+- **🧹 Limpeza de Dados**: Datas antigas são removidas antes do processamento para permitir pré-preenchimento correto
+- **✅ Consistência Garantida**: Elimina diferenças de datas entre ajustes e registros aprovados anteriores
+- **🔧 Otimização do Fluxo**: Melhoria na função `insert_return_carrier_from_ui()` com consulta SQL otimizada ao último registro aprovado
+- **🎯 Preenchimento do Booking Confirmation Date**: Campo agora é automaticamente preenchido com a data de emissão do PDF após aprovação
+
 ### 📌 v3.9.2 - Remoção da Coleta Automática de ETD/ETA (Setembro 2025)
 - **🔄 Mudança de Responsabilidade**: Datas ETD e ETA não são mais coletadas automaticamente do processamento de PDFs
 - **📋 Formulário Simplificado**: Campos ETD e ETA removidos do formulário de validação de booking

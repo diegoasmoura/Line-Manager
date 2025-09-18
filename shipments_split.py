@@ -330,9 +330,23 @@ def show_split_form():
                                         # Para original (índice 0) e splits (1..num_splits), usa o que está no editor
                                         for i in range(0, 1 + (num_splits or 0)):
                                             ui_row = edited_display.iloc[i].to_dict()
+                                            
+                                            # Remover campos de data do ui_row para permitir pré-preenchimento
+                                            # do último registro aprovado (apenas para Adjustment Requested)
+                                            date_fields_to_remove = [
+                                                "Requested Deadline Start Date", "Requested Deadline End Date", 
+                                                "Required Arrival Date", "B Data Draft Deadline", "B Data Deadline",
+                                                "B Data Estimativa Saida ETD", "B Data Estimativa Chegada ETA",
+                                                "B Data Abertura Gate", "B Data Partida ATD", "B Data Chegada ATA",
+                                                "B Data Estimativa Atracacao ETB", "B Data Atracacao ATB"
+                                            ]
+                                            for date_field in date_fields_to_remove:
+                                                ui_row.pop(date_field, None)
+                                            
                                             insert_return_carrier_from_ui(
                                                 ui_row, 
                                                 user_insert=st.session_state.get('current_user', 'system'),
+                                                status_override="Adjustment Requested",  # Explicitamente definir para ativar pré-preenchimento
                                                 area=area,
                                                 request_reason=reason,
                                                 adjustments_owner=responsibility,
