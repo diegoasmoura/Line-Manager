@@ -3030,7 +3030,7 @@ def display_pdf_validation_interface(processed_data):
                 # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
                 "Requested Deadline Start Date": "",  # ETD removido
                 "Requested Deadline End Date": "",
-                "Required Arrival Date": "",  # ETA removido
+                "Required Arrival Date Expected": "",  # ETA removido
                 "PDF Booking Emission Date": pdf_print_date
             }
 

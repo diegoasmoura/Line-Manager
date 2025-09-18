@@ -1361,10 +1361,10 @@ def exibir_history():
         except Exception:
             pass
         
-        # Adiciona Required Arrival Date da tabela principal para cada linha
+        # Adiciona Required Arrival Date Expected da tabela principal para cada linha
         try:
             if "Farol Reference" in df_processed.columns:
-                # Buscar Required Arrival Date da tabela principal para cada Farol Reference
+                # Buscar Required Arrival Date Expected da tabela principal para cada Farol Reference
                 farol_refs = df_processed["Farol Reference"].dropna().unique()
                 required_arrival_dates = {}
                 

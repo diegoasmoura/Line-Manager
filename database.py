@@ -204,7 +204,7 @@ def get_data_salesData():
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas
             "Creation Of Shipment", "Requested Shipment Week", "Requested Deadline Start Date", "Requested Deadline End Date",
-            "Shipment Period Start Date", "Shipment Period End Date", "Required Arrival Date",
+            "Shipment Period Start Date", "Shipment Period End Date", "Required Arrival Date Expected",
             # Pedido e cliente
             "Sales Order Reference", "Sales Order Date", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
             # Condições
@@ -1514,7 +1514,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Port Terminal City": "B_TERMINAL",
             "Requested Deadline Start Date": "B_DATA_ESTIMATIVA_SAIDA_ETD",
             "Requested Deadline End Date": "B_DATA_DRAFT_DEADLINE",
-            "Required Arrival Date": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+            "Required Arrival Date Expected": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
             "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE",
             "PDF Name": "P_PDF_NAME",
         }

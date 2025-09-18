@@ -133,7 +133,7 @@ def show_booking_management_form():
         with col3:
             st.text_input("Requested Deadline End Date", value=format_date_only(booking_data.get("requested_cut_off_end_date", "")), disabled=True)
 
-        # Nova linha: Required Arrival Date, Shipment Period Start Date, Shipment Period End Date
+        # Nova linha: Required Arrival Date Expected, Shipment Period Start Date, Shipment Period End Date
         col_arr, col_start, col_end = st.columns(3)
         with col_arr:
             st.text_input("Required Arrival Date Expected", value=format_date_only(booking_data.get("required_arrival_date", "")), disabled=True)
