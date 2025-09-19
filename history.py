@@ -2636,22 +2636,27 @@ def exibir_history():
 
             ref_options.append("🆕 New Adjustment")
 
+            selected_ref_key = f"related_ref_{adjustment_id}"
             selected_ref = st.selectbox(
                 "Selecione uma referência...",
                 options=ref_options,
-                key=f"related_ref_{adjustment_id}"
+                key=selected_ref_key
             )
             
-            if selected_ref and selected_ref != "Selecione uma referência...":
-                if selected_ref == "🆕 New Adjustment":
+            # Lógica de confirmação lendo diretamente do session_state para maior robustez
+            selected_value = st.session_state.get(selected_ref_key)
+
+            if selected_value and selected_value != "Selecione uma referência...":
+                if selected_value == "🆕 New Adjustment":
                     st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
                 else:
-                    st.info(f"📋 **Referência selecionada:** {selected_ref}")
+                    st.info(f"📋 **Referência selecionada:** {selected_value}")
             
             st.markdown("---")
             st.warning("**Confirmar alteração para: Booking Approved**")
 
-            can_confirm = selected_ref and selected_ref != "Selecione uma referência..."
+            # A validação para habilitar o botão agora usa o valor lido diretamente do estado da sessão
+            can_confirm = selected_value and selected_value != "Selecione uma referência..."
             if not can_confirm:
                 st.error("❌ **Erro:** Você deve selecionar uma referência relacionada para continuar.")
             
