@@ -2653,8 +2653,6 @@ def exibir_history():
 
             # A validação para habilitar o botão agora usa o valor lido diretamente do estado da sessão
             can_confirm = selected_value and selected_value != "Selecione uma referência..."
-            if not can_confirm:
-                st.error("❌ **Erro:** Você deve selecionar uma referência relacionada para continuar.")
             
             # Botões de confirmação
             col_confirm, col_cancel = st.columns([1, 1])
