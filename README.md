@@ -666,23 +666,227 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - `check_company_exists` verifica CNPJ em terminais Ellox
 - Monitoramento: `POST /api/monitor/navio`, `POST /api/terminalmonitorings`, `POST /api/monitor/shipowner`, `POST /api/shipownermonitorings`
 
+## 🔌 Arquivos Ellox - Sistema de Integração
+
+### 📋 **Visão Geral dos Arquivos Ellox**
+
+O sistema Farol inclui um conjunto especializado de arquivos para integração com a API Ellox da Comexia, responsável pelo tracking marítimo e monitoramento de viagens:
+
+| Arquivo | Tipo | Função Principal | Dados |
+|---------|------|------------------|-------|
+| `ellox_api.py` | Cliente | Comunicação com API | API Externa |
+| `ellox_data_extractor.py` | Extrator | Popula banco | Tabelas F_ELLOX |
+| `ellox_data_queries.py` | Consultas | Analisa dados | Relatórios |
+| `setup_ellox_database.py` | Script | Configuração | Execução |
+
+### 🔄 **Fluxo de Trabalho dos Arquivos Ellox**
+
+```mermaid
+graph TD
+    A[setup_ellox_database.py] --> B[ellox_data_extractor.py]
+    B --> C[ellox_api.py]
+    C --> D[API Ellox Externa]
+    B --> E[Banco Oracle]
+    E --> F[ellox_data_queries.py]
+    F --> G[Interface Streamlit]
+```
+
+### 🎯 **Funcionalidades por Arquivo**
+
+#### 🔌 **`ellox_api.py` - Cliente da API Ellox**
+**Propósito**: Interface principal para comunicação com a API Ellox da Comexia
+
+**Principais Funções:**
+- **`__init__()`**: Configuração e autenticação
+- **`_authenticate()`**: Autenticação com email/senha ou API key
+- **`test_connection()`**: Testa conectividade com a API
+- **`search_voyage_tracking()`**: Busca informações de viagem
+- **`request_vessel_monitoring()`**: Solicita monitoramento de navios
+- **`view_vessel_monitoring()`**: Visualiza dados de monitoramento
+- **`get_vessel_schedule()`**: Obtém cronograma de navios
+- **`search_port_information()`**: Busca informações de portos
+- **`normalize_carrier_name()`**: Normaliza nomes de carriers
+- **`normalize_vessel_name()`**: Normaliza nomes de navios
+
+#### 📥 **`ellox_data_extractor.py` - Extrator de Dados**
+**Propósito**: Extrai dados da API e armazena no banco Oracle
+
+**Principais Funções:**
+- **`__init__()`**: Inicializa cliente da API
+- **`create_tables()`**: Cria tabelas F_ELLOX no banco
+- **`extract_terminals()`**: Extrai terminais da API
+- **`extract_ships()`**: Extrai navios por terminal
+- **`extract_voyages_sample()`**: Extrai amostra de viagens
+- **`extract_carriers()`**: Insere carriers suportados
+- **`run_full_extraction()`**: Executa extração completa
+- **`_identify_carrier_from_ship_name()`**: Identifica carrier por nome do navio
+
+#### 📊 **`ellox_data_queries.py` - Consultas e Relatórios**
+**Propósito**: Consulta e analisa dados extraídos armazenados no banco
+
+**Principais Funções:**
+- **`get_all_terminals()`**: Lista todos os terminais
+- **`get_ships_by_terminal()`**: Navios filtrados por terminal/carrier
+- **`get_voyages_by_ship()`**: Viagens filtradas por navio/carrier
+- **`get_carriers_summary()`**: Resumo estatístico de carriers
+- **`get_terminals_summary()`**: Resumo estatístico de terminais
+- **`search_ships()`**: Busca navios por termo
+- **`get_database_stats()`**: Estatísticas gerais do banco
+- **`display_ellox_data_interface()`**: Interface Streamlit para visualização
+
+#### ⚙️ **`setup_ellox_database.py` - Script de Configuração**
+**Propósito**: Script principal para configurar e popular o banco Ellox
+
+**Funcionalidades:**
+- **Configuração via linha de comando**
+- **Extração automática de dados**
+- **Controle de parâmetros** (voyages, amostras, etc.)
+- **Relatórios de progresso**
+- **Tratamento de erros**
+
+**Uso:**
+```bash
+# Extração padrão (sem voyages)
+python setup_ellox_database.py
+
+# Incluir voyages (pode demorar muito)
+python setup_ellox_database.py --include-voyages
+
+# Configurar amostra de navios
+python setup_ellox_database.py --ships-sample 100
+```
+
+### 🗃️ **Tabelas F_ELLOX Criadas**
+
+#### `F_ELLOX_TERMINALS`
+```sql
+- ID (PK)
+- NOME
+- CNPJ
+- CIDADE
+- ATIVO
+- DATA_CRIACAO
+- DATA_ATUALIZACAO
+```
+
+#### `F_ELLOX_SHIPS`
+```sql
+- ID (PK)
+- NOME
+- TERMINAL_CNPJ (FK)
+- CARRIER
+- IMO
+- MMSI
+- FLAG
+- ATIVO
+- DATA_CRIACAO
+- DATA_ATUALIZACAO
+```
+
+#### `F_ELLOX_VOYAGES`
+```sql
+- ID (PK)
+- SHIP_NAME
+- TERMINAL_CNPJ (FK)
+- VOYAGE_CODE
+- CARRIER
+- STATUS
+- ETD
+- ETA
+- POL
+- POD
+- ATIVO
+- DATA_CRIACAO
+- DATA_ATUALIZACAO
+```
+
+#### `F_ELLOX_CARRIERS`
+```sql
+- ID (PK)
+- NOME
+- CODIGO
+- NOME_COMPLETO
+```
+
+#### `F_ELLOX_TERMINAL_MONITORINGS`
+```sql
+- ID (PK)
+- NAVIO
+- VIAGEM
+- AGENCIA
+- DATA_DEADLINE
+- DATA_DRAFT_DEADLINE
+- DATA_ABERTURA_GATE
+- DATA_ABERTURA_GATE_REEFER
+- DATA_ESTIMATIVA_SAIDA
+- DATA_ESTIMATIVA_CHEGADA
+- DATA_ATUALIZACAO
+- TERMINAL
+- CNPJ_TERMINAL
+- DATA_CHEGADA
+- DATA_ESTIMATIVA_ATRACACAO
+- DATA_ATRACACAO
+- DATA_PARTIDA
+- ROW_INSERTED_DATE
+```
+
+### 🔧 **Correções Implementadas**
+
+#### **Ordem de Exclusão de Dados (Resolvido)**
+- **Problema**: `ORA-02292: integrity constraint violated - child record found`
+- **Causa**: Tentativa de excluir tabelas pai antes das filhas
+- **Solução**: Ordem correta implementada em `ellox_data_extractor.py`:
+  1. `F_ELLOX_SHIPS` (filha)
+  2. `F_ELLOX_VOYAGES` (filha)
+  3. `F_ELLOX_TERMINAL_MONITORINGS` (filha)
+  4. `F_ELLOX_TERMINALS` (pai)
+
+#### **Controle de Voyages (Implementado)**
+- **Padrão**: `--skip-voyages` (desabilitado por padrão)
+- **Opção**: `--include-voyages` para habilitar extração
+- **Motivo**: Voyages podem gerar milhares de registros e causar lentidão
+- **Uso**: `python setup_ellox_database.py --include-voyages`
+
+### 🚀 **Integração com Sistema Principal**
+
+Os dados extraídos pelos arquivos Ellox são utilizados em:
+
+1. **Tracking de Navios** (`tracking.py`)
+2. **Voyage Monitoring** (`voyage_monitoring.py`)
+3. **Processamento de PDFs** (`pdf_booking_processor.py`)
+4. **Histórico de Viagens** (`history.py`)
+
+### 📊 **Estatísticas de Dados**
+
+- **Terminais**: ~50 terminais ativos
+- **Navios**: ~500+ navios por terminal
+- **Voyages**: ~1000+ viagens (quando habilitado)
+- **Carriers**: 8 carriers principais suportados
+- **Monitoramentos**: Dados em tempo real da API
+
 ### 🧰 `ellox_data_queries.py`
 **Consultas e utilitários sobre as tabelas locais Ellox**
 - Funções de consulta para `F_ELLOX_TERMINALS`, `F_ELLOX_SHIPS`, `F_ELLOX_VOYAGES`, `F_ELLOX_TERMINAL_MONITORINGS`
 - `get_database_stats()`, `search_ships(term)`, listagens por terminal/navio/voyage
 - Fornece DataFrames prontos para UI e relatórios (usado também em interfaces auxiliares)
+- **Interface Streamlit**: `display_ellox_data_interface()` para visualização de dados
 
 ### 🧪 `ellox_data_extractor.py`
 **Extração e normalização de dados vindos da Ellox**
 - Rotinas de chamada a endpoints Ellox para carregar terminais, navios e voyages
 - Normalização de payloads e conversão para DataFrames padronizados
 - Funções de carga em lote (upsert) para popular as tabelas locais Ellox
+- **Criação de Tabelas**: `create_tables()` para criar todas as tabelas F_ELLOX
+- **Extração de Dados**: `extract_terminals()`, `extract_ships()`, `extract_voyages_sample()`, `extract_carriers()`
+- **Ordem de Exclusão Corrigida**: Exclusão de dados respeitando foreign keys (ships → voyages → terminals)
 
 ### 🛠️ `setup_ellox_database.py`
 **Bootstrapping do banco local Ellox**
 - Script de inicialização para criar/preencher as tabelas locais Ellox
 - Orquestra a extração via `ellox_data_extractor.py` e persiste no Oracle (upsert idempotente)
 - Pode ser reexecutado com segurança para atualizar cadastros (terminais/navios/voyages)
+- **Controle de Voyages**: `--skip-voyages` (padrão) e `--include-voyages` para controlar extração de voyages
+- **Argumentos de Linha de Comando**: Configuração flexível de amostras e tipos de extração
 
 ### 📝 `nomenclature_standardizer.py`
 **Padronização de Dados**
@@ -1431,6 +1635,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.9 - Sistema Ellox Otimizado (Janeiro 2025)
+- **🔧 Correção de Integridade**: Resolvido erro `ORA-02292` na exclusão de dados Ellox implementando ordem correta de exclusão (ships → voyages → terminals)
+- **⚙️ Controle de Voyages**: Implementado `--skip-voyages` como padrão para evitar extração de milhares de registros desnecessários
+- **📊 Documentação Completa**: Adicionada seção detalhada sobre arquivos Ellox no README com fluxo de trabalho e funcionalidades
+- **🎯 Scripts de Configuração**: Melhorado `setup_ellox_database.py` com argumentos de linha de comando flexíveis
+- **📈 Estatísticas de Dados**: Documentadas métricas de terminais, navios, voyages e carriers
+- **🔗 Integração Aprimorada**: Clarificada integração dos dados Ellox com sistema principal (tracking, voyage monitoring, PDFs, histórico)
+
 ### 📌 v3.9.8 - Pré-preenchimento Automático de Datas em PDFs (Janeiro 2025)
 - **🔄 Pré-preenchimento Inteligente**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo
 - **📅 Campos Preenchidos**: Sistema copia automaticamente os últimos valores de:
@@ -1796,16 +2008,18 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.5)
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.9)
 - **Módulos**: 15+ módulos especializados  
+- **Arquivos Ellox**: 4 arquivos especializados para integração API
 - **Carriers Suportados**: 8 carriers principais
 - **Integrações**: Oracle DB + API Ellox
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.5)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.5)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.5)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.9)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.9)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.9)
+- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.9)
 
 ### 🎯 Roadmap Técnico Detalhado
 
@@ -1824,16 +2038,18 @@ ento de Embarques - Versão 3.9*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.5)
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.9)
 - **Módulos**: 15+ módulos especializados  
+- **Arquivos Ellox**: 4 arquivos especializados para integração API
 - **Carriers Suportados**: 8 carriers principais
 - **Integrações**: Oracle DB + API Ellox
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.5)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.5)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.5)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.9)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.9)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.9)
+- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.9)
 
 ### 🎯 Roadmap Técnico Detalhado
 

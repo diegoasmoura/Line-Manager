@@ -147,7 +147,10 @@ class ElloxDataExtractor:
             # Inserir no banco
             conn = get_database_connection()
             try:
-                # Limpar dados existentes
+                # Limpar dados existentes (primeiro navios, depois terminais)
+                conn.execute(text("DELETE FROM F_ELLOX_SHIPS"))
+                conn.execute(text("DELETE FROM F_ELLOX_VOYAGES"))
+                conn.execute(text("DELETE FROM F_ELLOX_TERMINAL_MONITORINGS"))
                 conn.execute(text("DELETE FROM F_ELLOX_TERMINALS"))
                 
                 # Inserir novos dados
@@ -178,8 +181,7 @@ class ElloxDataExtractor:
         
         conn = get_database_connection()
         try:
-            # Limpar dados existentes
-            conn.execute(text("DELETE FROM F_ELLOX_SHIPS"))
+            # Dados já foram limpos no extract_terminals()
             
             for i, terminal in enumerate(terminals_data, 1):
                 cnpj = terminal['cnpj']
@@ -253,8 +255,7 @@ class ElloxDataExtractor:
             
             ships = result.fetchall()
             
-            # Limpar dados existentes
-            conn.execute(text("DELETE FROM F_ELLOX_VOYAGES"))
+            # Dados já foram limpos no extract_terminals()
             
             all_voyages = []
             

@@ -15,12 +15,18 @@ def main():
     parser = argparse.ArgumentParser(description='Configurar e popular banco de dados Ellox')
     parser.add_argument('--ships-sample', type=int, default=100, 
                        help='Número de navios para amostra de voyages (padrão: 100)')
-    parser.add_argument('--skip-voyages', action='store_true',
-                       help='Pular extração de voyages (apenas terminais, navios e carriers)')
+    parser.add_argument('--skip-voyages', action='store_true', default=True,
+                       help='Pular extração de voyages (apenas terminais, navios e carriers) - PADRÃO: True')
+    parser.add_argument('--include-voyages', action='store_true',
+                       help='Incluir extração de voyages (desabilita --skip-voyages)')
     parser.add_argument('--force', action='store_true',
                        help='Forçar recriação das tabelas')
     
     args = parser.parse_args()
+    
+    # Ajustar lógica de voyages
+    if args.include_voyages:
+        args.skip_voyages = False
     
     print("🚀 CONFIGURAÇÃO DO BANCO DE DADOS ELLOX")
     print("=" * 50)
@@ -62,13 +68,16 @@ def main():
         print(f"✅ {len(ships)} navios inseridos")
         
         # Extrair voyages (se não foi pulado)
+        # NOTA: Voyages são desabilitados por padrão pois geram muitos dados
+        # Para habilitar, use: python setup_ellox_database.py --include-voyages
         voyages = []
         if not args.skip_voyages:
             print(f"⛵ Extraindo amostra de {args.ships_sample} voyages...")
+            print("⚠️  ATENÇÃO: Esta operação pode demorar muito e gerar milhares de registros!")
             voyages = extractor.extract_voyages_sample(args.ships_sample)
             print(f"✅ {len(voyages)} voyages inseridos")
         else:
-            print("⏭️ Extração de voyages pulada")
+            print("⏭️ Extração de voyages pulada (padrão - use --include-voyages para habilitar)")
         
         # Resumo final
         end_time = datetime.now()
