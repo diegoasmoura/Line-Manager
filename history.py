@@ -2517,9 +2517,11 @@ def exibir_history():
                     # Cancelar entrada manual e limpar estado
                     st.info("❌ Entrada manual cancelada.")
                     
-                    # Limpar o flag de entrada manual
+                    # Limpar o flag de entrada manual e o status pendente
                     if "voyage_manual_entry_required" in st.session_state:
                         del st.session_state["voyage_manual_entry_required"]
+                    if f"pending_status_change_{farol_reference}" in st.session_state:
+                        del st.session_state[f"pending_status_change_{farol_reference}"]
                     
                     # Limpar cache e recarregar
                     st.cache_data.clear()
