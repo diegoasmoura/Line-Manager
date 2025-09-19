@@ -1599,8 +1599,11 @@ def exibir_history():
         if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() == 1:
             selected_row = edited_df_other[edited_df_other["Selecionar"] == True].iloc[0]
             status = selected_row.get("Status")
+            
             if status == "📦 Cargill Booking Request":
                 st.info("ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
+            elif status == "📋 Booking Request":
+                st.info("ℹ️ **Booking Request:** Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "📄 Split Info":
                 st.info("ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "🛠️ Cargill (Adjusts)":

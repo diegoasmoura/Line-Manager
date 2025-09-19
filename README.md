@@ -268,6 +268,108 @@ test_ui_data = {
 
 **⚠️ IMPORTANTE**: Qualquer modificação futura no `shipments_split.py` deve considerar este mapeamento especial para evitar regressão.
 
+#### 🔄 **Pré-preenchimento Automático de Datas em PDFs (v3.9.8)**
+
+**Funcionalidade Implementada**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo, baseado nos últimos valores da mesma Farol Reference.
+
+**Campos Pré-preenchidos**:
+- `Required Arrival Date Expected` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
+- `Requested Deadline Start Date` (S_REQUESTED_DEADLINE_START_DATE)  
+- `Requested Deadline End Date` (S_REQUESTED_DEADLINE_END_DATE)
+
+**Implementação Técnica**:
+
+```python
+# 1. Função de busca dos últimos valores
+def get_last_date_values_from_carriers(farol_reference: str) -> dict:
+    """
+    Busca os últimos valores dos campos de data da tabela F_CON_RETURN_CARRIERS
+    para uma Farol Reference específica, independentemente do status.
+    """
+    query = text("""
+        SELECT 
+            S_REQUESTED_DEADLINE_START_DATE,
+            S_REQUESTED_DEADLINE_END_DATE,
+            S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+            ROW_INSERTED_DATE,
+            B_BOOKING_STATUS,
+            ADJUSTMENT_ID
+        FROM LogTransp.F_CON_RETURN_CARRIERS
+        WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
+        AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+             OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+             OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+        ORDER BY ROW_INSERTED_DATE DESC
+        FETCH FIRST 1 ROWS ONLY
+    """)
+```
+
+```python
+# 2. Aplicação do pré-preenchimento na validação do PDF
+def insert_return_carrier_from_ui(ui_data, ...):
+    """
+    Insere dados na tabela F_CON_RETURN_CARRIERS com pré-preenchimento automático.
+    """
+    # PRÉ-PREENCHIMENTO: Buscar datas do último registro para a mesma Farol Reference
+    prefill_dates = {}
+    if status_override in ["Adjustment Requested", "Received from Carrier"] and "Farol Reference" in ui_data:
+        farol_ref = ui_data["Farol Reference"]
+        try:
+            # Buscar último registro da mesma Farol Reference (independentemente do status)
+            prefill_query = text("""
+                SELECT 
+                    S_REQUESTED_DEADLINE_START_DATE, 
+                    S_REQUESTED_DEADLINE_END_DATE, 
+                    S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                    B_BOOKING_STATUS, ROW_INSERTED_DATE
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE FAROL_REFERENCE = :farol_ref 
+                AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                     OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                     OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+                ORDER BY ROW_INSERTED_DATE DESC
+                FETCH FIRST 1 ROWS ONLY
+            """)
+            result = conn.execute(prefill_query, {"farol_ref": farol_ref}).mappings().fetchone()
+            if result:
+                # Mapear campos para pré-preenchimento
+                prefill_dates = {
+                    'S_REQUESTED_DEADLINE_START_DATE': result.get('S_REQUESTED_DEADLINE_START_DATE'),
+                    'S_REQUESTED_DEADLINE_END_DATE': result.get('S_REQUESTED_DEADLINE_END_DATE'),
+                    'S_REQUIRED_ARRIVAL_DATE_EXPECTED': result.get('S_REQUIRED_ARRIVAL_DATE_EXPECTED')
+                }
+        except Exception as e:
+            # Se falhar, continua sem pré-preenchimento
+            pass
+```
+
+**Regras de Funcionamento**:
+- ✅ **Ativação**: Funciona para PDFs processados com status "Received from Carrier" ou "Adjustment Requested"
+- ✅ **Busca Inteligente**: Busca o último registro da mesma Farol Reference independentemente do status
+- ✅ **Critério de Seleção**: Registro deve ter pelo menos um campo de data preenchido (não NULL)
+- ✅ **Ordenação**: Ordena por `ROW_INSERTED_DATE DESC` para pegar o mais recente
+- ✅ **Fallback Seguro**: Se não encontrar dados anteriores, continua sem pré-preenchimento
+- ✅ **Aplicação Condicional**: Só preenche campos que estão vazios ou nulos
+
+**Vantagens**:
+- 🚀 **Eficiência**: Elimina preenchimento manual repetitivo
+- 📊 **Consistência**: Mantém dados consistentes entre registros da mesma Farol Reference
+- ⚡ **Automação**: Funciona automaticamente durante validação do PDF
+- 🎯 **Inteligente**: Só preenche quando há dados válidos disponíveis
+- 🔄 **Flexível**: Funciona independentemente do status do registro anterior
+
+**Arquivos Modificados**:
+- ✅ `database.py` - Função `get_last_date_values_from_carriers()` e lógica de pré-preenchimento
+- ✅ `history.py` - Correção de mensagem para linhas "📋 Booking Request"
+- ✅ `README.md` - Documentação completa da funcionalidade
+
+**Regras de Interface - Mensagens Contextuais**:
+- ✅ **📋 Booking Request**: "ℹ️ **Booking Request:** Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
+- ✅ **📦 Cargill Booking Request**: "ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
+- ✅ **📄 Split Info**: "ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
+- ✅ **🛠️ Cargill (Adjusts)**: "ℹ️ **Ajuste da Cargill:** Esta linha representa ajuste interno. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
+- ✅ **🛠️ Adjustment Request**: "ℹ️ **Solicitação de Ajuste:** Esta linha representa uma solicitação de ajuste da empresa. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
+
 #### 🔧 **Padronização de Colunas de Data (CRÍTICO - v3.9.7)**
 
 **Problema Identificado**: Inconsistência entre colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` causando falhas em múltiplas telas do sistema.
@@ -357,6 +459,7 @@ values["s_required_arrival_date_expected"] = st.date_input(...)
 **Alertas Contextuais por Aba:**
 
 **📋 Request Timeline:**
+- ⚠️ **Booking Request**: "Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 - ⚠️ **Cargill Booking Request**: "Esta linha representa o pedido original da Cargill (Cargill Booking Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 - ⚠️ **Cargill (Adjusts)**: "Esta linha representa um ajuste da Cargill (Cargill Adjusts). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
 - ⚠️ **Adjustment Request**: "Esta linha representa uma solicitação de ajuste da empresa (Adjustment Request). Use a aba 'Returns Awaiting Review' para aprovar retornos de armadores."
@@ -1308,6 +1411,23 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9.8 - Pré-preenchimento Automático de Datas em PDFs (Janeiro 2025)
+- **🔄 Pré-preenchimento Inteligente**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo
+- **📅 Campos Preenchidos**: Sistema copia automaticamente os últimos valores de:
+  - `Required Arrival Date Expected` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
+  - `Requested Deadline Start Date` (S_REQUESTED_DEADLINE_START_DATE)  
+  - `Requested Deadline End Date` (S_REQUESTED_DEADLINE_END_DATE)
+- **⚡ Ativação Automática**: Funcionalidade ativa para PDFs processados com status "Received from Carrier" ou "Adjustment Requested"
+- **🎯 Busca Inteligente**: Sistema busca o último registro da mesma Farol Reference independentemente do status, desde que tenha pelo menos um campo de data preenchido
+- **✅ Consistência Garantida**: Elimina diferenças de datas entre PDFs processados e registros anteriores
+- **🔧 Implementação Técnica**: 
+  - Função `get_last_date_values_from_carriers()` busca valores anteriores
+  - Função `insert_return_carrier_from_ui()` aplica pré-preenchimento durante validação
+  - Query SQL otimizada para buscar último registro com dados válidos
+- **🎯 Correção de Interface**: Adicionada mensagem informativa para linhas "📋 Booking Request" na aba Request Timeline
+- **📋 Mensagens Contextuais**: Implementadas mensagens específicas para cada tipo de linha na aba Request Timeline
+- **⚠️ Impacto**: Melhoria significativa na experiência do usuário ao processar PDFs, eliminando necessidade de preenchimento manual repetitivo
 
 ### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
 - **🔧 Padronização Completa**: Unificação das colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todo o sistema
