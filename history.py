@@ -2057,91 +2057,61 @@ def exibir_history():
                             key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
-                    # Mostrar barra de progresso horizontal
-                    progress_bar = st.progress(0, text="🔄 Processando aprovação...")
-                    
-                    # Validação imediata da API (somente setar flag; não exibir formulário sem o flag)
-                    if selected_row_status == "Received from Carrier":
-                        progress_bar.progress(25, text="🔍 Validando dados da API...")
-                        
-                        # Buscar dados do navio, viagem e terminal
-                        conn = get_database_connection()
-                        vessel_data = conn.execute(text("""
-                            SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
-                            FROM LogTransp.F_CON_RETURN_CARRIERS 
-                            WHERE ADJUSTMENT_ID = :adj_id
-                        """), {"adj_id": adjustment_id}).mappings().fetchone()
-                        conn.close()
-                        
-                        if vessel_data:
-                            progress_bar.progress(50, text="🚢 Consultando dados de monitoramento...")
-                            
-                            vessel_name = vessel_data.get("b_vessel_name")
-                            voyage_code = vessel_data.get("b_voyage_code") or ""
-                            terminal = vessel_data.get("b_terminal") or ""
-                            
-                            if vessel_name and terminal:
-                                # Validar dados de monitoramento da viagem IMEDIATAMENTE (sem salvar)
-                                from database import validate_and_collect_voyage_monitoring
-                                voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
-                                
-                                progress_bar.progress(75, text="✅ Finalizando processamento...")
-                                
-                                # Se requer entrada manual, definir no session_state e mostrar formulário
-                                if voyage_validation_result.get("requires_manual"):
-                                    st.session_state["voyage_manual_entry_required"] = {
-                                        "adjustment_id": adjustment_id,
-                                        "vessel_name": vessel_name,
-                                        "voyage_code": voyage_code,
-                                        "terminal": terminal,
-                                        "message": voyage_validation_result.get("message", ""),
-                                        "error_type": voyage_validation_result.get("error_type", "unknown"),
-                                        "pending_approval": True
-                                    }
-                                    progress_bar.progress(100, text="✅ Processamento concluído!")
-                                    st.rerun()
-                                elif voyage_validation_result.get("success"):
-                                    # Armazenar dados da API em buffer para usar na confirmação
-                                    api_buf = {
-                                        "NAVIO": vessel_name,
-                                        "VIAGEM": voyage_code,
-                                        "TERMINAL": terminal,
-                                        "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
-                                        "AGENCIA": voyage_validation_result.get("agencia", ""),
-                                        # Campos obrigatórios que podem estar faltando
-                                        "DATA_DRAFT_DEADLINE": None,
-                                        "DATA_CHEGADA": None,
-                                        "DATA_ESTIMATIVA_ATRACACAO": None,
-                                        "DATA_ATRACACAO": None,
-                                        "DATA_PARTIDA": None,
-                                    }
-                                    # Inclui datas da API
-                                    for k, v in (voyage_validation_result.get("data") or {}).items():
-                                        api_buf[k] = v
-                                    st.session_state[f"voyage_api_buffer_{adjustment_id}"] = api_buf
-                                    
-                                    # Alerta estruturado (via flash) quando a API retorna dados/encontra a combinação
-                                    api_fields = voyage_validation_result.get("data") or {}
-                                    try:
-                                        fields_count = len(api_fields)
-                                    except Exception:
-                                        fields_count = 0
-                                    campos_txt = f" Campos atualizados: {fields_count}." if fields_count > 0 else ""
-                                    msg = (
-                                        f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                        f"Foram encontrados dados de monitoramento na API\n"
-                                        f"🚢 {vessel_name} | {voyage_code} | {terminal}."
-                                    )
-                                    st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
-                                    progress_bar.progress(100, text="✅ Processamento concluído!")
-                                else:
-                                    st.error(voyage_validation_result.get("message", ""))
-                                    progress_bar.progress(100, text="❌ Erro no processamento!")
-                                    st.rerun()
-                    
-                    # Se chegou até aqui, prosseguir com fluxo normal
-                    progress_bar.progress(100, text="✅ Processamento concluído!")
+                    # Define o status pendente para 'Booking Approved' para acionar a próxima etapa do fluxo
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
+                    
+                    # Validação da API de Voyage Monitoring
+                    if selected_row_status == "Received from Carrier":
+                        with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
+                            # Buscar dados do navio, viagem e terminal
+                            conn = get_database_connection()
+                            vessel_data = conn.execute(text("""
+                                SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
+                                FROM LogTransp.F_CON_RETURN_CARRIERS 
+                                WHERE ADJUSTMENT_ID = :adj_id
+                            """), {"adj_id": adjustment_id}).mappings().fetchone()
+                            conn.close()
+                            
+                            if vessel_data:
+                                vessel_name = vessel_data.get("b_vessel_name")
+                                voyage_code = vessel_data.get("b_voyage_code") or ""
+                                terminal = vessel_data.get("b_terminal") or ""
+                                
+                                if vessel_name and terminal:
+                                    from database import validate_and_collect_voyage_monitoring
+                                    voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                                    
+                                    if voyage_validation_result.get("requires_manual"):
+                                        st.session_state["voyage_manual_entry_required"] = {
+                                            "adjustment_id": adjustment_id,
+                                            "vessel_name": vessel_name,
+                                            "voyage_code": voyage_code,
+                                            "terminal": terminal,
+                                            "message": voyage_validation_result.get("message", ""),
+                                            "error_type": voyage_validation_result.get("error_type", "unknown"),
+                                            "pending_approval": True
+                                        }
+                                    elif voyage_validation_result.get("success"):
+                                        api_buf = {
+                                            "NAVIO": vessel_name, "VIAGEM": voyage_code, "TERMINAL": terminal,
+                                            "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
+                                            "AGENCIA": voyage_validation_result.get("agencia", ""),
+                                            "DATA_DRAFT_DEADLINE": None, "DATA_CHEGADA": None,
+                                            "DATA_ESTIMATIVA_ATRACACAO": None, "DATA_ATRACACAO": None, "DATA_PARTIDA": None,
+                                        }
+                                        api_buf.update(voyage_validation_result.get("data") or {})
+                                        st.session_state[f"voyage_api_buffer_{adjustment_id}"] = api_buf
+                                        
+                                        msg = (
+                                            f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
+                                            f"Foram encontrados dados de monitoramento na API\n"
+                                            f"🚢 {vessel_name} | {voyage_code} | {terminal}."
+                                        )
+                                        st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                    else:
+                                        st.error(voyage_validation_result.get("message", ""))
+                    
+                    # Reroda a aplicação para exibir a seção de referência relacionada e confirmação
                     st.rerun()
             
             with subcol2:
@@ -2349,117 +2319,42 @@ def exibir_history():
                     with col_ata_time:
                         manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
-                # Seção de Referência Relacionada (apenas para voyage_not_found) - NO FINAL DO FORMULÁRIO
-                if error_type == "voyage_not_found":
-                    st.markdown("---")
-                    st.markdown("#### 🔗 Referência Relacionada")
-                    st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
-                    
-                    # Buscar referências disponíveis
-                    try:
-                        available_refs = get_available_references_for_relation(farol_ref)
-                    except Exception:
-                        available_refs = []
-
-                    ref_options = ["Selecione uma referência..."]
-                    if available_refs:
-                        def _is_empty_local(value):
-                            try:
-                                if value is None:
-                                    return True
-                                if isinstance(value, str):
-                                    v = value.strip()
-                                    return v == '' or v.upper() == 'NULL'
-                                import pandas as _pd
-                                return _pd.isna(value)
-                            except Exception:
-                                return False
-
-                        filtered = []
-                        for ref in available_refs:
-                            p_status = str(ref.get('P_STATUS', '') or '').strip()
-                            b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                            linked = ref.get('LINKED_REFERENCE')
-                            if (b_status == 'Booking Requested' and _is_empty_local(linked)) or (b_status == 'Adjustment Requested' and _is_empty_local(linked)):
-                                filtered.append(ref)
-
-                        def sort_by_date(ref):
-                            try:
-                                date_val = ref.get('ROW_INSERTED_DATE')
-                                dt = pd.to_datetime(date_val, errors='coerce')
-                                if pd.isna(dt):
-                                    return (pd.Timestamp('1900-01-01').date(), 0)
-                                return (dt.date(), -int(getattr(dt, 'value', 0)))
-                            except Exception:
-                                return (pd.Timestamp('1900-01-01').date(), 0)
-
-                        filtered = sorted(filtered, key=sort_by_date)
-
-                        for ref in filtered:
-                            inserted_date = ref.get('ROW_INSERTED_DATE', '')
-                            if inserted_date and hasattr(inserted_date, 'strftime'):
-                                date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
-                            else:
-                                date_str_raw = str(inserted_date) if inserted_date else ''
-                                if len(date_str_raw) >= 16:
-                                    try:
-                                        parts = date_str_raw[:16].replace(' ', 'T').split('T')
-                                        if len(parts) == 2:
-                                            date_part = parts[0].split('-')
-                                            time_part = parts[1][:5]
-                                            if len(date_part) == 3:
-                                                date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
-                                            else:
-                                                date_str = date_str_raw[:16]
-                                        else:
-                                            date_str = date_str_raw[:16]
-                                    except:
-                                        date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
-                                else:
-                                    date_str = 'N/A'
-
-                            p_status = str(ref.get('P_STATUS', '') or '').strip()
-                            b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                            linked = ref.get('LINKED_REFERENCE')
-
-                            if p_status.lower() == 'adjusts cargill':
-                                status_display = 'Cargill (Adjusts)'
-                            elif b_status == 'Booking Requested' and _is_empty_local(linked):
-                                status_display = 'Cargill Booking Request'
-                            else:
-                                status_display = b_status or p_status or 'Status'
-
-                            option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
-                            ref_options.append(option_text)
-
-                    ref_options.append("🆕 New Adjustment")
-
-                    selected_ref = st.selectbox(
-                        "Selecione uma referência...",
-                        options=ref_options,
-                        key=f"manual_voyage_ref_{adjustment_id}"
-                    )
-                    
-                    if selected_ref and selected_ref != "Selecione uma referência...":
-                        if selected_ref == "🆕 New Adjustment":
-                            st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
-                        else:
-                            st.info(f"📋 **Referência selecionada:** {selected_ref}")
-                    
-                    st.markdown("---")
-                    st.warning("**Confirmar alteração para: Booking Approved**")
+                # A seção de referência relacionada será exibida fora deste formulário.
 
                 # Botões do formulário
+                
+                # Validação para desabilitar botão de confirmação se necessário
+                can_confirm = True
+                if error_type == "voyage_not_found":
+                    selected_ref = st.session_state.get(f"manual_voyage_ref_{adjustment_id}")
+                    # Validação simplificada: verifica se há uma referência válida selecionada
+                    can_confirm = (
+                        selected_ref is not None and 
+                        selected_ref.strip() != "" and 
+                        selected_ref != "Selecione uma referência..."
+                    )
                 
                 col_confirm, col_cancel = st.columns([1, 1])
                 
                 with col_confirm:
-                    confirm_manual_clicked = st.form_submit_button("✅ Confirmar", type="primary")
+                    confirm_manual_clicked = st.form_submit_button("✅ Confirmar", type="primary", disabled=not can_confirm)
                 
                 with col_cancel:
                     cancel_manual_clicked = st.form_submit_button("❌ Cancelar")
                 
                 if confirm_manual_clicked:
+                    # Validação: verificar se uma referência foi selecionada (apenas para voyage_not_found)
+                    if error_type == "voyage_not_found":
+                        selected_ref = st.session_state.get(f"manual_voyage_ref_{adjustment_id}")
+                        # Validação simplificada: verifica se há uma referência válida selecionada
+                        if (
+                            not selected_ref or 
+                            selected_ref.strip() == "" or 
+                            selected_ref == "Selecione uma referência..."
+                        ):
+                            st.error("❌ **Erro:** Você deve selecionar uma referência relacionada antes de confirmar.")
+                            st.stop()
+                    
                     # Preparar dados para inserção
                     from datetime import datetime
                     
@@ -2601,20 +2496,165 @@ def exibir_history():
             st.success(voyage_success_notice.get("message", ""))
 
         # --- Seleção de Referência (SEMPRE após as mensagens, antes da confirmação) ---
-        # Aparece para "Received from Carrier" quando há status pendente OU quando há formulário manual
         related_reference = None  # Inicializa a variável
         pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
         voyage_manual_required = st.session_state.get("voyage_manual_entry_required")
         
-        # Mostra seleção de referência se:
-        # 1. Há pending_status (aprovação normal) OU
-        # 2. Há voyage_manual_required para este adjustment_id (formulário manual ativo)
+        # A seção de referência relacionada aparece se um 'Booking Approved' está pendente
         show_reference_selection = (
             selected_row_status == "Received from Carrier" and 
-            (pending_status or (voyage_manual_required and voyage_manual_required.get("adjustment_id") == adjustment_id))
+            pending_status == "Booking Approved"
         )
         
+        # Renderizar seção de seleção de referência se necessário
+        if show_reference_selection:
+
+            def _is_empty_local(value):
+                try:
+                    if value is None: return True
+                    if isinstance(value, str):
+                        v = value.strip()
+                        return v == '' or v.upper() == 'NULL'
+                    import pandas as _pd
+                    return _pd.isna(value)
+                except Exception:
+                    return False
+
+            st.markdown("---")
+            st.markdown("#### 🔗 Referência Relacionada")
+            st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
             
+            # Buscar referências disponíveis
+            try:
+                available_refs = get_available_references_for_relation(farol_ref)
+            except Exception:
+                available_refs = []
+
+            ref_options = ["Selecione uma referência..."]
+            if available_refs:
+                filtered = []
+                for ref in available_refs:
+                    p_status = str(ref.get('P_STATUS', '') or '').strip()
+                    b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                    linked = ref.get('LINKED_REFERENCE')
+                    if (b_status == 'Booking Requested' and _is_empty_local(linked)) or (b_status == 'Adjustment Requested' and _is_empty_local(linked)):
+                        filtered.append(ref)
+
+                def sort_by_date(ref):
+                    try:
+                        date_val = ref.get('ROW_INSERTED_DATE')
+                        dt = pd.to_datetime(date_val, errors='coerce')
+                        if pd.isna(dt):
+                            return (pd.Timestamp('1900-01-01').date(), 0)
+                        return (dt.date(), -int(getattr(dt, 'value', 0)))
+                    except Exception:
+                        return (pd.Timestamp('1900-01-01').date(), 0)
+
+                filtered = sorted(filtered, key=sort_by_date)
+
+                for ref in filtered:
+                    inserted_date = ref.get('ROW_INSERTED_DATE')
+                    if inserted_date and hasattr(inserted_date, 'strftime'):
+                        date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                    else:
+                        date_str_raw = str(inserted_date) if inserted_date else ''
+                        if len(date_str_raw) >= 16:
+                            try:
+                                parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                if len(parts) == 2:
+                                    date_part = parts[0].split('-')
+                                    time_part = parts[1][:5]
+                                    if len(date_part) == 3:
+                                        date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                    else:
+                                        date_str = date_str_raw[:16]
+                                else:
+                                    date_str = date_str_raw[:16]
+                            except:
+                                date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                        else:
+                            date_str = 'N/A'
+
+                    p_status = str(ref.get('P_STATUS', '') or '').strip()
+                    b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                    linked = ref.get('LINKED_REFERENCE')
+
+                    if p_status.lower() == 'adjusts cargill':
+                        status_display = 'Cargill (Adjusts)'
+                    elif b_status == 'Booking Requested' and _is_empty_local(linked):
+                        status_display = 'Cargill Booking Request'
+                    else:
+                        status_display = b_status or p_status or 'Status'
+
+                    option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
+                    ref_options.append(option_text)
+
+            ref_options.append("🆕 New Adjustment")
+
+            selected_ref = st.selectbox(
+                "Selecione uma referência...",
+                options=ref_options,
+                key=f"related_ref_{adjustment_id}"
+            )
+            
+            if selected_ref and selected_ref != "Selecione uma referência...":
+                if selected_ref == "🆕 New Adjustment":
+                    st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                else:
+                    st.info(f"📋 **Referência selecionada:** {selected_ref}")
+            
+            st.markdown("---")
+            st.warning("**Confirmar alteração para: Booking Approved**")
+
+            can_confirm = selected_ref and selected_ref != "Selecione uma referência..."
+            if not can_confirm:
+                st.error("❌ **Erro:** Você deve selecionar uma referência relacionada para continuar.")
+            
+            # Botões de confirmação
+            col_confirm, col_cancel = st.columns([1, 1])
+            
+            with col_confirm:
+                if st.button("✅ Confirmar Aprovação", key=f"confirm_approval_{adjustment_id}", type="primary", disabled=not can_confirm):
+                    # Preparar dados da justificativa
+                    justification = {
+                        "area": "Booking",
+                        "request_reason": "Carrier Return Approval",
+                        "adjustments_owner": "System",
+                        "comments": "Aprovação de retorno do carrier"
+                    }
+                    
+                    # Usar referência selecionada
+                    if selected_ref == "🆕 New Adjustment":
+                        related_reference = "New Adjustment"
+                    else:
+                        related_reference = selected_ref.split(" | ")[0]
+                    
+                    # Executar aprovação
+                    from database import approve_carrier_return
+                    try:
+                        result = approve_carrier_return(adjustment_id, related_reference, justification)
+                        if result:
+                            st.success("✅ Aprovação concluída com sucesso!")
+                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
+                            # Limpar estados
+                            st.session_state.pop(f"pending_status_change_{farol_reference}", None)
+                            st.session_state.pop("voyage_success_notice", None)
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error("❌ Erro ao completar aprovação")
+                    except Exception as e:
+                        st.error(f"❌ Erro crítico durante a aprovação: {str(e)}")
+            
+            with col_cancel:
+                if st.button("❌ Cancelar", key=f"cancel_approval_{adjustment_id}"):
+                    # Limpar estados
+                    if f"pending_status_change_{farol_reference}" in st.session_state:
+                        del st.session_state[f"pending_status_change_{farol_reference}"]
+                    if "voyage_success_notice" in st.session_state:
+                        del st.session_state["voyage_success_notice"]
+                    st.cache_data.clear()
+                    st.rerun()
 
     else:
         # Mensagem somente para abas de tabela (não exibir na "Voyage Timeline")
