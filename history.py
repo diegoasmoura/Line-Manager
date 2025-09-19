@@ -2349,14 +2349,109 @@ def exibir_history():
                     with col_ata_time:
                         manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
+                # Seção de Referência Relacionada (apenas para voyage_not_found) - NO FINAL DO FORMULÁRIO
+                if error_type == "voyage_not_found":
+                    st.markdown("---")
+                    st.markdown("#### 🔗 Referência Relacionada")
+                    st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
+                    
+                    # Buscar referências disponíveis
+                    try:
+                        available_refs = get_available_references_for_relation(farol_ref)
+                    except Exception:
+                        available_refs = []
+
+                    ref_options = ["Selecione uma referência..."]
+                    if available_refs:
+                        def _is_empty_local(value):
+                            try:
+                                if value is None:
+                                    return True
+                                if isinstance(value, str):
+                                    v = value.strip()
+                                    return v == '' or v.upper() == 'NULL'
+                                import pandas as _pd
+                                return _pd.isna(value)
+                            except Exception:
+                                return False
+
+                        filtered = []
+                        for ref in available_refs:
+                            p_status = str(ref.get('P_STATUS', '') or '').strip()
+                            b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                            linked = ref.get('LINKED_REFERENCE')
+                            if (b_status == 'Booking Requested' and _is_empty_local(linked)) or (b_status == 'Adjustment Requested' and _is_empty_local(linked)):
+                                filtered.append(ref)
+
+                        def sort_by_date(ref):
+                            try:
+                                date_val = ref.get('ROW_INSERTED_DATE')
+                                dt = pd.to_datetime(date_val, errors='coerce')
+                                if pd.isna(dt):
+                                    return (pd.Timestamp('1900-01-01').date(), 0)
+                                return (dt.date(), -int(getattr(dt, 'value', 0)))
+                            except Exception:
+                                return (pd.Timestamp('1900-01-01').date(), 0)
+
+                        filtered = sorted(filtered, key=sort_by_date)
+
+                        for ref in filtered:
+                            inserted_date = ref.get('ROW_INSERTED_DATE', '')
+                            if inserted_date and hasattr(inserted_date, 'strftime'):
+                                date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                            else:
+                                date_str_raw = str(inserted_date) if inserted_date else ''
+                                if len(date_str_raw) >= 16:
+                                    try:
+                                        parts = date_str_raw[:16].replace(' ', 'T').split('T')
+                                        if len(parts) == 2:
+                                            date_part = parts[0].split('-')
+                                            time_part = parts[1][:5]
+                                            if len(date_part) == 3:
+                                                date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
+                                            else:
+                                                date_str = date_str_raw[:16]
+                                        else:
+                                            date_str = date_str_raw[:16]
+                                    except:
+                                        date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
+                                else:
+                                    date_str = 'N/A'
+
+                            p_status = str(ref.get('P_STATUS', '') or '').strip()
+                            b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                            linked = ref.get('LINKED_REFERENCE')
+
+                            if p_status.lower() == 'adjusts cargill':
+                                status_display = 'Cargill (Adjusts)'
+                            elif b_status == 'Booking Requested' and _is_empty_local(linked):
+                                status_display = 'Cargill Booking Request'
+                            else:
+                                status_display = b_status or p_status or 'Status'
+
+                            option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
+                            ref_options.append(option_text)
+
+                    ref_options.append("🆕 New Adjustment")
+
+                    selected_ref = st.selectbox(
+                        "Selecione uma referência...",
+                        options=ref_options,
+                        key=f"manual_voyage_ref_{adjustment_id}"
+                    )
+                    
+                    if selected_ref and selected_ref != "Selecione uma referência...":
+                        if selected_ref == "🆕 New Adjustment":
+                            st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                        else:
+                            st.info(f"📋 **Referência selecionada:** {selected_ref}")
+                    
+                    st.markdown("---")
+                    st.warning("**Confirmar alteração para: Booking Approved**")
+
                 # Botões do formulário
-                col_save, col_skip = st.columns([1, 1])
                 
-                with col_save:
-                    save_manual_clicked = st.form_submit_button("💾 Salvar Dados Manuais", type="primary")
-                
-                with col_skip:
-                    skip_manual_clicked = st.form_submit_button("⏭️ Pular e Continuar Aprovação")
+                save_manual_clicked = st.form_submit_button("💾 Salvar Dados Manuais", type="primary")
                 
                 if save_manual_clicked:
                     # Preparar dados para inserção
@@ -2424,7 +2519,20 @@ def exibir_history():
                                     "adjustments_owner": "System",
                                     "comments": "Dados de monitoramento inseridos manualmente"
                                 }
-                                related_reference = "New Adjustment"
+                                
+                                # Usar referência selecionada no formulário manual se disponível
+                                if error_type == "voyage_not_found":
+                                    selected_ref = st.session_state.get(f"manual_voyage_ref_{adjustment_id}")
+                                    if selected_ref and selected_ref != "Selecione uma referência...":
+                                        if selected_ref == "🆕 New Adjustment":
+                                            related_reference = "New Adjustment"
+                                        else:
+                                            # Extrair a referência da opção selecionada
+                                            related_reference = selected_ref.split(" | ")[0] if " | " in selected_ref else selected_ref
+                                    else:
+                                        related_reference = "New Adjustment"
+                                else:
+                                    related_reference = "New Adjustment"
                                 
                                 # Preparar dados manuais para aprovação
                                 manual_data = {
@@ -2466,35 +2574,6 @@ def exibir_history():
                         st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": f"❌ Erro ao salvar: {str(e)}"}
                         st.error(f"❌ Erro ao salvar: {str(e)}")
                 
-                if skip_manual_clicked:
-                    # Se há aprovação pendente, completar a aprovação sem dados de monitoramento
-                    if voyage_manual_required.get("pending_approval", False):
-                        st.info("🔄 Completando aprovação sem dados de monitoramento...")
-                        
-                        # Obter dados da justificativa (valores padrão)
-                        justification = {
-                            "area": "Booking",
-                            "request_reason": "Voyage Monitoring",
-                            "adjustments_owner": "System",
-                            "comments": "Aprovação sem dados de monitoramento"
-                        }
-                        related_reference = "New Adjustment"
-                        
-                        # Completar aprovação
-                        result = approve_carrier_return(adjustment_id, related_reference, justification)
-                        
-                        if result:
-                            st.success("✅ Aprovação concluída com sucesso!")
-                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful without voyage data!"}
-                        else:
-                            st.error("❌ Erro ao completar aprovação")
-                    
-                    # Limpar o flag de entrada manual
-                    if "voyage_manual_entry_required" in st.session_state:
-                        del st.session_state["voyage_manual_entry_required"]
-                    
-                    st.cache_data.clear()
-                    st.rerun()
         
             # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
 

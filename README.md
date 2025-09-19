@@ -370,6 +370,14 @@ def insert_return_carrier_from_ui(ui_data, ...):
 - ✅ **🛠️ Cargill (Adjusts)**: "ℹ️ **Ajuste da Cargill:** Esta linha representa ajuste interno. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
 - ✅ **🛠️ Adjustment Request**: "ℹ️ **Solicitação de Ajuste:** Esta linha representa uma solicitação de ajuste da empresa. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'."
 
+**Formulário Manual de Voyage Monitoring**:
+- ✅ **Seção de Referência Relacionada**: Quando a voyage não é encontrada na API, o formulário manual inclui uma seção para selecionar a referência relacionada **no final do formulário**
+- ✅ **Dropdown de Referências**: Mostra opções da aba 'Other Status' ou 'New Adjustment' com formatação "FR_... | Status | DD/MM/YYYY HH:MM"
+- ✅ **Confirmação de Alteração**: Exibe "Confirmar alteração para: Booking Approved" antes do botão de ação
+- ✅ **Integração com Aprovação**: A referência selecionada é automaticamente usada na aprovação do registro
+- ✅ **Posicionamento**: A seção de referência relacionada aparece após todos os campos de data, no final do formulário
+- ✅ **Botão Único**: Apenas o botão "💾 Salvar Dados Manuais" está disponível (botão "Pular e Continuar Aprovação" foi removido)
+
 #### 🔧 **Padronização de Colunas de Data (CRÍTICO - v3.9.7)**
 
 **Problema Identificado**: Inconsistência entre colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` causando falhas em múltiplas telas do sistema.
@@ -1427,6 +1435,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - Query SQL otimizada para buscar último registro com dados válidos
 - **🎯 Correção de Interface**: Adicionada mensagem informativa para linhas "📋 Booking Request" na aba Request Timeline
 - **📋 Mensagens Contextuais**: Implementadas mensagens específicas para cada tipo de linha na aba Request Timeline
+- **🔗 Formulário Manual Aprimorado**: Adicionada seção de "Referência Relacionada" no formulário manual de voyage monitoring quando a voyage não é encontrada na API
 - **⚠️ Impacto**: Melhoria significativa na experiência do usuário ao processar PDFs, eliminando necessidade de preenchimento manual repetitivo
 
 ### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
