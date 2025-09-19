@@ -2368,21 +2368,10 @@ def exibir_history():
                 # Botões do formulário
                 st.markdown("---")
                 
-                # Validação para desabilitar botão de confirmação se necessário
-                can_confirm = True
-                if error_type == "voyage_not_found":
-                    # A validação agora usa o selectbox de dentro do form
-                    selected_ref_val = st.session_state.get(manual_ref_key)
-                    can_confirm = (
-                        selected_ref_val is not None and 
-                        selected_ref_val.strip() != "" and 
-                        selected_ref_val != "Selecione uma referência..."
-                    )
-
                 col_confirm, col_cancel = st.columns([1, 1])
                 
                 with col_confirm:
-                    confirm_manual_clicked = st.form_submit_button("✅ Confirmar", type="primary", disabled=not can_confirm)
+                    confirm_manual_clicked = st.form_submit_button("✅ Confirmar", type="primary")
                 
                 with col_cancel:
                     cancel_manual_clicked = st.form_submit_button("❌ Cancelar")
