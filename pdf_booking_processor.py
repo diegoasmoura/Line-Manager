@@ -2452,7 +2452,7 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
                 conn = get_database_connection()
                 query = text("""
                     SELECT CNPJ, NOME
-                    FROM F_ELLOX_TERMINALS
+                    FROM LogTransp.F_ELLOX_TERMINALS
                     WHERE UPPER(NOME) LIKE '%DPW%'
                        OR UPPER(NOME) LIKE '%DP WORLD%'
                        OR UPPER(NOME) LIKE '%EMBRAPORT%'
@@ -2472,7 +2472,7 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
                 conn = get_database_connection()
                 query = text("""
                     SELECT DISTINCT CNPJ, NOME
-                    FROM F_ELLOX_TERMINALS
+                    FROM LogTransp.F_ELLOX_TERMINALS
                     WHERE UPPER(NOME) LIKE UPPER(:terminal_name)
                     FETCH FIRST 1 ROWS ONLY
                 """)
@@ -2506,7 +2506,7 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
             df_monitoring = visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code)
             
             if not df_monitoring.empty:
-                # Salvar no Oracle (F_ELLOX_TERMINAL_MONITORINGS)
+                # Salvar no Oracle (LogTransp.F_ELLOX_TERMINAL_MONITORINGS)
                 try:
                     processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
                     if processed_count > 0:
@@ -2531,7 +2531,7 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
 @st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
 def load_ships_from_database():
     """
-    Carrega lista de navios únicos da tabela F_ELLOX_SHIPS.
+    Carrega lista de navios únicos da tabela LogTransp.F_ELLOX_SHIPS.
     Como um navio pode estar em múltiplos terminais, retorna apenas uma entrada por navio.
     
     Returns:
@@ -2542,7 +2542,7 @@ def load_ships_from_database():
         # Buscar navios únicos (um registro por nome de navio)
         query = text("""
             SELECT DISTINCT NOME, CARRIER 
-            FROM F_ELLOX_SHIPS 
+            FROM LogTransp.F_ELLOX_SHIPS 
             ORDER BY NOME
         """)
         result = conn.execute(query).fetchall()
@@ -2557,14 +2557,14 @@ def load_ships_from_database():
 @st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
 def load_terminals_from_database():
     """
-    Carrega lista de terminais da tabela F_ELLOX_TERMINALS.
+    Carrega lista de terminais da tabela LogTransp.F_ELLOX_TERMINALS.
     
     Returns:
         list: Lista de nomes dos terminais
     """
     try:
         conn = get_database_connection()
-        query = text("SELECT NOME FROM F_ELLOX_TERMINALS ORDER BY NOME")
+        query = text("SELECT NOME FROM LogTransp.F_ELLOX_TERMINALS ORDER BY NOME")
         result = conn.execute(query).fetchall()
         conn.close()
         

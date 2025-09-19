@@ -22,7 +22,7 @@ class ElloxDataQueries:
             query = text("""
                 SELECT ID, NOME, CNPJ, CIDADE, 
                        TO_CHAR(DATA_CRIACAO, 'DD/MM/YYYY HH24:MI') as DATA_CRIACAO
-                FROM F_ELLOX_TERMINALS 
+                FROM LogTransp.F_ELLOX_TERMINALS 
                 WHERE ATIVO = 'Y'
                 ORDER BY NOME
             """)
@@ -54,8 +54,8 @@ class ElloxDataQueries:
                 SELECT s.ID, s.NOME as NAVIO, s.CARRIER, 
                        t.NOME as TERMINAL, s.TERMINAL_CNPJ,
                        TO_CHAR(s.DATA_CRIACAO, 'DD/MM/YYYY') as DATA_CRIACAO
-                FROM F_ELLOX_SHIPS s
-                JOIN F_ELLOX_TERMINALS t ON s.TERMINAL_CNPJ = t.CNPJ
+                FROM LogTransp.F_ELLOX_SHIPS s
+                JOIN LogTransp.F_ELLOX_TERMINALS t ON s.TERMINAL_CNPJ = t.CNPJ
                 WHERE {where_clause}
                 ORDER BY s.NOME
             """)
@@ -90,8 +90,8 @@ class ElloxDataQueries:
                        TO_CHAR(v.ETA, 'DD/MM/YYYY') as ETA,
                        v.POL, v.POD,
                        TO_CHAR(v.DATA_CRIACAO, 'DD/MM/YYYY') as DATA_CRIACAO
-                FROM F_ELLOX_VOYAGES v
-                JOIN F_ELLOX_TERMINALS t ON v.TERMINAL_CNPJ = t.CNPJ
+                FROM LogTransp.F_ELLOX_VOYAGES v
+                JOIN LogTransp.F_ELLOX_TERMINALS t ON v.TERMINAL_CNPJ = t.CNPJ
                 WHERE {where_clause}
                 ORDER BY v.SHIP_NAME, v.VOYAGE_CODE
             """)
@@ -111,9 +111,9 @@ class ElloxDataQueries:
                        COUNT(DISTINCT s.ID) as TOTAL_NAVIOS,
                        COUNT(DISTINCT v.ID) as TOTAL_VOYAGES,
                        COUNT(DISTINCT s.TERMINAL_CNPJ) as TERMINAIS_ATIVOS
-                FROM F_ELLOX_CARRIERS c
-                LEFT JOIN F_ELLOX_SHIPS s ON c.NOME = s.CARRIER AND s.ATIVO = 'Y'
-                LEFT JOIN F_ELLOX_VOYAGES v ON c.NOME = v.CARRIER AND v.ATIVO = 'Y'
+                FROM LogTransp.F_ELLOX_CARRIERS c
+                LEFT JOIN LogTransp.F_ELLOX_SHIPS s ON c.NOME = s.CARRIER AND s.ATIVO = 'Y'
+                LEFT JOIN LogTransp.F_ELLOX_VOYAGES v ON c.NOME = v.CARRIER AND v.ATIVO = 'Y'
                 WHERE c.ATIVO = 'Y'
                 GROUP BY c.NOME, c.CODIGO, c.NOME_COMPLETO
                 ORDER BY TOTAL_NAVIOS DESC
@@ -134,9 +134,9 @@ class ElloxDataQueries:
                        COUNT(DISTINCT s.ID) as TOTAL_NAVIOS,
                        COUNT(DISTINCT v.ID) as TOTAL_VOYAGES,
                        COUNT(DISTINCT s.CARRIER) as CARRIERS_ATIVOS
-                FROM F_ELLOX_TERMINALS t
-                LEFT JOIN F_ELLOX_SHIPS s ON t.CNPJ = s.TERMINAL_CNPJ AND s.ATIVO = 'Y'
-                LEFT JOIN F_ELLOX_VOYAGES v ON t.CNPJ = v.TERMINAL_CNPJ AND v.ATIVO = 'Y'
+                FROM LogTransp.F_ELLOX_TERMINALS t
+                LEFT JOIN LogTransp.F_ELLOX_SHIPS s ON t.CNPJ = s.TERMINAL_CNPJ AND s.ATIVO = 'Y'
+                LEFT JOIN LogTransp.F_ELLOX_VOYAGES v ON t.CNPJ = v.TERMINAL_CNPJ AND v.ATIVO = 'Y'
                 WHERE t.ATIVO = 'Y'
                 GROUP BY t.NOME, t.CNPJ, t.CIDADE
                 ORDER BY TOTAL_NAVIOS DESC
@@ -155,8 +155,8 @@ class ElloxDataQueries:
             query = text("""
                 SELECT s.NOME as NAVIO, s.CARRIER, t.NOME as TERMINAL,
                        s.TERMINAL_CNPJ, s.IMO, s.MMSI, s.FLAG
-                FROM F_ELLOX_SHIPS s
-                JOIN F_ELLOX_TERMINALS t ON s.TERMINAL_CNPJ = t.CNPJ
+                FROM LogTransp.F_ELLOX_SHIPS s
+                JOIN LogTransp.F_ELLOX_TERMINALS t ON s.TERMINAL_CNPJ = t.CNPJ
                 WHERE s.ATIVO = 'Y' 
                 AND UPPER(s.NOME) LIKE UPPER(:search_term)
                 ORDER BY s.NOME
@@ -175,29 +175,29 @@ class ElloxDataQueries:
             stats = {}
             
             # Contadores gerais
-            result = conn.execute(text("SELECT COUNT(*) FROM F_ELLOX_TERMINALS WHERE ATIVO = 'Y'"))
+            result = conn.execute(text("SELECT COUNT(*) FROM LogTransp.F_ELLOX_TERMINALS WHERE ATIVO = 'Y'"))
             stats['terminais'] = result.scalar()
             
-            result = conn.execute(text("SELECT COUNT(*) FROM F_ELLOX_SHIPS WHERE ATIVO = 'Y'"))
+            result = conn.execute(text("SELECT COUNT(*) FROM LogTransp.F_ELLOX_SHIPS WHERE ATIVO = 'Y'"))
             stats['navios'] = result.scalar()
             
-            result = conn.execute(text("SELECT COUNT(*) FROM F_ELLOX_VOYAGES WHERE ATIVO = 'Y'"))
+            result = conn.execute(text("SELECT COUNT(*) FROM LogTransp.F_ELLOX_VOYAGES WHERE ATIVO = 'Y'"))
             stats['voyages'] = result.scalar()
             
-            result = conn.execute(text("SELECT COUNT(*) FROM F_ELLOX_CARRIERS WHERE ATIVO = 'Y'"))
+            result = conn.execute(text("SELECT COUNT(*) FROM LogTransp.F_ELLOX_CARRIERS WHERE ATIVO = 'Y'"))
             stats['carriers'] = result.scalar()
             
             # Data da última atualização
             result = conn.execute(text("""
                 SELECT MAX(DATA_ATUALIZACAO) 
                 FROM (
-                    SELECT MAX(DATA_ATUALIZACAO) as DATA_ATUALIZACAO FROM F_ELLOX_TERMINALS
+                    SELECT MAX(DATA_ATUALIZACAO) as DATA_ATUALIZACAO FROM LogTransp.F_ELLOX_TERMINALS
                     UNION ALL
-                    SELECT MAX(DATA_ATUALIZACAO) FROM F_ELLOX_SHIPS
+                    SELECT MAX(DATA_ATUALIZACAO) FROM LogTransp.F_ELLOX_SHIPS
                     UNION ALL
-                    SELECT MAX(DATA_ATUALIZACAO) FROM F_ELLOX_VOYAGES
+                    SELECT MAX(DATA_ATUALIZACAO) FROM LogTransp.F_ELLOX_VOYAGES
                     UNION ALL
-                    SELECT MAX(DATA_ATUALIZACAO) FROM F_ELLOX_CARRIERS
+                    SELECT MAX(DATA_ATUALIZACAO) FROM LogTransp.F_ELLOX_CARRIERS
                 )
             """))
             

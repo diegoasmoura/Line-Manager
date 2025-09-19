@@ -1742,7 +1742,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         # Verificar se há dados VÁLIDOS (não apenas registro vazio)
         existing_query = text("""
             SELECT COUNT(*) as count
-            FROM F_ELLOX_TERMINAL_MONITORINGS 
+            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
             WHERE UPPER(NAVIO) = UPPER(:vessel_name)
             AND UPPER(VIAGEM) = UPPER(:voyage_code)
             AND UPPER(TERMINAL) = UPPER(:terminal)
@@ -1805,7 +1805,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 conn = get_database_connection()
                 query = text("""
                     SELECT CNPJ, NOME
-                    FROM F_ELLOX_TERMINALS
+                    FROM LogTransp.F_ELLOX_TERMINALS
                     WHERE UPPER(NOME) LIKE '%DPW%'
                        OR UPPER(NOME) LIKE '%DP WORLD%'
                        OR UPPER(NOME) LIKE '%EMBRAPORT%'
@@ -2016,7 +2016,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 'manual_deadline': 'B_DATA_DEADLINE',
                 'manual_draft_deadline': 'B_DATA_DRAFT_DEADLINE',
                 'manual_gate_opening': 'B_DATA_ABERTURA_GATE',
-                # B_DATA_ABERTURA_GATE_REEFER só existe em F_ELLOX_TERMINAL_MONITORINGS, não em F_CON_RETURN_CARRIERS
+                # B_DATA_ABERTURA_GATE_REEFER só existe em LogTransp.F_ELLOX_TERMINAL_MONITORINGS, não em F_CON_RETURN_CARRIERS
                 'manual_etd': 'B_DATA_ESTIMATIVA_SAIDA_ETD',
                 'manual_eta': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
                 'manual_etb': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
@@ -2062,7 +2062,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                     else:
                         st.error(voyage_validation_result.get("message", ""))
 
-                # Se existe buffer, persiste em F_ELLOX_TERMINAL_MONITORINGS agora (no momento da confirmação)
+                # Se existe buffer, persiste em LogTransp.F_ELLOX_TERMINAL_MONITORINGS agora (no momento da confirmação)
                 if api_buf:
                     try:
                         df_monitoring = pd.DataFrame([api_buf])
@@ -2075,7 +2075,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                             if vessel_name:
                                 monitoring_query = text("""
                                     SELECT * FROM (
-                                        SELECT * FROM F_ELLOX_TERMINAL_MONITORINGS
+                                        SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
                                         WHERE UPPER(NAVIO) = UPPER(:vessel_name)
                                         ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
                                     ) WHERE ROWNUM = 1
@@ -2460,21 +2460,21 @@ def _parse_iso_datetime(value):
 
 
 def ensure_table_f_ellox_terminal_monitorings():
-    """Cria a tabela F_ELLOX_TERMINAL_MONITORINGS caso não exista."""
+    """Cria a tabela LogTransp.F_ELLOX_TERMINAL_MONITORINGS caso não exista."""
     conn = get_database_connection()
     try:
         exists = conn.execute(text(
             """
             SELECT COUNT(*) AS ct
             FROM user_tables
-            WHERE table_name = 'F_ELLOX_TERMINAL_MONITORINGS'
+            WHERE table_name = 'LogTransp.F_ELLOX_TERMINAL_MONITORINGS'
             """
         )).scalar()
 
         if int(exists or 0) == 0:
             ddl = text(
                 """
-                CREATE TABLE F_ELLOX_TERMINAL_MONITORINGS (
+                CREATE TABLE LogTransp.F_ELLOX_TERMINAL_MONITORINGS (
                     ID                          NUMBER(20)      PRIMARY KEY,
                     NAVIO                       VARCHAR2(100 CHAR),
                     VIAGEM                      VARCHAR2(50 CHAR),
@@ -2503,7 +2503,7 @@ def ensure_table_f_ellox_terminal_monitorings():
 
 
 def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
-    """Realiza upsert (MERGE) em F_ELLOX_TERMINAL_MONITORINGS a partir de um DataFrame.
+    """Realiza upsert (MERGE) em LogTransp.F_ELLOX_TERMINAL_MONITORINGS a partir de um DataFrame.
 
     Espera colunas (case-insensitive):
       id, navio, viagem, agencia, data_deadline, data_draft_deadline, data_abertura_gate,
@@ -2575,7 +2575,7 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
 
             merge_sql = text(
                 """
-                MERGE INTO F_ELLOX_TERMINAL_MONITORINGS t
+                MERGE INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS t
                 USING (SELECT :ID AS ID FROM dual) s
                 ON (t.ID = s.ID)
                 WHEN MATCHED THEN UPDATE SET
@@ -2615,13 +2615,13 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
     return processed
 
 def get_terminal_monitorings(limit: int = 200) -> pd.DataFrame:
-    """Consulta recentes da F_ELLOX_TERMINAL_MONITORINGS."""
+    """Consulta recentes da LogTransp.F_ELLOX_TERMINAL_MONITORINGS."""
     ensure_table_f_ellox_terminal_monitorings()
     with get_database_connection() as conn:
         rows = conn.execute(text(
             f"""
             SELECT *
-            FROM F_ELLOX_TERMINAL_MONITORINGS
+            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
             ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
             FETCH FIRST {int(limit)} ROWS ONLY
             """

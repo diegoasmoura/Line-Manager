@@ -81,7 +81,7 @@ class CarrierClassifier:
             conn = get_database_connection()
             query = """
                 SELECT DISTINCT NOME 
-                FROM F_ELLOX_SHIPS 
+                FROM LogTransp.F_ELLOX_SHIPS 
                 WHERE UPPER(CARRIER) = 'OUTROS' 
                 ORDER BY NOME
             """
@@ -101,7 +101,7 @@ class CarrierClassifier:
         try:
             conn = get_database_connection()
             query = """
-                UPDATE F_ELLOX_SHIPS 
+                UPDATE LogTransp.F_ELLOX_SHIPS 
                 SET CARRIER = :new_carrier 
                 WHERE UPPER(NOME) = UPPER(:vessel_name)
             """
@@ -176,7 +176,7 @@ class CarrierClassifier:
             conn = get_database_connection()
             query = """
                 SELECT CARRIER, COUNT(*) as count
-                FROM F_ELLOX_SHIPS 
+                FROM LogTransp.F_ELLOX_SHIPS 
                 GROUP BY CARRIER 
                 ORDER BY count DESC
             """

@@ -263,7 +263,7 @@ def get_voyage_monitoring_with_farol_references():
                         PARTITION BY UPPER(m.NAVIO), UPPER(m.VIAGEM), UPPER(m.TERMINAL) 
                         ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
                     ) as rn
-                FROM F_ELLOX_TERMINAL_MONITORINGS m
+                FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
             )
             SELECT 
                 lm.ID,
@@ -333,7 +333,7 @@ def get_voyage_monitoring_with_farol_references():
 
 def update_voyage_monitoring_data(monitoring_id, updates):
     """
-    Atualiza dados de monitoramento na tabela F_ELLOX_TERMINAL_MONITORINGS.
+    Atualiza dados de monitoramento na tabela LogTransp.F_ELLOX_TERMINAL_MONITORINGS.
     
     Args:
         monitoring_id: ID do registro a ser atualizado
@@ -361,7 +361,7 @@ def update_voyage_monitoring_data(monitoring_id, updates):
         set_clauses.append("DATA_ATUALIZACAO = SYSDATE")
         
         update_query = text(f"""
-            UPDATE F_ELLOX_TERMINAL_MONITORINGS 
+            UPDATE LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
             SET {', '.join(set_clauses)}
             WHERE ID = :monitoring_id
         """)
@@ -426,20 +426,20 @@ def get_dropdown_options():
     """Busca opções para dropdowns do banco de dados"""
     try:
         with get_database_connection() as conn:
-            # Busca navios únicos da tabela F_ELLOX_SHIPS (convertendo para maiúsculas)
+            # Busca navios únicos da tabela LogTransp.F_ELLOX_SHIPS (convertendo para maiúsculas)
             vessel_query = text("""
                 SELECT DISTINCT UPPER(TRIM(NOME)) as NOME
-                FROM F_ELLOX_SHIPS 
+                FROM LogTransp.F_ELLOX_SHIPS 
                 WHERE NOME IS NOT NULL AND ATIVO = 'Y'
                 ORDER BY UPPER(TRIM(NOME))
             """)
             vessel_result = conn.execute(vessel_query).fetchall()
             vessel_options = [row[0] for row in vessel_result] if vessel_result else []
             
-            # Busca terminais únicos da tabela F_ELLOX_TERMINALS (convertendo para maiúsculas)
+            # Busca terminais únicos da tabela LogTransp.F_ELLOX_TERMINALS (convertendo para maiúsculas)
             terminal_query = text("""
                 SELECT DISTINCT UPPER(TRIM(NOME)) as NOME
-                FROM F_ELLOX_TERMINALS 
+                FROM LogTransp.F_ELLOX_TERMINALS 
                 WHERE NOME IS NOT NULL AND ATIVO = 'Y'
                 ORDER BY UPPER(TRIM(NOME))
             """)

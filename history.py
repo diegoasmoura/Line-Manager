@@ -187,7 +187,7 @@ def get_voyage_monitoring_for_reference(farol_reference):
         placeholders = ", ".join([f":vessel_{i}" for i in range(len(vessel_names))])
         monitoring_query = text(f"""
             SELECT *
-            FROM F_ELLOX_TERMINAL_MONITORINGS
+            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
             WHERE UPPER(NAVIO) IN ({placeholders})
             ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
         """)
