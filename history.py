@@ -2669,7 +2669,6 @@ def exibir_history():
                         related_reference = selected_ref.split(" | ")[0]
                     
                     # Executar aprovação
-                    from database import approve_carrier_return
                     try:
                         result = approve_carrier_return(adjustment_id, related_reference, justification)
                         if result:
