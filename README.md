@@ -376,7 +376,7 @@ def insert_return_carrier_from_ui(ui_data, ...):
 - ✅ **Confirmação de Alteração**: Exibe "Confirmar alteração para: Booking Approved" antes do botão de ação
 - ✅ **Integração com Aprovação**: A referência selecionada é automaticamente usada na aprovação do registro
 - ✅ **Posicionamento**: A seção de referência relacionada aparece após todos os campos de data, no final do formulário
-- ✅ **Botão Único**: Apenas o botão "💾 Salvar Dados Manuais" está disponível (botão "Pular e Continuar Aprovação" foi removido)
+- ✅ **Botões de Ação**: Dois botões disponíveis: "✅ Confirmar" (primário) e "❌ Cancelar" (botão "Pular e Continuar Aprovação" foi removido)
 
 #### 🔧 **Padronização de Colunas de Data (CRÍTICO - v3.9.7)**
 

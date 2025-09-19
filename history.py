@@ -2451,9 +2451,15 @@ def exibir_history():
 
                 # Botões do formulário
                 
-                save_manual_clicked = st.form_submit_button("💾 Salvar Dados Manuais", type="primary")
+                col_confirm, col_cancel = st.columns([1, 1])
                 
-                if save_manual_clicked:
+                with col_confirm:
+                    confirm_manual_clicked = st.form_submit_button("✅ Confirmar", type="primary")
+                
+                with col_cancel:
+                    cancel_manual_clicked = st.form_submit_button("❌ Cancelar")
+                
+                if confirm_manual_clicked:
                     # Preparar dados para inserção
                     from datetime import datetime
                     
@@ -2573,6 +2579,18 @@ def exibir_history():
                     except Exception as e:
                         st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": f"❌ Erro ao salvar: {str(e)}"}
                         st.error(f"❌ Erro ao salvar: {str(e)}")
+                
+                elif cancel_manual_clicked:
+                    # Cancelar entrada manual e limpar estado
+                    st.info("❌ Entrada manual cancelada.")
+                    
+                    # Limpar o flag de entrada manual
+                    if "voyage_manual_entry_required" in st.session_state:
+                        del st.session_state["voyage_manual_entry_required"]
+                    
+                    # Limpar cache e recarregar
+                    st.cache_data.clear()
+                    st.rerun()
                 
         
             # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
