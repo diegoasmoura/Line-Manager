@@ -884,6 +884,7 @@ def display_attachments_section(farol_reference):
 
 def exibir_history():
     st.header("📜 Return Carriers History")
+    
     # Exibe mensagens persistentes da última ação (flash)
     try:
         _flash = st.session_state.pop("history_flash", None)

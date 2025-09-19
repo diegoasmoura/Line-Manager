@@ -1535,19 +1535,22 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         
         # PRÉ-PREENCHIMENTO: Buscar datas do último registro aprovado para a mesma Farol Reference
         prefill_dates = {}
-        if status_override == "Adjustment Requested" and "Farol Reference" in ui_data:
+        if status_override in ["Adjustment Requested", "Received from Carrier"] and "Farol Reference" in ui_data:
             farol_ref = ui_data["Farol Reference"]
             try:
-                # Buscar último registro aprovado da mesma Farol Reference
+                # Buscar último registro da mesma Farol Reference (independentemente do status)
                 prefill_query = text("""
                     SELECT 
                         B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, 
                         S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE, S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                         B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, 
-                        B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
+                        B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
+                        B_BOOKING_STATUS, ROW_INSERTED_DATE
                     FROM LogTransp.F_CON_RETURN_CARRIERS
                     WHERE FAROL_REFERENCE = :farol_ref 
-                    AND B_BOOKING_STATUS = 'Booking Approved'
+                    AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                         OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                         OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
                     ORDER BY ROW_INSERTED_DATE DESC
                     FETCH FIRST 1 ROWS ONLY
                 """)
@@ -1985,6 +1988,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
     :param justification: A dict with justification fields for 'New Adjustment' cases.
     :return: True if successful, False otherwise.
     """
+    
     conn = get_database_connection()
     tx = conn.begin()
     try:
@@ -2197,24 +2201,34 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
         conn.execute(main_update_query, main_update_fields)
 
-        # 6. Atualizar colunas de expectativa interna no registro existente da tabela carriers
+        # 6. Buscar últimos valores de data e atualizar colunas de expectativa interna no registro existente da tabela carriers
         try:
+            # Buscar últimos valores dos campos de data da F_CON_RETURN_CARRIERS
+            last_date_values = get_last_date_values_from_carriers(farol_reference)
+            
             carrier_update_fields = {}
-            if "S_REQUESTED_DEADLINE_START_DATE" in main_update_fields:
-                carrier_update_fields["S_REQUESTED_DEADLINE_START_DATE"] = main_update_fields["S_REQUESTED_DEADLINE_START_DATE"]
-            if "S_REQUESTED_DEADLINE_END_DATE" in main_update_fields:
-                carrier_update_fields["S_REQUESTED_DEADLINE_END_DATE"] = main_update_fields["S_REQUESTED_DEADLINE_END_DATE"]
-            if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in main_update_fields:
-                carrier_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = main_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"]
+            
+            # Sempre tentar preencher com os últimos valores encontrados
+            if last_date_values.get("S_REQUESTED_DEADLINE_START_DATE"):
+                carrier_update_fields["S_REQUESTED_DEADLINE_START_DATE"] = last_date_values.get("S_REQUESTED_DEADLINE_START_DATE")
+                
+            if last_date_values.get("S_REQUESTED_DEADLINE_END_DATE"):
+                carrier_update_fields["S_REQUESTED_DEADLINE_END_DATE"] = last_date_values.get("S_REQUESTED_DEADLINE_END_DATE")
+                
+            if last_date_values.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"):
+                carrier_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = last_date_values.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED")
             
             if carrier_update_fields:
                 carrier_set_clause = ", ".join([f"{field} = :{field}" for field in carrier_update_fields.keys()])
                 carrier_update_query = text(f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {carrier_set_clause} WHERE ADJUSTMENT_ID = :adjustment_id")
                 carrier_update_fields["adjustment_id"] = adjustment_id
+                
                 conn.execute(carrier_update_query, carrier_update_fields)
+                st.info(f"📝 Campos de data pré-preenchidos com últimos valores encontrados para {farol_reference}")
+                
         except Exception as e:
             # Log do erro mas não falha toda a operação
-            print(f"Aviso: Erro ao atualizar colunas de expectativa interna: {e}")
+            st.error(f"❌ Erro ao pré-preencher campos: {e}")
 
         # 7. Commit transaction
         tx.commit()
@@ -2230,6 +2244,48 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
     finally:
         if 'conn' in locals() and not conn.closed:
             conn.close()
+
+def get_last_date_values_from_carriers(farol_reference: str) -> dict:
+    """
+    Busca os últimos valores dos campos de data da tabela F_CON_RETURN_CARRIERS
+    para uma Farol Reference específica, independentemente do status.
+    
+    :param farol_reference: Referência do Farol para buscar os valores
+    :return: Dicionário com os últimos valores dos campos de data
+    """
+    conn = get_database_connection()
+    try:
+        query = text("""
+            SELECT 
+                S_REQUESTED_DEADLINE_START_DATE,
+                S_REQUESTED_DEADLINE_END_DATE,
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                ROW_INSERTED_DATE,
+                B_BOOKING_STATUS,
+                ADJUSTMENT_ID
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
+            AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                 OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                 OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+            ORDER BY ROW_INSERTED_DATE DESC
+            FETCH FIRST 1 ROWS ONLY
+        """)
+        
+        result = conn.execute(query, {"farol_ref": farol_reference}).mappings().fetchone()
+        
+        if result:
+            return {
+                "S_REQUESTED_DEADLINE_START_DATE": result.get("S_REQUESTED_DEADLINE_START_DATE"),
+                "S_REQUESTED_DEADLINE_END_DATE": result.get("S_REQUESTED_DEADLINE_END_DATE"),
+                "S_REQUIRED_ARRIVAL_DATE_EXPECTED": result.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED")
+            }
+        else:
+            return {}
+    except Exception as e:
+        return {}
+    finally:
+        conn.close()
 
 def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
     """
