@@ -1996,7 +1996,6 @@ def exibir_history():
                     "adjustments_owner": responsibility,
                     "comments": comment
                 }
-                from database import approve_carrier_return
                 result = approve_carrier_return(adjustment_id, related_reference, justification)
                 if result:
                     st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
@@ -2438,7 +2437,6 @@ def exibir_history():
                                 }
                                 
                                 # Completar aprovação
-                                from database import approve_carrier_return
                                 try:
                                     result = approve_carrier_return(adjustment_id, related_reference, justification, manual_data)
                                 except Exception as e:
@@ -2480,7 +2478,6 @@ def exibir_history():
                         related_reference = "New Adjustment"
                         
                         # Completar aprovação
-                        from database import approve_carrier_return
                         result = approve_carrier_return(adjustment_id, related_reference, justification)
                         
                         if result:
