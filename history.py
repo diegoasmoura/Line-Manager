@@ -2325,7 +2325,8 @@ def exibir_history():
                         manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
                 # --- Início da Seção de Referência Relacionada (Movido para dentro do Form) ---
-                if error_type == "voyage_not_found":
+                # A seleção de referência é necessária para todos os cenários de entrada manual.
+                if True:
                     st.markdown("---")
                     st.markdown("#### 🔗 Referência Relacionada")
                     st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
@@ -2382,8 +2383,8 @@ def exibir_history():
                     cancel_manual_clicked = st.form_submit_button("❌ Cancelar")
                 
                 if confirm_manual_clicked:
-                    # Validação: verificar se uma referência foi selecionada (apenas para voyage_not_found)
-                    if error_type == "voyage_not_found":
+                    # Validação: verificar se uma referência foi selecionada
+                    if True:
                         selected_ref = st.session_state.get(manual_ref_key) # Usa a chave do form
                         if (
                             not selected_ref or 

@@ -456,16 +456,16 @@ values["s_required_arrival_date_expected"] = st.date_input(...)
 - **Exibição do Histórico**: A tabela de histórico de monitoramento de uma viagem agora é exibida mesmo que haja apenas um registro. Anteriormente, a tabela só aparecia se houvesse mais de um registro.
 - **Expansível**: O histórico de cada viagem é apresentado dentro de um painel expansível (`expander`) para manter a interface limpa, mostrando o card principal com os dados mais recentes da viagem.
 
-#### Limitação de Interatividade em Formulários
+#### Limitação de Interatividade em Formulários e Fluxo de Aprovação Manual
 
-Durante o desenvolvimento do formulário de entrada manual de dados de viagem (exibido quando uma *voyage* não é encontrada na API), foi identificada uma limitação na biblioteca Streamlit:
+Durante o desenvolvimento do formulário de entrada manual de dados de viagem (exibido em qualquer cenário de falha da API Ellox, como falha de autenticação ou *voyage* não encontrada), foi identificada uma limitação na biblioteca Streamlit que impactou o fluxo de aprovação:
 
-- **Problema**: Widgets interativos (como uma caixa de seleção) dentro de um `st.form` não podem habilitar ou desabilitar dinamicamente outros widgets (como o botão de submissão) no mesmo formulário. A interface do formulário só é atualizada após o envio.
+- **Problema**: Widgets interativos (como a caixa de seleção de "Referência Relacionada") dentro de um `st.form` não podem habilitar ou desabilitar dinamicamente o botão de submissão no mesmo formulário. A interface do formulário só é atualizada após o envio.
 
-- **Abordagem Adotada**: Para manter a experiência do usuário fluida e evitar a divisão do formulário em múltiplas etapas, foi adotada a seguinte solução:
-  - O botão **"Confirmar"** no formulário manual permanece **sempre habilitado**.
-  - A validação para garantir que uma "Referência Relacionada" foi selecionada ocorre **após o clique** no botão.
-  - Se nenhuma referência for selecionada, o sistema exibirá uma mensagem de erro e impedirá o envio dos dados, garantindo a integridade do processo sem prejudicar a usabilidade.
+- **Abordagem Adotada**: Para manter a experiência do usuário fluida em uma única tela, foi adotada a seguinte solução:
+  - **Seleção de Referência Obrigatória**: Em qualquer cenário que exija entrada manual de dados para uma aprovação, a seção **"Referência Relacionada"** é exibida dentro do formulário.
+  - **Botão Sempre Habilitado**: O botão **"Confirmar"** no formulário manual permanece **sempre habilitado**.
+  - **Validação Pós-Clique**: A validação que garante que uma "Referência Relacionada" foi selecionada ocorre **após o clique** no botão. Se nenhuma referência for selecionada, o sistema exibirá uma mensagem de erro e impedirá o envio, garantindo a integridade do processo.
 
 #### 🎯 **Regras de Seleção e Interface (v3.6+)**
 
