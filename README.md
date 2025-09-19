@@ -515,7 +515,7 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - 🚫 **Booking Rejected**: Desabilitado se Farol Status = "Booking Rejected"
 - 🚫 **Booking Cancelled**: Desabilitado se Farol Status = "Booking Cancelled"
 - 🚫 **Adjustment Requested**: Desabilitado se Farol Status = "Adjustment Requested"
-- 🔄 **Limpeza Automática**: Status pendente é limpo ao mudar seleção de linha
+- 🔄 **Limpeza de Estado**: Ao mudar a seleção de linha, o sistema limpa automaticamente status pendentes e mensagens de erro (`approval_error`, `manual_save_error`) da sessão anterior. Isso previne que erros antigos apareçam fora de contexto em novas ações.
 - 🎯 **Rastreamento por ID**: Usa ADJUSTMENT_ID para detectar mudanças de seleção
 
 ### 🚢 `voyage_monitoring.py`

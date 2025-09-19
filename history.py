@@ -1914,6 +1914,11 @@ def exibir_history():
             # Limpa aviso de sucesso da API
             if "voyage_success_notice" in st.session_state:
                 del st.session_state["voyage_success_notice"]
+            # Limpa erros de aprovação ou salvamento manual de ações anteriores
+            if "approval_error" in st.session_state:
+                del st.session_state["approval_error"]
+            if "manual_save_error" in st.session_state:
+                del st.session_state["manual_save_error"]
             # Limpa possíveis triggers por ajuste anterior
             for k in list(st.session_state.keys()):
                 if str(k).startswith("manual_related_ref_value_") or str(k).startswith("manual_trigger_"):
