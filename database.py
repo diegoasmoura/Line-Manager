@@ -2699,3 +2699,45 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
     finally:
         if 'conn' in locals() and not conn.closed:
             conn.close()
+
+def get_last_date_values_from_carriers(farol_reference: str) -> dict:
+    """
+    Busca os últimos valores dos campos de data da tabela F_CON_RETURN_CARRIERS
+    para uma Farol Reference específica, independentemente do status.
+    
+    :param farol_reference: Referência do Farol para buscar os valores
+    :return: Dicionário com os últimos valores dos campos de data
+    """
+    conn = get_database_connection()
+    try:
+        query = text("""
+            SELECT 
+                S_REQUESTED_DEADLINE_START_DATE,
+                S_REQUESTED_DEADLINE_END_DATE,
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                ROW_INSERTED_DATE,
+                B_BOOKING_STATUS,
+                ADJUSTMENT_ID
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
+            AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                 OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                 OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+            ORDER BY ROW_INSERTED_DATE DESC
+            FETCH FIRST 1 ROWS ONLY
+        """)
+        
+        result = conn.execute(query, {"farol_ref": farol_reference}).mappings().fetchone()
+        
+        if result:
+            return {
+                "S_REQUESTED_DEADLINE_START_DATE": result.get("S_REQUESTED_DEADLINE_START_DATE"),
+                "S_REQUESTED_DEADLINE_END_DATE": result.get("S_REQUESTED_DEADLINE_END_DATE"),
+                "S_REQUIRED_ARRIVAL_DATE_EXPECTED": result.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED")
+            }
+        else:
+            return {}
+    except Exception as e:
+        return {}
+    finally:
+        conn.close()

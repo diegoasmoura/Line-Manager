@@ -1436,6 +1436,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🎯 Correção de Interface**: Adicionada mensagem informativa para linhas "📋 Booking Request" na aba Request Timeline
 - **📋 Mensagens Contextuais**: Implementadas mensagens específicas para cada tipo de linha na aba Request Timeline
 - **🔗 Formulário Manual Aprimorado**: Adicionada seção de "Referência Relacionada" no formulário manual de voyage monitoring quando a voyage não é encontrada na API
+- **🎛️ Botões de Ação**: Implementados botões "✅ Confirmar" e "❌ Cancelar" no formulário manual de voyage monitoring
 - **⚠️ Impacto**: Melhoria significativa na experiência do usuário ao processar PDFs, eliminando necessidade de preenchimento manual repetitivo
 
 ### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
