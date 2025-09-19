@@ -2319,21 +2319,66 @@ def exibir_history():
                     with col_ata_time:
                         manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
-                # A seção de referência relacionada será exibida fora deste formulário.
+                # --- Início da Seção de Referência Relacionada (Movido para dentro do Form) ---
+                if error_type == "voyage_not_found":
+                    st.markdown("---")
+                    st.markdown("#### 🔗 Referência Relacionada")
+                    st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
+
+                    # Lógica para buscar e exibir opções de referência
+                    try:
+                        available_refs = get_available_references_for_relation(farol_ref)
+                    except Exception:
+                        available_refs = []
+
+                    ref_options = ["Selecione uma referência..."]
+                    if available_refs:
+                        # ... (lógica de filtragem e formatação das opções)
+                        filtered = []
+                        for ref in available_refs:
+                            p_status = str(ref.get('P_STATUS', '') or '').strip()
+                            b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
+                            linked = ref.get('LINKED_REFERENCE')
+                            if (b_status == 'Booking Requested' and (linked is None or str(linked).strip() == '')) or \
+                               (b_status == 'Adjustment Requested' and (linked is None or str(linked).strip() == '')):
+                                filtered.append(ref)
+                        
+                        # Ordenar e formatar opções
+                        # ... (código de ordenação e formatação)
+
+                        for ref in filtered:
+                            # ... (código de formatação da opção)
+                            inserted_date = ref.get('ROW_INSERTED_DATE')
+                            date_str = inserted_date.strftime('%d/%m/%Y %H:%M') if inserted_date else 'N/A'
+                            status_display = ref.get('B_BOOKING_STATUS', 'Status')
+                            option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
+                            ref_options.append(option_text)
+
+                    ref_options.append("🆕 New Adjustment")
+
+                    # Chave do selectbox atualizada para ser única dentro do form
+                    manual_ref_key = f"manual_voyage_ref_{adjustment_id}"
+                    selected_ref_manual = st.selectbox(
+                        "Selecione uma referência...",
+                        options=ref_options,
+                        key=manual_ref_key
+                    )
+                # --- Fim da Seção de Referência Relacionada ---
 
                 # Botões do formulário
+                st.markdown("---")
                 
                 # Validação para desabilitar botão de confirmação se necessário
                 can_confirm = True
                 if error_type == "voyage_not_found":
-                    selected_ref = st.session_state.get(f"manual_voyage_ref_{adjustment_id}")
-                    # Validação simplificada: verifica se há uma referência válida selecionada
+                    # A validação agora usa o selectbox de dentro do form
+                    selected_ref_val = st.session_state.get(manual_ref_key)
                     can_confirm = (
-                        selected_ref is not None and 
-                        selected_ref.strip() != "" and 
-                        selected_ref != "Selecione uma referência..."
+                        selected_ref_val is not None and 
+                        selected_ref_val.strip() != "" and 
+                        selected_ref_val != "Selecione uma referência..."
                     )
-                
+
                 col_confirm, col_cancel = st.columns([1, 1])
                 
                 with col_confirm:
@@ -2345,8 +2390,7 @@ def exibir_history():
                 if confirm_manual_clicked:
                     # Validação: verificar se uma referência foi selecionada (apenas para voyage_not_found)
                     if error_type == "voyage_not_found":
-                        selected_ref = st.session_state.get(f"manual_voyage_ref_{adjustment_id}")
-                        # Validação simplificada: verifica se há uma referência válida selecionada
+                        selected_ref = st.session_state.get(manual_ref_key) # Usa a chave do form
                         if (
                             not selected_ref or 
                             selected_ref.strip() == "" or 
@@ -2507,7 +2551,8 @@ def exibir_history():
         )
         
         # Renderizar seção de seleção de referência se necessário
-        if show_reference_selection:
+        # Adicionado: não mostrar se o formulário manual estiver ativo para evitar duplicidade
+        if show_reference_selection and not (voyage_manual_required and voyage_manual_required.get("adjustment_id") == adjustment_id):
 
             def _is_empty_local(value):
                 try:
@@ -2655,6 +2700,8 @@ def exibir_history():
                         del st.session_state["voyage_success_notice"]
                     st.cache_data.clear()
                     st.rerun()
+
+
 
     else:
         # Mensagem somente para abas de tabela (não exibir na "Voyage Timeline")
