@@ -2460,48 +2460,28 @@ def _parse_iso_datetime(value):
 
 
 def ensure_table_f_ellox_terminal_monitorings():
-    """Cria a tabela LogTransp.F_ELLOX_TERMINAL_MONITORINGS caso não exista."""
+    """Verifica se a tabela LogTransp.F_ELLOX_TERMINAL_MONITORINGS existe e é acessível."""
     conn = get_database_connection()
     try:
-        exists = conn.execute(text(
-            """
+        # Verificar se a tabela existe no LogTransp
+        exists = conn.execute(text("""
             SELECT COUNT(*) AS ct
-            FROM user_tables
-            WHERE table_name = 'LogTransp.F_ELLOX_TERMINAL_MONITORINGS'
-            """
-        )).scalar()
+            FROM all_tables
+            WHERE owner = 'LOGTRANSP' 
+            AND table_name = 'F_ELLOX_TERMINAL_MONITORINGS'
+        """)).scalar()
 
         if int(exists or 0) == 0:
-            ddl = text(
-                """
-                CREATE TABLE LogTransp.F_ELLOX_TERMINAL_MONITORINGS (
-                    ID                          NUMBER(20)      PRIMARY KEY,
-                    NAVIO                       VARCHAR2(100 CHAR),
-                    VIAGEM                      VARCHAR2(50 CHAR),
-                    AGENCIA                     VARCHAR2(100 CHAR),
-                    DATA_DEADLINE               DATE,
-                    DATA_DRAFT_DEADLINE         DATE,
-                    DATA_ABERTURA_GATE          DATE,
-                    DATA_ABERTURA_GATE_REEFER   DATE,
-                    DATA_ESTIMATIVA_SAIDA       DATE,
-                    DATA_ESTIMATIVA_CHEGADA     DATE,
-                    DATA_ATUALIZACAO            DATE,
-                    TERMINAL                    VARCHAR2(100 CHAR),
-                    CNPJ_TERMINAL               VARCHAR2(20 CHAR),
-                    DATA_CHEGADA                DATE,
-                    DATA_ESTIMATIVA_ATRACACAO   DATE,
-                    DATA_ATRACACAO              DATE,
-                    DATA_PARTIDA                DATE,
-                    ROW_INSERTED_DATE           DATE DEFAULT SYSDATE
-                )
-                """
-            )
-            conn.execute(ddl)
-            conn.commit()
-    finally:
-        conn.close()
-
-
+            print("❌ Tabela LogTransp.F_ELLOX_TERMINAL_MONITORINGS não existe")
+            print("💡 Execute o script de criação das tabelas primeiro")
+            return False
+        else:
+            print("✅ Tabela LogTransp.F_ELLOX_TERMINAL_MONITORINGS existe e é acessível")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Erro ao verificar tabela: {e}")
+        return False
 def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
     """Realiza upsert (MERGE) em LogTransp.F_ELLOX_TERMINAL_MONITORINGS a partir de um DataFrame.
 

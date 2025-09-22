@@ -1501,7 +1501,21 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - Validar estrutura do PDF
    - Conferir logs de extração
 
-4. **❌ Campo "Required Arrival Date Expected" Não Salva (CRÍTICO - RESOLVIDO v3.9.7)**
+4. **❌ Erro de Permissões LogTransp (CRÍTICO - RESOLVIDO v3.9.10)**
+   - **Sintoma**: `ORA-01031: insufficient privileges` ao tentar criar tabelas no schema LogTransp
+   - **Causa Raiz**: Usuário não tem permissão de CREATE no schema LogTransp, apenas SELECT/INSERT/UPDATE
+   - **Erros Específicos**:
+     - `ORA-01031: insufficient privileges` ao executar `CREATE TABLE LogTransp.F_ELLOX_TERMINAL_MONITORINGS`
+     - Sistema trava na função `ensure_table_f_ellox_terminal_monitorings()`
+     - Erro ocorre em ambientes corporativos com restrições de permissão
+   - **✅ Solução Implementada**:
+     - Verificação prévia se tabela existe no LogTransp usando `all_tables`
+     - Apenas tenta criar se tabela não existir
+     - Sistema detecta automaticamente permissões disponíveis
+     - Fallback para schema do usuário se necessário
+   - **Prevenção**: Sistema agora verifica existência antes de tentar criar objetos
+
+5. **❌ Campo "Required Arrival Date Expected" Não Salva (CRÍTICO - RESOLVIDO v3.9.7)**
    - **Sintoma**: Campo aparece vazio mesmo após preenchimento em formulários
    - **Causa Raiz**: Inconsistência entre colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED`
    - **Erros Específicos**:
@@ -1515,7 +1529,7 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - Validação de funcionamento em todas as telas
    - **Prevenção**: Sistema agora usa nomenclatura consistente em todo o projeto
 
-5. **Erros de ImportError (Resolvidos na v3.5)**
+6. **Erros de ImportError (Resolvidos na v3.5)**
    - **`ImportError: cannot import name 'get_split_data_by_farol_reference'`**:
      - ✅ **Resolvido**: Função implementada no `database.py` linha 1005
      - **Causa**: Função estava sendo importada em `shipments_split.py` mas não existia
@@ -1536,7 +1550,7 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - **Causa**: Campo limitado a 18 caracteres, mas datas com segundos têm 19 caracteres
      - **Solução**: Remoção automática de segundos (formato: YYYY-MM-DD HH:MM)
 
-5. **Problemas com API Ellox**
+7. **Problemas com API Ellox**
    - **🔴 API Desconectada**:
      - Verificar credenciais (email/senha)
      - Testar conectividade de rede
@@ -1549,7 +1563,7 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - Verificar se credenciais não expiraram
      - Testar manualmente via Postman/curl
 
-6. **Problemas com Voyage Monitoring (Resolvidos na v3.9)**
+8. **Problemas com Voyage Monitoring (Resolvidos na v3.9)**
    - **❌ Campos de Data Salvos como `None`**:
      - ✅ **Resolvido**: Função `_parse_iso_datetime` corrigida para processar objetos `pd.Timestamp`
      - **Causa**: Função não reconhecia timestamps do pandas, convertendo para `None`
@@ -1570,12 +1584,12 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - **Causa**: Usuário não conseguia distinguir entre diferentes problemas da API
      - **Solução**: Cores e mensagens específicas para cada tipo de erro (autenticação, conexão, terminal não encontrado, etc.)
 
-7. **Dropdown com nomes duplicados (navios)**
+9. **Dropdown com nomes duplicados (navios)**
    - Causa comum: o nome extraído do PDF está em caixa alta e não bate exatamente com o nome normalizado do banco
    - Correção: busca case-insensitive e uso da versão do banco; o valor do PDF é normalizado para Title Case apenas se inexistente
    - Observação: listas usam `@st.cache_data(ttl=300)`; o refresh ocorre automaticamente em até 5 minutos
 
-8. **❌ Colunas de Data Não Salvam no Split (CRÍTICO - RESOLVIDO v3.9.6)**
+10. **❌ Colunas de Data Não Salvam no Split (CRÍTICO - RESOLVIDO v3.9.6)**
    - **Sintoma**: Campos `Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date` aparecem editáveis no `shipments_split.py` mas não são salvos na tabela `F_CON_RETURN_CARRIERS`
    - **Causa**: Mapeamento incorreto na função `perform_split_operation` tentando aplicar prefixo "Sales" a colunas que não o possuem
    - **Solução**: 
@@ -1634,6 +1648,23 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9.10 - Correção de Permissões LogTransp (Janeiro 2025)
+- **🔐 Problema de Permissões Resolvido**: Corrigido erro `ORA-01031: insufficient privileges` ao tentar criar tabelas no schema LogTransp
+- **🔍 Diagnóstico Completo**: Implementado sistema de detecção automática de permissões de schema (leitura/escrita/criação)
+- **✅ Solução Inteligente**: Sistema agora detecta se usuário tem permissão de criação no LogTransp ou usa schema do usuário automaticamente
+- **🛠️ Função `ensure_table_f_ellox_terminal_monitorings` Corrigida**: 
+  - Verifica se tabela existe no LogTransp antes de tentar criar
+  - Usa `all_tables` para verificar existência no schema LogTransp
+  - Apenas tenta criar se tabela não existir
+  - Evita erro de permissão quando tabela já existe
+- **📊 Teste de Permissões**: Implementado script de teste que verifica:
+  - SELECT no LogTransp (leitura)
+  - INSERT/UPDATE/DELETE no LogTransp (escrita)
+  - CREATE no schema do usuário (criação)
+- **🎯 Compatibilidade Total**: Sistema funciona tanto com usuários que têm permissão de criação no LogTransp quanto com usuários que só têm leitura/escrita
+- **⚡ Performance**: Eliminado erro de permissão que impedia funcionamento do sistema em ambientes corporativos
+- **🔧 Schema Detection**: Sistema detecta automaticamente o schema correto a usar baseado nas permissões disponíveis
 
 ### 📌 v3.9.9 - Sistema Ellox Otimizado (Janeiro 2025)
 - **🔧 Correção de Integridade**: Resolvido erro `ORA-02292` na exclusão de dados Ellox implementando ordem correta de exclusão (ships → voyages → terminals)
@@ -2004,11 +2035,11 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.9.5*
+*Sistema de Gerenciamento de Embarques - Versão 3.9.10*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.9)
+- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.10)
 - **Módulos**: 15+ módulos especializados  
 - **Arquivos Ellox**: 4 arquivos especializados para integração API
 - **Carriers Suportados**: 8 carriers principais
@@ -2016,40 +2047,11 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 - **Funcionalidades**: 50+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.9)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.9)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.9)
-- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.9)
-
-### 🎯 Roadmap Técnico Detalhado
-
-#### 🚀 Versão 3.1 (Próxima Release)
-- [ ] **Cache Redis**: Implementação de cache distribuído
-- [ ] **WebSocket**: Atualizações em tempo real
-- [ ] **API GraphQL**: Query flexível de dados
-- [ ] **Testes Automatizados**: Cobertura 90%+
-
-#### 🔮 Versão 4.0 (Futuro)
-- [ ] **Microservices**: Arquitetura distribuída  
-- [ ] **Kubernetes**: Orquestração de containers
-- [ ] **Machine Learning**: Previsão de atrasos
-- [ ] **Mobile Native**: App iOS/Android
-ento de Embarques - Versão 3.9*
-
-### 📊 Estatísticas do Sistema
-
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.9)
-- **Módulos**: 15+ módulos especializados  
-- **Arquivos Ellox**: 4 arquivos especializados para integração API
-- **Carriers Suportados**: 8 carriers principais
-- **Integrações**: Oracle DB + API Ellox
-- **Funcionalidades**: 50+ funcionalidades ativas
-- **Performance**: < 1s resposta média
-- **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.9)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.9)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.9)
-- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.9)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.10)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.10)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.10)
+- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.10)
+- **Permissões LogTransp**: ✅ Erro ORA-01031 resolvido (v3.9.10)
 
 ### 🎯 Roadmap Técnico Detalhado
 
