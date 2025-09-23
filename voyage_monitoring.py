@@ -819,7 +819,7 @@ def exibir_voyage_monitoring():
                             deadline_value = get_field_value("DATA_DEADLINE", safe_datetime_value(row.get("DATA_DEADLINE")))
                             new_deadline_date = st.date_input("⏳ Data Deadline", value=safe_datetime_to_date(deadline_value), key=f"edit_deadline_date_{idx}", help="Data limite para entrega de documentos")
                         with col_deadline_time:
-                            new_deadline_time = st.time_input("Hora", value=safe_datetime_to_time(deadline_value), key=f"edit_deadline_time_{idx}", help="Hora limite para entrega de documentos")
+                            new_deadline_time = st.time_input("Hora", value=safe_datetime_to_time(deadline_value), key=f"edit_deadline_time_{idx}", help="Hora limite para entrega de documentos", label_visibility="collapsed")
                     
                     with col2:
                         col_draft_date, col_draft_time = st.columns([2, 1])
@@ -827,7 +827,7 @@ def exibir_voyage_monitoring():
                             draft_value = get_field_value("DATA_DRAFT_DEADLINE", safe_datetime_value(row.get("DATA_DRAFT_DEADLINE")))
                             new_draft_date = st.date_input("📝 Data Draft Deadline", value=safe_datetime_to_date(draft_value), key=f"edit_draft_date_{idx}", help="Data limite para entrega do draft")
                         with col_draft_time:
-                            new_draft_time = st.time_input("Hora", value=safe_datetime_to_time(draft_value), key=f"edit_draft_time_{idx}", help="Hora limite para entrega do draft")
+                            new_draft_time = st.time_input("Hora", value=safe_datetime_to_time(draft_value), key=f"edit_draft_time_{idx}", help="Hora limite para entrega do draft", label_visibility="collapsed")
                     
                     # Segunda linha: Data Abertura Gate e Data Abertura Gate Reefer
                     col4, col5 = st.columns(2)
@@ -838,7 +838,7 @@ def exibir_voyage_monitoring():
                             gate_value = get_field_value("DATA_ABERTURA_GATE", safe_datetime_value(row.get("DATA_ABERTURA_GATE")))
                             new_gate_date = st.date_input("🚪 Data Abertura Gate", value=safe_datetime_to_date(gate_value), key=f"edit_gate_date_{idx}", help="Data de abertura do gate para recebimento de cargas")
                         with col_gate_time:
-                            new_gate_time = st.time_input("Hora", value=safe_datetime_to_time(gate_value), key=f"edit_gate_time_{idx}", help="Hora de abertura do gate para recebimento de cargas")
+                            new_gate_time = st.time_input("Hora", value=safe_datetime_to_time(gate_value), key=f"edit_gate_time_{idx}", help="Hora de abertura do gate para recebimento de cargas", label_visibility="collapsed")
                     
                     with col5:
                         col_reefer_date, col_reefer_time = st.columns([2, 1])
@@ -846,7 +846,7 @@ def exibir_voyage_monitoring():
                             reefer_value = get_field_value("DATA_ABERTURA_GATE_REEFER", safe_datetime_value(row.get("DATA_ABERTURA_GATE_REEFER")))
                             new_reefer_date = st.date_input("🧊 Data Abertura Gate Reefer", value=safe_datetime_to_date(reefer_value), key=f"edit_reefer_date_{idx}", help="Data de abertura do gate para cargas refrigeradas")
                         with col_reefer_time:
-                            new_reefer_time = st.time_input("Hora", value=safe_datetime_to_time(reefer_value), key=f"edit_reefer_time_{idx}", help="Hora de abertura do gate para cargas refrigeradas")
+                            new_reefer_time = st.time_input("Hora", value=safe_datetime_to_time(reefer_value), key=f"edit_reefer_time_{idx}", help="Hora de abertura do gate para cargas refrigeradas", label_visibility="collapsed")
                     
                     # Datas de navegação
                     st.subheader("Datas de Navegação")
@@ -860,7 +860,7 @@ def exibir_voyage_monitoring():
                             etd_value = get_field_value("DATA_ESTIMATIVA_SAIDA", safe_datetime_value(row.get("DATA_ESTIMATIVA_SAIDA")))
                             new_etd_date = st.date_input("🚢 Data Estimativa Saída (ETD)", value=safe_datetime_to_date(etd_value), key=f"edit_etd_date_{idx}", help="Data estimada de saída do porto")
                         with col_etd_time:
-                            new_etd_time = st.time_input("Hora", value=safe_datetime_to_time(etd_value), key=f"edit_etd_time_{idx}", help="Hora estimada de saída do porto")
+                            new_etd_time = st.time_input("Hora", value=safe_datetime_to_time(etd_value), key=f"edit_etd_time_{idx}", help="Hora estimada de saída do porto", label_visibility="collapsed")
                     
                     with col2:
                         col_eta_date, col_eta_time = st.columns([2, 1])
@@ -868,7 +868,7 @@ def exibir_voyage_monitoring():
                             eta_value = get_field_value("DATA_ESTIMATIVA_CHEGADA", safe_datetime_value(row.get("DATA_ESTIMATIVA_CHEGADA")))
                             new_eta_date = st.date_input("🎯 Data Estimativa Chegada (ETA)", value=safe_datetime_to_date(eta_value), key=f"edit_eta_date_{idx}", help="Data estimada de chegada ao porto")
                         with col_eta_time:
-                            new_eta_time = st.time_input("Hora", value=safe_datetime_to_time(eta_value), key=f"edit_eta_time_{idx}", help="Hora estimada de chegada ao porto")
+                            new_eta_time = st.time_input("Hora", value=safe_datetime_to_time(eta_value), key=f"edit_eta_time_{idx}", help="Hora estimada de chegada ao porto", label_visibility="collapsed")
                     
                     # Segunda linha: ETB e ATB
                     col4, col5 = st.columns(2)
@@ -879,7 +879,7 @@ def exibir_voyage_monitoring():
                             etb_value = get_field_value("DATA_ESTIMATIVA_ATRACACAO", safe_datetime_value(row.get("DATA_ESTIMATIVA_ATRACACAO")))
                             new_etb_date = st.date_input("🛳️ Data Estimativa Atracação (ETB)", value=safe_datetime_to_date(etb_value), key=f"edit_etb_date_{idx}", help="Data estimada de atracação no cais")
                         with col_etb_time:
-                            new_etb_time = st.time_input("Hora", value=safe_datetime_to_time(etb_value), key=f"edit_etb_time_{idx}", help="Hora estimada de atracação no cais")
+                            new_etb_time = st.time_input("Hora", value=safe_datetime_to_time(etb_value), key=f"edit_etb_time_{idx}", help="Hora estimada de atracação no cais", label_visibility="collapsed")
                     
                     with col5:
                         col_atb_date, col_atb_time = st.columns([2, 1])
@@ -887,7 +887,7 @@ def exibir_voyage_monitoring():
                             atb_value = get_field_value("DATA_ATRACACAO", safe_datetime_value(row.get("DATA_ATRACACAO")))
                             new_atb_date = st.date_input("✅ Data Atracação (ATB)", value=safe_datetime_to_date(atb_value), key=f"edit_atb_date_{idx}", help="Data real de atracação no cais")
                         with col_atb_time:
-                            new_atb_time = st.time_input("Hora", value=safe_datetime_to_time(atb_value), key=f"edit_atb_time_{idx}", help="Hora real de atracação no cais")
+                            new_atb_time = st.time_input("Hora", value=safe_datetime_to_time(atb_value), key=f"edit_atb_time_{idx}", help="Hora real de atracação no cais", label_visibility="collapsed")
                     
                     # Chegada e Partida
                     st.subheader("Chegada e Partida")
@@ -901,7 +901,7 @@ def exibir_voyage_monitoring():
                             atd_value = get_field_value("DATA_PARTIDA", safe_datetime_value(row.get("DATA_PARTIDA")))
                             new_atd_date = st.date_input("📤 Data Partida (ATD)", value=safe_datetime_to_date(atd_value), key=f"edit_atd_date_{idx}", help="Data real de partida do porto")
                         with col_atd_time:
-                            new_atd_time = st.time_input("Hora", value=safe_datetime_to_time(atd_value), key=f"edit_atd_time_{idx}", help="Hora real de partida do porto")
+                            new_atd_time = st.time_input("Hora", value=safe_datetime_to_time(atd_value), key=f"edit_atd_time_{idx}", help="Hora real de partida do porto", label_visibility="collapsed")
                     
                     with col2:
                         col_ata_date, col_ata_time = st.columns([2, 1])
@@ -909,7 +909,7 @@ def exibir_voyage_monitoring():
                             ata_value = get_field_value("DATA_CHEGADA", safe_datetime_value(row.get("DATA_CHEGADA")))
                             new_ata_date = st.date_input("📥 Data Chegada (ATA)", value=safe_datetime_to_date(ata_value), key=f"edit_ata_date_{idx}", help="Data real de chegada ao porto")
                         with col_ata_time:
-                            new_ata_time = st.time_input("Hora", value=safe_datetime_to_time(ata_value), key=f"edit_ata_time_{idx}", help="Hora real de chegada ao porto")
+                            new_ata_time = st.time_input("Hora", value=safe_datetime_to_time(ata_value), key=f"edit_ata_time_{idx}", help="Hora real de chegada ao porto", label_visibility="collapsed")
                     
                     
                     
