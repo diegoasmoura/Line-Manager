@@ -66,11 +66,16 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
                 ROW_INSERTED_DATE,
-                PDF_BOOKING_EMISSION_DATE
+                PDF_BOOKING_EMISSION_DATE,
+                ADJUSTMENTS_OWNER
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
                OR UPPER(FAROL_REFERENCE) LIKE UPPER(:ref || '.%')

@@ -1061,43 +1061,48 @@ def exibir_history():
     # Grade principal com colunas relevantes (ADJUSTMENT_ID oculto mas usado internamente)
     # ID removido da visualização - não é mais necessário para o usuário
     display_cols = [
+        "P_STATUS",
+        "ROW_INSERTED_DATE",
         "FAROL_REFERENCE",
-        "B_BOOKING_REFERENCE",
-        "LINKED_REFERENCE",
         "B_BOOKING_STATUS",
-        "S_SPLITTED_BOOKING_REFERENCE",
-        "S_PLACE_OF_RECEIPT",
+        "B_BOOKING_REFERENCE",
+        "B_VESSEL_NAME",
+        "B_VOYAGE_CARRIER",
+        "B_VOYAGE_CODE",
         "S_QUANTITY_OF_CONTAINERS",
+        "S_PLACE_OF_RECEIPT",
         "S_PORT_OF_LOADING_POL",
         "S_PORT_OF_DELIVERY_POD",
         "S_FINAL_DESTINATION",
         "B_TRANSHIPMENT_PORT",
         "B_TERMINAL",
-        "B_VESSEL_NAME",
-        "B_VOYAGE_CARRIER",
-        "B_VOYAGE_CODE",
-        "B_DATA_DRAFT_DEADLINE",
-        "B_DATA_DEADLINE",
+        "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
         "S_REQUESTED_DEADLINE_START_DATE",
         "S_REQUESTED_DEADLINE_END_DATE",
-        "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
+        "B_DATA_DRAFT_DEADLINE",
+        "B_DATA_DEADLINE",
         "B_DATA_ESTIMATIVA_SAIDA_ETD",
         "B_DATA_ESTIMATIVA_CHEGADA_ETA",
         "B_DATA_ABERTURA_GATE",
-        "B_DATA_PARTIDA_ATD",
-        "B_DATA_CHEGADA_ATA",
-        "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
-        "B_DATA_ATRACACAO_ATB",
-        "P_STATUS",
         "P_PDF_NAME",
         "PDF_BOOKING_EMISSION_DATE",
-        "ROW_INSERTED_DATE",
+        "S_SPLITTED_BOOKING_REFERENCE",
+        "LINKED_REFERENCE",
+        "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+        "B_DATA_ATRACACAO_ATB",
+        "B_DATA_PARTIDA_ATD",
+        "B_DATA_CHEGADA_ATA",
         "ADJUSTMENTS_OWNER",
     ]
 
     # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna
     internal_cols = display_cols + ["ADJUSTMENT_ID"]
+    
     df_show = df[[c for c in internal_cols if c in df.columns]].copy()
+    
+    # Força a ordem correta das colunas baseada na lista display_cols
+    ordered_cols = [c for c in internal_cols if c in df_show.columns]
+    df_show = df_show[ordered_cols]
     
     # Aplica ordenação por Inserted Date antes de separar em abas
     if "ROW_INSERTED_DATE" in df_show.columns:
@@ -1118,9 +1123,8 @@ def exibir_history():
         else:
             df_show = df_show.sort_values(by=["ROW_INSERTED_DATE"], ascending=[True], kind="mergesort")
     
-    # Adiciona coluna de seleção ao df_display
+    # Cria cópia do DataFrame (coluna Selecionar será adicionada na função display_tab_content)
     df_display = df_show.copy()
-    df_display.insert(0, "Selecionar", False)
     
     # Separa os dados em duas abas baseado no status
     df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
@@ -1263,7 +1267,7 @@ def exibir_history():
                 width = "medium"  # Todas as outras colunas são medium
             
             # Determina o tipo de coluna baseado no nome
-            if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate"]):
+            if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate", "atd", "ata", "etb", "atb"]):
                 config[col] = st.column_config.DatetimeColumn(col, width=width)
             elif col in ["Quantity of Containers"]:
                 config[col] = st.column_config.NumberColumn(col, width=width)
@@ -1335,6 +1339,8 @@ def exibir_history():
         
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
+        
+        # A ordenação de colunas foi movida para a função display_tab_content para centralizar a lógica.
 
         # Deriva/Preenche a coluna "Splitted Farol Reference" quando a referência tem sufixo .n
         try:
@@ -1441,7 +1447,9 @@ def exibir_history():
         date_cols = [
             "Inserted Date", "Data Draft Deadline", "Data Deadline", 
             "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
-            "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "PDF Booking Emission Date"
+            "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "Data Abertura Gate",
+            "Data Partida ATD", "Data Chegada ATA", "Data Estimativa Atracação ETB", "Data Atracação ATB",
+            "PDF Booking Emission Date"
         ]
         for col in date_cols:
             if col in df_processed.columns:
@@ -1555,22 +1563,34 @@ def exibir_history():
                 "Required Arrival Date Expected",
                 "Requested Deadline Start Date",
                 "Requested Deadline End Date",
-                "Data Draft Deadline",
                 "Data Deadline",
+                "Data Draft Deadline",
+                "Data Abertura Gate",
                 "Data Estimativa Saída ETD",
                 "Data Estimativa Chegada ETA",
-                "Data Abertura Gate",
+                "Data Estimativa Atracação ETB",
+                "Data Atracação ATB",
+                "Data Partida ATD",
+                "Data Chegada ATA",
                 "PDF Name",
                 "PDF Booking Emission Date",
                 "Splitted Farol Reference",
                 "Linked Reference",
             ]
-            ordered = [c for c in desired_order if c in df_processed.columns]
-            remaining = [c for c in df_processed.columns if c not in ordered]
-            if ordered:
-                df_processed = df_processed[ordered + remaining]
+            
+            # Helper function to reorder columns safely
+            def reorder_columns(df, ordered_list):
+                existing_cols = [col for col in ordered_list if col in df.columns]
+                remaining_cols = [col for col in df.columns if col not in existing_cols]
+                return df[existing_cols + remaining_cols]
+
+            df_processed = reorder_columns(df_processed, desired_order)
+
         except Exception:
             pass
+        
+        # Adiciona coluna de seleção APÓS a reordenação
+        df_processed.insert(0, "Selecionar", False)
                 
         return df_processed
 
@@ -1622,7 +1642,9 @@ def exibir_history():
         # Remove colunas ETD/ETA específicas desta aba
         columns_to_remove = [
             "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", 
-            "Data Estimativa Chegada ETA", "Data Abertura Gate"
+            "Data Estimativa Chegada ETA", "Data Abertura Gate",
+            "Data Estimativa Atracação ETB", "Data Atracação ATB",
+            "Data Partida ATD", "Data Chegada ATA"
         ]
         df_for_display = df_received_processed.drop(
             columns=[col for col in columns_to_remove if col in df_received_processed.columns],
