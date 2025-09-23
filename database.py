@@ -66,8 +66,11 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
+                B_DATA_CONFIRMACAO_EMBARQUE,
                 B_DATA_PARTIDA_ATD,
+                B_DATA_ESTIMADA_TRANSBORDO_ETD,
                 B_DATA_CHEGADA_ATA,
+                B_DATA_TRANSBORDO_ATD,
                 B_DATA_ESTIMATIVA_ATRACACAO_ETB,
                 B_DATA_ATRACACAO_ATB,
                 USER_INSERT,
@@ -120,6 +123,13 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
+                B_DATA_CONFIRMACAO_EMBARQUE,
+                B_DATA_PARTIDA_ATD,
+                B_DATA_ESTIMADA_TRANSBORDO_ETD,
+                B_DATA_CHEGADA_ATA,
+                B_DATA_TRANSBORDO_ATD,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                B_DATA_ATRACACAO_ATB,
                 USER_INSERT,
                 USER_UPDATE,
                 DATE_UPDATE,
@@ -260,8 +270,11 @@ def get_data_bookingData():
         B_DATA_ESTIMATIVA_SAIDA_ETD          AS b_data_estimativa_saida_etd,
         B_DATA_ESTIMATIVA_CHEGADA_ETA        AS b_data_estimativa_chegada_eta,
         B_DATA_ABERTURA_GATE                 AS b_data_abertura_gate,
+        B_DATA_CONFIRMACAO_EMBARQUE          AS b_data_confirmacao_embarque,
         B_DATA_PARTIDA_ATD                   AS b_data_partida_atd,
+        B_DATA_ESTIMADA_TRANSBORDO_ETD       AS b_data_estimada_transbordo_etd,
         B_DATA_CHEGADA_ATA                   AS b_data_chegada_ata,
+        B_DATA_TRANSBORDO_ATD                AS b_data_transbordo_atd,
         B_DATA_ESTIMATIVA_ATRACACAO_ETB      AS b_data_estimativa_atracacao_etb,
         B_DATA_ATRACACAO_ATB                 AS b_data_atracacao_atb,
         /* demais valores */
@@ -293,8 +306,9 @@ def get_data_bookingData():
         # Converter colunas de data/hora para datetime
         datetime_columns = [
             'Data Draft Deadline', 'Data Deadline', 'Data Estimativa Saída ETD', 
-            'Data Estimativa Chegada ETA', 'Data Abertura Gate', 'Data Partida ATD', 
-            'Data Chegada ATA', 'Data Estimativa Atracação ETB', 'Data Atracação ATB'
+            'Data Estimativa Chegada ETA', 'Data Abertura Gate', 'Data Confirmação Embarque',
+            'Data Partida ATD', 'Data Estimada Transbordo ETD', 'Data Chegada ATA', 
+            'Data Transbordo ATD', 'Data Estimativa Atracação ETB', 'Data Atracação ATB'
         ]
         
         for col in datetime_columns:
@@ -312,7 +326,8 @@ def get_data_bookingData():
             # Datas de planejamento
             "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
             "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "Data Abertura Gate",
-            "Data Partida ATD", "Data Chegada ATA", "Data Estimativa Atracação ETB", "Data Atracação ATB",
+            "Data Confirmação Embarque", "Data Partida ATD", "Data Estimada Transbordo ETD", "Data Chegada ATA", 
+            "Data Transbordo ATD", "Data Estimativa Atracação ETB", "Data Atracação ATB",
             # Armador/viagem
             "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
@@ -1549,7 +1564,8 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, 
                         S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE, S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                         B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, 
-                        B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
+                        B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, 
+                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATTD, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
                         B_BOOKING_STATUS, ROW_INSERTED_DATE
                     FROM LogTransp.F_CON_RETURN_CARRIERS
                     WHERE FAROL_REFERENCE = :farol_ref 
@@ -2380,8 +2396,11 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.Da
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
+                B_DATA_CONFIRMACAO_EMBARQUE,
                 B_DATA_PARTIDA_ATD,
+                B_DATA_ESTIMADA_TRANSBORDO_ETD,
                 B_DATA_CHEGADA_ATA,
+                B_DATA_TRANSBORDO_ATD,
                 B_DATA_ESTIMATIVA_ATRACACAO_ETB,
                 B_DATA_ATRACACAO_ATB,
                 AREA,

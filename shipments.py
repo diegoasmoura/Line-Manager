@@ -315,6 +315,32 @@ def exibir_shipments():
             colunas_ordenadas.remove("Voyage Code")
             idx_carrier = colunas_ordenadas.index("Voyage Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
+        
+        # Posiciona as novas colunas de datas entre "Data Abertura Gate" e "Data Partida ATD"
+        if "Data Abertura Gate" in colunas_ordenadas and "Data Partida ATD" in colunas_ordenadas:
+            # Remove as novas colunas se já estiverem na lista
+            for col in ["Data Confirmação Embarque", "Data Estimada Transbordo ETD", "Data Transbordo ATD"]:
+                if col in colunas_ordenadas:
+                    colunas_ordenadas.remove(col)
+            
+            # Encontra a posição após "Data Abertura Gate"
+            idx_gate = colunas_ordenadas.index("Data Abertura Gate")
+            
+            # Insere as novas colunas na ordem correta (apenas se existirem no DataFrame)
+            if "Data Confirmação Embarque" in df.columns:
+                colunas_ordenadas.insert(idx_gate + 1, "Data Confirmação Embarque")
+                idx_gate += 1  # Ajusta o índice após inserção
+            
+            # Recalcula a posição de "Data Partida ATD" após inserções
+            idx_partida = colunas_ordenadas.index("Data Partida ATD")
+            if "Data Estimada Transbordo ETD" in df.columns:
+                colunas_ordenadas.insert(idx_partida, "Data Estimada Transbordo ETD")
+                idx_partida += 1  # Ajusta o índice após inserção
+            
+            # Recalcula a posição de "Data Chegada ATA" após inserções
+            if "Data Chegada ATA" in colunas_ordenadas and "Data Transbordo ATD" in df.columns:
+                idx_chegada = colunas_ordenadas.index("Data Chegada ATA")
+                colunas_ordenadas.insert(idx_chegada, "Data Transbordo ATD")
 
     # Fixar largura da coluna Carrier Returns aproximadamente ao tamanho do título
     if "Carrier Returns" in colunas_ordenadas:

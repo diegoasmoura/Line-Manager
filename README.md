@@ -947,6 +947,46 @@ Gestão de anexos e documentos
 - UPLOAD_TIMESTAMP
 ```
 
+### 📅 Colunas de Monitoramento de Booking
+
+#### Novas Colunas de Data (v3.9.8 - Janeiro 2025)
+
+O sistema agora inclui três novas colunas para monitoramento avançado de bookings:
+
+##### **B_DATA_CONFIRMACAO_EMBARQUE**
+- **Descrição**: Confirmação do booking no site do armador
+- **Tipo**: TIMESTAMP(6)
+- **Posicionamento**: Entre "Data Abertura Gate" e "Data Partida ATD"
+- **Uso**: Rastreamento de quando o booking foi confirmado oficialmente pelo carrier
+
+##### **B_DATA_ESTIMADA_TRANSBORDO_ETD**
+- **Descrição**: Data programada para saída do booking do transbordo
+- **Tipo**: TIMESTAMP(6)
+- **Posicionamento**: Entre "Data Partida ATD" e "Data Chegada ATA"
+- **Uso**: Planejamento de transbordos e conexões de carga
+
+##### **B_DATA_TRANSBORDO_ATD**
+- **Descrição**: Data real de saída do booking do transbordo
+- **Tipo**: TIMESTAMP(6)
+- **Posicionamento**: Após "Data Chegada ATA"
+- **Uso**: Controle de execução real dos transbordos
+
+#### Implementação Técnica
+
+**Tabelas Afetadas:**
+- ✅ `F_CON_SALES_BOOKING_DATA` - Colunas criadas e funcionais
+- ✅ `F_CON_RETURN_CARRIERS` - Colunas criadas e funcionais
+
+**Interfaces Atualizadas:**
+- ✅ **Booking Management** (`shipments.py`) - Exibição entre colunas existentes
+- ✅ **Request Timeline** (`history.py`) - Exibição na aba de histórico
+- ✅ **Mapeamentos** (`shipments_mapping.py`) - Configuração de editores datetime
+
+**Formato de Exibição:**
+- **Interface**: `DD/MM/YYYY HH:mm` (padrão datetime)
+- **Banco**: `TIMESTAMP(6)` (precisão de microssegundos)
+- **Validação**: Conversão automática com tratamento de erros
+
 ### Relacionamentos
 
 ```
@@ -1649,6 +1689,24 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.11 - Novas Colunas de Monitoramento de Booking (Janeiro 2025)
+- **📅 Novas Colunas de Data**: Implementadas 3 novas colunas para monitoramento avançado de bookings:
+  - **B_DATA_CONFIRMACAO_EMBARQUE**: Confirmação do booking no site do armador
+  - **B_DATA_ESTIMADA_TRANSBORDO_ETD**: Data programada para saída do booking do transbordo  
+  - **B_DATA_TRANSBORDO_ATD**: Data real de saída do booking do transbordo
+- **🗃️ Estrutura do Banco**: Colunas criadas em ambas as tabelas `F_CON_SALES_BOOKING_DATA` e `F_CON_RETURN_CARRIERS`
+- **🎨 Interfaces Atualizadas**:
+  - **Booking Management**: Colunas exibidas entre colunas existentes conforme posicionamento solicitado
+  - **Request Timeline**: Colunas incluídas na aba de histórico com mapeamento correto
+  - **Mapeamentos**: Configuração de editores datetime com formato `DD/MM/YYYY HH:mm`
+- **🔧 Implementação Técnica**:
+  - Consultas SQL atualizadas em `database.py` para incluir as novas colunas
+  - Mapeamentos corrigidos em `shipments_mapping.py` e `history.py`
+  - Lógica de posicionamento implementada em `shipments.py`
+  - Lista `display_cols` atualizada em `history.py` para exibição na Request Timeline
+- **📊 Formato de Dados**: TIMESTAMP(6) no banco com conversão automática para datetime na interface
+- **⚠️ Impacto**: Melhoria significativa no monitoramento de bookings com rastreamento detalhado de confirmações e transbordos
+
 ### 📌 v3.9.10 - Correção de Permissões LogTransp (Janeiro 2025)
 - **🔐 Problema de Permissões Resolvido**: Corrigido erro `ORA-01031: insufficient privileges` ao tentar criar tabelas no schema LogTransp
 - **🔍 Diagnóstico Completo**: Implementado sistema de detecção automática de permissões de schema (leitura/escrita/criação)
@@ -1722,7 +1780,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **⚙️ Configuração Melhorada**: Adicionado `step=60` para `DatetimeColumn` com melhor controle de edição
 - **🔄 Conversão de Dados**: Implementada conversão explícita para `datetime64[ns]` em `get_data_bookingData()`
 - **📊 Formato Padronizado**: Todas as colunas B_DATA_* agora exibem formato `DD/MM/YYYY HH:mm`
-- **✅ Colunas Afetadas**: B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
+- **✅ Colunas Afetadas**: B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATD, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
 - **🎯 Melhoria na UX**: Usuários agora podem ver e editar horários precisos nas datas de booking
 
 ### 📌 v3.9.4 - Melhoria na Identificação de Origem e Limpeza de Campos (Setembro 2025)
