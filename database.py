@@ -1563,9 +1563,9 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         B_BOOKING_STATUS, ROW_INSERTED_DATE
                     FROM LogTransp.F_CON_RETURN_CARRIERS
                     WHERE FAROL_REFERENCE = :farol_ref 
-                    AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                         OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                         OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+                    -- AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                         -- OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                         -- OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
                     ORDER BY ROW_INSERTED_DATE DESC
                     FETCH FIRST 1 ROWS ONLY
                 """)
@@ -2230,9 +2230,9 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                         S_REQUIRED_ARRIVAL_DATE_EXPECTED
                     FROM LogTransp.F_CON_SALES_BOOKING_DATA
                     WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
-                    AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                         OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                         OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+                    -- AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                         -- OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                         -- OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
                     ORDER BY ROW_INSERTED_DATE DESC
                     FETCH FIRST 1 ROWS ONLY
                 """)
@@ -2304,9 +2304,9 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
                 ADJUSTMENT_ID
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
-            AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                 OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                 OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+            -- AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                 -- OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                 -- OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
             ORDER BY ROW_INSERTED_DATE DESC
             FETCH FIRST 1 ROWS ONLY
         """)
@@ -2742,9 +2742,9 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
                 ADJUSTMENT_ID
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
-            AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                 OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                 OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+            -- AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                 -- OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                 -- OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
             ORDER BY ROW_INSERTED_DATE DESC
             FETCH FIRST 1 ROWS ONLY
         """)
