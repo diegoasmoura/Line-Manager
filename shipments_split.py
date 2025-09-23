@@ -351,6 +351,7 @@ def show_split_form():
                                                 ui_row, 
                                                 user_insert=st.session_state.get('current_user', 'system'),
                                                 status_override="Adjustment Requested",  # Explicitamente definir para ativar pré-preenchimento
+                                                p_status_override="Adjusts Cargill",  # Define P_STATUS para ajustes da Cargill
                                                 area=area,
                                                 request_reason=reason,
                                                 adjustments_owner=responsibility,
