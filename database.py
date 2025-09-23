@@ -1571,6 +1571,10 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                 """)
                 result = conn.execute(prefill_query, {"farol_ref": farol_ref}).mappings().fetchone()
                 if result:
+                    # Debug: verificar se encontrou dados
+                    print(f"DEBUG: Encontrou dados para Farol Reference {farol_ref}")
+                    print(f"DEBUG: Dados encontrados: {dict(result)}")
+                    
                     # Mapear campos para pré-preenchimento
                     date_fields_mapping = {
                         'B_DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE',
@@ -1589,6 +1593,9 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                     for src_field, dest_field in date_fields_mapping.items():
                         if src_field.lower() in result and result[src_field.lower()] is not None:
                             prefill_dates[dest_field] = result[src_field.lower()]
+                            print(f"DEBUG: Pré-preenchido {dest_field} = {result[src_field.lower()]}")
+                else:
+                    print(f"DEBUG: Nenhum dado encontrado para Farol Reference {farol_ref}")
             except Exception as e:
                 # Se falhar, continua sem pré-preenchimento
                 pass
@@ -1640,6 +1647,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                     db_data[db_key] = value
         
         # Aplicar pré-preenchimento de datas do último registro aprovado (apenas se não fornecidas)
+        print(f"DEBUG: prefill_dates disponíveis: {prefill_dates}")
         for date_field, date_value in prefill_dates.items():
             # Só aplica pré-preenchimento se:
             # 1. A coluna não estiver no db_data OU
@@ -1651,8 +1659,11 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                 (isinstance(db_data[date_field], str) and db_data[date_field].strip() == "")
             )
             
+            print(f"DEBUG: Campo {date_field} - should_prefill: {should_prefill}, valor atual: {db_data.get(date_field, 'N/A')}")
+            
             if should_prefill:
                 db_data[date_field] = date_value
+                print(f"DEBUG: Pré-preenchido {date_field} = {date_value}")
 
         # Campos obrigatórios e padrões
         db_data["B_BOOKING_STATUS"] = status_override or "Adjustment Requested"
