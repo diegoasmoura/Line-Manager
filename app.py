@@ -11,6 +11,7 @@ import performance_control
 import tracking
 import history
 import voyage_monitoring
+import voyage_update
 import setup
  
 # Ícone SVG personalizado (Farol)
@@ -38,7 +39,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
  
     # Lista de opções
-    options = ["Shipments", "Op. Control", "Performance", "Tracking", "History", "Voyage Monitoring", "Setup"]  # Removido "Adjustments" - funcionalidade movida para History
+    options = ["Shipments", "Op. Control", "Performance", "Tracking", "History", "Voyage Monitoring", "Voyage Update", "Setup"]  # Removido "Adjustments" - funcionalidade movida para History
     
     # Encontra o índice da opção atual
     current_index = options.index(st.session_state.menu_choice) if st.session_state.menu_choice in options else 0
@@ -47,7 +48,7 @@ with st.sidebar:
     choice = option_menu(
         None,
         options,
-        icons=["truck", "clipboard-data", "bar-chart", "geo-alt", "clock-history", "ship", "gear"],  # Removido ícone "sliders" do Adjustments
+        icons=["truck", "clipboard-data", "bar-chart", "geo-alt", "clock-history", "ship", "pencil-square", "gear"],  # Removido ícone "sliders" do Adjustments
         menu_icon="menu",
         default_index=current_index,
         key="main_menu",  # Chave estável para evitar remount e flicker
@@ -76,6 +77,8 @@ elif st.session_state.menu_choice == "History":
     history.exibir_history()
 elif st.session_state.menu_choice == "Voyage Monitoring":
     voyage_monitoring.exibir_voyage_monitoring()
+elif st.session_state.menu_choice == "Voyage Update":
+    voyage_update.exibir_voyage_update_page()
 elif st.session_state.menu_choice == "Setup":
     setup.exibir_setup()
  

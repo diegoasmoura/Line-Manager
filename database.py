@@ -2284,6 +2284,137 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
     finally:
         conn.close()
 
+def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
+    """
+    Processes manual updates from the voyage update screen.
+
+    For each updated voyage, this function will:
+    1. Insert a new record into F_ELLOX_TERMINAL_MONITORINGS with the new state.
+    2. Update the corresponding date fields in F_CON_SALES_BOOKING_DATA for all associated Farol References.
+    3. Insert a log record into F_CON_VOYAGE_MANUAL_UPDATES for each change.
+
+    Args:
+        changes (list): A list of dictionaries, where each dictionary represents a single cell change.
+
+    Returns:
+        tuple[bool, str]: A tuple containing a success flag and a message.
+    """
+    if not changes:
+        return False, "No changes provided."
+
+    conn = get_database_connection()
+    transaction = conn.begin()
+
+    # This mapping is crucial and needs to be validated against the database schema.
+    COLUMN_MAPPING = {
+        "DATA_ESTIMATIVA_SAIDA": "B_DATA_ESTIMATIVA_SAIDA_ETD",
+        "DATA_ESTIMATIVA_CHEGADA": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+        "DATA_DEADLINE": "B_DATA_DEADLINE",
+        "DATA_DRAFT_DEADLINE": "B_DATA_DRAFT_DEADLINE",
+        "DATA_ABERTURA_GATE": "B_DATA_ABERTURA_GATE",
+        "DATA_ATRACACAO": "B_DATA_ATRACACAO_ATB",
+        "DATA_PARTIDA": "B_DATA_PARTIDA_ATD",
+        "DATA_CHEGADA": "B_DATA_CHEGADA_ATA",
+        "DATA_ESTIMATIVA_ATRACACAO": "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+    }
+
+    try:
+        from collections import defaultdict
+
+        # Group changes by unique voyage to process them in batches
+        voyage_updates = defaultdict(lambda: {'fields': {}, 'farol_references': None, 'id': None})
+        for change in changes:
+            voyage_key = (change['vessel_name'], change['voyage_code'], change['terminal'])
+            voyage_updates[voyage_key]['fields'][change['field_name']] = {
+                'new_value': change['new_value'],
+                'old_value': change['old_value']
+            }
+            voyage_updates[voyage_key]['farol_references'] = change['farol_references']
+            voyage_updates[voyage_key]['id'] = change['id'] # Original ID of the monitoring record
+
+        for voyage_key, update_data in voyage_updates.items():
+            vessel_name, voyage_code, terminal = voyage_key
+            changed_fields = update_data['fields']
+            farol_references_str = update_data['farol_references']
+            original_monitoring_id = update_data['id']
+
+            # 1. Create new record for F_ELLOX_TERMINAL_MONITORINGS
+            # First, fetch the latest record to use as a template
+            latest_monitoring_query = text("SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS WHERE ID = :id")
+            template_record = conn.execute(latest_monitoring_query, {"id": original_monitoring_id}).mappings().fetchone()
+
+            if not template_record:
+                raise Exception(f"Could not find original monitoring record with ID {original_monitoring_id}")
+
+            new_monitoring_record = dict(template_record)
+            # Remove ID, as it's an identity column and a new one will be generated
+            if 'id' in new_monitoring_record:
+                del new_monitoring_record['id']
+            if 'ID' in new_monitoring_record:
+                del new_monitoring_record['ID']
+
+            # Update fields with new values
+            for field_name, values in changed_fields.items():
+                if field_name.upper() in new_monitoring_record:
+                    new_monitoring_record[field_name.upper()] = values['new_value']
+
+            # Insert the new monitoring record
+            monitoring_cols = ", ".join(new_monitoring_record.keys())
+            monitoring_placeholders = ", ".join([f":{k}" for k in new_monitoring_record.keys()])
+            insert_monitoring_sql = text(f"INSERT INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS ({monitoring_cols}) VALUES ({monitoring_placeholders})")
+            conn.execute(insert_monitoring_sql, new_monitoring_record)
+
+            # If there are no associated references, we are done with this voyage
+            if not farol_references_str or pd.isna(farol_references_str):
+                continue
+
+            farol_references = [ref.strip() for ref in farol_references_str.split(',')]
+
+            # 2. & 3. Update F_CON_SALES_BOOKING_DATA and log the change
+            for fr in farol_references:
+                update_clauses = []
+                log_entries = []
+                update_params = {'farol_reference': fr}
+                
+                for field_name, values in changed_fields.items():
+                    # Map to the main table's column name
+                    main_table_col = COLUMN_MAPPING.get(field_name.upper())
+                    if main_table_col:
+                        update_clauses.append(f"{main_table_col} = :{main_table_col}")
+                        update_params[main_table_col] = values['new_value']
+                        
+                        log_entries.append({
+                            "farol_reference": fr,
+                            "field_name": main_table_col,
+                            "old_value": str(values['old_value']) if values['old_value'] is not None else None,
+                            "new_value": str(values['new_value']) if values['new_value'] is not None else None,
+                            "updated_by": "system" # Placeholder for user
+                        })
+
+                # Update F_CON_SALES_BOOKING_DATA
+                if update_clauses:
+                    update_sql = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {', '.join(update_clauses)} WHERE FAROL_REFERENCE = :farol_reference")
+                    conn.execute(update_sql, update_params)
+
+                # Insert into log table
+                if log_entries:
+                    log_sql = text("""
+                        INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY)
+                        VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)
+                    """)
+                    conn.execute(log_sql, log_entries)
+
+        transaction.commit()
+        return True, "Changes saved successfully."
+
+    except Exception as e:
+        if transaction:
+            transaction.rollback()
+        return False, str(e)
+    finally:
+        if conn:
+            conn.close()
+
 def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
     """
     Atualiza o status da linha na tabela F_CON_RETURN_CARRIERS.

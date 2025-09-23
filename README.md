@@ -1764,6 +1764,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.12 - Módulo de Atualização Manual de Viagens (Setembro 2025)
+- **🚢 Nova Tela "Voyage Update"**: Adicionada uma nova tela ao menu principal para permitir a atualização manual de datas de viagens (ETD, ETA, Deadlines, etc.).
+- **✏️ Edição Direta na Grade**: A nova interface permite que os usuários editem as datas diretamente na tabela, de forma rápida e intuitiva, como em uma planilha.
+- **⚙️ Lógica de Atualização em Massa**: Ao salvar, o sistema atualiza a data correspondente em todos os registros da `F_CON_SALES_BOOKING_DATA` associados àquela viagem.
+- **🗄️ Auditoria de Alterações**: Criada a tabela `F_CON_VOYAGE_MANUAL_UPDATES` para registrar um log detalhado de toda e qualquer alteração manual de data, garantindo total rastreabilidade.
+- **🔄 Inserção de Histórico de Monitoramento**: Cada atualização manual também gera um novo registro de estado na tabela `F_ELLOX_TERMINAL_MONITORINGS`.
+
+
 ### 📌 v3.9.11 - Novas Colunas de Monitoramento de Booking (Janeiro 2025)
 - **📅 Novas Colunas de Data**: Implementadas 3 novas colunas para monitoramento avançado de bookings:
   - **B_DATA_CONFIRMACAO_EMBARQUE**: Confirmação do booking no site do armador
@@ -2226,4 +2234,6 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 - [ ] **Microservices**: Arquitetura distribuída  
 - [ ] **Kubernetes**: Orquestração de containers
 - [ ] **Machine Learning**: Previsão de atrasos
+- [ ] **Mobile Native**: App iOS/Android
+evisão de atrasos
 - [ ] **Mobile Native**: App iOS/Android
