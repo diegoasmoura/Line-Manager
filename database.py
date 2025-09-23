@@ -2221,6 +2221,30 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             # Buscar últimos valores dos campos de data da F_CON_RETURN_CARRIERS
             last_date_values = get_last_date_values_from_carriers(farol_reference)
             
+            # Se não há valores na F_CON_RETURN_CARRIERS, buscar da tabela principal F_CON_SALES_BOOKING_DATA
+            if not last_date_values:
+                main_date_query = text("""
+                    SELECT 
+                        S_REQUESTED_DEADLINE_START_DATE,
+                        S_REQUESTED_DEADLINE_END_DATE,
+                        S_REQUIRED_ARRIVAL_DATE_EXPECTED
+                    FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                    WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
+                    AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
+                         OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
+                         OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
+                    ORDER BY ROW_INSERTED_DATE DESC
+                    FETCH FIRST 1 ROWS ONLY
+                """)
+                
+                main_date_result = conn.execute(main_date_query, {"farol_ref": farol_reference}).mappings().fetchone()
+                if main_date_result:
+                    last_date_values = {
+                        "S_REQUESTED_DEADLINE_START_DATE": main_date_result.get("S_REQUESTED_DEADLINE_START_DATE"),
+                        "S_REQUESTED_DEADLINE_END_DATE": main_date_result.get("S_REQUESTED_DEADLINE_END_DATE"),
+                        "S_REQUIRED_ARRIVAL_DATE_EXPECTED": main_date_result.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED")
+                    }
+            
             carrier_update_fields = {}
             
             # Sempre tentar preencher com os últimos valores encontrados
