@@ -201,13 +201,9 @@ def get_data_salesData():
         conn = get_database_connection()
         df = pd.read_sql_query(text(query), conn)
 
-        print(df)
- 
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
-
-        print(df)
         
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
@@ -297,8 +293,6 @@ def get_data_bookingData():
         conn = get_database_connection()
         df = pd.read_sql_query(text(query), conn)
 
-        print(df.columns)
- 
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
