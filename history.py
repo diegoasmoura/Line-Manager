@@ -1115,7 +1115,7 @@ def exibir_history():
             refs_base = df_show["FAROL_REFERENCE"].astype(str)
             df_show["__ref_root"] = refs_base.str.split(".").str[0]
             df_show["__ref_suffix_num"] = (
-                refs_base.str.extract(r"\.(\d+)$")[0].fillna(0).infer_objects(copy=False).astype(int)
+                refs_base.str.extract(r"\.(\d+)$")[0].fillna("0").astype(str).astype(int)
             )
             df_show = df_show.sort_values(
                 by=["ROW_INSERTED_DATE", "__ref_root", "__ref_suffix_num"],
@@ -1468,7 +1468,7 @@ def exibir_history():
                 refs_base = df_processed["Farol Reference"].astype(str)
                 df_processed["__ref_root"] = refs_base.str.split(".").str[0]
                 df_processed["__ref_suffix_num"] = (
-                    refs_base.str.extract(r"\.(\d+)$")[0].fillna(0).infer_objects(copy=False).astype(int)
+                    refs_base.str.extract(r"\.(\d+)$")[0].fillna("0").astype(str).astype(int)
                 )
                 df_processed = df_processed.sort_values(
                     by=["Inserted Date", "__ref_root", "__ref_suffix_num"],
