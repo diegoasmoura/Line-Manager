@@ -1,11 +1,9 @@
-
 import streamlit as st
 import pandas as pd
 from sqlalchemy import text
 import traceback
 
 # Presume que as funções de banco de dados estarão disponíveis
-# A função update_booking_from_voyage será criada no proximo passo
 from database import get_database_connection, update_booking_from_voyage
 
 def get_voyage_data_for_update():
@@ -15,14 +13,14 @@ def get_voyage_data_for_update():
     """
     try:
         with get_database_connection() as conn:
-            # Query otimizada para buscar apenas os dados necessários para a edição
+            # A convenção do driver Oracle com pandas retorna colunas em minúsculas
             query = text("""
                 WITH latest_monitoring AS (
                     SELECT
                         m.ID,
-                        m.NAVIO as "vessel_name",
-                        m.VIAGEM as "voyage_code",
-                        m.TERMINAL as "terminal",
+                        m.NAVIO,
+                        m.VIAGEM,
+                        m.TERMINAL,
                         m.DATA_ESTIMATIVA_SAIDA,
                         m.DATA_ESTIMATIVA_CHEGADA,
                         m.DATA_DEADLINE,
@@ -40,9 +38,9 @@ def get_voyage_data_for_update():
                 )
                 SELECT
                     lm.ID,
-                    lm."vessel_name",
-                    lm."voyage_code",
-                    lm."terminal",
+                    lm.NAVIO,
+                    lm.VIAGEM,
+                    lm.TERMINAL,
                     lm.DATA_ESTIMATIVA_SAIDA,
                     lm.DATA_ESTIMATIVA_CHEGADA,
                     lm.DATA_DEADLINE,
@@ -52,26 +50,28 @@ def get_voyage_data_for_update():
                     lm.DATA_PARTIDA,
                     lm.DATA_CHEGADA,
                     lm.DATA_ESTIMATIVA_ATRACACAO,
-                    LISTAGG(DISTINCT r.FAROL_REFERENCE, ', ') WITHIN GROUP (ORDER BY r.FAROL_REFERENCE) as "farol_references"
+                    LISTAGG(DISTINCT r.FAROL_REFERENCE, ', ') WITHIN GROUP (ORDER BY r.FAROL_REFERENCE) as FAROL_REFERENCES
                 FROM latest_monitoring lm
                 LEFT JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
-                    UPPER(lm."vessel_name") = UPPER(r.B_VESSEL_NAME)
-                    AND UPPER(lm."voyage_code") = UPPER(r.B_VOYAGE_CODE)
-                    AND UPPER(lm."terminal") = UPPER(r.B_TERMINAL)
+                    UPPER(lm.NAVIO) = UPPER(r.B_VESSEL_NAME)
+                    AND UPPER(lm.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
+                    AND UPPER(lm.TERMINAL) = UPPER(r.B_TERMINAL)
                     AND r.FAROL_REFERENCE IS NOT NULL
                 )
                 WHERE lm.rn = 1
                 GROUP BY
-                    lm.ID, lm."vessel_name", lm."voyage_code", lm."terminal", lm.DATA_ESTIMATIVA_SAIDA,
+                    lm.ID, lm.NAVIO, lm.VIAGEM, lm.TERMINAL, lm.DATA_ESTIMATIVA_SAIDA,
                     lm.DATA_ESTIMATIVA_CHEGADA, lm.DATA_DEADLINE, lm.DATA_DRAFT_DEADLINE,
                     lm.DATA_ABERTURA_GATE, lm.DATA_ATRACACAO, lm.DATA_PARTIDA, lm.DATA_CHEGADA,
                     lm.DATA_ESTIMATIVA_ATRACACAO
-                ORDER BY lm."vessel_name", lm."voyage_code"
+                ORDER BY lm.NAVIO, lm.VIAGEM
             """)
             df = pd.read_sql(query, conn)
 
+            # O driver retorna colunas em minúsculas. Não é necessário converter para maiúsculas.
+
             # Converte colunas de data para datetime
-            date_columns = [col for col in df.columns if 'DATA' in col.upper()]
+            date_columns = [col for col in df.columns if 'data' in col.lower()]
             for col in date_columns:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
 
@@ -87,7 +87,6 @@ def exibir_voyage_update_page():
     """
     st.title("🚢 Atualização Manual de Datas de Viagem")
 
-    # Guarda o dataframe original no estado da sessão para comparação
     if 'original_voyage_data' not in st.session_state:
         with st.spinner("Carregando dados de viagens..."):
             st.session_state.original_voyage_data = get_voyage_data_for_update()
@@ -98,13 +97,13 @@ def exibir_voyage_update_page():
         st.info("Nenhum dado de viagem encontrado para atualização.")
         return
 
-    # Filtros
+    # Filtros usando colunas em minúsculas
     st.subheader("🔍 Filtros")
     col1, col2 = st.columns(2)
     with col1:
         vessel_filter = st.multiselect(
             "Filtrar por Navio",
-            options=sorted(df_original["vessel_name"].dropna().unique().tolist()),
+            options=sorted(df_original["navio"].dropna().unique().tolist()),
             key="voyage_update_vessel_filter"
         )
     with col2:
@@ -116,28 +115,29 @@ def exibir_voyage_update_page():
 
     df_filtered = df_original.copy()
     if vessel_filter:
-        df_filtered = df_filtered[df_filtered["vessel_name"].isin(vessel_filter)]
+        df_filtered = df_filtered[df_filtered["navio"].isin(vessel_filter)]
     if terminal_filter:
         df_filtered = df_filtered[df_filtered["terminal"].isin(terminal_filter)]
 
     st.info("Edite as datas diretamente na grade. As alterações serão destacadas. Clique em 'Salvar Alterações' para confirmar.")
 
-    # Configuração das colunas do data_editor
+    # Configuração das colunas do data_editor usando chaves em minúsculas
     column_config = {
-        "ID": None, # Ocultar ID
-        "vessel_name": st.column_config.TextColumn("Navio", disabled=True, help="Nome do Navio"),
-        "voyage_code": st.column_config.TextColumn("Viagem", disabled=True, help="Código da Viagem"),
+        "id": None,
+        "rn": None,
+        "navio": st.column_config.TextColumn("Navio", disabled=True, help="Nome do Navio"),
+        "viagem": st.column_config.TextColumn("Viagem", disabled=True, help="Código da Viagem"),
         "terminal": st.column_config.TextColumn("Terminal", disabled=True, help="Terminal de Operação"),
         "farol_references": st.column_config.TextColumn("Farol References", help="Referências associadas a esta viagem.", disabled=True, width="large"),
-        "DATA_ESTIMATIVA_SAIDA": st.column_config.DatetimeColumn("ETD", format="DD/MM/YYYY HH:mm"),
-        "DATA_ESTIMATIVA_CHEGADA": st.column_config.DatetimeColumn("ETA", format="DD/MM/YYYY HH:mm"),
-        "DATA_DEADLINE": st.column_config.DatetimeColumn("Deadline", format="DD/MM/YYYY HH:mm"),
-        "DATA_DRAFT_DEADLINE": st.column_config.DatetimeColumn("Draft Deadline", format="DD/MM/YYYY HH:mm"),
-        "DATA_ABERTURA_GATE": st.column_config.DatetimeColumn("Abertura Gate", format="DD/MM/YYYY HH:mm"),
-        "DATA_ATRACACAO": st.column_config.DatetimeColumn("Atracação (ATB)", format="DD/MM/YYYY HH:mm"),
-        "DATA_PARTIDA": st.column_config.DatetimeColumn("Partida (ATD)", format="DD/MM/YYYY HH:mm"),
-        "DATA_CHEGADA": st.column_config.DatetimeColumn("Chegada (ATA)", format="DD/MM/YYYY HH:mm"),
-        "DATA_ESTIMATIVA_ATRACACAO": st.column_config.DatetimeColumn("Estimativa Atracação (ETB)", format="DD/MM/YYYY HH:mm"),
+        "data_estimativa_saida": st.column_config.DatetimeColumn("ETD", format="DD/MM/YYYY HH:mm"),
+        "data_estimativa_chegada": st.column_config.DatetimeColumn("ETA", format="DD/MM/YYYY HH:mm"),
+        "data_deadline": st.column_config.DatetimeColumn("Deadline", format="DD/MM/YYYY HH:mm"),
+        "data_draft_deadline": st.column_config.DatetimeColumn("Draft Deadline", format="DD/MM/YYYY HH:mm"),
+        "data_abertura_gate": st.column_config.DatetimeColumn("Abertura Gate", format="DD/MM/YYYY HH:mm"),
+        "data_atracacao": st.column_config.DatetimeColumn("Atracação (ATB)", format="DD/MM/YYYY HH:mm"),
+        "data_partida": st.column_config.DatetimeColumn("Partida (ATD)", format="DD/MM/YYYY HH:mm"),
+        "data_chegada": st.column_config.DatetimeColumn("Chegada (ATA)", format="DD/MM/YYYY HH:mm"),
+        "data_estimativa_atracacao": st.column_config.DatetimeColumn("Estimativa Atracação (ETB)", format="DD/MM/YYYY HH:mm"),
     }
 
     edited_df = st.data_editor(
@@ -145,13 +145,13 @@ def exibir_voyage_update_page():
         column_config=column_config,
         use_container_width=True,
         num_rows="fixed",
-        key="voyage_editor"
+        key="voyage_editor",
+        hide_index=True
     )
 
     # Lógica para detectar alterações
     changes = []
-    if not df_filtered.equals(edited_df):
-        # Compara as duas tabelas para encontrar as diferenças
+    if not df_filtered.reset_index(drop=True).equals(edited_df.reset_index(drop=True)):
         diff_mask = (df_filtered != edited_df) & ~(df_filtered.isnull() & edited_df.isnull())
         changed_rows_indices = diff_mask.any(axis=1)
         
@@ -165,9 +165,9 @@ def exibir_voyage_update_page():
                 
                 for col in changed_cols:
                     changes.append({
-                        "id": original_changed_df.loc[index, "ID"],
-                        "vessel_name": original_changed_df.loc[index, "vessel_name"],
-                        "voyage_code": original_changed_df.loc[index, "voyage_code"],
+                        "id": original_changed_df.loc[index, "id"],
+                        "vessel_name": original_changed_df.loc[index, "navio"],
+                        "voyage_code": original_changed_df.loc[index, "viagem"],
                         "terminal": original_changed_df.loc[index, "terminal"],
                         "farol_references": original_changed_df.loc[index, "farol_references"],
                         "field_name": col,
@@ -180,17 +180,17 @@ def exibir_voyage_update_page():
         st.warning(f"{len(changes)} alterações detectadas. Verifique e clique em salvar.")
         
         changes_df = pd.DataFrame(changes)
-        st.dataframe(changes_df[["vessel_name", "voyage_code", "field_name", "old_value", "new_value"]], use_container_width=True)
+        st.dataframe(changes_df[["vessel_name", "voyage_code", "field_name", "old_value", "new_value"]].rename(
+            columns={"vessel_name": "Navio", "voyage_code": "Viagem", "field_name": "Campo Alterado", "old_value": "Valor Antigo", "new_value": "Novo Valor"}
+        ), use_container_width=True)
 
         if st.button("💾 Salvar Alterações", type="primary"):
             with st.spinner("Salvando alterações no banco de dados..."):
                 try:
-                    # A função de banco de dados receberá a lista de alterações
                     success, message = update_booking_from_voyage(changes)
                     
                     if success:
                         st.success("✅ Alterações salvas com sucesso!")
-                        # Limpa o cache e recarrega a página para refletir as mudanças
                         del st.session_state.original_voyage_data
                         st.rerun()
                     else:
@@ -201,7 +201,6 @@ def exibir_voyage_update_page():
     else:
         st.caption("Nenhuma alteração detectada.")
 
-# Ponto de entrada para ser chamado pelo app.py
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
     exibir_voyage_update_page()
