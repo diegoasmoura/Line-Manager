@@ -300,6 +300,49 @@ test_ui_data = {
 
 **⚠️ IMPACTO**: Qualquer alteração que defina campos de data como strings vazias quebrará o pré-preenchimento automático.
 
+#### 🏷️ **Mapeamento de P_STATUS - Regras Críticas (v3.9.10)**
+
+**Funcionalidade**: Sistema identifica corretamente a origem dos ajustes no histórico através do campo P_STATUS.
+
+**Mapeamentos de P_STATUS**:
+- `"Adjusts Cargill"` → "🛠️ Cargill (Adjusts)" (ajustes criados pela Cargill)
+- `"Adjusts Carrier"` → "🚢 Adjusts Carrier" (ajustes de carriers)
+- `"Booking Request - Company"` → "📋 Booking Request" (pedidos de booking)
+- `"PDF Document - Carrier"` → "📄 PDF Document" (documentos PDF)
+- `"Adjustment Request - Company"` → "🛠️ Adjustment Request" (solicitações de ajuste)
+- `"Other Request - Company"` → "⚙️ Other Request" (outras solicitações)
+
+**⚠️ REGRAS CRÍTICAS PARA EVITAR REGRESSÃO**:
+
+1. **No `shipments_split.py`**: 
+   - **SEMPRE** definir `p_status_override="Adjusts Cargill"` para ajustes da Cargill
+   - **NUNCA** omitir o parâmetro `p_status_override` pois resulta em "Other Request"
+
+2. **No `history.py`**:
+   - Lógica de mapeamento deve tratar tanto nomes novos quanto antigos
+   - Condição: `if low == "adjusts cargill": return "🛠️ Cargill (Adjusts)"`
+
+3. **Teste de Validação**:
+   ```python
+   # ✅ CORRETO - identifica como ajuste da Cargill
+   insert_return_carrier_from_ui(
+       ui_row, 
+       p_status_override="Adjusts Cargill",  # ← OBRIGATÓRIO
+       # ... outros parâmetros
+   )
+   
+   # ❌ INCORRETO - resulta em "Other Request"  
+   insert_return_carrier_from_ui(
+       ui_row, 
+       # p_status_override omitido = "Other Request - Company"
+       # ... outros parâmetros
+   )
+   ```
+
+**Causa Raiz do Bug v3.9.10**: Omissão do parâmetro `p_status_override` resultava em uso do valor padrão "Other Request - Company".
+
+**⚠️ IMPACTO**: Qualquer alteração que omita `p_status_override` em ajustes da Cargill resultará em identificação incorreta no histórico.
+
 #### 🔄 **Pré-preenchimento Automático de Datas em PDFs (v3.9.8)**
 
 **Funcionalidade Implementada**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo, baseado nos últimos valores da mesma Farol Reference.
@@ -1796,6 +1839,20 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - Aplica pré-preenchimento nos campos: `Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date`
 - **📚 Documentação Atualizada**: Seção específica no README para evitar regressão futura
 - **⚠️ Impacto**: Correção crítica que restaura funcionalidade essencial de automação no processamento de PDFs
+
+### 📌 v3.9.10 - Correção de Identificação de Ajustes da Cargill (Janeiro 2025)
+- **🐛 Bug Resolvido**: Ajustes criados pela Cargill apareciam como "⚙️ Other Request" ao invés de "🛠️ Cargill (Adjusts)" no histórico
+- **🎯 Causa Raiz Identificada**: 
+  - Função `insert_return_carrier_from_ui()` no `shipments_split.py` não definia `p_status_override`
+  - Sistema usava valor padrão "Other Request - Company" para todos os ajustes
+- **✅ Correção Implementada**:
+  - **shipments_split.py**: Adicionado `p_status_override="Adjusts Cargill"` na chamada da função
+  - **Mapeamento correto**: Ajustes da Cargill agora são identificados corretamente no histórico
+- **🔄 Funcionamento Corrigido**: 
+  - Ajustes criados pela Cargill aparecem como "🛠️ Cargill (Adjusts)" no Request Timeline
+  - Outros tipos de solicitação continuam aparecendo como "⚙️ Other Request"
+- **📚 Documentação Atualizada**: Seção específica no README para evitar regressão futura
+- **⚠️ Impacto**: Correção de identificação visual que melhora a experiência do usuário no histórico
 
 ### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
 - **🔧 Padronização Completa**: Unificação das colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todo o sistema
