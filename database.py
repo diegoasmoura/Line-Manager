@@ -1507,7 +1507,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
     finally:
         conn.close()
 
-def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=None, area=None, request_reason=None, adjustments_owner=None, comments=None):
+def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=None, p_status_override=None, area=None, request_reason=None, adjustments_owner=None, comments=None):
     """
     Insere dados na tabela F_CON_RETURN_CARRIERS baseado em dados da interface do usuário.
     Usado para PDFs processados, splits e ajustes.
@@ -1515,17 +1515,21 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
     :param ui_data: Dicionário com dados da UI (com nomes de colunas amigáveis)
     :param user_insert: Usuário que está inserindo os dados
     :param status_override: Status específico a ser definido (ex: "Received from Carrier")
+    :param p_status_override: P_STATUS específico a ser definido (ex: "PDF Document - Carrier")
     :param area: Área do ajuste (para casos de split/adjustment)
     :param request_reason: Motivo do ajuste
     :param adjustments_owner: Responsável pelo ajuste
     :param comments: Comentários
-    :return: True se sucesso, False caso contrário
+    :return: Tupla (bool, str) indicando sucesso e mensagem
     """
     conn = get_database_connection()
+    transaction = None
     try:
+        transaction = conn.begin()
         # Mapeia campos da UI para campos da tabela
         field_mapping = {
             "Farol Reference": "FAROL_REFERENCE",
+            "Booking": "B_BOOKING_REFERENCE",
             "Booking Reference": "B_BOOKING_REFERENCE", 
             "Splitted Booking Reference": "S_SPLITTED_BOOKING_REFERENCE",
             "Voyage Carrier": "B_VOYAGE_CARRIER",
@@ -1547,7 +1551,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "PDF Name": "P_PDF_NAME",
         }
         
-        # PRÉ-PREENCHIMENTO: Buscar datas do último registro aprovado para a mesma Farol Reference
+        # PRÉ-PREENCHIMENTO: Buscar datas do último registro para a mesma Farol Reference
         prefill_dates = {}
         if status_override in ["Adjustment Requested", "Received from Carrier"] and "Farol Reference" in ui_data:
             farol_ref = ui_data["Farol Reference"]
@@ -1559,7 +1563,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE, S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                         B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, 
                         B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, 
-                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATTD, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
+                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATD, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
                         B_BOOKING_STATUS, ROW_INSERTED_DATE
                     FROM LogTransp.F_CON_RETURN_CARRIERS
                     WHERE FAROL_REFERENCE = :farol_ref 
@@ -1581,14 +1585,19 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         'B_DATA_ESTIMATIVA_SAIDA_ETD': 'B_DATA_ESTIMATIVA_SAIDA_ETD',
                         'B_DATA_ESTIMATIVA_CHEGADA_ETA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
                         'B_DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE',
+                        'B_DATA_CONFIRMACAO_EMBARQUE': 'B_DATA_CONFIRMACAO_EMBARQUE',
                         'B_DATA_PARTIDA_ATD': 'B_DATA_PARTIDA_ATD',
+                        'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'B_DATA_ESTIMADA_TRANSBORDO_ETD',
                         'B_DATA_CHEGADA_ATA': 'B_DATA_CHEGADA_ATA',
+                        'B_DATA_TRANSBORDO_ATD': 'B_DATA_TRANSBORDO_ATD',
                         'B_DATA_ESTIMATIVA_ATRACACAO_ETB': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
                         'B_DATA_ATRACACAO_ATB': 'B_DATA_ATRACACAO_ATB'
                     }
                     for src_field, dest_field in date_fields_mapping.items():
-                        if src_field.lower() in result and result[src_field.lower()] is not None:
-                            prefill_dates[dest_field] = result[src_field.lower()]
+                        # Acesso case-insensitive ao resultado do banco
+                        src_field_lower = src_field.lower()
+                        if src_field_lower in result and result[src_field_lower] is not None:
+                            prefill_dates[dest_field] = result[src_field_lower]
             except Exception as e:
                 # Se falhar, continua sem pré-preenchimento
                 pass
@@ -1596,7 +1605,8 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         # Converte dados da UI para formato da tabela
         db_data = {}
         for ui_key, db_key in field_mapping.items():
-            if ui_key in ui_data and ui_data[ui_key] is not None:
+            # Apenas processa chaves que existem no ui_data
+            if ui_key in ui_data:
                 value = ui_data[ui_key]
                 # Converte valores especiais
                 if (db_key.startswith("B_DATA_") or db_key.startswith("S_REQUESTED_") or db_key.startswith("S_REQUIRED_")) and isinstance(value, str) and value.strip():
@@ -1608,50 +1618,37 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         else:  # formato só data
                             db_data[db_key] = datetime.strptime(value, "%Y-%m-%d")
                     except:
-                        db_data[db_key] = value
+                        db_data[db_key] = None # Define como None se a conversão falhar
                 elif db_key == "PDF_BOOKING_EMISSION_DATE" and isinstance(value, str):
                     # Trunca PDF_BOOKING_EMISSION_DATE para máximo 18 caracteres (formato: YYYY-MM-DD HH:MM)
-                    # Remove segundos se existirem para caber no limite da coluna
                     if len(value) > 18:
                         try:
                             from datetime import datetime
-                            # Tenta parsear e reformatar sem segundos
                             dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
-                            db_data[db_key] = dt.strftime("%Y-%m-%d %H:%M")  # 16 caracteres
+                            db_data[db_key] = dt.strftime("%Y-%m-%d %H:%M")
                         except:
-                            # Se falhar, trunca diretamente para 18 caracteres
                             db_data[db_key] = value[:18]
                     else:
                         db_data[db_key] = value
                 else:
-                    # Normaliza S_SPLITTED_BOOKING_REFERENCE: só aceita Farol Reference (FR_..). Caso contrário, mantém vazio
                     if db_key == "S_SPLITTED_BOOKING_REFERENCE":
                         try:
                             val_str = str(value).strip()
                             if not val_str or not val_str.startswith("FR_"):
-                                value = ""
+                                value = None
                         except Exception:
-                            value = ""
-                    # Trunca PDF Name se necessário (evita ORA-12899)
+                            value = None
                     if db_key == "P_PDF_NAME" and isinstance(value, str):
                         value = value.strip()
                         if len(value) > 200:
                             value = value[:200]
                     db_data[db_key] = value
         
-        # Aplicar pré-preenchimento de datas do último registro aprovado (apenas se não fornecidas)
+        # Aplicar pré-preenchimento de datas (apenas se não fornecidas na UI)
         for date_field, date_value in prefill_dates.items():
-            # Só aplica pré-preenchimento se:
-            # 1. A coluna não estiver no db_data OU
-            # 2. O valor for None OU
-            # 3. O valor for uma string vazia (apenas para colunas de data específicas)
-            should_prefill = (
-                date_field not in db_data or 
-                db_data[date_field] is None or
-                (isinstance(db_data[date_field], str) and db_data[date_field].strip() == "")
-            )
-            
-            if should_prefill:
+            current_value = db_data.get(date_field)
+            # Aplicar pré-preenchimento se o campo estiver None ou for string vazia
+            if current_value is None or (isinstance(current_value, str) and current_value.strip() == ""):
                 db_data[date_field] = date_value
 
         # Campos obrigatórios e padrões
@@ -1659,23 +1656,8 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         db_data["USER_INSERT"] = user_insert
         db_data["ADJUSTMENT_ID"] = str(uuid.uuid4())
         
-        # Definir P_STATUS baseado na origem da solicitação
-        if "P_STATUS" not in db_data or db_data.get("P_STATUS") in (None, "", "NULL"):
-            if user_insert == "PDF_PROCESSOR":
-                # Origem: Processamento de PDF/Documento do carrier
-                db_data["P_STATUS"] = "PDF Document - Carrier"
-            elif status_override == "Adjustment Requested":
-                # Origem: Solicitação de ajuste ou split via shipments_split.py
-                db_data["P_STATUS"] = "Adjustment Request - Company"
-            else:
-                # Fallback para outros casos
-                db_data["P_STATUS"] = "Other Request - Company"
-        
-        # NÃO gerar Linked Reference automaticamente na inserção.
-        # Regra de negócio: LINKED_REFERENCE só deve ser preenchido no momento da aprovação.
-        # Portanto, removemos qualquer geração automática aqui.
-        if "LINKED_REFERENCE" in db_data and (db_data["LINKED_REFERENCE"] is None or str(db_data["LINKED_REFERENCE"]).strip() == ""):
-            db_data.pop("LINKED_REFERENCE", None)
+        # Define P_STATUS com base na origem da solicitação
+        db_data["P_STATUS"] = p_status_override or "Other Request - Company"
         
         # Campos de ajuste (se fornecidos)
         if area:
@@ -1697,16 +1679,16 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         """)
         
         conn.execute(insert_sql, db_data)
-        conn.commit()
-        return True
+        transaction.commit()
+        return True, "Success"
         
     except Exception as e:
-        if conn:
-            conn.rollback()
-        st.error(f"Erro ao inserir dados de retorno do carrier: {e}")
-        return False
+        if transaction:
+            transaction.rollback()
+        return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 def _normalize_value(val):
     """Converts pandas/numpy types to native Python types for DB compatibility."""

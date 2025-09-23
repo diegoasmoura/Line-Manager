@@ -3028,9 +3028,10 @@ def display_pdf_validation_interface(processed_data):
                 "Port Terminal City": port_terminal_city,
                 # Preenchimentos padronizados esperados por insert_return_carrier_from_ui
                 # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
-                "Requested Deadline Start Date": "",  # ETD removido
-                "Requested Deadline End Date": "",
-                "Required Arrival Date Expected": "",  # ETA removido
+                # Definir como None para permitir pré-preenchimento automático
+                "Requested Deadline Start Date": None,  # ETD removido - permite pré-preenchimento
+                "Requested Deadline End Date": None,
+                "Required Arrival Date Expected": None,  # ETA removido - permite pré-preenchimento
                 "PDF Booking Emission Date": pdf_print_date
             }
 

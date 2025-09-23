@@ -268,6 +268,38 @@ test_ui_data = {
 
 **⚠️ IMPORTANTE**: Qualquer modificação futura no `shipments_split.py` deve considerar este mapeamento especial para evitar regressão.
 
+#### 🔄 **Pré-preenchimento Automático de Datas - Regras Críticas (v3.9.9)**
+
+**Funcionalidade**: Sistema preenche automaticamente campos de data quando um PDF é validado e salvo, baseado nos últimos valores da mesma Farol Reference.
+
+**Campos Pré-preenchidos**:
+- `Required Arrival Date Expected` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
+- `Requested Deadline Start Date` (S_REQUESTED_DEADLINE_START_DATE)  
+- `Requested Deadline End Date` (S_REQUESTED_DEADLINE_END_DATE)
+
+**⚠️ REGRAS CRÍTICAS PARA EVITAR REGRESSÃO**:
+
+1. **No `pdf_booking_processor.py`**: 
+   - **SEMPRE** definir campos de data como `None` (nunca strings vazias `""`)
+   - **NUNCA** definir como `""` pois impede o pré-preenchimento
+
+2. **No `database.py`**:
+   - Lógica de pré-preenchimento deve tratar tanto `None` quanto strings vazias
+   - Condição: `if current_value is None or (isinstance(current_value, str) and current_value.strip() == "")`
+
+3. **Teste de Validação**:
+   ```python
+   # ✅ CORRETO - permite pré-preenchimento
+   "Requested Deadline Start Date": None,
+   
+   # ❌ INCORRETO - impede pré-preenchimento  
+   "Requested Deadline Start Date": "",
+   ```
+
+**Causa Raiz do Bug v3.9.9**: Strings vazias (`""`) não são tratadas como valores nulos pela lógica original, impedindo o pré-preenchimento automático.
+
+**⚠️ IMPACTO**: Qualquer alteração que defina campos de data como strings vazias quebrará o pré-preenchimento automático.
+
 #### 🔄 **Pré-preenchimento Automático de Datas em PDFs (v3.9.8)**
 
 **Funcionalidade Implementada**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo, baseado nos últimos valores da mesma Farol Reference.
@@ -1750,6 +1782,20 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🔗 Formulário Manual Aprimorado**: Adicionada seção de "Referência Relacionada" no formulário manual de voyage monitoring quando a voyage não é encontrada na API
 - **🎛️ Botões de Ação**: Implementados botões "✅ Confirmar" e "❌ Cancelar" no formulário manual de voyage monitoring
 - **⚠️ Impacto**: Melhoria significativa na experiência do usuário ao processar PDFs, eliminando necessidade de preenchimento manual repetitivo
+
+### 📌 v3.9.9 - Correção Crítica do Pré-preenchimento de Datas em PDFs (Janeiro 2025)
+- **🐛 Bug Crítico Resolvido**: Pré-preenchimento automático de datas não funcionava após aprovar PDFs com "Validar e Salvar"
+- **🎯 Causa Raiz Identificada**: 
+  - Campos de data definidos como strings vazias (`""`) no `pdf_booking_processor.py`
+  - Lógica de pré-preenchimento só funcionava com valores `None`, não strings vazias
+- **✅ Correções Implementadas**:
+  - **pdf_booking_processor.py**: Campos de data alterados de `""` para `None` para permitir pré-preenchimento
+  - **database.py**: Lógica melhorada para tratar tanto `None` quanto strings vazias como valores nulos
+- **🔄 Funcionamento Corrigido**: 
+  - Sistema agora busca automaticamente os últimos valores de data da mesma `Farol Reference`
+  - Aplica pré-preenchimento nos campos: `Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date`
+- **📚 Documentação Atualizada**: Seção específica no README para evitar regressão futura
+- **⚠️ Impacto**: Correção crítica que restaura funcionalidade essencial de automação no processamento de PDFs
 
 ### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
 - **🔧 Padronização Completa**: Unificação das colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todo o sistema
