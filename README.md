@@ -192,6 +192,19 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 
 ## 🧩 Módulos do Sistema
 
+### 🔄 `voyage_update.py`
+**Módulo de Atualização Manual de Datas de Viagem**
+- **Dados Sempre Atuais**: A tela não utiliza cache e consulta o banco de dados a cada carregamento, garantindo que os dados exibidos são sempre um reflexo em tempo real do sistema.
+- **Filtro de Relevância**: Por padrão, a grade exibe apenas viagens que possuem pelo menos uma `Farol Reference` associada (`INNER JOIN`), ocultando monitoramentos antigos ou não relacionados.
+- **Interface Intuitiva**: Tela dedicada para visualização do último status de cada viagem, com filtros por navio e terminal.
+- **Edição em Grade**: Permite a edição de datas (ETD, ETA, Deadline, etc.) diretamente na grade, de forma ágil como em uma planilha.
+- **Detalhes do Booking**: A visão de "Ver Refs" foi enriquecida para incluir datas importantes do ciclo de vida do booking (`Shipment Creation`, `Booking Creation`, `Booking Request Date`), oferecendo um contexto mais completo.
+- **Salvar em Lote**: Um único botão "Salvar Alterações" processa todas as modificações feitas na tela de uma só vez.
+- **Lógica de Atualização Transacional**: Ao salvar, o sistema executa uma transação segura que:
+  1.  **Insere um novo estado** na tabela `F_ELLOX_TERMINAL_MONITORINGS` com as datas atualizadas.
+  2.  **Atualiza os registros principais** na tabela `F_CON_SALES_BOOKING_DATA`, propagando a nova data para todas as `Farol References` associadas à viagem.
+- **Auditoria Completa**: Cada alteração é registrada na nova tabela `LogTransp.F_CON_VOYAGE_MANUAL_UPDATES`, garantindo um histórico completo de quem alterou, o quê, e quando.
+
 ### 📦 `shipments.py`
 **Módulo principal** de gestão de embarques
 - Interface principal do sistema
@@ -1763,6 +1776,12 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - [ ] **Monitoring**: Dashboard de monitoramento em tempo real
 
 ## 🆕 Atualizações Recentes
+
+### 📌 v3.9.13 - Melhorias de Relevância e Contexto no Módulo de Atualização (Setembro 2025)
+- **Dados Sempre Atuais**: Removido todo o sistema de cache (`@st.cache_data` e `st.session_state`) da tela de atualização de viagens para garantir que os dados sejam sempre 100% ao vivo, eliminando o problema de registros antigos ou incorretos aparecerem.
+- **Filtro de Relevância**: A consulta principal da tela agora usa `INNER JOIN`, exibindo apenas viagens que possuem `Farol References` associadas, o que torna a lista mais limpa e relevante.
+- **Contexto de Booking Adicionado**: A visão de detalhes ("Ver Refs") agora inclui datas importantes do ciclo de vida do booking (criação do embarque, criação do booking e data de solicitação), trazendo mais contexto para a análise.
+
 
 ### 📌 v3.9.12 - Módulo de Atualização Manual de Viagens (Setembro 2025)
 - **🚢 Nova Tela "Voyage Update"**: Adicionada uma nova tela ao menu principal para permitir a atualização manual de datas de viagens (ETD, ETA, Deadlines, etc.).

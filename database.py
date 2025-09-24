@@ -2287,17 +2287,6 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
 def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
     """
     Processes manual updates from the voyage update screen.
-
-    For each updated voyage, this function will:
-    1. Insert a new record into F_ELLOX_TERMINAL_MONITORINGS with the new state.
-    2. Update the corresponding date fields in F_CON_SALES_BOOKING_DATA for all associated Farol References.
-    3. Insert a log record into F_CON_VOYAGE_MANUAL_UPDATES for each change.
-
-    Args:
-        changes (list): A list of dictionaries, where each dictionary represents a single cell change.
-
-    Returns:
-        tuple[bool, str]: A tuple containing a success flag and a message.
     """
     if not changes:
         return False, "No changes provided."
@@ -2345,15 +2334,12 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                 raise Exception(f"Could not find original monitoring record with ID {original_monitoring_id}")
 
             new_monitoring_record = dict(template_record)
-            
-            # FIX: Generate a new unique ID for the new record.
             new_monitoring_record['id'] = uuid.uuid4().int >> 64
 
             for field_name, values in changed_fields.items():
                 new_val = values['new_value']
                 if isinstance(new_val, pd.Timestamp):
                     new_val = new_val.to_pydatetime()
-                
                 if field_name.lower() in new_monitoring_record:
                     new_monitoring_record[field_name.lower()] = new_val
 
@@ -2369,20 +2355,18 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
 
             for fr in farol_references:
                 update_clauses = []
-                log_entries = []
                 update_params = {'farol_reference': fr}
+                log_entries = []
                 
                 for field_name, values in changed_fields.items():
                     main_table_col = COLUMN_MAPPING.get(field_name.upper())
                     if main_table_col:
                         update_clauses.append(f"{main_table_col} = :{main_table_col}")
-                        
                         new_val = values['new_value']
                         if isinstance(new_val, pd.Timestamp):
                             new_val = new_val.to_pydatetime()
-                        
                         update_params[main_table_col] = new_val
-                        
+
                         log_entries.append({
                             "farol_reference": fr,
                             "field_name": main_table_col,
@@ -2392,15 +2376,14 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                         })
 
                 if update_clauses:
-                    update_sql = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {', '.join(update_clauses)} WHERE FAROL_REFERENCE = :farol_reference")
-                    conn.execute(update_sql, update_params)
+                    # Use robust WHERE clause and log changes after successful update
+                    update_sql = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {', '.join(update_clauses)} WHERE UPPER(TRIM(FAROL_REFERENCE)) = UPPER(TRIM(:farol_reference))")
+                    result = conn.execute(update_sql, update_params)
 
-                if log_entries:
-                    log_sql = text("""
-                        INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY)
-                        VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)
-                    """)
-                    conn.execute(log_sql, log_entries)
+                    # Only log if the update was successful (affected rows > 0)
+                    if result.rowcount > 0 and log_entries:
+                        log_sql = text("""INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY) VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)""")
+                        conn.execute(log_sql, log_entries)
 
         transaction.commit()
         return True, "Changes saved successfully."

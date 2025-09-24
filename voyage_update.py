@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from sqlalchemy import text
@@ -6,7 +5,6 @@ import traceback
 
 from database import get_database_connection, update_booking_from_voyage
 
-@st.cache_data(ttl=300)
 def get_voyage_data_for_update():
     """
     Busca o último registro de cada combinação e conta as Farol References associadas.
@@ -34,7 +32,7 @@ def get_voyage_data_for_update():
                     LISTAGG(DISTINCT r.FAROL_REFERENCE, ', ') WITHIN GROUP (ORDER BY r.FAROL_REFERENCE) as "farol_references_list",
                     COUNT(DISTINCT r.FAROL_REFERENCE) as "farol_references_count"
                 FROM latest_monitoring lm
-                LEFT JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
+                INNER JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
                     UPPER(lm.NAVIO) = UPPER(r.B_VESSEL_NAME)
                     AND UPPER(lm.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
                     AND UPPER(lm.TERMINAL) = UPPER(r.B_TERMINAL)
@@ -59,7 +57,6 @@ def get_voyage_data_for_update():
         st.error(f"❌ Erro ao buscar dados de monitoramento: {str(e)}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=300)
 def get_farol_references_details(vessel_name, voyage_code, terminal):
     """Busca o detalhe mais recente de cada Farol Reference, incluindo datas da tabela principal."""
     try:
@@ -101,15 +98,12 @@ def exibir_voyage_update_page():
     """
     if "page_flash_message" in st.session_state:
         flash = st.session_state.pop("page_flash_message")
-        st.success(flash["message"]) # Simplificado para apenas sucesso
+        st.success(flash["message"])
 
     st.title("🚢 Atualização Manual de Datas de Viagem")
 
-    if 'original_voyage_data' not in st.session_state:
-        with st.spinner("Carregando dados de viagens..."):
-            st.session_state.original_voyage_data = get_voyage_data_for_update()
-
-    df_original = st.session_state.original_voyage_data
+    with st.spinner("Carregando dados de viagens..."):
+        df_original = get_voyage_data_for_update()
 
     if df_original.empty:
         st.info("Nenhum dado de viagem encontrado para atualização.")
@@ -151,10 +145,7 @@ def exibir_voyage_update_page():
         "Selecionar": st.column_config.CheckboxColumn("Ver Refs", help="Selecione para ver as Farol References associadas")
     }
     
-    # Reordenar colunas para exibição de forma segura
     display_order_preferred = ["Selecionar", "navio", "viagem", "terminal", "farol_references_count", "data_estimativa_saida", "data_estimativa_chegada", "data_deadline"] + [col for col in df_display.columns if col not in ["Selecionar", "navio", "viagem", "terminal", "farol_references_count", "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "id", "rn", "farol_references_list"]]
-    
-    # Filtra a lista de ordenação para garantir que todas as colunas existem no DataFrame
     display_order_safe = [col for col in display_order_preferred if col in df_display.columns]
 
     edited_df = st.data_editor(
@@ -162,7 +153,6 @@ def exibir_voyage_update_page():
         column_config=column_config, use_container_width=True, num_rows="fixed", key="voyage_editor", hide_index=True
     )
 
-    # Lógica para exibir detalhes das referências selecionadas
     selected_rows = edited_df[edited_df["Selecionar"] == True]
     if not selected_rows.empty:
         st.divider()
@@ -170,38 +160,25 @@ def exibir_voyage_update_page():
             st.subheader(f"Farol References para: {row['navio']} - {row['viagem']}")
             details_df = get_farol_references_details(row['navio'], row['viagem'], row['terminal'])
             if not details_df.empty:
-                # Renomeia colunas para exibição amigável
                 rename_map = {
-                    'farol_reference': 'Farol Reference',
-                    'b_booking_reference': 'Booking Ref',
-                    'b_booking_status': 'Booking Status',
-                    'p_status': 'P Status',
-                    'row_inserted_date': 'Latest Update',
-                    's_creation_of_shipment': 'Shipment Creation',
-                    'b_creation_of_booking': 'Booking Creation',
-                    'b_booking_request_date': 'Booking Request Date',
-                    'b_data_estimativa_saida_etd': 'ETD',
-                    'b_data_estimativa_chegada_eta': 'ETA'
+                    'farol_reference': 'Farol Reference', 'b_booking_reference': 'Booking Ref',
+                    'b_booking_status': 'Booking Status', 'p_status': 'P Status',
+                    'row_inserted_date': 'Latest Update', 's_creation_of_shipment': 'Shipment Creation',
+                    'b_creation_of_booking': 'Booking Creation', 'b_booking_request_date': 'Booking Request Date',
+                    'b_data_estimativa_saida_etd': 'ETD', 'b_data_estimativa_chegada_eta': 'ETA'
                 }
-                display_df = details_df.rename(columns=rename_map)
-                
-                # Garante a ordem e a presença das colunas
+                display_df_details = details_df.rename(columns=rename_map)
                 display_cols = [
                     'Farol Reference', 'Booking Ref', 'Booking Status', 'P Status', 'Latest Update',
                     'Shipment Creation', 'Booking Creation', 'Booking Request Date', 'ETD', 'ETA'
                 ]
-                final_cols = [col for col in display_cols if col in display_df.columns]
-                
-                st.dataframe(display_df[final_cols], hide_index=True, use_container_width=True)
+                final_cols = [col for col in display_cols if col in display_df_details.columns]
+                st.dataframe(display_df_details[final_cols], hide_index=True, use_container_width=True)
             else:
                 st.info("Nenhuma Farol Reference encontrada para esta viagem.")
 
-    # Lógica para detectar alterações
     changes = []
-
-    # Prepara o DataFrame editado, removendo colunas de UI
     edited_for_comparison = edited_df.drop(columns=['Selecionar'])
-    # Garante que o DataFrame original tenha exatamente as mesmas colunas e na mesma ordem do editado
     original_for_comparison = df_filtered[edited_for_comparison.columns]
 
     if not original_for_comparison.reset_index(drop=True).equals(edited_for_comparison.reset_index(drop=True)):
@@ -244,7 +221,6 @@ def exibir_voyage_update_page():
                     
                     if success:
                         st.session_state.page_flash_message = {"type": "success", "message": "✅ Alterações salvas com sucesso!"}
-                        if 'original_voyage_data' in st.session_state: del st.session_state.original_voyage_data
                         st.rerun()
                     else:
                         st.error(f"❌ Falha ao salvar: {message}")
