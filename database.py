@@ -2342,6 +2342,12 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                     new_val = new_val.to_pydatetime()
                 if field_name.lower() in new_monitoring_record:
                     new_monitoring_record[field_name.lower()] = new_val
+            
+            # FIX: Explicitly set new timestamps for the new record
+            now = datetime.now()
+            new_monitoring_record['data_atualizacao'] = now
+            if 'row_inserted_date' in new_monitoring_record:
+                new_monitoring_record['row_inserted_date'] = now
 
             monitoring_cols = ", ".join(new_monitoring_record.keys())
             monitoring_placeholders = ", ".join([f":{k}" for k in new_monitoring_record.keys()])
