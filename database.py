@@ -2653,6 +2653,7 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                 "DATA_ESTIMATIVA_ATRACACAO": _parse_iso_datetime(g('data_estimativa_atracacao')),
                 "DATA_ATRACACAO": _parse_iso_datetime(g('data_atracacao')),
                 "DATA_PARTIDA": _parse_iso_datetime(g('data_partida')),
+                "ROW_INSERTED_DATE": _datetime.now()
             }
 
             # Se não há ID vindo da API, gera ID determinístico a partir de campos-chave
@@ -2698,12 +2699,12 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                     ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
                     DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
                     DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
-                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA
+                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE
                 ) VALUES (
                     :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
                     :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
                     :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
-                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA
+                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
                 )
                 """
             )
