@@ -61,7 +61,7 @@ def get_voyage_data_for_update():
 
 @st.cache_data(ttl=300)
 def get_farol_references_details(vessel_name, voyage_code, terminal):
-    """Busca o detalhe mais recente de cada Farol Reference para uma combinação específica."""
+    """Busca o detalhe mais recente de cada Farol Reference, incluindo datas da tabela principal."""
     try:
         with get_database_connection() as conn:
             query = text("""
@@ -70,8 +70,10 @@ def get_farol_references_details(vessel_name, voyage_code, terminal):
                         r.FAROL_REFERENCE, r.B_BOOKING_REFERENCE, r.B_BOOKING_STATUS, 
                         r.P_STATUS, r.B_VESSEL_NAME, r.B_VOYAGE_CODE, r.B_TERMINAL,
                         r.B_DATA_ESTIMATIVA_SAIDA_ETD, r.B_DATA_ESTIMATIVA_CHEGADA_ETA, r.ROW_INSERTED_DATE,
+                        s.S_CREATION_OF_SHIPMENT, s.B_CREATION_OF_BOOKING, s.B_BOOKING_REQUEST_DATE,
                         ROW_NUMBER() OVER(PARTITION BY r.FAROL_REFERENCE ORDER BY r.ROW_INSERTED_DATE DESC) as rn
                     FROM LogTransp.F_CON_RETURN_CARRIERS r
+                    LEFT JOIN LogTransp.F_CON_SALES_BOOKING_DATA s ON r.FAROL_REFERENCE = s.FAROL_REFERENCE
                     WHERE UPPER(TRIM(r.B_VESSEL_NAME)) = UPPER(TRIM(:vessel_name))
                     AND UPPER(TRIM(r.B_VOYAGE_CODE)) = UPPER(TRIM(:voyage_code))
                     AND UPPER(TRIM(r.B_TERMINAL)) = UPPER(TRIM(:terminal))
@@ -80,7 +82,8 @@ def get_farol_references_details(vessel_name, voyage_code, terminal):
                 SELECT
                     FAROL_REFERENCE, B_BOOKING_REFERENCE, B_BOOKING_STATUS, 
                     P_STATUS, B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL,
-                    B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, ROW_INSERTED_DATE
+                    B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, ROW_INSERTED_DATE,
+                    S_CREATION_OF_SHIPMENT, B_CREATION_OF_BOOKING, B_BOOKING_REQUEST_DATE
                 FROM ranked_references
                 WHERE rn = 1
                 ORDER BY FAROL_REFERENCE
@@ -167,7 +170,29 @@ def exibir_voyage_update_page():
             st.subheader(f"Farol References para: {row['navio']} - {row['viagem']}")
             details_df = get_farol_references_details(row['navio'], row['viagem'], row['terminal'])
             if not details_df.empty:
-                st.dataframe(details_df, hide_index=True, use_container_width=True)
+                # Renomeia colunas para exibição amigável
+                rename_map = {
+                    'farol_reference': 'Farol Reference',
+                    'b_booking_reference': 'Booking Ref',
+                    'b_booking_status': 'Booking Status',
+                    'p_status': 'P Status',
+                    'row_inserted_date': 'Latest Update',
+                    's_creation_of_shipment': 'Shipment Creation',
+                    'b_creation_of_booking': 'Booking Creation',
+                    'b_booking_request_date': 'Booking Request Date',
+                    'b_data_estimativa_saida_etd': 'ETD',
+                    'b_data_estimativa_chegada_eta': 'ETA'
+                }
+                display_df = details_df.rename(columns=rename_map)
+                
+                # Garante a ordem e a presença das colunas
+                display_cols = [
+                    'Farol Reference', 'Booking Ref', 'Booking Status', 'P Status', 'Latest Update',
+                    'Shipment Creation', 'Booking Creation', 'Booking Request Date', 'ETD', 'ETA'
+                ]
+                final_cols = [col for col in display_cols if col in display_df.columns]
+                
+                st.dataframe(display_df[final_cols], hide_index=True, use_container_width=True)
             else:
                 st.info("Nenhuma Farol Reference encontrada para esta viagem.")
 
