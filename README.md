@@ -46,6 +46,30 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Validação inteligente** de dados extraídos
 - **Suporte a múltiplos carriers**: HAPAG-LLOYD, MAERSK, MSC, CMA CGM, COSCO, EVERGREEN, OOCL, PIL
 - **Extração automática** de campos-chave (booking reference, vessel name, voyage, portos)
+
+### 🛡️ Lógica de Prevenção de Duplicidade de PDFs
+
+Para evitar o processamento e salvamento de dados duplicados, o sistema implementa uma verificação rigorosa antes de inserir novas informações de booking extraídas de PDFs.
+
+**Como funciona a verificação:**
+
+1.  **Critérios de Identificação**: O sistema considera um PDF de booking como duplicado se já existir um registro na tabela `LogTransp.F_CON_RETURN_CARRIERS` que corresponda à mesma `FAROL_REFERENCE` e aos seguintes dados extraídos do PDF:
+    *   `B_BOOKING_REFERENCE` (Referência do Booking)
+    *   `B_VOYAGE_CARRIER` (Armador da Viagem)
+    *   `B_VOYAGE_CODE` (Código da Viagem)
+    *   `B_VESSEL_NAME` (Nome do Navio)
+    *   `PDF_BOOKING_EMISSION_DATE` (Data de Emissão/Impressão do PDF)
+
+2.  **Status Ignorados na Verificação**: Para flexibilidade, a verificação de duplicidade **ignora** registros existentes que possuam um dos seguintes status. Isso significa que, se um registro anterior tiver um desses status, ele não será considerado uma duplicata ativa, permitindo um novo processamento do mesmo PDF:
+    *   `Attachment Deleted`
+    *   `Booking Rejected`
+    *   `Cancelled`
+    *   `Adjustment Requested`
+
+3.  **Ação em Caso de Duplicidade Ativa**: Se um registro ativo (com um status diferente dos listados acima) for encontrado com os mesmos critérios de identificação, o sistema impedirá o novo processamento e exibirá uma mensagem de aviso ao usuário, garantindo a integridade dos dados.
+
+---
+
 - **Interface de validação** com correção manual de dados
 - **Histórico completo** de documentos por embarque
 - **Datas ETD/ETA**: Responsabilidade da API Ellox ou preenchimento manual (não mais extraídas automaticamente)
