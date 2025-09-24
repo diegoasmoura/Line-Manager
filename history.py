@@ -2678,6 +2678,34 @@ def exibir_history():
             if selected_value and selected_value != "Selecione uma referência...":
                 if selected_value == "🆕 New Adjustment":
                     st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
+                    
+                    st.markdown("#### 📋 Justificativas do Armador - New Adjustment")
+                    
+                    # Usar as listas de UDC específicas para Carrier
+                    reason = st.selectbox(
+                        "Booking Adjustment Request Reason",
+                        options=[""] + Booking_adj_reason_car,
+                        key=f"new_adj_reason_{adjustment_id}"
+                    )
+                    
+                    if len(Booking_adj_responsibility_car) == 1:
+                        responsibility = st.text_input(
+                            "Booking Adjustment Responsibility",
+                            value=Booking_adj_responsibility_car[0],
+                            disabled=True,
+                            key=f"new_adj_resp_{adjustment_id}"
+                        )
+                    else:
+                        responsibility = st.selectbox(
+                            "Booking Adjustment Responsibility",
+                            options=[""] + Booking_adj_responsibility_car,
+                            key=f"new_adj_resp_{adjustment_id}"
+                        )
+
+                    comment = st.text_area(
+                        "Comentários",
+                        key=f"new_adj_comment_{adjustment_id}"
+                    )
                 else:
                     st.info(f"📋 **Referência selecionada:** {selected_value}")
             
@@ -2692,33 +2720,52 @@ def exibir_history():
             
             with col_confirm:
                 if st.button("✅ Confirmar Aprovação", key=f"confirm_approval_{adjustment_id}", type="primary", disabled=not can_confirm):
-                    # Preparar dados da justificativa
-                    justification = {
-                        "area": "Booking",
-                        "request_reason": "Carrier Return Approval",
-                        "adjustments_owner": "System",
-                        "comments": "Aprovação de retorno do carrier"
-                    }
-                    
-                    # Usar referência selecionada
-                    if selected_ref == "🆕 New Adjustment":
+                    justification = {}
+                    related_reference = ""
+
+                    # Lógica para coletar dados dependendo da seleção
+                    if selected_value == "🆕 New Adjustment":
                         related_reference = "New Adjustment"
+                        
+                        # Coleta dados do formulário de justificativa
+                        reason_val = st.session_state.get(f"new_adj_reason_{adjustment_id}")
+                        comment_val = st.session_state.get(f"new_adj_comment_{adjustment_id}")
+                        
+                        # Trata o campo de responsabilidade (pode ser desabilitado)
+                        if len(Booking_adj_responsibility_car) == 1:
+                            resp_val = Booking_adj_responsibility_car[0]
+                        else:
+                            resp_val = st.session_state.get(f"new_adj_resp_{adjustment_id}")
+
+                        # Validação dos campos obrigatórios para New Adjustment
+                        if not reason_val:
+                            st.error("❌ Para 'New Adjustment', o campo 'Booking Adjustment Request Reason' é obrigatório.")
+                            st.stop()
+                        
+                        justification = {
+                            "area": "Booking",  # Área padrão para este fluxo
+                            "request_reason": reason_val,
+                            "adjustments_owner": resp_val,
+                            "comments": comment_val
+                        }
                     else:
-                        related_reference = selected_ref.split(" | ")[0]
-                    
-                    # Executar aprovação
+                        # Fluxo normal para referências existentes
+                        related_reference = selected_value.split(" | ")[0]
+                        justification = {} # Justificativa não necessária aqui
+
+                    # Executar aprovação com os dados corretos
                     try:
                         result = approve_carrier_return(adjustment_id, related_reference, justification)
                         if result:
                             st.success("✅ Aprovação concluída com sucesso!")
                             st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
-                            # Limpar estados
                             st.session_state.pop(f"pending_status_change_{farol_reference}", None)
                             st.session_state.pop("voyage_success_notice", None)
                             st.cache_data.clear()
                             st.rerun()
                         else:
-                            st.error("❌ Erro ao completar aprovação")
+                            # A função approve_carrier_return já deve ter mostrado um erro específico
+                            pass
                     except Exception as e:
                         st.error(f"❌ Erro crítico durante a aprovação: {str(e)}")
             
