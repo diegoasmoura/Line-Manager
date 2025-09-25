@@ -1283,6 +1283,37 @@ graph TD
 - **🔧 Flexibilidade**: Formulário manual quando API não encontra dados
 - **📊 Controle**: Usuário pode revisar/ajustar dados antes da aprovação final
 
+##### 🔗 Vinculação de Monitoramento de Viagem (ELLOX_MONITORING_ID)
+
+Para garantir a integridade dos dados, evitar duplicações e otimizar o processo de aprovação, foi implementada uma nova lógica de vinculação entre os registros de retorno (`F_CON_RETURN_CARRIERS`) e os dados de monitoramento de viagem (`F_ELLOX_TERMINAL_MONITORINGS`).
+
+**Detalhes da Implementação:**
+
+1.  **Nova Coluna `ELLOX_MONITORING_ID`:**
+    *   Uma nova coluna `ELLOX_MONITORING_ID` (tipo `NUMBER`) será adicionada à tabela `F_CON_RETURN_CARRIERS`.
+    *   Esta coluna armazenará o `ID` do registro correspondente na tabela `F_ELLOX_TERMINAL_MONITORINGS`, estabelecendo uma relação direta e estável.
+
+2.  **Fluxo de Verificação e Vinculação ao Clicar em "Booking Approved":**
+    *   Quando o usuário seleciona uma linha na aba "Returns Awaiting Review" e clica em "Booking Approved", o sistema **não cria uma nova linha** em `F_CON_RETURN_CARRIERS`. Em vez disso, ele **atualiza a linha existente** que foi criada no processamento inicial do PDF.
+    *   **Verificação Local:** Antes de consultar a API ELLOX, o sistema verifica se já existe um registro de monitoramento de viagem na tabela `F_ELLOX_TERMINAL_MONITORINGS` para o conjunto `(NAVIO, VIAGEM, TERMINAL)` do retorno que está sendo aprovado.
+    *   **Cenário 1: Monitoramento Existente:**
+        *   Se um registro correspondente for encontrado em `F_ELLOX_TERMINAL_MONITORINGS`, o sistema utiliza o `ID` desse registro.
+        *   O `ELLOX_MONITORING_ID` da linha de `F_CON_RETURN_CARRIERS` que está sendo aprovada é atualizado com este `ID` existente.
+        *   **Não há chamada à API ELLOX**, evitando tráfego desnecessário e duplicação de dados.
+    *   **Cenário 2: Monitoramento Não Existente:**
+        *   O sistema procede com a chamada à API ELLOX para coletar os dados de monitoramento.
+        *   Os dados retornados são salvos como um **novo registro** em `F_ELLOX_TERMINAL_MONITORINGS`, e o `ID` desse novo registro é obtido.
+        *   O `ELLOX_MONITORING_ID` da linha de `F_CON_RETURN_CARRIERS` que está sendo aprovada é atualizado com o `ID` do novo registro.
+        *   Caso a API falhe e o usuário preencha os dados manualmente, o `ELLOX_MONITORING_ID` será vinculado ao registro criado manualmente em `F_ELLOX_TERMINAL_MONITORINGS`.
+
+3.  **Benefícios da Abordagem `ELLOX_MONITORING_ID`:**
+    *   **Estabilidade e Integridade dos Dados:** Garante que a ligação entre o retorno e o monitoramento seja estável, mesmo que os detalhes da viagem (`Navio`, `Viagem`, `Terminal`) mudem no futuro (ex: container rolado). O `ELLOX_MONITORING_ID` aponta para um registro específico de monitoramento, preservando o contexto histórico.
+    *   **Performance:** Juntar tabelas usando um ID numérico é mais rápido e eficiente.
+    *   **Clareza:** A relação entre `F_CON_RETURN_CARRIERS` e `F_ELLOX_TERMINAL_MONITORINGS` torna-se explícita e fácil de entender.
+    *   **Evita Duplicação:** Impede a criação de múltiplos registros idênticos em `F_ELLOX_TERMINAL_MONITORINGS` para a mesma viagem.
+
+---
+
 ##### 🛠️ Implementação Técnica
 
 **1. Durante o Processamento do PDF:**
