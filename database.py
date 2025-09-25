@@ -31,6 +31,36 @@ def get_database_connection():
     """Cria e retorna a conexão com o banco de dados (conn deve ser fechado pelo chamador)."""
     return ENGINE.connect()
 
+def ensure_ellox_monitoring_id_column(conn):
+    """
+    Verifica se a coluna ELLOX_MONITORING_ID existe em F_CON_RETURN_CARRIERS e a adiciona se não existir.
+    """
+    try:
+        # Verifica se a coluna já existe
+        check_column_query = text("""
+            SELECT COUNT(*)
+            FROM ALL_TAB_COLUMNS
+            WHERE OWNER = UPPER('LOGTRANSP') -- Ou o schema correto se for diferente
+              AND TABLE_NAME = UPPER('F_CON_RETURN_CARRIERS')
+              AND COLUMN_NAME = UPPER('ELLOX_MONITORING_ID')
+        """)
+        result = conn.execute(check_column_query).scalar()
+
+        if result == 0:
+            # Adiciona a coluna se não existir
+            add_column_query = text("""
+                ALTER TABLE LogTransp.F_CON_RETURN_CARRIERS
+                ADD ELLOX_MONITORING_ID NUMBER(20) NULL
+            """)
+            conn.execute(add_column_query)
+            conn.commit()
+            st.success("✅ Coluna ELLOX_MONITORING_ID adicionada a F_CON_RETURN_CARRIERS.")
+        # else:
+            # st.info("Coluna ELLOX_MONITORING_ID já existe em F_CON_RETURN_CARRIERS.")
+    except Exception as e:
+        st.error(f"❌ Erro ao verificar/adicionar coluna ELLOX_MONITORING_ID: {str(e)}")
+        conn.rollback() # Rollback any pending changes if an error occurs
+
 # --- RETURN CARRIERS ---
 def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
     """Busca dados da F_CON_RETURN_CARRIERS por Farol Reference."""
@@ -38,49 +68,49 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
     try:
         query = text(
             """
-            SELECT 
-                ID,
-                FAROL_REFERENCE,
-                B_BOOKING_REFERENCE,
-                ADJUSTMENT_ID,
-                Linked_Reference,
-                B_BOOKING_STATUS,
-                P_STATUS,
-                P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
-                S_PLACE_OF_RECEIPT,
-                S_QUANTITY_OF_CONTAINERS,
-                S_PORT_OF_LOADING_POL,
-                S_PORT_OF_DELIVERY_POD,
-                S_FINAL_DESTINATION,
-                B_TRANSHIPMENT_PORT,
-                B_TERMINAL,
-                B_VESSEL_NAME,
-                B_VOYAGE_CARRIER,
-                B_VOYAGE_CODE,
-                B_DATA_DRAFT_DEADLINE,
-                B_DATA_DEADLINE,
-                S_REQUESTED_DEADLINE_START_DATE,
-                S_REQUESTED_DEADLINE_END_DATE,
-                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
-                B_DATA_ESTIMATIVA_SAIDA_ETD,
-                B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                B_DATA_ABERTURA_GATE,
-                B_DATA_CONFIRMACAO_EMBARQUE,
-                B_DATA_PARTIDA_ATD,
-                B_DATA_ESTIMADA_TRANSBORDO_ETD,
-                B_DATA_CHEGADA_ATA,
-                B_DATA_TRANSBORDO_ATD,
-                B_DATA_ESTIMATIVA_ATRACACAO_ETB,
-                B_DATA_ATRACACAO_ATB,
-                USER_INSERT,
-                USER_UPDATE,
-                DATE_UPDATE,
-                ROW_INSERTED_DATE,
-                PDF_BOOKING_EMISSION_DATE,
-                ADJUSTMENTS_OWNER
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
+                        SELECT
+                            ID,
+                            FAROL_REFERENCE,
+                            B_BOOKING_REFERENCE,
+                            ADJUSTMENT_ID,
+                            Linked_Reference,
+                            B_BOOKING_STATUS,
+                            P_STATUS,
+                            P_PDF_NAME,
+                            S_SPLITTED_BOOKING_REFERENCE,
+                            S_PLACE_OF_RECEIPT,
+                            S_QUANTITY_OF_CONTAINERS,
+                            S_PORT_OF_LOADING_POL,
+                            S_PORT_OF_DELIVERY_POD,
+                            S_FINAL_DESTINATION,
+                            B_TRANSHIPMENT_PORT,
+                            B_TERMINAL,
+                            B_VESSEL_NAME,
+                            B_VOYAGE_CARRIER,
+                            B_VOYAGE_CODE,
+                            B_DATA_DRAFT_DEADLINE,
+                            B_DATA_DEADLINE,
+                            S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
+                            S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
+                            S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
+                            B_DATA_ESTIMATIVA_SAIDA_ETD,
+                            B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                            B_DATA_ABERTURA_GATE,
+                            B_DATA_CONFIRMACAO_EMBARQUE,
+                            B_DATA_PARTIDA_ATD,
+                            B_DATA_ESTIMADA_TRANSBORDO_ETD,
+                            B_DATA_CHEGADA_ATA,
+                            B_DATA_TRANSBORDO_ATD,
+                            B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                            B_DATA_ATRACACAO_ATB,
+                            USER_INSERT,
+                            USER_UPDATE,
+                            DATE_UPDATE,
+                            ROW_INSERTED_DATE,
+                            PDF_BOOKING_EMISSION_DATE,
+                            ADJUSTMENTS_OWNER,
+                            ELLOX_MONITORING_ID
+                        FROM LogTransp.F_CON_RETURN_CARRIERS            WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
                OR UPPER(FAROL_REFERENCE) LIKE UPPER(:ref || '.%')
             ORDER BY ROW_INSERTED_DATE DESC
             """
@@ -1223,9 +1253,9 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                 B_VOYAGE_CARRIER,
                 B_DATA_DRAFT_DEADLINE,
                 B_DATA_DEADLINE,
-                S_REQUESTED_DEADLINE_START_DATE,
-                S_REQUESTED_DEADLINE_END_DATE,
-                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
+                S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
@@ -1260,6 +1290,9 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             "B_DATA_CHEGADA_ATA",
             "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
             "B_DATA_ATRACACAO_ATB",
+            "S_REQUESTED_DEADLINE_START_DATE", -- Re-adicionado
+            "S_REQUESTED_DEADLINE_END_DATE",   -- Re-adicionado
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED", -- Re-adicionado
         ):
             if k not in data:
                 data[k] = None
@@ -1322,14 +1355,15 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     B_VOYAGE_CARRIER,
                     B_DATA_DRAFT_DEADLINE,
                     B_DATA_DEADLINE,
-                    S_REQUESTED_DEADLINE_START_DATE,
-                    S_REQUESTED_DEADLINE_END_DATE,
-                    S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                    S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
+                    S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
+                    S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
                     B_DATA_ESTIMATIVA_SAIDA_ETD,
                     B_DATA_ESTIMATIVA_CHEGADA_ETA,
                     B_DATA_ABERTURA_GATE,
                     USER_INSERT,
-                    ADJUSTMENT_ID
+                    ADJUSTMENT_ID,
+                    ELLOX_MONITORING_ID -- Adicionado
                 ) VALUES (
                     :FAROL_REFERENCE,
                     :B_BOOKING_STATUS,
@@ -1347,14 +1381,15 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     :B_VOYAGE_CARRIER,
                     :B_DATA_DRAFT_DEADLINE,
                     :B_DATA_DEADLINE,
-                    :S_REQUESTED_DEADLINE_START_DATE,
-                    :S_REQUESTED_DEADLINE_END_DATE,
-                    :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                    :S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
+                    :S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
+                    :S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
                     :B_DATA_ESTIMATIVA_SAIDA_ETD,
                     :B_DATA_ESTIMATIVA_CHEGADA_ETA,
                     :B_DATA_ABERTURA_GATE,
                     :USER_INSERT,
-                    :ADJUSTMENT_ID
+                    :ADJUSTMENT_ID,
+                    :ELLOX_MONITORING_ID -- Adicionado
                 )
                 """
             )
@@ -1428,14 +1463,15 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                 B_VOYAGE_CARRIER,
                 B_DATA_DRAFT_DEADLINE,
                 B_DATA_DEADLINE,
-                S_REQUESTED_DEADLINE_START_DATE,
-                S_REQUESTED_DEADLINE_END_DATE,
-                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
+                S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
                 USER_INSERT,
-                ADJUSTMENT_ID
+                ADJUSTMENT_ID,
+                ELLOX_MONITORING_ID -- Adicionado
             ) VALUES (
                 :FAROL_REFERENCE,
                 :B_BOOKING_STATUS,
@@ -1453,14 +1489,15 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                 :B_VOYAGE_CARRIER,
                 :B_DATA_DRAFT_DEADLINE,
                 :B_DATA_DEADLINE,
-                :S_REQUESTED_DEADLINE_START_DATE,
-                :S_REQUESTED_DEADLINE_END_DATE,
-                :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                :S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
+                :S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
+                :S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
                 :B_DATA_ESTIMATIVA_SAIDA_ETD,
                 :B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 :B_DATA_ABERTURA_GATE,
                 :USER_INSERT,
-                :ADJUSTMENT_ID
+                :ADJUSTMENT_ID,
+                :ELLOX_MONITORING_ID -- Adicionado
             )
             """
         )
@@ -1483,14 +1520,15 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "B_VOYAGE_CARRIER": rd.get("B_VOYAGE_CARRIER"),
             "B_DATA_DRAFT_DEADLINE": rd.get("B_DATA_DRAFT_DEADLINE"),
             "B_DATA_DEADLINE": rd.get("B_DATA_DEADLINE"),
-            "S_REQUESTED_DEADLINE_START_DATE": rd.get("S_REQUESTED_DEADLINE_START_DATE"),
-            "S_REQUESTED_DEADLINE_END_DATE": rd.get("S_REQUESTED_DEADLINE_END_DATE"),
-            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": rd.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"),
+            "S_REQUESTED_DEADLINE_START_DATE": rd.get("S_REQUESTED_DEADLINE_START_DATE"), -- Re-adicionado
+            "S_REQUESTED_DEADLINE_END_DATE": rd.get("S_REQUESTED_DEADLINE_END_DATE"),   -- Re-adicionado
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": rd.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"), -- Re-adicionado
             "B_DATA_ESTIMATIVA_SAIDA_ETD": rd.get("B_DATA_ESTIMATIVA_SAIDA_ETD"),
             "B_DATA_ESTIMATIVA_CHEGADA_ETA": rd.get("B_DATA_ESTIMATIVA_CHEGADA_ETA"),
             "B_DATA_ABERTURA_GATE": rd.get("B_DATA_ABERTURA_GATE"),
             "USER_INSERT": user_insert,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
+            "ELLOX_MONITORING_ID": None, -- Adicionado, será preenchido posteriormente
         }
 
         # Garante binds quando SELECT não retornar colunas (compatibilidade)
