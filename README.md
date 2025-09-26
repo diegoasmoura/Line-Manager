@@ -2118,6 +2118,13 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.14 - Correções de Interface e Validação da API (Janeiro 2025)
+- **🎨 Alinhamento de Campos**: Corrigido desalinhamento dos campos de data e hora no formulário manual de voyage monitoring, restaurando a estrutura original do commit `ee2ed356`
+- **🔧 Validação da API Melhorada**: Função `validate_and_collect_voyage_monitoring` agora sempre consulta a API para validação, mesmo quando `save_to_db=False`, retornando mensagens específicas baseadas no resultado
+- **💬 Mensagens de Erro Aprimoradas**: Atualizada mensagem de erro de autenticação da API para ser mais clara e orientativa, incluindo instruções práticas para o usuário
+- **📋 Documentação Atualizada**: Adicionada seção detalhada sobre comportamento da validação da API no README.md
+- **✅ Correções Técnicas**: Removido `label_visibility="collapsed"` dos campos de hora para restaurar alinhamento perfeito
+
 ### 📌 v3.9.13 - Melhorias de Relevância e Contexto no Módulo de Atualização (Setembro 2025)
 - **Dados Sempre Atuais**: Removido todo o sistema de cache (`@st.cache_data` e `st.session_state`) da tela de atualização de viagens para garantir que os dados sejam sempre 100% ao vivo, eliminando o problema de registros antigos ou incorretos aparecerem.
 - **Filtro de Relevância**: A consulta principal da tela agora usa `INNER JOIN`, exibindo apenas viagens que possuem `Farol References` associadas, o que torna a lista mais limpa e relevante.

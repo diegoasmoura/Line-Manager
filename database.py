@@ -1871,7 +1871,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                 return {
                     "success": False,
                     "data": None,
-                    "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
+                    "message": "🔴 Erro na Conexão com a API Ellox\n\nNão foi possível autenticar ou a API está temporariamente indisponível.\n\n- Tente novamente em alguns minutos.\n- Caso o problema continue, um formulário será aberto automaticamente para preenchimento manual.",
                     "requires_manual": True,
                     "error_type": "authentication_failed"
                 }

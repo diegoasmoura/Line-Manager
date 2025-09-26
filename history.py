@@ -2287,14 +2287,14 @@ def exibir_history():
                     with col_deadline_date:
                         manual_deadline_date = st.date_input("⏳ Data Deadline", value=None, key=f"manual_deadline_date_{adjustment_id}", help="Data limite para entrega de documentos")
                     with col_deadline_time:
-                        manual_deadline_time = st.time_input("Hora", value=None, key=f"manual_deadline_time_{adjustment_id}", help="Hora limite para entrega de documentos", label_visibility="collapsed")
+                        manual_deadline_time = st.time_input("Hora", value=None, key=f"manual_deadline_time_{adjustment_id}", help="Hora limite para entrega de documentos")
                 
                 with col2:
                     col_draft_date, col_draft_time = st.columns([2, 1])
                     with col_draft_date:
                         manual_draft_date = st.date_input("📝 Data Draft Deadline", value=None, key=f"manual_draft_date_{adjustment_id}", help="Data limite para entrega do draft")
                     with col_draft_time:
-                        manual_draft_time = st.time_input("Hora", value=None, key=f"manual_draft_time_{adjustment_id}", help="Hora limite para entrega do draft", label_visibility="collapsed")
+                        manual_draft_time = st.time_input("Hora", value=None, key=f"manual_draft_time_{adjustment_id}", help="Hora limite para entrega do draft")
                 
                 # Segunda linha: Data Abertura Gate e Data Abertura Gate Reefer
                 col4, col5 = st.columns(2)
@@ -2304,14 +2304,14 @@ def exibir_history():
                     with col_gate_date:
                         manual_gate_date = st.date_input("🚪 Data Abertura Gate", value=None, key=f"manual_gate_date_{adjustment_id}", help="Data de abertura do gate para recebimento de cargas")
                     with col_gate_time:
-                        manual_gate_time = st.time_input("Hora", value=None, key=f"manual_gate_time_{adjustment_id}", help="Hora de abertura do gate para recebimento de cargas", label_visibility="collapsed")
+                        manual_gate_time = st.time_input("Hora", value=None, key=f"manual_gate_time_{adjustment_id}", help="Hora de abertura do gate para recebimento de cargas")
                 
                 with col5:
                     col_reefer_date, col_reefer_time = st.columns([2, 1])
                     with col_reefer_date:
                         manual_reefer_date = st.date_input("🧊 Data Abertura Gate Reefer", value=None, key=f"manual_reefer_date_{adjustment_id}", help="Data de abertura do gate para cargas refrigeradas")
                     with col_reefer_time:
-                        manual_reefer_time = st.time_input("Hora", value=None, key=f"manual_reefer_time_{adjustment_id}", help="Hora de abertura do gate para cargas refrigeradas", label_visibility="collapsed")
+                        manual_reefer_time = st.time_input("Hora", value=None, key=f"manual_reefer_time_{adjustment_id}", help="Hora de abertura do gate para cargas refrigeradas")
                 
                 # Datas de navegação
                 st.markdown("#### Datas de Navegação")
@@ -2324,14 +2324,14 @@ def exibir_history():
                     with col_etd_date:
                         manual_etd_date = st.date_input("🚢 Data Estimativa Saída (ETD)", value=None, key=f"manual_etd_date_{adjustment_id}", help="Data estimada de saída do porto")
                     with col_etd_time:
-                        manual_etd_time = st.time_input("Hora", value=None, key=f"manual_etd_time_{adjustment_id}", help="Hora estimada de saída do porto", label_visibility="collapsed")
+                        manual_etd_time = st.time_input("Hora", value=None, key=f"manual_etd_time_{adjustment_id}", help="Hora estimada de saída do porto")
                 
                 with col2:
                     col_eta_date, col_eta_time = st.columns([2, 1])
                     with col_eta_date:
                         manual_eta_date = st.date_input("🎯 Data Estimativa Chegada (ETA)", value=None, key=f"manual_eta_date_{adjustment_id}", help="Data estimada de chegada ao porto")
                     with col_eta_time:
-                        manual_eta_time = st.time_input("Hora", value=None, key=f"manual_eta_time_{adjustment_id}", help="Hora estimada de chegada ao porto", label_visibility="collapsed")
+                        manual_eta_time = st.time_input("Hora", value=None, key=f"manual_eta_time_{adjustment_id}", help="Hora estimada de chegada ao porto")
                 
                 # Segunda linha: ETB e ATB
                 col4, col5 = st.columns(2)
@@ -2341,14 +2341,14 @@ def exibir_history():
                     with col_etb_date:
                         manual_etb_date = st.date_input("🛳️ Data Estimativa Atracação (ETB)", value=None, key=f"manual_etb_date_{adjustment_id}", help="Data estimada de atracação no cais")
                     with col_etb_time:
-                        manual_etb_time = st.time_input("Hora", value=None, key=f"manual_etb_time_{adjustment_id}", help="Hora estimada de atracação no cais", label_visibility="collapsed")
+                        manual_etb_time = st.time_input("Hora", value=None, key=f"manual_etb_time_{adjustment_id}", help="Hora estimada de atracação no cais")
                 
                 with col5:
                     col_atb_date, col_atb_time = st.columns([2, 1])
                     with col_atb_date:
                         manual_atb_date = st.date_input("✅ Data Atracação (ATB)", value=None, key=f"manual_atb_date_{adjustment_id}", help="Data real de atracação no cais")
                     with col_atb_time:
-                        manual_atb_time = st.time_input("Hora", value=None, key=f"manual_atb_time_{adjustment_id}", help="Hora real de atracação no cais", label_visibility="collapsed")
+                        manual_atb_time = st.time_input("Hora", value=None, key=f"manual_atb_time_{adjustment_id}", help="Hora real de atracação no cais")
                 
                 # Chegada e Partida
                 st.markdown("#### Chegada e Partida")
@@ -2361,14 +2361,14 @@ def exibir_history():
                     with col_atd_date:
                         manual_atd_date = st.date_input("📤 Data Partida (ATD)", value=None, key=f"manual_atd_date_{adjustment_id}", help="Data real de partida do porto")
                     with col_atd_time:
-                        manual_atd_time = st.time_input("Hora", value=None, key=f"manual_atd_time_{adjustment_id}", help="Hora real de partida do porto", label_visibility="collapsed")
+                        manual_atd_time = st.time_input("Hora", value=None, key=f"manual_atd_time_{adjustment_id}", help="Hora real de partida do porto")
                 
                 with col2:
                     col_ata_date, col_ata_time = st.columns([2, 1])
                     with col_ata_date:
                         manual_ata_date = st.date_input("📥 Data Chegada (ATA)", value=None, key=f"manual_ata_date_{adjustment_id}", help="Data real de chegada ao porto")
                     with col_ata_time:
-                        manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto", label_visibility="collapsed")
+                        manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
                 # --- Início da Seção de Referência Relacionada (Movido para dentro do Form) ---
                 # A seleção de referência é necessária para todos os cenários de entrada manual.
