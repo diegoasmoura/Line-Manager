@@ -1297,7 +1297,7 @@ Para garantir a integridade dos dados, evitar duplicações e otimizar o process
     *   Quando o usuário seleciona uma linha na aba "Returns Awaiting Review" e clica em "Booking Approved", o sistema **não cria uma nova linha** em `F_CON_RETURN_CARRIERS`. Em vez disso, ele **atualiza a linha existente** que foi criada no processamento inicial do PDF.
     *   **Verificação Local:** Antes de consultar a API ELLOX, o sistema verifica se já existe um registro de monitoramento de viagem na tabela `F_ELLOX_TERMINAL_MONITORINGS` para o conjunto `(NAVIO, VIAGEM, TERMINAL)` do retorno que está sendo aprovado.
     *   **Cenário 1: Monitoramento Existente:**
-        *   Se um registro correspondente for encontrado em `F_ELLOX_TERMINAL_MONITORINGS`, o sistema utiliza o `ID` desse registro.
+        *   Se um registro correspondente for encontrado em `F_ELLOX_TERMINAL_MONITORINGS`, o sistema utiliza o `ID` do **registro mais recente** (baseado em `DATA_ATUALIZACAO` ou `ROW_INSERTED_DATE`).
         *   O `ELLOX_MONITORING_ID` da linha de `F_CON_RETURN_CARRIERS` que está sendo aprovada é atualizado com este `ID` existente.
         *   **Não há chamada à API ELLOX**, evitando tráfego desnecessário e duplicação de dados.
     *   **Cenário 2: Monitoramento Não Existente:**
@@ -1306,11 +1306,24 @@ Para garantir a integridade dos dados, evitar duplicações e otimizar o process
         *   O `ELLOX_MONITORING_ID` da linha de `F_CON_RETURN_CARRIERS` que está sendo aprovada é atualizado com o `ID` do novo registro.
         *   Caso a API falhe e o usuário preencha os dados manualmente, o `ELLOX_MONITORING_ID` será vinculado ao registro criado manualmente em `F_ELLOX_TERMINAL_MONITORINGS`.
 
-3.  **Benefícios da Abordagem `ELLOX_MONITORING_ID`:**
+3.  **Estratégia de Histórico Temporal:**
+    *   **Preservação do Histórico:** A tabela `F_ELLOX_TERMINAL_MONITORINGS` mantém um histórico completo de todas as atualizações de monitoramento para cada conjunto `(NAVIO, VIAGEM, TERMINAL)`.
+    *   **Evita Duplicatas Exatas:** O sistema verifica se já existe um registro com exatamente os mesmos dados (navio, viagem, terminal, data_atualizacao, cnpj_terminal, agencia) antes de inserir. Se existir, não insere duplicata.
+    *   **Permite Evolução Temporal:** Dados podem evoluir ao longo do tempo (ex: atualizações da API a cada hora), criando novos registros com timestamps diferentes.
+    *   **Vinculação Inteligente:** O `ELLOX_MONITORING_ID` sempre aponta para o registro **mais recente** do conjunto, garantindo que os dados mais atuais sejam utilizados.
+
+4.  **Benefícios da Abordagem `ELLOX_MONITORING_ID`:**
     *   **Estabilidade e Integridade dos Dados:** Garante que a ligação entre o retorno e o monitoramento seja estável, mesmo que os detalhes da viagem (`Navio`, `Viagem`, `Terminal`) mudem no futuro (ex: container rolado). O `ELLOX_MONITORING_ID` aponta para um registro específico de monitoramento, preservando o contexto histórico.
     *   **Performance:** Juntar tabelas usando um ID numérico é mais rápido e eficiente.
     *   **Clareza:** A relação entre `F_CON_RETURN_CARRIERS` e `F_ELLOX_TERMINAL_MONITORINGS` torna-se explícita e fácil de entender.
-    *   **Evita Duplicação:** Impede a criação de múltiplos registros idênticos em `F_ELLOX_TERMINAL_MONITORINGS` para a mesma viagem.
+    *   **Histórico Completo:** Mantém todas as atualizações temporais dos dados de monitoramento.
+    *   **Evita Duplicatas Exatas:** Impede a criação de registros idênticos, mas permite evolução temporal dos dados.
+
+5.  **Cenário de Atualizações Temporais:**
+    *   **Hora 0:** Aprovação inicial → Cria registro com dados da API
+    *   **Hora 7:** API atualiza dados → Sistema coleta e cria novo registro (se dados diferentes)
+    *   **Hora 8:** Nova aprovação → Vincula ao registro mais recente (hora 7)
+    *   **Resultado:** Histórico completo preservado, vinculação sempre atualizada
 
 ---
 
@@ -1328,23 +1341,63 @@ st.info("ℹ️ Dados de monitoramento serão coletados durante a aprovação")
 
 **2. Durante a Aprovação:**
 ```python
-# Validação automática da API
-result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal)
+# Validação automática da API com vinculação
+result = validate_and_collect_voyage_monitoring(adjustment_id, farol_reference, vessel_name, voyage_code, terminal)
 
 if result["requires_manual"]:
     # Exibe formulário manual
     st.warning("⚠️ Cadastro Manual de Voyage Monitoring Necessário")
     display_manual_voyage_form(vessel_name, voyage_code, terminal)
 else:
-    # Dados coletados automaticamente
-    st.success("✅ Dados de monitoramento coletados da API")
+    # Dados coletados automaticamente e vinculados
+    st.success("✅ Dados de monitoramento coletados da API e vinculados")
+    if result.get("monitoring_id"):
+        st.info(f"🔗 Vinculado ao monitoramento ID: {result['monitoring_id']}")
 ```
 
-**3. Formulário Manual (quando necessário):**
+**3. Estratégia de Histórico Temporal:**
+```python
+# Verificação de duplicatas exatas antes de inserir
+check_duplicate_sql = text("""
+    SELECT COUNT(*) as count
+    FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+    WHERE UPPER(NAVIO) = UPPER(:NAVIO)
+    AND UPPER(VIAGEM) = UPPER(:VIAGEM)
+    AND UPPER(TERMINAL) = UPPER(:TERMINAL)
+    AND NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) = :DATA_ATUALIZACAO
+    AND NVL(CNPJ_TERMINAL, 'NULL') = NVL(:CNPJ_TERMINAL, 'NULL')
+    AND NVL(AGENCIA, 'NULL') = NVL(:AGENCIA, 'NULL')
+""")
+
+# Se não é duplicata exata, inserir novo registro (manter histórico)
+if duplicate_count == 0:
+    insert_sql = text("INSERT INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS ...")
+    conn.execute(insert_sql, params)
+else:
+    print("⚠️ Duplicata exata encontrada, pulando inserção.")
+```
+
+**4. Vinculação Inteligente:**
+```python
+# Função que sempre retorna o registro mais recente
+def check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal):
+    query = text("""
+        SELECT ID
+        FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+        WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+        AND UPPER(VIAGEM) = UPPER(:voyage_code)
+        AND UPPER(TERMINAL) = UPPER(:terminal)
+        ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+        FETCH FIRST 1 ROWS ONLY
+    """)
+    # Retorna o ID do registro mais recente
+```
+
+**5. Formulário Manual (quando necessário):**
 - Interface idêntica ao `voyage_monitoring.py`
 - Campos para todas as datas importantes (ETD, ETA, Deadlines, etc.)
 - Opção de "Pular e Continuar" se dados não estão disponíveis
-- Salvamento direto em `F_ELLOX_TERMINAL_MONITORINGS`
+- Salvamento direto em `F_ELLOX_TERMINAL_MONITORINGS` com verificação de duplicatas
 
 ##### 📝 Casos de Uso
 
@@ -1360,12 +1413,22 @@ else:
 - ⚠️ Voyage não existe no sistema Ellox
 - ⚠️ Dados de monitoramento não disponíveis
 
+**Cenários de Histórico Temporal:**
+- 🔄 **Atualizações da API:** Sistema coleta dados atualizados a cada hora
+- 📊 **Múltiplas Aprovações:** Diferentes Farol References para mesmo navio/viagem/terminal
+- 🕐 **Evolução Temporal:** Dados podem mudar ao longo do tempo (ETD, ETA, etc.)
+- 🔗 **Vinculação Inteligente:** Sempre aponta para o registro mais recente
+- 📈 **Preservação do Histórico:** Todas as atualizações são mantidas para auditoria
+
 ##### 🔧 Localização no Código
 
 - **Validação API**: `database.py` → `validate_and_collect_voyage_monitoring()`
 - **Aprovação**: `database.py` → `approve_carrier_return()` (modificado)
 - **Formulário Manual**: `history.py` → seção "voyage_manual_entry_required"
 - **PDF Processing**: `pdf_booking_processor.py` → `save_pdf_booking_data()` (simplificado)
+- **Vinculação**: `database.py` → `update_return_carrier_monitoring_id()`
+- **Verificação de Duplicatas**: `database.py` → `upsert_terminal_monitorings_from_dataframe()`
+- **Busca do Mais Recente**: `database.py` → `check_for_existing_monitoring()`
 
 ##### 🛠️ Melhorias Técnicas da v3.9
 

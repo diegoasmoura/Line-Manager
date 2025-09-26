@@ -2001,7 +2001,7 @@ def exibir_history():
                     
                     if vessel_name and terminal:
                         # Validar dados de monitoramento da viagem (sem salvar ainda)
-                        voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                        voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, farol_ref, vessel_name, voyage_code, terminal, save_to_db=False)
                         
                         # Se requer entrada manual, definir no session_state e NÃO aprovar ainda
                         if voyage_validation_result.get("requires_manual"):
@@ -2116,7 +2116,7 @@ def exibir_history():
                                 
                                 if vessel_name and terminal:
                                     from database import validate_and_collect_voyage_monitoring
-                                    voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                                    voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, farol_ref, vessel_name, voyage_code, terminal, save_to_db=False)
                                     
                                     if voyage_validation_result.get("requires_manual"):
                                         st.session_state["voyage_manual_entry_required"] = {

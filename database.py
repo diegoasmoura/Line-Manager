@@ -61,6 +61,70 @@ def ensure_ellox_monitoring_id_column(conn):
         st.error(f"❌ Erro ao verificar/adicionar coluna ELLOX_MONITORING_ID: {str(e)}")
         conn.rollback() # Rollback any pending changes if an error occurs
 
+def check_for_existing_monitoring(conn, vessel_name: str, voyage_code: str, terminal: str) -> int | None:
+    """
+    Verifica se já existe um registro de monitoramento em F_ELLOX_TERMINAL_MONITORINGS
+    com base no navio, viagem e terminal.
+    Retorna o ID do registro se encontrado, ou None.
+    """
+    try:
+        query = text("""
+            SELECT ID
+            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+            WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+              AND UPPER(VIAGEM) = UPPER(:voyage_code)
+              AND UPPER(TERMINAL) = UPPER(:terminal)
+            ORDER BY ROW_INSERTED_DATE DESC -- Pega o mais recente se houver múltiplos
+            FETCH FIRST 1 ROWS ONLY
+        """)
+        result = conn.execute(query, {
+            "vessel_name": vessel_name,
+            "voyage_code": voyage_code,
+            "terminal": terminal
+        }).scalar()
+        return result
+    except Exception as e:
+        st.error(f"❌ Erro ao verificar monitoramento existente: {str(e)}")
+        return None
+
+def update_return_carrier_monitoring_id(conn, adjustment_id: str, monitoring_id: int) -> bool:
+    """
+    Atualiza a coluna ELLOX_MONITORING_ID na tabela F_CON_RETURN_CARRIERS
+    para vincular o registro de retorno ao monitoramento de viagem.
+    
+    Args:
+        conn: Conexão com o banco de dados
+        adjustment_id: ID do ajuste na F_CON_RETURN_CARRIERS
+        monitoring_id: ID do registro em F_ELLOX_TERMINAL_MONITORINGS
+        
+    Returns:
+        bool: True se a atualização foi bem-sucedida, False caso contrário
+    """
+    try:
+        update_query = text("""
+            UPDATE LogTransp.F_CON_RETURN_CARRIERS
+            SET ELLOX_MONITORING_ID = :monitoring_id,
+                USER_UPDATE = 'System',
+                DATE_UPDATE = SYSDATE
+            WHERE ADJUSTMENT_ID = :adjustment_id
+        """)
+        
+        result = conn.execute(update_query, {
+            "monitoring_id": monitoring_id,
+            "adjustment_id": adjustment_id
+        })
+        
+        # Verifica se a atualização afetou alguma linha
+        if result.rowcount > 0:
+            return True
+        else:
+            st.warning(f"⚠️ Nenhum registro encontrado com ADJUSTMENT_ID: {adjustment_id}")
+            return False
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao vincular monitoramento de viagem: {str(e)}")
+        return False
+
 # --- RETURN CARRIERS ---
 def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
     """Busca dados da F_CON_RETURN_CARRIERS por Farol Reference."""
@@ -90,9 +154,9 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                             B_VOYAGE_CODE,
                             B_DATA_DRAFT_DEADLINE,
                             B_DATA_DEADLINE,
-                            S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
-                            S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
-                            S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
+                            S_REQUESTED_DEADLINE_START_DATE, 
+                            S_REQUESTED_DEADLINE_END_DATE,   
+                            S_REQUIRED_ARRIVAL_DATE_EXPECTED, 
                             B_DATA_ESTIMATIVA_SAIDA_ETD,
                             B_DATA_ESTIMATIVA_CHEGADA_ETA,
                             B_DATA_ABERTURA_GATE,
@@ -164,7 +228,9 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 USER_UPDATE,
                 DATE_UPDATE,
                 ROW_INSERTED_DATE,
-                PDF_BOOKING_EMISSION_DATE
+                PDF_BOOKING_EMISSION_DATE,
+                ADJUSTMENTS_OWNER,
+                ELLOX_MONITORING_ID
             FROM LogTransp.F_CON_RETURN_CARRIERS
             ORDER BY ROW_INSERTED_DATE DESC
             FETCH FIRST {int(limit)} ROWS ONLY
@@ -1253,9 +1319,9 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                 B_VOYAGE_CARRIER,
                 B_DATA_DRAFT_DEADLINE,
                 B_DATA_DEADLINE,
-                S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
-                S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
-                S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
+                S_REQUESTED_DEADLINE_START_DATE, 
+                S_REQUESTED_DEADLINE_END_DATE,   
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED, 
                 B_DATA_ESTIMATIVA_SAIDA_ETD,
                 B_DATA_ESTIMATIVA_CHEGADA_ETA,
                 B_DATA_ABERTURA_GATE,
@@ -1290,9 +1356,10 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             "B_DATA_CHEGADA_ATA",
             "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
             "B_DATA_ATRACACAO_ATB",
-            "S_REQUESTED_DEADLINE_START_DATE", -- Re-adicionado
-            "S_REQUESTED_DEADLINE_END_DATE",   -- Re-adicionado
-            "S_REQUIRED_ARRIVAL_DATE_EXPECTED", -- Re-adicionado
+            "S_REQUESTED_DEADLINE_START_DATE", 
+            "S_REQUESTED_DEADLINE_END_DATE",  
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
+            "ELLOX_MONITORING_ID"  # Adicionado para evitar erro de bind parameter
         ):
             if k not in data:
                 data[k] = None
@@ -1327,6 +1394,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     B_DATA_ESTIMATIVA_SAIDA_ETD = :B_DATA_ESTIMATIVA_SAIDA_ETD,
                     B_DATA_ESTIMATIVA_CHEGADA_ETA = :B_DATA_ESTIMATIVA_CHEGADA_ETA,
                     B_DATA_ABERTURA_GATE = :B_DATA_ABERTURA_GATE,
+                    ELLOX_MONITORING_ID = :ELLOX_MONITORING_ID, -- Adicionado
                     USER_UPDATE = :USER_INSERT,
                     DATE_UPDATE = SYSDATE
                 WHERE FAROL_REFERENCE = :FAROL_REFERENCE
@@ -1337,62 +1405,62 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         else:
             # Insere
             insert_sql = text(
-                """
-                INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
-                    FAROL_REFERENCE,
-                    B_BOOKING_STATUS,
-                    P_STATUS,
-                    P_PDF_NAME,
-                    S_SPLITTED_BOOKING_REFERENCE,
-                    S_PLACE_OF_RECEIPT,
-                    S_QUANTITY_OF_CONTAINERS,
-                    S_PORT_OF_LOADING_POL,
-                    S_PORT_OF_DELIVERY_POD,
-                    S_FINAL_DESTINATION,
-                    B_TRANSHIPMENT_PORT,
-                    B_TERMINAL,
-                    B_VESSEL_NAME,
-                    B_VOYAGE_CARRIER,
-                    B_DATA_DRAFT_DEADLINE,
-                    B_DATA_DEADLINE,
-                    S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
-                    S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
-                    S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
-                    B_DATA_ESTIMATIVA_SAIDA_ETD,
-                    B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                    B_DATA_ABERTURA_GATE,
-                    USER_INSERT,
-                    ADJUSTMENT_ID,
-                    ELLOX_MONITORING_ID -- Adicionado
-                ) VALUES (
-                    :FAROL_REFERENCE,
-                    :B_BOOKING_STATUS,
-                    :P_STATUS,
-                    :P_PDF_NAME,
-                    :S_SPLITTED_BOOKING_REFERENCE,
-                    :S_PLACE_OF_RECEIPT,
-                    :S_QUANTITY_OF_CONTAINERS,
-                    :S_PORT_OF_LOADING_POL,
-                    :S_PORT_OF_DELIVERY_POD,
-                    :S_FINAL_DESTINATION,
-                    :B_TRANSHIPMENT_PORT,
-                    :B_TERMINAL,
-                    :B_VESSEL_NAME,
-                    :B_VOYAGE_CARRIER,
-                    :B_DATA_DRAFT_DEADLINE,
-                    :B_DATA_DEADLINE,
-                    :S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
-                    :S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
-                    :S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
-                    :B_DATA_ESTIMATIVA_SAIDA_ETD,
-                    :B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                    :B_DATA_ABERTURA_GATE,
-                    :USER_INSERT,
-                    :ADJUSTMENT_ID,
-                    :ELLOX_MONITORING_ID -- Adicionado
-                )
-                """
-            )
+                            """
+                            INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
+                                FAROL_REFERENCE,
+                                B_BOOKING_STATUS,
+                                P_STATUS,
+                                P_PDF_NAME,
+                                S_SPLITTED_BOOKING_REFERENCE,
+                                S_PLACE_OF_RECEIPT,
+                                S_QUANTITY_OF_CONTAINERS,
+                                S_PORT_OF_LOADING_POL,
+                                S_PORT_OF_DELIVERY_POD,
+                                S_FINAL_DESTINATION,
+                                B_TRANSHIPMENT_PORT,
+                                B_TERMINAL,
+                                B_VESSEL_NAME,
+                                B_VOYAGE_CARRIER,
+                                B_DATA_DRAFT_DEADLINE,
+                                B_DATA_DEADLINE,
+                                S_REQUESTED_DEADLINE_START_DATE,
+                                S_REQUESTED_DEADLINE_END_DATE,
+                                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                                B_DATA_ESTIMATIVA_SAIDA_ETD,
+                                B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                                B_DATA_ABERTURA_GATE,
+                                USER_INSERT,
+                                ADJUSTMENT_ID,
+                                ELLOX_MONITORING_ID
+                            ) VALUES (
+                                :FAROL_REFERENCE,
+                                :B_BOOKING_STATUS,
+                                :P_STATUS,
+                                :P_PDF_NAME,
+                                :S_SPLITTED_BOOKING_REFERENCE,
+                                :S_PLACE_OF_RECEIPT,
+                                :S_QUANTITY_OF_CONTAINERS,
+                                :S_PORT_OF_LOADING_POL,
+                                :S_PORT_OF_DELIVERY_POD,
+                                :S_FINAL_DESTINATION,
+                                :B_TRANSHIPMENT_PORT,
+                                :B_TERMINAL,
+                                :B_VESSEL_NAME,
+                                :B_VOYAGE_CARRIER,
+                                :B_DATA_DRAFT_DEADLINE,
+                                :B_DATA_DEADLINE,
+                                :S_REQUESTED_DEADLINE_START_DATE,
+                                :S_REQUESTED_DEADLINE_END_DATE,
+                                :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                                :B_DATA_ESTIMATIVA_SAIDA_ETD,
+                                :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                                :B_DATA_ABERTURA_GATE,
+                                :USER_INSERT,
+                                :ADJUSTMENT_ID,
+                                NULL -- Temporariamente definido como NULL
+                            )
+                            """
+                        )
             data["ADJUSTMENT_ID"] = str(uuid.uuid4())
             conn.execute(insert_sql, data)
         conn.commit()
@@ -1446,60 +1514,59 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
 
         insert_sql = text(
             """
-            INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
-                FAROL_REFERENCE,
-                B_BOOKING_STATUS,
-                P_STATUS,
-                P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
-                S_PLACE_OF_RECEIPT,
-                S_QUANTITY_OF_CONTAINERS,
-                S_PORT_OF_LOADING_POL,
-                S_PORT_OF_DELIVERY_POD,
-                S_FINAL_DESTINATION,
-                B_TRANSHIPMENT_PORT,
-                B_TERMINAL,
-                B_VESSEL_NAME,
-                B_VOYAGE_CARRIER,
-                B_DATA_DRAFT_DEADLINE,
-                B_DATA_DEADLINE,
-                S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
-                S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
-                S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
-                B_DATA_ESTIMATIVA_SAIDA_ETD,
-                B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                B_DATA_ABERTURA_GATE,
-                USER_INSERT,
-                ADJUSTMENT_ID,
-                ELLOX_MONITORING_ID -- Adicionado
-            ) VALUES (
-                :FAROL_REFERENCE,
-                :B_BOOKING_STATUS,
-                :P_STATUS,
-                :P_PDF_NAME,
-                :S_SPLITTED_BOOKING_REFERENCE,
-                :S_PLACE_OF_RECEIPT,
-                :S_QUANTITY_OF_CONTAINERS,
-                :S_PORT_OF_LOADING_POL,
-                :S_PORT_OF_DELIVERY_POD,
-                :S_FINAL_DESTINATION,
-                :B_TRANSHIPMENT_PORT,
-                :B_TERMINAL,
-                :B_VESSEL_NAME,
-                :B_VOYAGE_CARRIER,
-                :B_DATA_DRAFT_DEADLINE,
-                :B_DATA_DEADLINE,
-                :S_REQUESTED_DEADLINE_START_DATE, -- Re-adicionado
-                :S_REQUESTED_DEADLINE_END_DATE,   -- Re-adicionado
-                :S_REQUIRED_ARRIVAL_DATE_EXPECTED, -- Re-adicionado
-                :B_DATA_ESTIMATIVA_SAIDA_ETD,
-                :B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                :B_DATA_ABERTURA_GATE,
-                :USER_INSERT,
-                :ADJUSTMENT_ID,
-                :ELLOX_MONITORING_ID -- Adicionado
-            )
-            """
+                        INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
+                            FAROL_REFERENCE,
+                            B_BOOKING_STATUS,
+                            P_STATUS,
+                            P_PDF_NAME,
+                            S_SPLITTED_BOOKING_REFERENCE,
+                            S_PLACE_OF_RECEIPT,
+                            S_QUANTITY_OF_CONTAINERS,
+                            S_PORT_OF_LOADING_POL,
+                            S_PORT_OF_DELIVERY_POD,
+                            S_FINAL_DESTINATION,
+                            B_TRANSHIPMENT_PORT,
+                            B_TERMINAL,
+                            B_VESSEL_NAME,
+                            B_VOYAGE_CARRIER,
+                            B_DATA_DRAFT_DEADLINE,
+                            B_DATA_DEADLINE,
+                            S_REQUESTED_DEADLINE_START_DATE,
+                            S_REQUESTED_DEADLINE_END_DATE,
+                            S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                            B_DATA_ESTIMATIVA_SAIDA_ETD,
+                            B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                            B_DATA_ABERTURA_GATE,
+                            USER_INSERT,
+                            ADJUSTMENT_ID,
+                            ELLOX_MONITORING_ID
+                        ) VALUES (
+                            :FAROL_REFERENCE,
+                            :B_BOOKING_STATUS,
+                            :P_STATUS,
+                            :P_PDF_NAME,
+                            :S_SPLITTED_BOOKING_REFERENCE,
+                            :S_PLACE_OF_RECEIPT,
+                            :S_QUANTITY_OF_CONTAINERS,
+                            :S_PORT_OF_LOADING_POL,
+                            :S_PORT_OF_DELIVERY_POD,
+                            :S_FINAL_DESTINATION,
+                            :B_TRANSHIPMENT_PORT,
+                            :B_TERMINAL,
+                            :B_VESSEL_NAME,
+                            :B_VOYAGE_CARRIER,
+                            :B_DATA_DRAFT_DEADLINE,
+                            :B_DATA_DEADLINE,
+                            :S_REQUESTED_DEADLINE_START_DATE,
+                            :S_REQUESTED_DEADLINE_END_DATE,
+                            :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                            :B_DATA_ESTIMATIVA_SAIDA_ETD,
+                            :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+                            :B_DATA_ABERTURA_GATE,
+                            :USER_INSERT,
+                            :ADJUSTMENT_ID,
+                            NULL -- Temporariamente definido como NULL
+                        )            """
         )
 
         params = {
@@ -1520,15 +1587,15 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "B_VOYAGE_CARRIER": rd.get("B_VOYAGE_CARRIER"),
             "B_DATA_DRAFT_DEADLINE": rd.get("B_DATA_DRAFT_DEADLINE"),
             "B_DATA_DEADLINE": rd.get("B_DATA_DEADLINE"),
-            "S_REQUESTED_DEADLINE_START_DATE": rd.get("S_REQUESTED_DEADLINE_START_DATE"), -- Re-adicionado
-            "S_REQUESTED_DEADLINE_END_DATE": rd.get("S_REQUESTED_DEADLINE_END_DATE"),   -- Re-adicionado
-            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": rd.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"), -- Re-adicionado
+            "S_REQUESTED_DEADLINE_START_DATE": rd.get("S_REQUESTED_DEADLINE_START_DATE"), 
+            "S_REQUESTED_DEADLINE_END_DATE": rd.get("S_REQUESTED_DEADLINE_END_DATE"),   
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": rd.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"), 
             "B_DATA_ESTIMATIVA_SAIDA_ETD": rd.get("B_DATA_ESTIMATIVA_SAIDA_ETD"),
             "B_DATA_ESTIMATIVA_CHEGADA_ETA": rd.get("B_DATA_ESTIMATIVA_CHEGADA_ETA"),
             "B_DATA_ABERTURA_GATE": rd.get("B_DATA_ABERTURA_GATE"),
             "USER_INSERT": user_insert,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
-            "ELLOX_MONITORING_ID": None, -- Adicionado, será preenchido posteriormente
+            "ELLOX_MONITORING_ID": None, 
         }
 
         # Garante binds quando SELECT não retornar colunas (compatibilidade)
@@ -1707,6 +1774,9 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         if comments:
             db_data["COMMENTS"] = comments
         
+        # Adiciona ELLOX_MONITORING_ID ao db_data antes de construir a query
+        db_data["ELLOX_MONITORING_ID"] = None # Temporariamente definido como NULL
+        
         # SQL de inserção
         columns = list(db_data.keys())
         placeholders = [f":{col}" for col in columns]
@@ -1755,7 +1825,7 @@ def _normalize_value(val):
 
     return val
 
-def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True) -> dict:
+def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: str, vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True) -> dict:
     """
     Valida e coleta dados de monitoramento da viagem usando a API Ellox.
     
@@ -1771,35 +1841,24 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         from ellox_api import get_default_api_client
         import pandas as pd
         
-        # 1. Verificar se os dados já existem no banco
         conn = get_database_connection()
+        tx = conn.begin() # Inicia uma transação para garantir atomicidade
         
-        # Verificar se há dados VÁLIDOS (não apenas registro vazio)
-        existing_query = text("""
-            SELECT COUNT(*) as count
-            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
-            WHERE UPPER(NAVIO) = UPPER(:vessel_name)
-            AND UPPER(VIAGEM) = UPPER(:voyage_code)
-            AND UPPER(TERMINAL) = UPPER(:terminal)
-            AND (DATA_DEADLINE IS NOT NULL 
-                OR DATA_ESTIMATIVA_SAIDA IS NOT NULL 
-                OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL 
-                OR DATA_ABERTURA_GATE IS NOT NULL)
-        """)
+        # Garante que a coluna ELLOX_MONITORING_ID exista
+        ensure_ellox_monitoring_id_column(conn)
+
+        # 1. Verificar se os dados de monitoramento já existem no banco
+        existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
         
-        existing_count = conn.execute(existing_query, {
-            "vessel_name": vessel_name,
-            "voyage_code": voyage_code, 
-            "terminal": terminal
-        }).scalar()
-        
-        conn.close()
-        
-        if existing_count > 0:
+        if existing_monitoring_id:
+            # Se o monitoramento já existe, apenas vincula o F_CON_RETURN_CARRIERS a ele
+            update_return_carrier_monitoring_id(conn, adjustment_id, existing_monitoring_id)
+            tx.commit()
+            conn.close()
             return {
                 "success": True,
                 "data": None,
-                "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
+                "message": f"✅ Dados de monitoramento já existem e foram vinculados para {vessel_name} - {voyage_code} - {terminal}",
                 "requires_manual": False
             }
         
@@ -1983,13 +2042,45 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
             
             if processed_count > 0:
-                return {
-                    "success": True,
-                    "data": api_data,
-                    "message": f"✅ Dados de monitoramento coletados da API e salvos ({len(api_data)} campos)",
-                    "requires_manual": False
-                }
+                # Após salvar, obter o ID do registro criado e vincular ao F_CON_RETURN_CARRIERS
+                try:
+                    # Buscar o ID do registro recém-criado
+                    new_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                    
+                    if new_monitoring_id:
+                        # Vincular o registro de retorno ao monitoramento
+                        update_return_carrier_monitoring_id(conn, adjustment_id, new_monitoring_id)
+                        tx.commit()
+                        conn.close()
+                        
+                        return {
+                            "success": True,
+                            "data": api_data,
+                            "message": f"✅ Dados de monitoramento coletados da API, salvos e vinculados ({len(api_data)} campos)",
+                            "requires_manual": False,
+                            "monitoring_id": new_monitoring_id
+                        }
+                    else:
+                        tx.rollback()
+                        conn.close()
+                        return {
+                            "success": False,
+                            "data": None,
+                            "message": "❌ Erro ao vincular dados de monitoramento",
+                            "requires_manual": True
+                        }
+                except Exception as e:
+                    tx.rollback()
+                    conn.close()
+                    return {
+                        "success": False,
+                        "data": None,
+                        "message": f"❌ Erro ao vincular monitoramento: {str(e)}",
+                        "requires_manual": True
+                    }
             else:
+                tx.rollback()
+                conn.close()
                 return {
                     "success": False,
                     "data": None,
@@ -2062,6 +2153,20 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             for manual_key, db_col in column_mapping.items():
                 if manual_key in manual_voyage_data and manual_voyage_data[manual_key] is not None:
                     elox_update_values[db_col] = manual_voyage_data[manual_key]
+            
+            # Para dados manuais, verificar se já existe monitoramento e vincular
+            if vessel_name_result:
+                vessel_name = vessel_name_result.get("b_vessel_name")
+                voyage_code = vessel_name_result.get("b_voyage_code") or ""
+                terminal = vessel_name_result.get("b_terminal") or ""
+                
+                if vessel_name and terminal:
+                    existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                    if existing_monitoring_id:
+                        elox_update_values["ELLOX_MONITORING_ID"] = existing_monitoring_id
+                        st.success(f"🔗 Vinculado ao monitoramento existente ID: {existing_monitoring_id}")
+                    else:
+                        st.warning("⚠️ Nenhum monitoramento existente encontrado para vinculação manual.")
         
         if vessel_name_result:
             vessel_name = vessel_name_result.get("b_vessel_name")
@@ -2073,7 +2178,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 api_buf_key = f"voyage_api_buffer_{adjustment_id}"
                 api_buf = st.session_state.get(api_buf_key)
                 if not api_buf:
-                    voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                    voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, related_reference, vessel_name, voyage_code, terminal, save_to_db=False)
                     if voyage_validation_result.get("success"):
                         api_buf = {
                             "NAVIO": vessel_name,
@@ -2133,6 +2238,12 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                                     for elox_col, return_col in column_mapping.items():
                                         if elox_col.lower() in latest_monitoring_record and latest_monitoring_record[elox_col.lower()] is not None:
                                             elox_update_values[return_col] = latest_monitoring_record[elox_col.lower()]
+                                    
+                                    # Vincular o ELLOX_MONITORING_ID
+                                    monitoring_id = latest_monitoring_record.get("id")
+                                    if monitoring_id:
+                                        elox_update_values["ELLOX_MONITORING_ID"] = monitoring_id
+                                        st.success(f"🔗 Vinculado ao monitoramento ID: {monitoring_id}")
                         else:
                             st.warning("⚠️ Falha ao salvar dados de monitoramento da API.")
                         
@@ -2711,43 +2822,47 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                     # Se falhar, ainda assim pula para evitar PK nula
                     continue
 
-            merge_sql = text(
-                """
-                MERGE INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS t
-                USING (SELECT :ID AS ID FROM dual) s
-                ON (t.ID = s.ID)
-                WHEN MATCHED THEN UPDATE SET
-                    NAVIO = :NAVIO,
-                    VIAGEM = :VIAGEM,
-                    AGENCIA = :AGENCIA,
-                    DATA_DEADLINE = :DATA_DEADLINE,
-                    DATA_DRAFT_DEADLINE = :DATA_DRAFT_DEADLINE,
-                    DATA_ABERTURA_GATE = :DATA_ABERTURA_GATE,
-                    DATA_ABERTURA_GATE_REEFER = :DATA_ABERTURA_GATE_REEFER,
-                    DATA_ESTIMATIVA_SAIDA = :DATA_ESTIMATIVA_SAIDA,
-                    DATA_ESTIMATIVA_CHEGADA = :DATA_ESTIMATIVA_CHEGADA,
-                    DATA_ATUALIZACAO = :DATA_ATUALIZACAO,
-                    TERMINAL = :TERMINAL,
-                    CNPJ_TERMINAL = :CNPJ_TERMINAL,
-                    DATA_CHEGADA = :DATA_CHEGADA,
-                    DATA_ESTIMATIVA_ATRACACAO = :DATA_ESTIMATIVA_ATRACACAO,
-                    DATA_ATRACACAO = :DATA_ATRACACAO,
-                    DATA_PARTIDA = :DATA_PARTIDA
-                WHEN NOT MATCHED THEN INSERT (
-                    ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
-                    DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
-                    DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
-                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE
-                ) VALUES (
-                    :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
-                    :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
-                    :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
-                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
-                )
-                """
-            )
-            conn.execute(merge_sql, params)
-            processed += 1
+            # Verificar se já existe um registro com os mesmos dados para evitar duplicatas exatas
+            check_duplicate_sql = text("""
+                SELECT COUNT(*) as count
+                FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+                WHERE UPPER(NAVIO) = UPPER(:NAVIO)
+                AND UPPER(VIAGEM) = UPPER(:VIAGEM)
+                AND UPPER(TERMINAL) = UPPER(:TERMINAL)
+                AND NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) = :DATA_ATUALIZACAO
+                AND NVL(CNPJ_TERMINAL, 'NULL') = NVL(:CNPJ_TERMINAL, 'NULL')
+                AND NVL(AGENCIA, 'NULL') = NVL(:AGENCIA, 'NULL')
+            """)
+            
+            duplicate_count = conn.execute(check_duplicate_sql, {
+                "NAVIO": params["NAVIO"],
+                "VIAGEM": params["VIAGEM"], 
+                "TERMINAL": params["TERMINAL"],
+                "DATA_ATUALIZACAO": params["DATA_ATUALIZACAO"],
+                "CNPJ_TERMINAL": params["CNPJ_TERMINAL"],
+                "AGENCIA": params["AGENCIA"]
+            }).fetchone()[0]
+            
+            # Se não é duplicata exata, inserir novo registro (manter histórico)
+            if duplicate_count == 0:
+                insert_sql = text("""
+                    INSERT INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS (
+                        ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
+                        DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
+                        DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
+                        DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE
+                    ) VALUES (
+                        :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
+                        :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
+                        :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
+                        :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
+                    )
+                """)
+                conn.execute(insert_sql, params)
+                processed += 1
+            else:
+                # Duplicata exata encontrada, não inserir
+                print(f"⚠️ Duplicata exata encontrada para {params['NAVIO']} - {params['VIAGEM']} - {params['TERMINAL']}, pulando inserção.")
 
         conn.commit()
     return processed
