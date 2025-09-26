@@ -1309,6 +1309,76 @@ graph TD
 - **🔧 Flexibilidade**: Formulário manual quando API não encontra dados
 - **📊 Controle**: Usuário pode revisar/ajustar dados antes da aprovação final
 
+##### ⚠️ **CORREÇÃO CRÍTICA: Exibição Prematura na Voyage Timeline**
+
+**Problema Identificado (Janeiro 2025):**
+A aba "Voyage Timeline" estava exibindo dados da tabela `F_ELLOX_TERMINAL_MONITORINGS` imediatamente após o processamento do PDF, mesmo quando o registro ainda não havia sido aprovado na aba "Returns Awaiting Review".
+
+**Causa Raiz:**
+A função `get_voyage_monitoring_for_reference()` no arquivo `history.py` estava fazendo uma consulta direta à tabela `F_ELLOX_TERMINAL_MONITORINGS` sem verificar se havia vinculação com registros **aprovados** na tabela `F_CON_RETURN_CARRIERS`.
+
+**Código SQL Antes da Correção:**
+```sql
+-- ❌ PROBLEMA: Mostrava registros não aprovados
+SELECT *
+FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+WHERE UPPER(NAVIO) IN ({placeholders})
+ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+```
+
+**Código SQL Após a Correção:**
+```sql
+-- ✅ SOLUÇÃO: Só mostra registros aprovados
+SELECT DISTINCT m.*
+FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
+INNER JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
+    UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME)
+    AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
+    AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
+    AND r.FAROL_REFERENCE = :farol_ref
+    AND r.B_BOOKING_STATUS = 'Booking Approved'  -- 🔑 FILTRO CRÍTICO
+)
+WHERE UPPER(m.NAVIO) IN ({placeholders})
+ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
+```
+
+**Resultado Esperado:**
+- ✅ A aba "Voyage Timeline" só exibe dados **após a aprovação manual**
+- ✅ Não há mais exibição prematura durante o processamento do PDF
+- ✅ O fluxo correto é: PDF → Validação → Aprovação Manual → Exibição na Voyage Timeline
+
+**⚠️ Lição Aprendida:**
+Sempre verificar se as consultas de exibição de dados respeitam o **status de aprovação** dos registros, especialmente quando há múltiplas tabelas relacionadas.
+
+##### 🛡️ **Boas Práticas para Evitar Problemas Similares**
+
+**1. Verificação de Status em Consultas de Exibição:**
+- ✅ **SEMPRE** incluir filtros de status nas consultas que exibem dados relacionados
+- ✅ **NUNCA** fazer consultas diretas a tabelas de monitoramento sem verificar aprovação
+- ✅ **SEMPRE** usar `INNER JOIN` com tabelas de status quando apropriado
+
+**2. Padrão de Consulta Segura:**
+```sql
+-- ✅ PADRÃO CORRETO: Sempre verificar status de aprovação
+SELECT dados.*
+FROM tabela_dados dados
+INNER JOIN tabela_status status ON (
+    dados.id = status.dados_id
+    AND status.status = 'APROVADO'  -- Filtro obrigatório
+)
+WHERE [outras condições]
+```
+
+**3. Testes de Validação Recomendados:**
+- ✅ Testar fluxo completo: PDF → Validação → Aprovação → Exibição
+- ✅ Verificar se dados não aparecem antes da aprovação
+- ✅ Confirmar que rejeição/cancelamento não exibe dados
+
+**4. Arquivos Críticos para Monitoramento:**
+- `history.py` → `get_voyage_monitoring_for_reference()`
+- `voyage_monitoring.py` → `get_voyage_monitoring_with_farol_references()`
+- `pdf_booking_processor.py` → Verificar chamadas automáticas
+
 ##### 🔗 Vinculação de Monitoramento de Viagem (ELLOX_MONITORING_ID)
 
 Para garantir a integridade dos dados, evitar duplicações e otimizar o processo de aprovação, foi implementada uma nova lógica de vinculação entre os registros de retorno (`F_CON_RETURN_CARRIERS`) e os dados de monitoramento de viagem (`F_ELLOX_TERMINAL_MONITORINGS`).
@@ -2405,6 +2475,49 @@ Todos os PRs passam por revisão técnica focando em:
 - **Performance**: O código é eficiente?
 - **Segurança**: Não há vulnerabilidades?
 - **Manutenibilidade**: O código é fácil de manter?
+
+## 📋 Changelog
+
+### 🔧 **v3.9.9 - Janeiro 2025 - Correção Crítica da Voyage Timeline**
+
+**🐛 Problema Corrigido:**
+- **Exibição Prematura na Voyage Timeline**: A aba "Voyage Timeline" estava exibindo dados da tabela `F_ELLOX_TERMINAL_MONITORINGS` imediatamente após o processamento do PDF, mesmo quando o registro ainda não havia sido aprovado.
+
+**🔧 Correções Aplicadas:**
+1. **`history.py`** → `get_voyage_monitoring_for_reference()`:
+   - Alterada consulta de `SELECT *` simples para `INNER JOIN` com `F_CON_RETURN_CARRIERS`
+   - Adicionado filtro obrigatório: `r.B_BOOKING_STATUS = 'Booking Approved'`
+   - Adicionado parâmetro `farol_ref` na execução da query
+
+2. **`pdf_booking_processor.py`** → `save_pdf_booking_data()`:
+   - Removida chamada automática para `collect_voyage_monitoring_data` durante processamento de PDF
+   - Garantido que coleta de dados só aconteça durante aprovação manual
+
+3. **`voyage_monitoring.py`** → `get_voyage_monitoring_with_farol_references()`:
+   - Alterada consulta de `LEFT JOIN` para `INNER JOIN` com filtro de status
+   - Adicionado filtro: `r.B_BOOKING_STATUS = 'Booking Approved'`
+
+4. **`database.py`** → Correções de sintaxe:
+   - Corrigidos erros de string literal não terminada
+   - Melhorado gerenciamento de transações
+
+5. **`README.md`** → Documentação completa:
+   - Adicionada seção de correção crítica com explicação detalhada
+   - Incluídas boas práticas para evitar problemas similares
+   - Documentado padrão de consulta segura
+
+**✅ Resultado Final:**
+- A aba "Voyage Timeline" só exibe dados **após aprovação manual** na aba "Returns Awaiting Review"
+- Não há mais exibição prematura durante processamento de PDF
+- Fluxo correto: PDF → Validação → Aprovação Manual → Exibição na Voyage Timeline
+- Documentação completa para evitar problemas similares no futuro
+
+**📁 Arquivos Modificados:**
+- `history.py` (função principal corrigida)
+- `pdf_booking_processor.py` (removida chamada automática)
+- `voyage_monitoring.py` (melhorada consulta)
+- `database.py` (correções de sintaxe)
+- `README.md` (documentação completa)
 
 ## 📞 Suporte
 
