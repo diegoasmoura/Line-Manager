@@ -769,6 +769,7 @@ def insert_adjustments_critic_splits(changes_df, comment, random_uuid, area, rea
  
  
  
+ 
 def add_sales_record(form_values):
     conn = None
     try:
@@ -869,6 +870,8 @@ def add_sales_record(form_values):
     finally:
         if conn:
             conn.close()
+ 
+ 
  
  
  
@@ -1065,7 +1068,7 @@ def insert_table(full_table_name, row_dict, conn):
     # Tenta importar numpy para checagem de tipos; segue sem np se não disponível
     try:
         import numpy as np  # type: ignore
-    except Exception:
+    except Exception:  # pragma: no cover
         np = None  # type: ignore
 
     for k, v in row_dict.items():
@@ -1612,7 +1615,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
 def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=None, p_status_override=None, area=None, request_reason=None, adjustments_owner=None, comments=None):
     """
     Insere dados na tabela F_CON_RETURN_CARRIERS baseado em dados da interface do usuário.
-    Usado para PDFs processados, splits e ajustes. 
+    Usado para PDFs processados, splits e ajustes.
     
     :param ui_data: Dicionário com dados da UI (com nomes de colunas amigáveis)
     :param user_insert: Usuário que está inserindo os dados
@@ -1674,7 +1677,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                          OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
                     ORDER BY ROW_INSERTED_DATE DESC
                     FETCH FIRST 1 ROWS ONLY
-                ")
+                """)
                 result = conn.execute(prefill_query, {"farol_ref": farol_ref}).mappings().fetchone()
                 if result:
                     # Mapear campos para pré-preenchimento
@@ -1822,7 +1825,7 @@ def _normalize_value(val):
 
     return val
 
-def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: str, vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True, conn=None) -> dict:
+def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: str, vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True) -> dict:
     """
     Valida e coleta dados de monitoramento da viagem usando a API Ellox.
     
@@ -1830,7 +1833,6 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
         vessel_name: Nome do navio
         voyage_code: Código da viagem  
         terminal: Nome do terminal
-        conn: Conexão com o banco de dados (opcional, se já estiver em transação)
         
     Returns:
         dict: {"success": bool, "data": dict/None, "message": str, "requires_manual": bool}
@@ -1839,10 +1841,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
         from ellox_api import get_default_api_client
         import pandas as pd
         
-        should_close_conn = False
-        if conn is None:
-            conn = get_database_connection()
-            should_close_conn = True
+        conn = get_database_connection()
         tx = conn.begin() # Inicia uma transação para garantir atomicidade
         
         # Garante que a coluna ELLOX_MONITORING_ID exista
@@ -1855,7 +1854,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
             # Se o monitoramento já existe, apenas vincula o F_CON_RETURN_CARRIERS a ele
             update_return_carrier_monitoring_id(conn, adjustment_id, existing_monitoring_id)
             tx.commit()
-            if should_close_conn: conn.close()
+            conn.close()
             return {
                 "success": True,
                 "data": None,
@@ -1922,7 +1921,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
         # Alguns PDFs trazem "Embraport Empresa Brasileira"; na API é reconhecido como DPW/DP WORLD
         if "EMBRAPORT" in terminal_normalized or "EMPRESA BRASILEIRA" in terminal_normalized:
             try:
-                # Reutiliza a conexão se já existir, senão cria uma nova
+                conn = get_database_connection()
                 query = text("""
                     SELECT CNPJ, NOME
                     FROM LogTransp.F_ELLOX_TERMINALS
@@ -1932,6 +1931,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                     FETCH FIRST 1 ROWS ONLY
                 """)
                 res = conn.execute(query).mappings().fetchone()
+                conn.close()
                 if res and res.get("cnpj"):
                     cnpj_terminal = res["cnpj"]
             except Exception:
@@ -2064,7 +2064,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
             
             # Usar a função existente para salvar
             df_monitoring = pd.DataFrame([monitoring_data])
-            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, conn=conn)
+            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
             
             if processed_count > 0:
                 # Após salvar, obter o ID do registro criado e vincular ao F_CON_RETURN_CARRIERS
@@ -2076,7 +2076,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                         # Vincular o registro de retorno ao monitoramento
                         update_return_carrier_monitoring_id(conn, adjustment_id, new_monitoring_id)
                         tx.commit()
-                        if should_close_conn: conn.close()
+                        conn.close()
                         
                         return {
                             "success": True,
@@ -2087,7 +2087,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                         }
                     else:
                         tx.rollback()
-                        if should_close_conn: conn.close()
+                        conn.close()
                         return {
                             "success": False,
                             "data": None,
@@ -2096,7 +2096,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                         }
                 except Exception as e:
                     tx.rollback()
-                    if should_close_conn: conn.close()
+                    conn.close()
                     return {
                         "success": False,
                         "data": None,
@@ -2105,7 +2105,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                     }
             else:
                 tx.rollback()
-                if should_close_conn: conn.close()
+                conn.close()
                 return {
                     "success": False,
                     "data": None,
@@ -2129,16 +2129,14 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
             "requires_manual": True
         }
 
-
 def approve_carrier_return(adjustment_id: str, related_reference: str, justification: dict, manual_voyage_data: dict = None) -> bool:
     """
     Executes the full approval process for a 'Received from Carrier' record within a single transaction.
     This includes fetching Ellox data, updating the return carrier record, and propagating changes to the main sales/booking table.
 
     :param adjustment_id: The ADJUSTMENT_ID of the F_CON_RETURN_CARRIERS record to approve.
-    :param related_reference: The complete selection string (e.g., 'FR_25.09_0001 | Cargill Booking Request | 11/09/2025 19:27') or 'New Adjustment'.
+    :param related_reference: The complete selection string (e.g., 'FR_25.09_0001 | Booking Requested | 11/09/2025 19:27') or 'New Adjustment'.
     :param justification: A dict with justification fields for 'New Adjustment' cases.
-    :param manual_voyage_data: Dict with manually entered voyage data.
     :return: True if successful, False otherwise.
     """
     
@@ -2203,7 +2201,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             if vessel_name and terminal and not manual_voyage_data:
                 # CORREÇÃO: Chamar validate_and_collect_voyage_monitoring com save_to_db=True
                 # para que a lógica de verificação de dados existentes funcione corretamente
-                voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, related_reference, vessel_name, voyage_code, terminal, save_to_db=True, conn=conn)
+                voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, related_reference, vessel_name, voyage_code, terminal, save_to_db=True)
                 
                 if voyage_validation_result.get("success"):
                     # Se dados já existiam, apenas vincular
@@ -2213,10 +2211,10 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                         # Buscar dados do registro existente para preencher elox_update_values
                         existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
                         if existing_monitoring_id:
-                            monitoring_query = text('''
+                            monitoring_query = text("""
                                 SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
                                 WHERE ID = :monitoring_id
-                            ''')
+                            """)
                             existing_record = conn.execute(monitoring_query, {"monitoring_id": existing_monitoring_id}).mappings().fetchone()
                             
                             if existing_record:
@@ -2244,10 +2242,10 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                         # Buscar dados do registro recém-criado
                         new_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
                         if new_monitoring_id:
-                            monitoring_query = text('''
+                            monitoring_query = text("""
                                 SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
                                 WHERE ID = :monitoring_id
-                            ''')
+                            """)
                             new_record = conn.execute(monitoring_query, {"monitoring_id": new_monitoring_id}).mappings().fetchone()
                             
                             if new_record:
@@ -2419,7 +2417,6 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         if 'conn' in locals() and not conn.closed:
             conn.close()
 
-
 def get_last_date_values_from_carriers(farol_reference: str) -> dict:
     """
     Busca os últimos valores dos campos de data da tabela F_CON_RETURN_CARRIERS
@@ -2440,13 +2437,9 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
                 ADJUSTMENT_ID
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
-            AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                 OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                 OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
             ORDER BY ROW_INSERTED_DATE DESC
             FETCH FIRST 1 ROWS ONLY
-        """
-        )
+        """)
         
         result = conn.execute(query, {"farol_ref": farol_reference}).mappings().fetchone()
         
@@ -2462,7 +2455,6 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
         return {}
     finally:
         conn.close()
-
 
 def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
     """
@@ -2568,7 +2560,7 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
 
                     # Only log if the update was successful (affected rows > 0)
                     if result.rowcount > 0 and log_entries:
-                        log_sql = text("""INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY) VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)"""')
+                        log_sql = text("""INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY) VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)""")
                         conn.execute(log_sql, log_entries)
 
         transaction.commit()
@@ -2599,8 +2591,7 @@ def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
                 USER_UPDATE = :user_update,
                 DATE_UPDATE = SYSDATE
             WHERE ADJUSTMENT_ID = :adjustment_id
-        """
-        )
+        """)
         
         result = conn.execute(update_query, {
             "new_status": new_status,
@@ -2701,7 +2692,6 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.Da
         if should_close:
             conn.close()
 
-
 def get_return_carrier_status_by_adjustment_id(adjustment_id: str):
     """Retorna o B_BOOKING_STATUS da F_CON_RETURN_CARRIERS para o ADJUSTMENT_ID dado."""
     conn = get_database_connection()
@@ -2783,7 +2773,7 @@ def ensure_table_f_ellox_terminal_monitorings():
     except Exception as e:
         print(f"❌ Erro ao verificar tabela: {e}")
         return False
-def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, conn=None) -> int:
+def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
     """Realiza upsert (MERGE) em LogTransp.F_ELLOX_TERMINAL_MONITORINGS a partir de um DataFrame.
 
     Espera colunas (case-insensitive):
@@ -2796,17 +2786,20 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, conn=None) -> i
     if df is None or df.empty:
         return 0
 
-    should_close_conn = False
-    if conn is None:
-        conn = get_database_connection()
-        should_close_conn = True
-    
-    try:
-        ensure_table_f_ellox_terminal_monitorings()
+    ensure_table_f_ellox_terminal_monitorings()
 
-        cols_map = {c.lower(): c for c in df.columns}
-        processed = 0
+    # Normaliza nomes de colunas para minúsculas para acesso resiliente
+    cols_map = {c.lower(): c for c in df.columns}
 
+    required = [
+        'id', 'navio', 'viagem', 'agencia', 'data_deadline', 'data_draft_deadline',
+        'data_abertura_gate', 'data_abertura_gate_reefer', 'data_estimativa_saida',
+        'data_estimativa_chegada', 'data_atualizacao', 'terminal', 'cnpj_terminal',
+        'data_chegada', 'data_estimativa_atracacao', 'data_atracacao', 'data_partida'
+    ]
+
+    processed = 0
+    with get_database_connection() as conn:
         for _, row in df.iterrows():
             def g(key):
                 c = cols_map.get(key)
@@ -2824,6 +2817,7 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, conn=None) -> i
                 "DATA_ABERTURA_GATE_REEFER": _parse_iso_datetime(g('data_abertura_gate_reefer')),
                 "DATA_ESTIMATIVA_SAIDA": _parse_iso_datetime(g('data_estimativa_saida')),
                 "DATA_ESTIMATIVA_CHEGADA": _parse_iso_datetime(g('data_estimativa_chegada')),
+                # Se vier vazio, assume timestamp atual nas entradas manuais
                 "DATA_ATUALIZACAO": _parse_iso_datetime(g('data_atualizacao')) or _datetime.now(),
                 "TERMINAL": g('terminal'),
                 "CNPJ_TERMINAL": g('cnpj_terminal'),
@@ -2859,8 +2853,8 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, conn=None) -> i
                 AND UPPER(VIAGEM) = UPPER(:VIAGEM)
                 AND UPPER(TERMINAL) = UPPER(:TERMINAL)
                 AND NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) = :DATA_ATUALIZACAO
-                AND NVL(CNPJ_TERMINAL, :null_str) = NVL(:CNPJ_TERMINAL, :null_str)
-                AND NVL(AGENCIA, :null_str) = NVL(:AGENCIA, :null_str)
+                AND NVL(CNPJ_TERMINAL, 'NULL') = NVL(:CNPJ_TERMINAL, 'NULL')
+                AND NVL(AGENCIA, 'NULL') = NVL(:AGENCIA, 'NULL')
             """)
             
             duplicate_count = conn.execute(check_duplicate_sql, {
@@ -2869,8 +2863,7 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, conn=None) -> i
                 "TERMINAL": params["TERMINAL"],
                 "DATA_ATUALIZACAO": params["DATA_ATUALIZACAO"],
                 "CNPJ_TERMINAL": params["CNPJ_TERMINAL"],
-                "AGENCIA": params["AGENCIA"],
-                "null_str": "NULL"
+                "AGENCIA": params["AGENCIA"]
             }).fetchone()[0]
             
             # Se não é duplicata exata, inserir novo registro (manter histórico)
@@ -2887,19 +2880,15 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, conn=None) -> i
                         :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
                         :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
                     )
-                ")
+                """)
                 conn.execute(insert_sql, params)
                 processed += 1
             else:
                 # Duplicata exata encontrada, não inserir
                 print(f"⚠️ Duplicata exata encontrada para {params['NAVIO']} - {params['VIAGEM']} - {params['TERMINAL']}, pulando inserção.")
 
-        # Não comita aqui, deixa para a função chamadora
-        return processed
-    finally:
-        if should_close_conn:
-            conn.close()
-
+        conn.commit()
+    return processed
 
 def get_terminal_monitorings(limit: int = 200) -> pd.DataFrame:
     """Consulta recentes da LogTransp.F_ELLOX_TERMINAL_MONITORINGS."""
@@ -2930,8 +2919,7 @@ def get_actions_count_by_farol_reference():
             SELECT FAROL_REFERENCE, COUNT(*) AS ACTION_COUNT
             FROM LogTransp.F_CON_RETURN_CARRIERS
             GROUP BY FAROL_REFERENCE
-        """
-        )
+        """)
         result = conn.execute(query).fetchall()
 
         # Converte para dicionário: ref exata -> action_count
@@ -2963,8 +2951,7 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
             UPDATE LogTransp.F_CON_RETURN_CARRIERS
             SET B_BOOKING_STATUS = :new_status, USER_UPDATE = 'System', DATE_UPDATE = SYSDATE
             WHERE ADJUSTMENT_ID = :adj_id
-        """
-        )
+        """)
         conn.execute(update_return_query, {"new_status": new_status, "adj_id": adjustment_id})
 
         # 3. Update the status in F_CON_SALES_BOOKING_DATA
@@ -2972,8 +2959,7 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
             UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
             SET FAROL_STATUS = :new_status
             WHERE FAROL_REFERENCE = :farol_ref
-        """
-        )
+        """)
         conn.execute(update_main_query, {"new_status": new_status, "farol_ref": farol_ref})
 
         # 4. Commit
@@ -2990,45 +2976,3 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
         if 'conn' in locals() and not conn.closed:
             conn.close()
 
-def get_last_date_values_from_carriers(farol_reference: str) -> dict:
-    """
-    Busca os últimos valores dos campos de data da tabela F_CON_RETURN_CARRIERS
-    para uma Farol Reference específica, independentemente do status.
-    
-    :param farol_reference: Referência do Farol para buscar os valores
-    :return: Dicionário com os últimos valores dos campos de data
-    """
-    conn = get_database_connection()
-    try:
-        query = text("""
-            SELECT 
-                S_REQUESTED_DEADLINE_START_DATE,
-                S_REQUESTED_DEADLINE_END_DATE,
-                S_REQUIRED_ARRIVAL_DATE_EXPECTED,
-                ROW_INSERTED_DATE,
-                B_BOOKING_STATUS,
-                ADJUSTMENT_ID
-            FROM LogTransp.F_CON_RETURN_CARRIERS
-            WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
-            AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                 OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                 OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
-            ORDER BY ROW_INSERTED_DATE DESC
-            FETCH FIRST 1 ROWS ONLY
-        """
-        )
-        
-        result = conn.execute(query, {"farol_ref": farol_reference}).mappings().fetchone()
-        
-        if result:
-            return {
-                "S_REQUESTED_DEADLINE_START_DATE": result.get("S_REQUESTED_DEADLINE_START_DATE"),
-                "S_REQUESTED_DEADLINE_END_DATE": result.get("S_REQUESTED_DEADLINE_END_DATE"),
-                "S_REQUIRED_ARRIVAL_DATE_EXPECTED": result.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED")
-            }
-        else:
-            return {}
-    except Exception as e:
-        return {}
-    finally:
-        conn.close()
