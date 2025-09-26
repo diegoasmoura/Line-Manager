@@ -1862,33 +1862,24 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                 "requires_manual": False
             }
         
-        # 2. Tentar obter dados da API Ellox (apenas se save_to_db=True)
-        if save_to_db:
-            try:
-                api_client = get_default_api_client()
-                
-                # Verificar autenticação primeiro
-                if not api_client.authenticated:
-                    return {
-                        "success": False,
-                        "data": None,
-                        "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
-                        "requires_manual": True,
-                        "error_type": "authentication_failed"
-                    }
-            except Exception as e:
+        # 2. Tentar obter dados da API Ellox (sempre para validação, independente de save_to_db)
+        try:
+            api_client = get_default_api_client()
+            
+            # Verificar autenticação primeiro
+            if not api_client.authenticated:
                 return {
                     "success": False,
                     "data": None,
-                    "message": f"❌ Erro ao inicializar cliente da API: {str(e)}",
-                    "requires_manual": True
+                    "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
+                    "requires_manual": True,
+                    "error_type": "authentication_failed"
                 }
-        else:
-            # Se save_to_db=False, não precisa da API
+        except Exception as e:
             return {
                 "success": False,
                 "data": None,
-                "message": "ℹ️ Validação sem salvamento solicitada",
+                "message": f"❌ Erro ao inicializar cliente da API: {str(e)}",
                 "requires_manual": True
             }
         

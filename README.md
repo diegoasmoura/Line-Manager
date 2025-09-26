@@ -1649,6 +1649,51 @@ AND (DATA_DEADLINE IS NOT NULL
 - 🔵 **Voyage Não Encontrada**: `st.warning()` com ícone de navio
 - ⚪ **Erro Geral**: `st.warning()` com ícone genérico
 
+#### 🔍 Validação da API (save_to_db=False)
+
+**Comportamento da Função `validate_and_collect_voyage_monitoring`:**
+
+Quando chamada com `save_to_db=False` (durante aprovação):
+- **Sempre consulta a API** para validação, independente do parâmetro
+- **Retorna mensagens específicas** baseadas no resultado da consulta
+- **Não salva dados** no banco de dados (apenas valida)
+- **Usado durante aprovação** para verificar disponibilidade de dados antes de prosseguir
+
+**Mensagens Esperadas:**
+
+| Situação | Mensagem | Tipo | Ação |
+|----------|----------|------|------|
+| ✅ **Dados encontrados** | "Dados de monitoramento encontrados na API (X campos)" | `st.success()` | Prosseguir com aprovação |
+| 🔵 **Voyage não encontrada** | "Voyage Não Encontrada na API - Use o formulário manual" | `st.warning()` | Exibir formulário manual |
+| 🟡 **API indisponível** | "API Ellox Temporariamente Indisponível" | `st.warning()` | Exibir formulário manual |
+| 🔴 **Falha de autenticação** | "Falha na Autenticação da API Ellox" | `st.error()` | Exibir formulário manual |
+| 🟠 **Terminal não encontrado** | "Terminal Não Localizado na API" | `st.info()` | Exibir formulário manual |
+| ⚪ **Dados inválidos** | "Nenhuma Data Válida Encontrada na API" | `st.warning()` | Exibir formulário manual |
+
+**Implementação Técnica:**
+```python
+# Validação durante aprovação (save_to_db=False)
+result = validate_and_collect_voyage_monitoring(
+    adjustment_id, farol_reference, vessel_name, voyage_code, terminal, 
+    save_to_db=False  # Apenas valida, não salva
+)
+
+if result["requires_manual"]:
+    # Exibe formulário manual com mensagem específica
+    st.warning(result["message"])
+    display_manual_voyage_form(vessel_name, voyage_code, terminal)
+else:
+    # Dados encontrados na API, prosseguir com aprovação
+    st.success(result["message"])
+    # Continuar com aprovação normal
+```
+
+**Benefícios:**
+- **Transparência**: Usuário sabe exatamente o que aconteceu com a API
+- **Experiência Consistente**: Mensagens claras e específicas para cada situação
+- **Validação Inteligente**: Sempre consulta API para dar feedback preciso
+- **Fluxo Otimizado**: Evita salvamento desnecessário durante validação
+
 #### 🚀 Consulta Direta à API Ellox (Estratégia Otimizada)
 
 **Problema Identificado**: A consulta tradicional via endpoint `/api/voyages` frequentemente resulta em timeout, especialmente quando há muitos registros ou a API está sobrecarregada.
