@@ -2564,7 +2564,7 @@ def exibir_history():
                                 del st.session_state["voyage_manual_entry_required"]
                             
                             st.cache_data.clear()
-                            st.rerun()
+                            # st.rerun()  # Removido para evitar piscada
                         else:
                             st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": "❌ Erro ao salvar dados de monitoramento"}
                             st.error("❌ Erro ao salvar dados de monitoramento")
@@ -2584,7 +2584,7 @@ def exibir_history():
                     
                     # Limpar cache e recarregar
                     st.cache_data.clear()
-                    st.rerun()
+                    # st.rerun()  # Removido para evitar piscada
                 
         
             # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
@@ -2788,7 +2788,7 @@ def exibir_history():
                             st.session_state.pop(f"pending_status_change_{farol_reference}", None)
                             st.session_state.pop("voyage_success_notice", None)
                             st.cache_data.clear()
-                            st.rerun()
+                            st.rerun()  # Mantido apenas este para atualizar a interface
                         else:
                             error_msg = st.session_state.get("approval_error", "❌ Falha ao aprovar. Verifique os logs para mais detalhes.")
                             st.error(error_msg)
@@ -2803,7 +2803,7 @@ def exibir_history():
                     if "voyage_success_notice" in st.session_state:
                         del st.session_state["voyage_success_notice"]
                     st.cache_data.clear()
-                    st.rerun()
+                    # st.rerun()  # Removido para evitar piscada
 
 
 
