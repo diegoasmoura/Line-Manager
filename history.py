@@ -186,7 +186,7 @@ def get_voyage_monitoring_for_reference(farol_reference):
         # Só mostra registros que tenham vinculação com registros APROVADOS
         placeholders = ", ".join([f":vessel_{i}" for i in range(len(vessel_names))])
         monitoring_query = text(f"""
-            SELECT DISTINCT m.*
+            SELECT DISTINCT m.*, r.ROW_INSERTED_DATE as APROVACAO_DATE
             FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
             INNER JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
                 UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME)
@@ -1730,7 +1730,13 @@ def exibir_history():
                         st.markdown(f"""
                         <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
                                    padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 0.1rem; text-transform: uppercase;">✅ Aprovado:</div>
+                                    <div style="font-weight: 600; color: #27ae60; font-size: 0.85em;">
+                                        {format_date_safe(latest_record.get('aprovacao_date'))}
+                                    </div>
+                                </div>
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 0.1rem; text-transform: uppercase;">🚢 Navio:</div>
                                     <div style="font-weight: 600; color: #2c3e50; font-size: 0.85em;">
