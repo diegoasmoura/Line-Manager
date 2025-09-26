@@ -183,17 +183,25 @@ def get_voyage_monitoring_for_reference(farol_reference):
             return pd.DataFrame()
         
         # Busca dados de monitoramento para esses navios
-        # Usa UPPER para busca case-insensitive
+        # Só mostra registros que tenham vinculação com registros APROVADOS
         placeholders = ", ".join([f":vessel_{i}" for i in range(len(vessel_names))])
         monitoring_query = text(f"""
-            SELECT *
-            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
-            WHERE UPPER(NAVIO) IN ({placeholders})
-            ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+            SELECT DISTINCT m.*
+            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
+            INNER JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
+                UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME)
+                AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
+                AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
+                AND r.FAROL_REFERENCE = :farol_ref
+                AND r.B_BOOKING_STATUS = 'Booking Approved'
+            )
+            WHERE UPPER(m.NAVIO) IN ({placeholders})
+            ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
         """)
         
         # Prepara parâmetros com nomes em maiúsculas para busca
         params = {f"vessel_{i}": vessel_name.upper() for i, vessel_name in enumerate(vessel_names)}
+        params["farol_ref"] = farol_reference
         
         result = conn.execute(monitoring_query, params).mappings().fetchall()
         conn.close()
