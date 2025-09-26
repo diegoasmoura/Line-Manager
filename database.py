@@ -1862,28 +1862,53 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
                 "requires_manual": False
             }
         
-        # 2. Tentar obter dados da API Ellox
-        api_client = get_default_api_client()
-        
-        # Verificar autenticação primeiro
-        if not api_client.authenticated:
+        # 2. Tentar obter dados da API Ellox (apenas se save_to_db=True)
+        if save_to_db:
+            try:
+                api_client = get_default_api_client()
+                
+                # Verificar autenticação primeiro
+                if not api_client.authenticated:
+                    return {
+                        "success": False,
+                        "data": None,
+                        "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
+                        "requires_manual": True,
+                        "error_type": "authentication_failed"
+                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "data": None,
+                    "message": f"❌ Erro ao inicializar cliente da API: {str(e)}",
+                    "requires_manual": True
+                }
+        else:
+            # Se save_to_db=False, não precisa da API
             return {
                 "success": False,
                 "data": None,
-                "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
-                "requires_manual": True,
-                "error_type": "authentication_failed"
+                "message": "ℹ️ Validação sem salvamento solicitada",
+                "requires_manual": True
             }
         
         # Testar conexão
-        api_test = api_client.test_connection()
-        if not api_test.get("success"):
+        try:
+            api_test = api_client.test_connection()
+            if not api_test.get("success"):
+                return {
+                    "success": False,
+                    "data": None,
+                    "message": "🟡 API Ellox Temporariamente Indisponível\n\nNão foi possível conectar com o servidor da API. Tente novamente em alguns minutos.",
+                    "requires_manual": True,
+                    "error_type": "connection_failed"
+                }
+        except Exception as e:
             return {
                 "success": False,
                 "data": None,
-                "message": "🟡 API Ellox Temporariamente Indisponível\n\nNão foi possível conectar com o servidor da API. Tente novamente em alguns minutos.",
-                "requires_manual": True,
-                "error_type": "connection_failed"
+                "message": f"❌ Erro ao testar conexão com API: {str(e)}",
+                "requires_manual": True
             }
         
         # 3. Resolver CNPJ do terminal (com normalização)
@@ -2174,83 +2199,84 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             terminal = vessel_name_result.get("b_terminal") or ""
             
             if vessel_name and terminal and not manual_voyage_data:
-                # Se houver buffer prévio no session_state, utiliza; senão, apenas valida (sem salvar ainda)
-                api_buf_key = f"voyage_api_buffer_{adjustment_id}"
-                api_buf = st.session_state.get(api_buf_key)
-                if not api_buf:
-                    voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, related_reference, vessel_name, voyage_code, terminal, save_to_db=False)
-                    if voyage_validation_result.get("success"):
-                        api_buf = {
-                            "NAVIO": vessel_name,
-                            "VIAGEM": voyage_code,
-                            "TERMINAL": terminal,
-                            "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
-                            "AGENCIA": voyage_validation_result.get("agencia", ""),
-                        }
-                        for k, v in (voyage_validation_result.get("data") or {}).items():
-                            api_buf[k] = v
-                        st.session_state[api_buf_key] = api_buf
-                    elif voyage_validation_result.get("requires_manual"):
-                        st.warning(voyage_validation_result.get("message", ""))
-                        st.session_state["voyage_manual_entry_required"] = {
-                            "adjustment_id": adjustment_id,
-                            "vessel_name": vessel_name,
-                            "voyage_code": voyage_code,
-                            "terminal": terminal,
-                            "message": voyage_validation_result.get("message", "")
-                        }
-                    else:
-                        st.error(voyage_validation_result.get("message", ""))
-
-                # Se existe buffer, persiste em LogTransp.F_ELLOX_TERMINAL_MONITORINGS agora (no momento da confirmação)
-                if api_buf:
-                    try:
-                        df_monitoring = pd.DataFrame([api_buf])
-                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
-                        if processed_count > 0:
-                            st.success("✅ Dados de monitoramento da API salvos no banco.")
-                            
-                            # Buscar dados mais recentes da tabela (como era feito antes)
-                            vessel_name = api_buf.get("NAVIO")
-                            if vessel_name:
-                                monitoring_query = text("""
-                                    SELECT * FROM (
-                                        SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
-                                        WHERE UPPER(NAVIO) = UPPER(:vessel_name)
-                                        ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
-                                    ) WHERE ROWNUM = 1
-                                """)
-                                latest_monitoring_record = conn.execute(monitoring_query, {"vessel_name": vessel_name}).mappings().fetchone()
-                                
-                                if latest_monitoring_record:
-                                    column_mapping = {
-                                        'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
-                                        'DATA_DEADLINE': 'B_DATA_DEADLINE',
-                                        'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
-                                        'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
-                                        'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
-                                        # B_DATA_ABERTURA_GATE_REEFER não existe em F_CON_RETURN_CARRIERS
-                                        'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
-                                        'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
-                                        'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
-                                        'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
-                                    }
-                                    for elox_col, return_col in column_mapping.items():
-                                        if elox_col.lower() in latest_monitoring_record and latest_monitoring_record[elox_col.lower()] is not None:
-                                            elox_update_values[return_col] = latest_monitoring_record[elox_col.lower()]
-                                    
-                                    # Vincular o ELLOX_MONITORING_ID
-                                    monitoring_id = latest_monitoring_record.get("id")
-                                    if monitoring_id:
-                                        elox_update_values["ELLOX_MONITORING_ID"] = monitoring_id
-                                        st.success(f"🔗 Vinculado ao monitoramento ID: {monitoring_id}")
-                        else:
-                            st.warning("⚠️ Falha ao salvar dados de monitoramento da API.")
+                # CORREÇÃO: Chamar validate_and_collect_voyage_monitoring com save_to_db=True
+                # para que a lógica de verificação de dados existentes funcione corretamente
+                voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, related_reference, vessel_name, voyage_code, terminal, save_to_db=True)
+                
+                if voyage_validation_result.get("success"):
+                    # Se dados já existiam, apenas vincular
+                    if voyage_validation_result.get("message", "").startswith("✅ Dados de monitoramento já existem"):
+                        st.success(voyage_validation_result.get("message", ""))
                         
-                        # Limpa o buffer após processar
-                        st.session_state.pop(api_buf_key, None)
-                    except Exception as e:
-                        st.error(f"❌ Erro ao persistir dados de monitoramento: {str(e)}")
+                        # Buscar dados do registro existente para preencher elox_update_values
+                        existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                        if existing_monitoring_id:
+                            monitoring_query = text("""
+                                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+                                WHERE ID = :monitoring_id
+                            """)
+                            existing_record = conn.execute(monitoring_query, {"monitoring_id": existing_monitoring_id}).mappings().fetchone()
+                            
+                            if existing_record:
+                                column_mapping = {
+                                    'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
+                                    'DATA_DEADLINE': 'B_DATA_DEADLINE',
+                                    'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
+                                    'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                                    'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
+                                    'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
+                                    'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
+                                    'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                                    'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
+                                }
+                                for elox_col, return_col in column_mapping.items():
+                                    if elox_col.lower() in existing_record and existing_record[elox_col.lower()] is not None:
+                                        elox_update_values[return_col] = existing_record[elox_col.lower()]
+                                
+                                elox_update_values["ELLOX_MONITORING_ID"] = existing_monitoring_id
+                                st.success(f"🔗 Vinculado ao monitoramento existente ID: {existing_monitoring_id}")
+                    else:
+                        # Dados foram coletados da API e salvos
+                        st.success(voyage_validation_result.get("message", ""))
+                        
+                        # Buscar dados do registro recém-criado
+                        new_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                        if new_monitoring_id:
+                            monitoring_query = text("""
+                                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+                                WHERE ID = :monitoring_id
+                            """)
+                            new_record = conn.execute(monitoring_query, {"monitoring_id": new_monitoring_id}).mappings().fetchone()
+                            
+                            if new_record:
+                                column_mapping = {
+                                    'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
+                                    'DATA_DEADLINE': 'B_DATA_DEADLINE',
+                                    'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
+                                    'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                                    'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
+                                    'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
+                                    'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
+                                    'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                                    'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
+                                }
+                                for elox_col, return_col in column_mapping.items():
+                                    if elox_col.lower() in new_record and new_record[elox_col.lower()] is not None:
+                                        elox_update_values[return_col] = new_record[elox_col.lower()]
+                                
+                                elox_update_values["ELLOX_MONITORING_ID"] = new_monitoring_id
+                                st.success(f"🔗 Vinculado ao monitoramento ID: {new_monitoring_id}")
+                elif voyage_validation_result.get("requires_manual"):
+                    st.warning(voyage_validation_result.get("message", ""))
+                    st.session_state["voyage_manual_entry_required"] = {
+                        "adjustment_id": adjustment_id,
+                        "vessel_name": vessel_name,
+                        "voyage_code": voyage_code,
+                        "terminal": terminal,
+                        "message": voyage_validation_result.get("message", "")
+                    }
+                else:
+                    st.error(voyage_validation_result.get("message", ""))
 
         # 3. Prepare and execute the UPDATE on F_CON_RETURN_CARRIERS
         update_params = {"adjustment_id": adjustment_id, "user_update": "System"}

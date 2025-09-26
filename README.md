@@ -1159,6 +1159,32 @@ Tabela de histórico de monitoramentos (Ellox) por navio/terminal/viagem
 - DATA_PARTIDA
 - ROW_INSERTED_DATE
 ```
+
+##### Lógica de Prevenção de Duplicidade
+O sistema adota uma abordagem inteligente que visa dois objetivos principais:
+1.  **Manter um histórico completo:** Registrar todas as mudanças no status de uma viagem (alterações de ETD, ETA, etc.) ao longo do tempo.
+2.  **Evitar redundância:** Não salvar registros idênticos que não agregam valor e apenas ocupam espaço.
+
+A tabela `F_ELLOX_TERMINAL_MONITORINGS` funciona como um log temporal. A lógica para evitar duplicidade não é simplesmente proibir novas entradas para a mesma viagem, mas sim **proibir a inserção de um registro que seja uma duplicata exata de um já existente.**
+
+Um novo registro de monitoramento é considerado uma **duplicata exata** se já existir uma linha na tabela `F_ELLOX_TERMINAL_MONITORINGS` com a mesma combinação dos seguintes campos:
+
+*   `NAVIO` (Nome do Navio)
+*   `VIAGEM` (Código da Viagem)
+*   `TERMINAL`
+*   `DATA_ATUALIZACAO` (Data da atualização vinda da API, ou a data de inserção do registro)
+*   `CNPJ_TERMINAL`
+*   `AGENCIA`
+
+###### Fluxo de Inserção:
+
+1.  **Coleta de Dados:** O sistema obtém novos dados de monitoramento, seja através da API da Ellox ou de uma entrada manual do usuário.
+2.  **Verificação Pré-Inserção:** Antes de salvar, o sistema executa uma consulta SQL para verificar se um registro com a combinação exata de dados (descrita acima) já existe.
+    *   A comparação nos campos de texto (`NAVIO`, `VIAGEM`, `TERMINAL`) é **case-insensitive** (ignora maiúsculas/minúsculas) para garantir consistência.
+    *   Valores `NULL` em campos como `CNPJ_TERMINAL` e `AGENCIA` são tratados corretamente na comparação.
+3.  **Decisão:**
+    *   **Se um registro idêntico é encontrado:** A inserção é **abortada**. Uma mensagem de aviso (`⚠️ Duplicata exata encontrada, pulando inserção.`) é registrada, e o sistema continua sem criar uma nova linha. Isso garante eficiência e impede a poluição do banco de dados.
+    *   **Se nenhum registro idêntico é encontrado:** O novo registro é **inserido** na tabela. Isso acontece quando há uma mudança real nos dados da viagem (ex: a API da Ellox retorna um novo ETA), permitindo que o sistema construa um histórico preciso da evolução da viagem.
 Tabela de carriers (armadores) e CNPJs
 ```sql
 - ID (PK)
@@ -1399,6 +1425,39 @@ def check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal):
 - Opção de "Pular e Continuar" se dados não estão disponíveis
 - Salvamento direto em `F_ELLOX_TERMINAL_MONITORINGS` com verificação de duplicatas
 
+**6. Prevenção e Correção de Registros Órfãos:**
+```python
+# Verificação de registros órfãos (ELLOX_MONITORING_ID que não existem)
+def check_orphaned_records():
+    orphan_query = text("""
+        SELECT 
+            rc.FAROL_REFERENCE,
+            rc.ELLOX_MONITORING_ID,
+            rc.B_VESSEL_NAME,
+            rc.B_VOYAGE_CODE,
+            rc.B_TERMINAL
+        FROM LogTransp.F_CON_RETURN_CARRIERS rc
+        LEFT JOIN LogTransp.F_ELLOX_TERMINAL_MONITORINGS tm 
+            ON rc.ELLOX_MONITORING_ID = tm.ID
+        WHERE tm.ID IS NULL
+        AND rc.ELLOX_MONITORING_ID IS NOT NULL
+    """)
+    # Retorna registros que apontam para IDs inexistentes
+
+# Correção automática de registros órfãos
+def fix_orphaned_records():
+    # 1. Identificar registros órfãos
+    # 2. Para cada órfão, buscar o ID mais recente do mesmo navio/viagem/terminal
+    # 3. Atualizar ELLOX_MONITORING_ID para o ID correto
+    # 4. Verificar se correção foi bem-sucedida
+```
+
+**⚠️ Cenário de Registros Órfãos:**
+- **Causa:** Durante desenvolvimento, limpeza de duplicatas pode remover IDs referenciados
+- **Sintoma:** `ELLOX_MONITORING_ID` aponta para registro inexistente em `F_ELLOX_TERMINAL_MONITORINGS`
+- **Solução:** Buscar ID mais recente do mesmo conjunto (navio/viagem/terminal) e atualizar
+- **Prevenção:** Nova implementação verifica existência antes de vincular
+
 ##### 📝 Casos de Uso
 
 **Coleta Automática (Ideal):**
@@ -1429,6 +1488,55 @@ def check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal):
 - **Vinculação**: `database.py` → `update_return_carrier_monitoring_id()`
 - **Verificação de Duplicatas**: `database.py` → `upsert_terminal_monitorings_from_dataframe()`
 - **Busca do Mais Recente**: `database.py` → `check_for_existing_monitoring()`
+
+##### 🔧 Troubleshooting
+
+**Problema: Registros Órfãos (ELLOX_MONITORING_ID aponta para ID inexistente)**
+
+**Sintomas:**
+- Aprovações com mesmo navio/viagem/terminal têm `ELLOX_MONITORING_ID` diferentes
+- Erro ao consultar dados de monitoramento
+- JOIN entre tabelas retorna NULL
+
+**Diagnóstico:**
+```sql
+-- Verificar registros órfãos
+SELECT 
+    rc.FAROL_REFERENCE,
+    rc.ELLOX_MONITORING_ID,
+    rc.B_VESSEL_NAME,
+    rc.B_VOYAGE_CODE,
+    rc.B_TERMINAL
+FROM LogTransp.F_CON_RETURN_CARRIERS rc
+LEFT JOIN LogTransp.F_ELLOX_TERMINAL_MONITORINGS tm 
+    ON rc.ELLOX_MONITORING_ID = tm.ID
+WHERE tm.ID IS NULL
+AND rc.ELLOX_MONITORING_ID IS NOT NULL;
+```
+
+**Correção:**
+```sql
+-- 1. Encontrar ID correto (mais recente) para o conjunto
+SELECT ID
+FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+WHERE UPPER(NAVIO) = 'MAERSK LOTA'
+AND UPPER(VIAGEM) = '439N'
+AND UPPER(TERMINAL) = 'BTP'
+ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+FETCH FIRST 1 ROWS ONLY;
+
+-- 2. Atualizar registro órfão
+UPDATE LogTransp.F_CON_RETURN_CARRIERS
+SET ELLOX_MONITORING_ID = :correct_id,
+    DATE_UPDATE = SYSDATE
+WHERE FAROL_REFERENCE = :farol_reference
+AND ELLOX_MONITORING_ID = :orphaned_id;
+```
+
+**Prevenção:**
+- ✅ Nova implementação verifica existência antes de vincular
+- ✅ Sempre busca o ID mais recente para o mesmo conjunto
+- ✅ Evita duplicatas mas preserva histórico
 
 ##### 🛠️ Melhorias Técnicas da v3.9
 
