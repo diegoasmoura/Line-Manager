@@ -892,6 +892,62 @@ def display_attachments_section(farol_reference):
 
 def exibir_history():
     st.header("📜 Return Carriers History")
+
+    # --- State Machine for Approval Flow (Refactored to prevent UI blocking) ---
+    if st.session_state.get('approval_flow_state'):
+        state = st.session_state['approval_flow_state']
+        step = state.get('step')
+        adjustment_id = state.get('adjustment_id')
+        farol_ref = state.get('farol_ref')
+
+        if step == 'validate_voyage':
+            if state.get('selected_row_status') == "Received from Carrier":
+                with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
+                    from database import validate_and_collect_voyage_monitoring
+                    conn = get_database_connection()
+                    vessel_data = conn.execute(text("""
+                        SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
+                        FROM LogTransp.F_CON_RETURN_CARRIERS 
+                        WHERE ADJUSTMENT_ID = :adj_id
+                    """), {"adj_id": adjustment_id}).mappings().fetchone()
+                    conn.close()
+                    
+                    if vessel_data:
+                        vessel_name = vessel_data.get("b_vessel_name")
+                        voyage_code = vessel_data.get("b_voyage_code") or ""
+                        terminal = vessel_data.get("b_terminal") or ""
+                        
+                        if vessel_name and terminal:
+                            voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, farol_ref, vessel_name, voyage_code, terminal, save_to_db=False)
+                            
+                            if voyage_validation_result.get("requires_manual"):
+                                st.session_state["voyage_manual_entry_required"] = {
+                                    "adjustment_id": adjustment_id, "vessel_name": vessel_name,
+                                    "voyage_code": voyage_code, "terminal": terminal,
+                                    "message": voyage_validation_result.get("message", ""),
+                                    "error_type": voyage_validation_result.get("error_type", "unknown"),
+                                    "pending_approval": True
+                                }
+                            elif voyage_validation_result.get("success"):
+                                api_buf = {
+                                    "NAVIO": vessel_name, "VIAGEM": voyage_code, "TERMINAL": terminal,
+                                    "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
+                                    "AGENCIA": voyage_validation_result.get("agencia", ""),
+                                    "DATA_DRAFT_DEADLINE": None, "DATA_CHEGADA": None,
+                                    "DATA_ESTIMATIVA_ATRACACAO": None, "DATA_ATRACACAO": None, "DATA_PARTIDA": None,
+                                }
+                                api_buf.update(voyage_validation_result.get("data") or {})
+                                st.session_state[f"voyage_api_buffer_{adjustment_id}"] = api_buf
+                                msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
+                                       f"Foram encontrados dados de monitoramento na API\n"
+                                       f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
+                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                            else:
+                                st.error(voyage_validation_result.get("message", ""))
+            
+            st.session_state['approval_flow_state'] = None
+            # O rerun foi removido para evitar que a aba seja trocada inesperadamente.
+    # --- End of State Machine ---
     
     # Exibe mensagens persistentes da última ação (flash)
     try:
@@ -2108,61 +2164,17 @@ def exibir_history():
                             key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
-                    # Define o status pendente para 'Booking Approved' para acionar a próxima etapa do fluxo
+                    # Define o status pendente para acionar a próxima etapa do fluxo
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
                     
-                    # Validação da API de Voyage Monitoring
-                    if selected_row_status == "Received from Carrier":
-                        with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
-                            # Buscar dados do navio, viagem e terminal
-                            conn = get_database_connection()
-                            vessel_data = conn.execute(text("""
-                                SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
-                                FROM LogTransp.F_CON_RETURN_CARRIERS 
-                                WHERE ADJUSTMENT_ID = :adj_id
-                            """), {"adj_id": adjustment_id}).mappings().fetchone()
-                            conn.close()
-                            
-                            if vessel_data:
-                                vessel_name = vessel_data.get("b_vessel_name")
-                                voyage_code = vessel_data.get("b_voyage_code") or ""
-                                terminal = vessel_data.get("b_terminal") or ""
-                                
-                                if vessel_name and terminal:
-                                    from database import validate_and_collect_voyage_monitoring
-                                    voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, farol_ref, vessel_name, voyage_code, terminal, save_to_db=False)
-                                    
-                                    if voyage_validation_result.get("requires_manual"):
-                                        st.session_state["voyage_manual_entry_required"] = {
-                                            "adjustment_id": adjustment_id,
-                                            "vessel_name": vessel_name,
-                                            "voyage_code": voyage_code,
-                                            "terminal": terminal,
-                                            "message": voyage_validation_result.get("message", ""),
-                                            "error_type": voyage_validation_result.get("error_type", "unknown"),
-                                            "pending_approval": True
-                                        }
-                                    elif voyage_validation_result.get("success"):
-                                        api_buf = {
-                                            "NAVIO": vessel_name, "VIAGEM": voyage_code, "TERMINAL": terminal,
-                                            "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
-                                            "AGENCIA": voyage_validation_result.get("agencia", ""),
-                                            "DATA_DRAFT_DEADLINE": None, "DATA_CHEGADA": None,
-                                            "DATA_ESTIMATIVA_ATRACACAO": None, "DATA_ATRACACAO": None, "DATA_PARTIDA": None,
-                                        }
-                                        api_buf.update(voyage_validation_result.get("data") or {})
-                                        st.session_state[f"voyage_api_buffer_{adjustment_id}"] = api_buf
-                                        
-                                        msg = (
-                                            f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                            f"Foram encontrados dados de monitoramento na API\n"
-                                            f"🚢 {vessel_name} | {voyage_code} | {terminal}."
-                                        )
-                                        st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
-                                    else:
-                                        st.error(voyage_validation_result.get("message", ""))
-                    
-                    # Reroda a aplicação para exibir a seção de referência relacionada e confirmação
+                    # Etapa 2 da Refatoração: Dispara a máquina de estados para fazer a validação da API
+                    # de forma segura, sem travar a interface.
+                    st.session_state['approval_flow_state'] = {
+                        'step': 'validate_voyage',
+                        'adjustment_id': adjustment_id,
+                        'farol_ref': farol_ref,
+                        'selected_row_status': selected_row_status
+                    }
                     st.rerun()
             
             with subcol2:
@@ -2778,8 +2790,8 @@ def exibir_history():
                             st.cache_data.clear()
                             st.rerun()
                         else:
-                            # A função approve_carrier_return já deve ter mostrado um erro específico
-                            pass
+                            error_msg = st.session_state.get("approval_error", "❌ Falha ao aprovar. Verifique os logs para mais detalhes.")
+                            st.error(error_msg)
                     except Exception as e:
                         st.error(f"❌ Erro crítico durante a aprovação: {str(e)}")
             

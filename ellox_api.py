@@ -582,7 +582,7 @@ class ElloxAPI:
                 f"{self.base_url}/api/terminalmonitorings",
                 headers={**self.headers, "Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=30
+                timeout=15
             )
             
             if response.status_code == 200:
