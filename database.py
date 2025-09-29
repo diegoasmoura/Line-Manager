@@ -333,14 +333,14 @@ def get_data_salesData():
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas
-            "Creation Of Shipment", "Requested Shipment Week", "Requested Deadline Start Date", "Requested Deadline End Date",
-            "Shipment Period Start Date", "Shipment Period End Date", "Required Arrival Date Expected",
+            "Creation Of Shipment", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
+            "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
             # Pedido e cliente
-            "Sales Order Reference", "Sales Order Date", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
+            "Sales Order Reference", "data_sales_order", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
             # Condições
             "Sales Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
             # Administração
-            "Allocation Date", "Producer Nomination Date", "LC Received", "Sales Owner",
+            "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
             # Observações
             "Comments Sales"
         ]]
@@ -418,10 +418,10 @@ def get_data_bookingData():
         
         # Converter colunas de data/hora para datetime
         datetime_columns = [
-            'Data Draft Deadline', 'Data Deadline', 'Data Estimativa Saída ETD', 
-            'Data Estimativa Chegada ETA', 'Data Abertura Gate', 'Data Confirmação Embarque',
-            'Data Partida ATD', 'Data Estimada Transbordo ETD', 'Data Chegada ATA', 
-            'Data Transbordo ATD', 'Data Estimativa Atracação ETB', 'Data Atracação ATB'
+            'data_draft_deadline', 'data_deadline', 'data_estimativa_saida', 
+            'data_estimativa_chegada', 'data_abertura_gate', 'data_confirmacao_embarque',
+            'data_partida', 'data_estimada_transbordo', 'data_chegada', 
+            'data_transbordo', 'data_estimativa_atracacao', 'data_atracacao'
         ]
         
         for col in datetime_columns:
@@ -437,10 +437,10 @@ def get_data_bookingData():
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
-            "Creation Of Booking", "Booking Request Date", "Booking Confirmation Date",
-            "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "Data Abertura Gate",
-            "Data Confirmação Embarque", "Data Partida ATD", "Data Estimada Transbordo ETD", "Data Chegada ATA", 
-            "Data Transbordo ATD", "Data Estimativa Atracação ETB", "Data Atracação ATB",
+            "Creation Of Booking", "data_booking_request", "data_booking_confirmation",
+            "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
+            "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
+            "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
             # Armador/viagem
             "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro

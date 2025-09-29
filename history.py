@@ -1374,21 +1374,21 @@ def exibir_history():
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
-            "B_DATA_ABERTURA_GATE": "Data Abertura Gate",
-            "B_DATA_CONFIRMACAO_EMBARQUE": "Data Confirmação Embarque",
-            "B_DATA_ESTIMADA_TRANSBORDO_ETD": "Data Estimada Transbordo ETD",
-            "B_DATA_TRANSBORDO_ATD": "Data Transbordo ATD",
+            "B_DATA_ABERTURA_GATE": "Abertura Gate",
+            "B_DATA_CONFIRMACAO_EMBARQUE": "Confirmação Embarque",
+            "B_DATA_ESTIMADA_TRANSBORDO_ETD": "Estimada Transbordo (ETD)",
+            "B_DATA_TRANSBORDO_ATD": "Transbordo (ATD)",
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",
-            "B_DATA_DRAFT_DEADLINE": "Data Draft Deadline",
-            "B_DATA_DEADLINE": "Data Deadline",
-            "S_REQUESTED_DEADLINE_START_DATE": "Requested Deadline Start Date",
-            "S_REQUESTED_DEADLINE_END_DATE": "Requested Deadline End Date",
-            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": "Required Arrival Date Expected",
-            "B_DATA_ESTIMATIVA_SAIDA_ETD": "Data Estimativa Saída ETD",
-            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "Data Estimativa Chegada ETA",
+            "B_DATA_DRAFT_DEADLINE": "Draft Deadline",
+            "B_DATA_DEADLINE": "Deadline",
+            "S_REQUESTED_DEADLINE_START_DATE": "Requested Deadline Start",
+            "S_REQUESTED_DEADLINE_END_DATE": "Requested Deadline End",
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": "Required Arrival Expected",
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
             "B_VOYAGE_CODE": "Voyage Code",
             "B_VESSEL_NAME": "Vessel Name",
             "B_VOYAGE_CARRIER": "Voyage Carrier",
@@ -1511,11 +1511,11 @@ def exibir_history():
         
         # Converte datas para exibição
         date_cols = [
-            "Inserted Date", "Data Draft Deadline", "Data Deadline", 
-            "Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected",
-            "Data Estimativa Saída ETD", "Data Estimativa Chegada ETA", "Data Abertura Gate",
-            "Data Confirmação Embarque", "Data Partida ATD", "Data Estimada Transbordo ETD",
-            "Data Chegada ATA", "Data Transbordo ATD", "Data Estimativa Atracação ETB", "Data Atracação ATB",
+            "Inserted Date", "Draft Deadline", "Deadline", 
+            "Requested Deadline Start", "Requested Deadline End", "Required Arrival Expected",
+            "ETD", "ETA", "Abertura Gate",
+            "Confirmação Embarque", "Partida (ATD)", "Estimada Transbordo (ETD)",
+            "Chegada (ATA)", "Transbordo (ATD)", "Estimativa Atracação (ETB)", "Atracação (ATB)",
             "PDF Booking Emission Date"
         ]
         for col in date_cols:
@@ -1627,21 +1627,21 @@ def exibir_history():
                 "Final Destination",
                 "Transhipment Port",
                 "Port Terminal City",
-                "Required Arrival Date Expected",
-                "Requested Deadline Start Date",
-                "Requested Deadline End Date",
-                "Data Deadline",
-                "Data Draft Deadline",
-                "Data Abertura Gate",
-                "Data Confirmação Embarque",
-                "Data Estimativa Saída ETD",
-                "Data Estimativa Chegada ETA",
-                "Data Estimativa Atracação ETB",
-                "Data Atracação ATB",
-                "Data Partida ATD",
-                "Data Estimada Transbordo ETD",
-                "Data Chegada ATA",
-                "Data Transbordo ATD",
+                "Required Arrival Expected",
+                "Requested Deadline Start",
+                "Requested Deadline End",
+                "Deadline",
+                "Draft Deadline",
+                "Abertura Gate",
+                "Confirmação Embarque",
+                "ETD",
+                "ETA",
+                "Estimativa Atracação (ETB)",
+                "Atracação (ATB)",
+                "Partida (ATD)",
+                "Estimada Transbordo (ETD)",
+                "Chegada (ATA)",
+                "Transbordo (ATD)",
                 "PDF Name",
                 "PDF Booking Emission Date",
                 "Splitted Farol Reference",
@@ -1711,10 +1711,10 @@ def exibir_history():
     if df_received_processed is not None and active_tab == received_label:
         # Remove colunas ETD/ETA específicas desta aba
         columns_to_remove = [
-            "Data Draft Deadline", "Data Deadline", "Data Estimativa Saída ETD", 
-            "Data Estimativa Chegada ETA", "Data Abertura Gate",
-            "Data Estimativa Atracação ETB", "Data Atracação ATB",
-            "Data Partida ATD", "Data Chegada ATA"
+            "Draft Deadline", "Deadline", "ETD", 
+            "ETA", "Abertura Gate",
+            "Estimativa Atracação (ETB)", "Atracação (ATB)",
+            "Partida (ATD)", "Chegada (ATA)"
         ]
         df_for_display = df_received_processed.drop(
             columns=[col for col in columns_to_remove if col in df_received_processed.columns],
@@ -1989,17 +1989,17 @@ def exibir_history():
                                     'terminal': 'Terminal',
                                     'cnpj_terminal': 'Terminal CNPJ',
                                     'agencia': 'Agência',
-                                    'data_deadline': 'Data Deadline',
-                                    'data_draft_deadline': 'Data Draft Deadline',
-                                    'data_abertura_gate': 'Data Abertura Gate',
-                                    'data_abertura_gate_reefer': 'Data Abertura Gate Reefer',
-                                    'data_estimativa_saida': 'Data Estimativa Saída ETD',
-                                    'data_estimativa_chegada': 'Data Estimativa Chegada ETA',
-                                    'data_estimativa_atracacao': 'Data Estimativa Atracação ETB',
-                                    'data_atracacao': 'Data Atracação ATB',
-                                    'data_partida': 'Data Partida ATD',
-                                    'data_chegada': 'Data Chegada ATA',
-                                    'data_atualizacao': 'Data Atualização',
+                                    'data_deadline': 'data_deadline',
+                                    'data_draft_deadline': 'data_draft_deadline',
+                                    'data_abertura_gate': 'data_abertura_gate',
+                                    'data_abertura_gate_reefer': 'data_abertura_gate_reefer',
+                                    'data_estimativa_saida': 'data_estimativa_saida',
+                                    'data_estimativa_chegada': 'data_estimativa_chegada',
+                                    'data_estimativa_atracacao': 'data_estimativa_atracacao',
+                                    'data_atracacao': 'data_atracacao',
+                                    'data_partida': 'data_partida',
+                                    'data_chegada': 'data_chegada',
+                                    'data_atualizacao': 'data_atualizacao',
                                     'row_inserted_date': 'Inserted Date',
                                 }
                                 voyage_display = voyage_display.rename(columns=rename_map_voyage)
@@ -2011,11 +2011,11 @@ def exibir_history():
 
                                 # Define desired column order, hiding Agência and moving Terminal
                                 desired_cols = [
-                                    'Vessel Name', 'Voyage Code', 'Terminal', 'Data Deadline', 
-                                    'Data Draft Deadline', 'Data Abertura Gate', 
-                                    'Data Estimativa Saída ETD', 'Data Estimativa Chegada ETA', 
-                                    'Data Estimativa Atracação ETB', 'Data Atracação ATB', 'Data Partida ATD', 
-                                    'Data Chegada ATA', 'Data Atualização', 'Inserted Date'
+                                    'Vessel Name', 'Voyage Code', 'Terminal', 'Deadline', 
+                                    'Draft Deadline', 'Abertura Gate', 
+                                    'ETD', 'ETA', 
+                                    'Estimativa Atracação (ETB)', 'Atracação (ATB)', 'Partida (ATD)', 
+                                    'Chegada (ATA)', 'Data Atualização', 'Inserted Date'
                                 ]
                                 existing_cols = [col for col in desired_cols if col in voyage_display.columns]
                                 voyage_display = voyage_display[existing_cols]
@@ -2356,14 +2356,14 @@ def exibir_history():
                 with col1:
                     col_deadline_date, col_deadline_time = st.columns([2, 1])
                     with col_deadline_date:
-                        manual_deadline_date = st.date_input("⏳ Data Deadline", value=None, key=f"manual_deadline_date_{adjustment_id}", help="Data limite para entrega de documentos")
+                        manual_deadline_date = st.date_input("⏳ Deadline", value=None, key=f"manual_deadline_date_{adjustment_id}", help="Data limite para entrega de documentos")
                     with col_deadline_time:
                         manual_deadline_time = st.time_input("Hora", value=None, key=f"manual_deadline_time_{adjustment_id}", help="Hora limite para entrega de documentos")
                 
                 with col2:
                     col_draft_date, col_draft_time = st.columns([2, 1])
                     with col_draft_date:
-                        manual_draft_date = st.date_input("📝 Data Draft Deadline", value=None, key=f"manual_draft_date_{adjustment_id}", help="Data limite para entrega do draft")
+                        manual_draft_date = st.date_input("📝 Draft Deadline", value=None, key=f"manual_draft_date_{adjustment_id}", help="Data limite para entrega do draft")
                     with col_draft_time:
                         manual_draft_time = st.time_input("Hora", value=None, key=f"manual_draft_time_{adjustment_id}", help="Hora limite para entrega do draft")
                 
@@ -2373,14 +2373,14 @@ def exibir_history():
                 with col4:
                     col_gate_date, col_gate_time = st.columns([2, 1])
                     with col_gate_date:
-                        manual_gate_date = st.date_input("🚪 Data Abertura Gate", value=None, key=f"manual_gate_date_{adjustment_id}", help="Data de abertura do gate para recebimento de cargas")
+                        manual_gate_date = st.date_input("🚪 Abertura Gate", value=None, key=f"manual_gate_date_{adjustment_id}", help="Data de abertura do gate para recebimento de cargas")
                     with col_gate_time:
                         manual_gate_time = st.time_input("Hora", value=None, key=f"manual_gate_time_{adjustment_id}", help="Hora de abertura do gate para recebimento de cargas")
                 
                 with col5:
                     col_reefer_date, col_reefer_time = st.columns([2, 1])
                     with col_reefer_date:
-                        manual_reefer_date = st.date_input("🧊 Data Abertura Gate Reefer", value=None, key=f"manual_reefer_date_{adjustment_id}", help="Data de abertura do gate para cargas refrigeradas")
+                        manual_reefer_date = st.date_input("🧊 Abertura Gate Reefer", value=None, key=f"manual_reefer_date_{adjustment_id}", help="Data de abertura do gate para cargas refrigeradas")
                     with col_reefer_time:
                         manual_reefer_time = st.time_input("Hora", value=None, key=f"manual_reefer_time_{adjustment_id}", help="Hora de abertura do gate para cargas refrigeradas")
                 
@@ -2393,14 +2393,14 @@ def exibir_history():
                 with col1:
                     col_etd_date, col_etd_time = st.columns([2, 1])
                     with col_etd_date:
-                        manual_etd_date = st.date_input("🚢 Data Estimativa Saída (ETD)", value=None, key=f"manual_etd_date_{adjustment_id}", help="Data estimada de saída do porto")
+                        manual_etd_date = st.date_input("🚢 ETD", value=None, key=f"manual_etd_date_{adjustment_id}", help="Data estimada de saída do porto")
                     with col_etd_time:
                         manual_etd_time = st.time_input("Hora", value=None, key=f"manual_etd_time_{adjustment_id}", help="Hora estimada de saída do porto")
                 
                 with col2:
                     col_eta_date, col_eta_time = st.columns([2, 1])
                     with col_eta_date:
-                        manual_eta_date = st.date_input("🎯 Data Estimativa Chegada (ETA)", value=None, key=f"manual_eta_date_{adjustment_id}", help="Data estimada de chegada ao porto")
+                        manual_eta_date = st.date_input("🎯 ETA", value=None, key=f"manual_eta_date_{adjustment_id}", help="Data estimada de chegada ao porto")
                     with col_eta_time:
                         manual_eta_time = st.time_input("Hora", value=None, key=f"manual_eta_time_{adjustment_id}", help="Hora estimada de chegada ao porto")
                 
@@ -2410,14 +2410,14 @@ def exibir_history():
                 with col4:
                     col_etb_date, col_etb_time = st.columns([2, 1])
                     with col_etb_date:
-                        manual_etb_date = st.date_input("🛳️ Data Estimativa Atracação (ETB)", value=None, key=f"manual_etb_date_{adjustment_id}", help="Data estimada de atracação no cais")
+                        manual_etb_date = st.date_input("🛳️ Estimativa Atracação (ETB)", value=None, key=f"manual_etb_date_{adjustment_id}", help="Data estimada de atracação no cais")
                     with col_etb_time:
                         manual_etb_time = st.time_input("Hora", value=None, key=f"manual_etb_time_{adjustment_id}", help="Hora estimada de atracação no cais")
                 
                 with col5:
                     col_atb_date, col_atb_time = st.columns([2, 1])
                     with col_atb_date:
-                        manual_atb_date = st.date_input("✅ Data Atracação (ATB)", value=None, key=f"manual_atb_date_{adjustment_id}", help="Data real de atracação no cais")
+                        manual_atb_date = st.date_input("✅ Atracação (ATB)", value=None, key=f"manual_atb_date_{adjustment_id}", help="Data real de atracação no cais")
                     with col_atb_time:
                         manual_atb_time = st.time_input("Hora", value=None, key=f"manual_atb_time_{adjustment_id}", help="Hora real de atracação no cais")
                 
@@ -2430,14 +2430,14 @@ def exibir_history():
                 with col1:
                     col_atd_date, col_atd_time = st.columns([2, 1])
                     with col_atd_date:
-                        manual_atd_date = st.date_input("📤 Data Partida (ATD)", value=None, key=f"manual_atd_date_{adjustment_id}", help="Data real de partida do porto")
+                        manual_atd_date = st.date_input("📤 Partida (ATD)", value=None, key=f"manual_atd_date_{adjustment_id}", help="Data real de partida do porto")
                     with col_atd_time:
                         manual_atd_time = st.time_input("Hora", value=None, key=f"manual_atd_time_{adjustment_id}", help="Hora real de partida do porto")
                 
                 with col2:
                     col_ata_date, col_ata_time = st.columns([2, 1])
                     with col_ata_date:
-                        manual_ata_date = st.date_input("📥 Data Chegada (ATA)", value=None, key=f"manual_ata_date_{adjustment_id}", help="Data real de chegada ao porto")
+                        manual_ata_date = st.date_input("📥 Chegada (ATA)", value=None, key=f"manual_ata_date_{adjustment_id}", help="Data real de chegada ao porto")
                     with col_ata_time:
                         manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
