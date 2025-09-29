@@ -326,36 +326,42 @@ def exibir_shipments():
             idx_carrier = colunas_ordenadas.index("Voyage Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
         
-        # Posiciona as novas colunas de datas seguindo a ordem do voyage_update.py
-        if "data_abertura_gate" in colunas_ordenadas:
-            # Remove as novas colunas se já estiverem na lista
-            for col in ["data_confirmacao_embarque", "data_atracacao", "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo"]:
-                if col in colunas_ordenadas:
-                    colunas_ordenadas.remove(col)
-            
-            # Encontra a posição após "data_abertura_gate"
-            idx_gate = colunas_ordenadas.index("data_abertura_gate")
-            
-            # Insere as novas colunas na ordem correta (apenas se existirem no DataFrame)
-            if "data_confirmacao_embarque" in df.columns:
-                colunas_ordenadas.insert(idx_gate + 1, "data_confirmacao_embarque")
-                idx_gate += 1  # Ajusta o índice após inserção
-            
-            # Posiciona data_atracacao após data_confirmacao_embarque
-            if "data_atracacao" in df.columns:
-                colunas_ordenadas.insert(idx_gate + 1, "data_atracacao")
-                idx_gate += 1  # Ajusta o índice após inserção
-            
-            # Posiciona data_estimativa_atracacao após data_chegada
-            if "data_chegada" in colunas_ordenadas and "data_estimativa_atracacao" in df.columns:
-                idx_chegada = colunas_ordenadas.index("data_chegada")
-                colunas_ordenadas.insert(idx_chegada + 1, "data_estimativa_atracacao")
-            
-            # Posiciona data_estimada_transbordo e data_transbordo no final
-            if "data_estimada_transbordo" in df.columns:
-                colunas_ordenadas.append("data_estimada_transbordo")
-            if "data_transbordo" in df.columns:
-                colunas_ordenadas.append("data_transbordo")
+        # Reordena as colunas de datas seguindo a ordem do voyage_update.py
+        # Ordem: ETD, ETA, Deadline, Draft Deadline, Abertura Gate, Confirmação Embarque, Atracação, Partida, Chegada, Estimativa Atracação, Transbordos
+        
+        # Lista das colunas de datas na ordem correta
+        date_columns_order = [
+            "data_estimativa_saida",      # ETD
+            "data_estimativa_chegada",    # ETA
+            "data_deadline",              # Deadline
+            "data_draft_deadline",        # Draft Deadline
+            "data_abertura_gate",         # Abertura Gate
+            "data_confirmacao_embarque",  # Confirmação Embarque
+            "data_atracacao",             # Atracação (ATB)
+            "data_partida",               # Partida (ATD)
+            "data_chegada",               # Chegada (ATA)
+            "data_estimativa_atracacao",  # Estimativa Atracação (ETB)
+            "data_estimada_transbordo",   # Estimada Transbordo (ETD)
+            "data_transbordo"             # Transbordo (ATD)
+        ]
+        
+        # Remove todas as colunas de datas da lista atual
+        for col in date_columns_order:
+            if col in colunas_ordenadas:
+                colunas_ordenadas.remove(col)
+        
+        # Encontra a posição após "data_booking_confirmation" para inserir as datas
+        if "data_booking_confirmation" in colunas_ordenadas:
+            insert_position = colunas_ordenadas.index("data_booking_confirmation") + 1
+        elif "Creation Of Booking" in colunas_ordenadas:
+            insert_position = colunas_ordenadas.index("Creation Of Booking") + 1
+        else:
+            insert_position = len(colunas_ordenadas)
+        
+        # Insere as colunas de datas na ordem correta
+        for i, col in enumerate(date_columns_order):
+            if col in df.columns:
+                colunas_ordenadas.insert(insert_position + i, col)
 
     # Fixar largura da coluna Carrier Returns Status aproximadamente ao tamanho do título
     if "Carrier Returns Status" in colunas_ordenadas:
