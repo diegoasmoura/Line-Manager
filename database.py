@@ -2172,85 +2172,35 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             terminal = vessel_name_result.get("b_terminal") or ""
             
             if vessel_name and terminal and not manual_voyage_data:
-                # CORREÇÃO: Chamar validate_and_collect_voyage_monitoring com save_to_db=True
-                # para que a lógica de verificação de dados existentes funcione corretamente
-                voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, related_reference, vessel_name, voyage_code, terminal, save_to_db=True)
+                # A validação de voyage monitoring já foi feita no botão "Booking Approved"
+                # Aqui apenas prosseguimos com a aprovação
                 
-                if voyage_validation_result.get("success"):
-                    # Se dados já existiam, apenas vincular
-                    if voyage_validation_result.get("message", "").startswith("✅ Dados de monitoramento já existem"):
-                        # st.success(voyage_validation_result.get("message", ""))
+                # Buscar dados do registro existente para preencher elox_update_values
+                existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                if existing_monitoring_id:
+                    monitoring_query = text("""
+                        SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+                        WHERE ID = :monitoring_id
+                    """)
+                    existing_record = conn.execute(monitoring_query, {"monitoring_id": existing_monitoring_id}).mappings().fetchone()
+                    
+                    if existing_record:
+                        column_mapping = {
+                            'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
+                            'DATA_DEADLINE': 'B_DATA_DEADLINE',
+                            'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
+                            'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
+                            'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
+                            'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
+                            'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
+                            'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
+                            'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
+                        }
+                        for elox_col, return_col in column_mapping.items():
+                            if elox_col.lower() in existing_record and existing_record[elox_col.lower()] is not None:
+                                elox_update_values[return_col] = existing_record[elox_col.lower()]
                         
-                        # Buscar dados do registro existente para preencher elox_update_values
-                        existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
-                        if existing_monitoring_id:
-                            monitoring_query = text("""
-                                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
-                                WHERE ID = :monitoring_id
-                            """)
-                            existing_record = conn.execute(monitoring_query, {"monitoring_id": existing_monitoring_id}).mappings().fetchone()
-                            
-                            if existing_record:
-                                column_mapping = {
-                                    'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
-                                    'DATA_DEADLINE': 'B_DATA_DEADLINE',
-                                    'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
-                                    'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
-                                    'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
-                                    'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
-                                    'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
-                                    'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
-                                    'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
-                                }
-                                for elox_col, return_col in column_mapping.items():
-                                    if elox_col.lower() in existing_record and existing_record[elox_col.lower()] is not None:
-                                        elox_update_values[return_col] = existing_record[elox_col.lower()]
-                                
-                                elox_update_values["ELLOX_MONITORING_ID"] = existing_monitoring_id
-                                # st.success(f"🔗 Vinculado ao monitoramento existente ID: {existing_monitoring_id}")
-                    else:
-                        # Dados foram coletados da API e salvos
-                        # st.success(voyage_validation_result.get("message", ""))
-                        
-                        # Buscar dados do registro recém-criado
-                        new_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
-                        if new_monitoring_id:
-                            monitoring_query = text("""
-                                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
-                                WHERE ID = :monitoring_id
-                            """)
-                            new_record = conn.execute(monitoring_query, {"monitoring_id": new_monitoring_id}).mappings().fetchone()
-                            
-                            if new_record:
-                                column_mapping = {
-                                    'DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE', 
-                                    'DATA_DEADLINE': 'B_DATA_DEADLINE',
-                                    'DATA_ESTIMATIVA_SAIDA': 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
-                                    'DATA_ESTIMATIVA_CHEGADA': 'B_DATA_ESTIMATIVA_CHEGADA_ETA',
-                                    'DATA_ABERTURA_GATE': 'B_DATA_ABERTURA_GATE', 
-                                    'DATA_PARTIDA': 'B_DATA_PARTIDA_ATD',
-                                    'DATA_CHEGADA': 'B_DATA_CHEGADA_ATA', 
-                                    'DATA_ESTIMATIVA_ATRACACAO': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
-                                    'DATA_ATRACACAO': 'B_DATA_ATRACACAO_ATB',
-                                }
-                                for elox_col, return_col in column_mapping.items():
-                                    if elox_col.lower() in new_record and new_record[elox_col.lower()] is not None:
-                                        elox_update_values[return_col] = new_record[elox_col.lower()]
-                                
-                                elox_update_values["ELLOX_MONITORING_ID"] = new_monitoring_id
-                                # st.success(f"🔗 Vinculado ao monitoramento ID: {new_monitoring_id}")
-                elif voyage_validation_result.get("requires_manual"):
-                    # st.warning(voyage_validation_result.get("message", ""))
-                    st.session_state["voyage_manual_entry_required"] = {
-                        "adjustment_id": adjustment_id,
-                        "vessel_name": vessel_name,
-                        "voyage_code": voyage_code,
-                        "terminal": terminal,
-                        "message": voyage_validation_result.get("message", "")
-                    }
-                else:
-                    # st.error(voyage_validation_result.get("message", ""))
-                    pass
+                        elox_update_values["ELLOX_MONITORING_ID"] = existing_monitoring_id
 
         # 3. Prepare and execute the UPDATE on F_CON_RETURN_CARRIERS
         update_params = {"adjustment_id": adjustment_id, "user_update": "System"}

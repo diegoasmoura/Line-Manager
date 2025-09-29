@@ -1998,54 +1998,10 @@ def exibir_history():
     def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
         try:
             if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
-                # 1. Primeiro validar dados de voyage monitoring ANTES de aprovar
-                from database import validate_and_collect_voyage_monitoring
+                # A validação de voyage monitoring agora é feita no botão "Booking Approved"
+                # Esta função só executa a aprovação final
                 
-                # Buscar dados do navio, viagem e terminal
-                conn = get_database_connection()
-                vessel_data = conn.execute(text("""
-                    SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
-                    FROM LogTransp.F_CON_RETURN_CARRIERS 
-                    WHERE ADJUSTMENT_ID = :adj_id
-                """), {"adj_id": adjustment_id}).mappings().fetchone()
-                conn.close()
-                
-                if vessel_data:
-                    vessel_name = vessel_data.get("b_vessel_name")
-                    voyage_code = vessel_data.get("b_voyage_code") or ""
-                    terminal = vessel_data.get("b_terminal") or ""
-                    
-                    if vessel_name and terminal:
-                        # Validar dados de monitoramento da viagem (sem salvar ainda)
-                        voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
-                        
-                        # Se requer entrada manual, definir no session_state e NÃO aprovar ainda
-                        if voyage_validation_result.get("requires_manual"):
-                            st.warning(voyage_validation_result.get("message", ""))
-                            st.session_state["voyage_manual_entry_required"] = {
-                                "adjustment_id": adjustment_id,
-                                "vessel_name": vessel_name,
-                                "voyage_code": voyage_code,
-                                "terminal": terminal,
-                                "message": voyage_validation_result.get("message", ""),
-                                "pending_approval": True,  # Flag para indicar que está pendente de aprovação
-                                "justification": {
-                                    "area": area,
-                                    "request_reason": reason,
-                                    "adjustments_owner": responsibility,
-                                    "comments": comment
-                                },
-                                "related_reference": related_reference
-                            }
-                            st.info("ℹ️ **Formulário manual de voyage monitoring será exibido abaixo.** Preencha os dados e clique em 'Salvar Dados Manuais' para continuar com a aprovação.")
-                            return
-                        elif voyage_validation_result.get("success"):
-                            st.info(voyage_validation_result.get("message", ""))
-                        else:
-                            st.error(voyage_validation_result.get("message", ""))
-                            return
-                
-                # 2. Se chegou até aqui, prosseguir com aprovação normal
+                # Se chegou até aqui, prosseguir com aprovação normal
                 justification = {
                     "area": area,
                     "request_reason": reason,
@@ -2110,6 +2066,9 @@ def exibir_history():
                             key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
+                    # Define o status pendente para acionar a seção de referência relacionada
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
+                    
                     # Lógica de validação movida para dentro do botão
                     with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
                         from database import validate_and_collect_voyage_monitoring
