@@ -892,6 +892,30 @@ def display_attachments_section(farol_reference):
 
 def exibir_history():
     import pandas as pd
+    import pytz
+    from datetime import datetime
+    
+    def convert_utc_to_brazil_time(utc_timestamp):
+        """Converte timestamp UTC do banco para horário local do Brasil"""
+        if utc_timestamp is None:
+            return None
+        
+        try:
+            # Se já é timezone-aware, assumir que é UTC
+            if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
+                utc_dt = utc_timestamp
+            else:
+                # Se é naive, assumir que é UTC
+                utc_dt = pytz.UTC.localize(utc_timestamp)
+            
+            # Converter para fuso horário do Brasil
+            brazil_tz = pytz.timezone('America/Sao_Paulo')
+            brazil_dt = utc_dt.astimezone(brazil_tz)
+            
+            return brazil_dt
+        except Exception:
+            return utc_timestamp  # Retorna original se houver erro
+    
     st.header("📜 Return Carriers History")
 
 
@@ -1720,12 +1744,15 @@ def exibir_history():
                                 if pd.isna(date_val):
                                     return 'N/A'
                                 
+                                # Converter UTC para horário do Brasil
+                                brazil_time = convert_utc_to_brazil_time(date_val)
+                                
                                 # Se é um pandas Timestamp válido
-                                if hasattr(date_val, 'strftime'):
-                                    return date_val.strftime('%d/%m/%Y %H:%M')
+                                if hasattr(brazil_time, 'strftime'):
+                                    return brazil_time.strftime('%d/%m/%Y %H:%M')
                                 
                                 # Para outros tipos, converter para string
-                                return str(date_val)
+                                return str(brazil_time)
                             except Exception:
                                 return 'N/A'
                         
@@ -1832,9 +1859,13 @@ def exibir_history():
                                                 import pandas as pd
                                                 if val is None or pd.isna(val):
                                                     return "Sem Registro"
-                                                if hasattr(val, 'strftime'):
-                                                    return val.strftime('%d/%m/%Y - %H:%M')
-                                                return str(val)
+                                                
+                                                # Converter UTC para horário do Brasil
+                                                brazil_time = convert_utc_to_brazil_time(val)
+                                                
+                                                if hasattr(brazil_time, 'strftime'):
+                                                    return brazil_time.strftime('%d/%m/%Y - %H:%M')
+                                                return str(brazil_time)
                                             
                                             current_formatted = format_date(current_val)
                                             previous_formatted = format_date(previous_val)
@@ -1854,12 +1885,15 @@ def exibir_history():
                                                         if pd.isna(date_val):
                                                             return 'N/A'
                                                         
+                                                        # Converter UTC para horário do Brasil
+                                                        brazil_time = convert_utc_to_brazil_time(date_val)
+                                                        
                                                         # Se é um pandas Timestamp válido
-                                                        if hasattr(date_val, 'strftime'):
-                                                            return date_val.strftime('%d/%m/%Y às %H:%M')
+                                                        if hasattr(brazil_time, 'strftime'):
+                                                            return brazil_time.strftime('%d/%m/%Y às %H:%M')
                                                         
                                                         # Para outros tipos, converter para string
-                                                        return str(date_val)
+                                                        return str(brazil_time)
                                                     except Exception:
                                                         return 'N/A'
                                                 
@@ -2381,7 +2415,8 @@ def exibir_history():
                         for ref in filtered:
                             # ... (código de formatação da opção)
                             inserted_date = ref.get('ROW_INSERTED_DATE')
-                            date_str = inserted_date.strftime('%d/%m/%Y %H:%M') if inserted_date else 'N/A'
+                            brazil_time = convert_utc_to_brazil_time(inserted_date) if inserted_date else None
+                            date_str = brazil_time.strftime('%d/%m/%Y %H:%M') if brazil_time else 'N/A'
                             status_display = ref.get('B_BOOKING_STATUS', 'Status')
                             option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
                             ref_options.append(option_text)
@@ -2624,10 +2659,14 @@ def exibir_history():
 
                 for ref in filtered:
                     inserted_date = ref.get('ROW_INSERTED_DATE')
-                    if inserted_date and hasattr(inserted_date, 'strftime'):
-                        date_str = inserted_date.strftime('%d/%m/%Y %H:%M')
+                    if inserted_date:
+                        brazil_time = convert_utc_to_brazil_time(inserted_date)
+                        if brazil_time and hasattr(brazil_time, 'strftime'):
+                            date_str = brazil_time.strftime('%d/%m/%Y %H:%M')
+                        else:
+                            date_str_raw = str(brazil_time) if brazil_time else ''
                     else:
-                        date_str_raw = str(inserted_date) if inserted_date else ''
+                        date_str_raw = ''
                         if len(date_str_raw) >= 16:
                             try:
                                 parts = date_str_raw[:16].replace(' ', 'T').split('T')
