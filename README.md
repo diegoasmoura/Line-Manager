@@ -86,9 +86,12 @@ O sistema implementa **dois mecanismos distintos** de prevenção de duplicidade
 - `NAVIO` (Nome do Navio)
 - `VIAGEM` (Código da Viagem)
 - `TERMINAL` (Nome do Terminal)
-- `DATA_ATUALIZACAO` (Data da atualização da API)
-- `CNPJ_TERMINAL` (CNPJ do Terminal)
-- `AGENCIA` (Agência)
+
+**Lógica de Prevenção Inteligente**:
+1. **Primeira Verificação**: Se não existem dados para a combinação navio/viagem/terminal → **INSERIR**
+2. **Segunda Verificação**: Se existem dados → verificar duplicata exata (incluindo timestamp)
+3. **Se não é duplicata exata** → **INSERIR** (permitir evolução temporal)
+4. **Se é duplicata exata** → **PULAR** (evitar duplicação)
 
 **Vantagens**:
 - 🔗 **Compartilhamento**: Múltiplas Farol References podem usar os mesmos dados de monitoramento
@@ -98,7 +101,7 @@ O sistema implementa **dois mecanismos distintos** de prevenção de duplicidade
 
 **Comportamento**:
 - ✅ **Dados únicos**: Insere novo registro na tabela
-- ⚠️ **Dados duplicados**: Pula inserção e usa registro existente
+- ⚠️ **Dados duplicados exatos**: Pula inserção e usa registro existente
 - 🔗 **Vinculação**: Usa `ELLOX_MONITORING_ID` para vincular Farol References ao monitoramento
 
 #### 🔗 **Sistema de Vinculação Inteligente (ELLOX_MONITORING_ID)**
@@ -152,6 +155,87 @@ graph TD
     style I fill:#87CEEB
     style K fill:#98FB98
 ```
+
+#### 🚨 **Problemas Identificados e Soluções Implementadas**
+
+##### **Problema 1: Loop Infinito no Botão "Booking Approved"**
+- **Sintoma**: Botão ficava travado em estado "Running..." indefinidamente
+- **Causa**: `st.rerun()` mal gerenciado no fluxo de validação
+- **Solução**: Refatoração do fluxo de estado e remoção de `st.rerun()` desnecessários
+- **Status**: ✅ **Resolvido**
+
+##### **Problema 2: Dados da API Não Salvos na Tabela de Monitoramento**
+- **Sintoma**: Dados da API eram validados mas não salvos em `F_ELLOX_TERMINAL_MONITORINGS`
+- **Causa**: Validação com `save_to_db=False` não salvava dados da API
+- **Solução**: Salvamento imediato dos dados da API quando validação retorna sucesso
+- **Status**: ✅ **Resolvido**
+
+##### **Problema 3: Lógica de Prevenção de Duplicatas Muito Restritiva**
+- **Sintoma**: Dados manuais não eram salvos em aprovações subsequentes
+- **Causa**: Verificação de duplicatas incluía timestamp, impedindo inserções legítimas
+- **Solução**: Lógica inteligente que verifica primeiro existência, depois duplicata exata
+- **Status**: ✅ **Resolvido**
+
+##### **Problema 4: Formulário Manual Não Desaparecia Após Aprovação**
+- **Sintoma**: Formulário continuava exibido após aprovação bem-sucedida
+- **Causa**: `st.rerun()` comentado após limpeza do `session_state`
+- **Solução**: Reativação do `st.rerun()` para atualizar interface
+- **Status**: ✅ **Resolvido**
+
+##### **Problema 5: Erro de Importação do Pandas**
+- **Sintoma**: `UnboundLocalError: cannot access local variable 'pd'`
+- **Causa**: Import do pandas não definido no escopo da função `exibir_history()`
+- **Solução**: Adição do import no início da função
+- **Status**: ✅ **Resolvido**
+
+#### 📊 **Fluxo de Aprovação Corrigido**
+
+**Cenário 1: PDF com Dados da API** ✅
+```
+1. Usuário clica "Booking Approved"
+   ↓
+2. Sistema valida API (encontra dados)
+   ↓
+3. Sistema salva dados da API em F_ELLOX_TERMINAL_MONITORINGS ✅
+   ↓
+4. Exibe mensagem "Dados encontrados e salvos da API" ✅
+   ↓
+5. Usuário clica "Confirmar Aprovação"
+   ↓
+6. Sistema vincula ELLOX_MONITORING_ID na F_CON_RETURN_CARRIERS ✅
+   ↓
+7. ✅ Aprovação concluída com ambas as tabelas preenchidas
+```
+
+**Cenário 2: PDF sem Dados da API (Manual)** ✅
+```
+1. Usuário clica "Booking Approved"
+   ↓
+2. Sistema valida API (não encontra)
+   ↓
+3. Exibe formulário manual ✅
+   ↓
+4. Usuário preenche dados manualmente
+   ↓
+5. Usuário clica "Confirmar Aprovação"
+   ↓
+6. Sistema salva dados manuais em F_ELLOX_TERMINAL_MONITORINGS ✅
+   ↓
+7. Sistema vincula ELLOX_MONITORING_ID na F_CON_RETURN_CARRIERS ✅
+   ↓
+8. Formulário desaparece automaticamente ✅
+   ↓
+9. ✅ Aprovação concluída com ambas as tabelas preenchidas
+```
+
+#### 🎯 **Resultado Final**
+
+O sistema agora funciona perfeitamente para ambos os cenários:
+- ✅ **Prevenção de duplicidade** funcionando corretamente
+- ✅ **Salvamento de dados** em ambas as tabelas
+- ✅ **Vinculação inteligente** via `ELLOX_MONITORING_ID`
+- ✅ **Interface responsiva** sem loops infinitos
+- ✅ **Fluxo completo** do processamento à aprovação
 
 **Resumo da Integração**:
 - **Sistema 1** (PDFs): Previne processamento duplicado de documentos

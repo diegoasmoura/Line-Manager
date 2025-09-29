@@ -2173,10 +2173,107 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             
             if vessel_name and terminal and not manual_voyage_data:
                 # A validação de voyage monitoring já foi feita no botão "Booking Approved"
-                # Aqui apenas prosseguimos com a aprovação
+                # Aqui precisamos salvar os dados da API se ainda não existem
+                
+                # Verificar se já existem dados para esta combinação
+                existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                
+                if not existing_monitoring_id:
+                    # Se não existem dados, tentar obter da API e salvar
+                    from ellox_api import get_default_api_client
+                    import pandas as pd
+                    
+                    try:
+                        api_client = get_default_api_client()
+                        
+                        # Verificar autenticação
+                        if not api_client.is_authenticated():
+                            print("⚠️ API não autenticada, pulando salvamento de dados da API")
+                        else:
+                            # Testar conexão
+                            api_test = api_client.test_connection()
+                            if api_test.get("success"):
+                                # Resolver CNPJ do terminal
+                                cnpj_terminal = None
+                                terminal_normalized = terminal.upper().strip()
+                                
+                                # Caso especial: Embraport
+                                if "EMBRAPORT" in terminal_normalized or "EMPRESA BRASILEIRA" in terminal_normalized:
+                                    try:
+                                        query = text("""
+                                            SELECT CNPJ, NOME
+                                            FROM LogTransp.F_ELLOX_TERMINALS
+                                            WHERE UPPER(NOME) LIKE '%DPW%'
+                                               OR UPPER(NOME) LIKE '%DP WORLD%'
+                                               OR UPPER(NOME) LIKE '%EMBRAPORT%'
+                                            FETCH FIRST 1 ROWS ONLY
+                                        """)
+                                        res = conn.execute(query).mappings().fetchone()
+                                        if res and res.get("cnpj"):
+                                            cnpj_terminal = res["cnpj"]
+                                    except Exception:
+                                        pass
+                                
+                                # Se não encontrou via normalização, buscar na API
+                                if not cnpj_terminal:
+                                    try:
+                                        terminals = api_client.get_terminals()
+                                        if terminals and len(terminals) > 0:
+                                            for t in terminals:
+                                                if terminal_normalized in t.get("nome", "").upper():
+                                                    cnpj_terminal = t.get("cnpj")
+                                                    break
+                                    except Exception:
+                                        pass
+                                
+                                # Buscar dados da API
+                                try:
+                                    voyages = api_client.get_voyages(
+                                        vessel_name=vessel_name,
+                                        voyage_code=voyage_code,
+                                        terminal_cnpj=cnpj_terminal
+                                    )
+                                    
+                                    if voyages and len(voyages) > 0:
+                                        # Processar dados da API
+                                        api_data = {}
+                                        for voyage in voyages:
+                                            for key, value in voyage.items():
+                                                if key.lower() in ['data_deadline', 'data_draft_deadline', 'data_abertura_gate',
+                                                                  'data_abertura_gate_reefer', 'data_estimativa_saida', 'data_estimativa_chegada',
+                                                                  'data_chegada', 'data_estimativa_atracacao', 'data_atracacao', 'data_partida']:
+                                                    if value:
+                                                        api_data[key] = value
+                                        
+                                        # Salvar dados da API
+                                        monitoring_data = {
+                                            "NAVIO": vessel_name,
+                                            "VIAGEM": voyage_code,
+                                            "TERMINAL": terminal,
+                                            "CNPJ_TERMINAL": cnpj_terminal,
+                                            "AGENCIA": "",
+                                            **api_data
+                                        }
+                                        
+                                        df_monitoring = pd.DataFrame([monitoring_data])
+                                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                                        
+                                        if processed_count > 0:
+                                            print(f"✅ Dados da API salvos para {vessel_name} - {voyage_code} - {terminal}")
+                                            # Buscar o ID do registro recém-criado
+                                            existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+                                        else:
+                                            print(f"⚠️ Falha ao salvar dados da API para {vessel_name} - {voyage_code} - {terminal}")
+                                    else:
+                                        print(f"⚠️ Nenhum dado encontrado na API para {vessel_name} - {voyage_code} - {terminal}")
+                                except Exception as e:
+                                    print(f"⚠️ Erro ao buscar dados da API: {str(e)}")
+                            else:
+                                print("⚠️ API indisponível, pulando salvamento de dados da API")
+                    except Exception as e:
+                        print(f"⚠️ Erro ao processar dados da API: {str(e)}")
                 
                 # Buscar dados do registro existente para preencher elox_update_values
-                existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
                 if existing_monitoring_id:
                     monitoring_query = text("""
                         SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
@@ -2771,46 +2868,64 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                     continue
 
             # Verificar se já existe um registro com os mesmos dados para evitar duplicatas exatas
-            check_duplicate_sql = text("""
+            # Mas permitir inserção se não há dados para esta combinação navio/viagem/terminal
+            check_existing_sql = text("""
                 SELECT COUNT(*) as count
                 FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
                 WHERE UPPER(NAVIO) = UPPER(:NAVIO)
                 AND UPPER(VIAGEM) = UPPER(:VIAGEM)
                 AND UPPER(TERMINAL) = UPPER(:TERMINAL)
-                AND NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) = :DATA_ATUALIZACAO
-                AND NVL(CNPJ_TERMINAL, 'NULL') = NVL(:CNPJ_TERMINAL, 'NULL')
-                AND NVL(AGENCIA, 'NULL') = NVL(:AGENCIA, 'NULL')
             """)
             
-            duplicate_count = conn.execute(check_duplicate_sql, {
+            existing_count = conn.execute(check_existing_sql, {
                 "NAVIO": params["NAVIO"],
                 "VIAGEM": params["VIAGEM"], 
-                "TERMINAL": params["TERMINAL"],
-                "DATA_ATUALIZACAO": params["DATA_ATUALIZACAO"],
-                "CNPJ_TERMINAL": params["CNPJ_TERMINAL"],
-                "AGENCIA": params["AGENCIA"]
+                "TERMINAL": params["TERMINAL"]
             }).fetchone()[0]
             
-            # Se não é duplicata exata, inserir novo registro (manter histórico)
-            if duplicate_count == 0:
-                insert_sql = text("""
-                    INSERT INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS (
-                        ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
-                        DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
-                        DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
-                        DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE
-                    ) VALUES (
-                        :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
-                        :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
-                        :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
-                        :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
-                    )
+            # Verificar duplicata exata apenas se já existem dados para esta combinação
+            if existing_count > 0:
+                check_duplicate_sql = text("""
+                    SELECT COUNT(*) as count
+                    FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+                    WHERE UPPER(NAVIO) = UPPER(:NAVIO)
+                    AND UPPER(VIAGEM) = UPPER(:VIAGEM)
+                    AND UPPER(TERMINAL) = UPPER(:TERMINAL)
+                    AND NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) = :DATA_ATUALIZACAO
+                    AND NVL(CNPJ_TERMINAL, 'NULL') = NVL(:CNPJ_TERMINAL, 'NULL')
+                    AND NVL(AGENCIA, 'NULL') = NVL(:AGENCIA, 'NULL')
                 """)
-                conn.execute(insert_sql, params)
-                processed += 1
-            else:
-                # Duplicata exata encontrada, não inserir
-                print(f"⚠️ Duplicata exata encontrada para {params['NAVIO']} - {params['VIAGEM']} - {params['TERMINAL']}, pulando inserção.")
+                
+                duplicate_count = conn.execute(check_duplicate_sql, {
+                    "NAVIO": params["NAVIO"],
+                    "VIAGEM": params["VIAGEM"], 
+                    "TERMINAL": params["TERMINAL"],
+                    "DATA_ATUALIZACAO": params["DATA_ATUALIZACAO"],
+                    "CNPJ_TERMINAL": params["CNPJ_TERMINAL"],
+                    "AGENCIA": params["AGENCIA"]
+                }).fetchone()[0]
+                
+                # Se é duplicata exata, não inserir
+                if duplicate_count > 0:
+                    print(f"⚠️ Duplicata exata encontrada para {params['NAVIO']} - {params['VIAGEM']} - {params['TERMINAL']}, pulando inserção.")
+                    continue
+            
+            # Inserir novo registro (primeira vez ou não é duplicata exata)
+            insert_sql = text("""
+                INSERT INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS (
+                    ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
+                    DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
+                    DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
+                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE
+                ) VALUES (
+                    :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
+                    :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
+                    :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
+                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
+                )
+            """)
+            conn.execute(insert_sql, params)
+            processed += 1
 
         conn.commit()
     return processed

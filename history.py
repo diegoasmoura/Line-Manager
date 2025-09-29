@@ -891,6 +891,7 @@ def display_attachments_section(farol_reference):
     # Interface de validação agora está integrada na aba de processamento de PDF
 
 def exibir_history():
+    import pandas as pd
     st.header("📜 Return Carriers History")
 
 
@@ -2099,10 +2100,47 @@ def exibir_history():
                                         "pending_approval": True
                                     }
                                 elif voyage_validation_result.get("success"):
-                                    msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                           f"Foram encontrados dados de monitoramento na API\n"
-                                           f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
-                                    st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                    # Se a API retornou sucesso, salvar os dados da API
+                                    try:
+                                        from database import upsert_terminal_monitorings_from_dataframe
+                                        import pandas as pd
+                                        
+                                        # Obter dados da API que foram coletados
+                                        api_data = voyage_validation_result.get("data", {})
+                                        if api_data:
+                                            monitoring_data = {
+                                                "NAVIO": vessel_name,
+                                                "VIAGEM": voyage_code,
+                                                "TERMINAL": terminal,
+                                                "CNPJ_TERMINAL": api_data.get("cnpj_terminal", ""),
+                                                "AGENCIA": api_data.get("agencia", ""),
+                                                **api_data
+                                            }
+                                            
+                                            df_monitoring = pd.DataFrame([monitoring_data])
+                                            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                                            
+                                            if processed_count > 0:
+                                                msg = (f"🟢 **Dados de Voyage Monitoring encontrados e salvos da API**\n\n"
+                                                       f"Foram encontrados e salvos dados de monitoramento na API\n"
+                                                       f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
+                                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                            else:
+                                                msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
+                                                       f"Foram encontrados dados de monitoramento na API\n"
+                                                       f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
+                                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                        else:
+                                            msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
+                                                   f"Foram encontrados dados de monitoramento na API\n"
+                                                   f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
+                                            st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                    except Exception as e:
+                                        st.error(f"❌ Erro ao salvar dados da API: {str(e)}")
+                                        msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
+                                               f"Foram encontrados dados de monitoramento na API\n"
+                                               f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
+                                        st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
                                 else:
                                     st.error(voyage_validation_result.get("message", ""))
                     st.rerun()
@@ -2494,7 +2532,7 @@ def exibir_history():
                                 del st.session_state["voyage_manual_entry_required"]
                             
                             st.cache_data.clear()
-                            # st.rerun()  # Removido para evitar piscada
+                            st.rerun()  # Atualizar interface após aprovação bem-sucedida
                         else:
                             st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": "❌ Erro ao salvar dados de monitoramento"}
                             st.error("❌ Erro ao salvar dados de monitoramento")
@@ -2514,7 +2552,7 @@ def exibir_history():
                     
                     # Limpar cache e recarregar
                     st.cache_data.clear()
-                    # st.rerun()  # Removido para evitar piscada
+                    st.rerun()  # Atualizar interface após cancelamento
                 
         
             # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
