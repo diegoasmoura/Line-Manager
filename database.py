@@ -2140,7 +2140,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             conn.execute(lock_query, {"adj_id": adjustment_id})
         except Exception as e:
             if "ORA-00054" in str(e):
-                # st.error("❌ This record is currently locked by another process. Please try again in a moment.")
+                st.error("❌ This record is currently locked by another process. Please try again in a moment.")
                 tx.rollback()
                 return False
             raise # Re-raise other unexpected errors
@@ -2153,7 +2153,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         
         # Primeiro, verificar se há dados manuais para processar
         if manual_voyage_data:
-            # st.info("ℹ️ Usando dados de monitoramento inseridos manualmente.")
+            st.info("ℹ️ Usando dados de monitoramento inseridos manualmente.")
             column_mapping = {
                 'manual_deadline': 'B_DATA_DEADLINE',
                 'manual_draft_deadline': 'B_DATA_DRAFT_DEADLINE',
@@ -2180,9 +2180,9 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                     existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
                     if existing_monitoring_id:
                         elox_update_values["ELLOX_MONITORING_ID"] = existing_monitoring_id
-                        # st.success(f"🔗 Vinculado ao monitoramento existente ID: {existing_monitoring_id}")
+                        st.success(f"🔗 Vinculado ao monitoramento existente ID: {existing_monitoring_id}")
                     else:
-                        # st.warning("⚠️ Nenhum monitoramento existente encontrado para vinculação manual.")
+                        st.warning("⚠️ Nenhum monitoramento existente encontrado para vinculação manual.")
                         pass
         
         if vessel_name_result:
@@ -2445,13 +2445,13 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
 
         # 7. Commit transaction
         tx.commit()
-        # st.success(f"✅ Record {farol_reference} approved and updated successfully.")
+        st.success(f"✅ Record {farol_reference} approved and updated successfully.")
         return True
 
     except Exception as e:
         if 'tx' in locals() and tx.is_active:
             tx.rollback()
-        # st.error(f"❌ A critical error occurred during the approval process: {e}")
+        st.error(f"❌ A critical error occurred during the approval process: {e}")
         st.session_state["approval_error"] = f"❌ A critical error occurred during the approval process: {e}"
         return False
     finally:

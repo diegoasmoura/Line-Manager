@@ -189,7 +189,15 @@ def exibir_shipments():
         ref = str(ref)
         return int(actions_count.get(ref, 0))
 
+    def format_carrier_returns_status(count: int) -> str:
+        """Formata o status de retornos com badges coloridos"""
+        if count == 0:
+            return "🟢 OK"  # Verde - Sem pendências
+        else:
+            return "🟡 PENDING"  # Amarelo - Pendente
+
     df["Carrier Returns"] = df[farol_ref_col].apply(branch_count).astype(int)
+    df["Carrier Returns Status"] = df["Carrier Returns"].apply(format_carrier_returns_status)
 
     previous_stage = st.session_state.get("previous_stage")
     unsaved_changes = st.session_state.get("changes") is not None and not st.session_state["changes"].empty
@@ -256,9 +264,11 @@ def exibir_shipments():
     # Garante que Splitted Booking Reference esteja visível porém somente leitura
     if "Splitted Booking Reference" not in disabled_columns:
         disabled_columns.append("Splitted Booking Reference")
-    # Garante que Carrier Returns seja somente leitura
+    # Garante que Carrier Returns e Carrier Returns Status sejam somente leitura
     if "Carrier Returns" not in disabled_columns:
         disabled_columns.append("Carrier Returns")
+    if "Carrier Returns Status" not in disabled_columns:
+        disabled_columns.append("Carrier Returns Status")
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
     # Configuração explícita para exibir como texto somente leitura
@@ -287,21 +297,21 @@ def exibir_shipments():
     # Garante que a coluna Farol Reference está pinada à esquerda
     column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
     
-    # Configuração da coluna Carrier Returns
-    column_config["Carrier Returns"] = st.column_config.NumberColumn(
+    # Configuração da coluna Carrier Returns Status
+    column_config["Carrier Returns Status"] = st.column_config.TextColumn(
         "Carrier Returns", 
-        help="Number of returns received from carriers (status 'Received from Carrier')",
-        format="%d"
+        help="Status of returns received from carriers (🟢 OK = No pending, 🟡 PENDING = Has returns to evaluate)",
+        disabled=True
     )
 
     # Reordena colunas e posiciona "Carrier Returns" após "Farol Status"
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
     
-    # Posiciona "Carrier Returns" após "Farol Status"
-    if "Carrier Returns" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
-        colunas_ordenadas.remove("Carrier Returns")
+    # Posiciona "Carrier Returns Status" após "Farol Status"
+    if "Carrier Returns Status" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
+        colunas_ordenadas.remove("Carrier Returns Status")
         idx_status = colunas_ordenadas.index("Farol Status")
-        colunas_ordenadas.insert(idx_status + 1, "Carrier Returns")
+        colunas_ordenadas.insert(idx_status + 1, "Carrier Returns Status")
     
             # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
         if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
@@ -342,15 +352,15 @@ def exibir_shipments():
                 idx_chegada = colunas_ordenadas.index("Data Chegada ATA")
                 colunas_ordenadas.insert(idx_chegada, "Data Transbordo ATD")
 
-    # Fixar largura da coluna Carrier Returns aproximadamente ao tamanho do título
-    if "Carrier Returns" in colunas_ordenadas:
-        idx_returns = colunas_ordenadas.index("Carrier Returns") + 1  # nth-child é 1-based
+    # Fixar largura da coluna Carrier Returns Status aproximadamente ao tamanho do título
+    if "Carrier Returns Status" in colunas_ordenadas:
+        idx_returns = colunas_ordenadas.index("Carrier Returns Status") + 1  # nth-child é 1-based
         returns_css = (
             f"[data-testid='stDataEditor'] thead th:nth-child({idx_returns}),"
             f"[data-testid='stDataEditor'] tbody td:nth-child({idx_returns}),"
             f"[data-testid='stDataFrame'] thead th:nth-child({idx_returns}),"
             f"[data-testid='stDataFrame'] tbody td:nth-child({idx_returns}) {{"
-            " width: 14ch !important; min-width: 14ch !important; max-width: 14ch !important;"
+            " width: 16ch !important; min-width: 16ch !important; max-width: 16ch !important;"
             " }}"
         )
         st.markdown(f"<style>{returns_css}</style>", unsafe_allow_html=True)
