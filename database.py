@@ -2575,7 +2575,15 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                     new_monitoring_record[field_name.lower()] = new_val
             
             # FIX: Explicitly set new timestamps for the new record
-            now = datetime.now()
+            import pytz
+            from datetime import datetime
+            
+            def get_brazil_time():
+                """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
+                brazil_tz = pytz.timezone('America/Sao_Paulo')
+                return datetime.now(brazil_tz)
+            
+            now = get_brazil_time()
             new_monitoring_record['data_atualizacao'] = now
             if 'row_inserted_date' in new_monitoring_record:
                 new_monitoring_record['row_inserted_date'] = now
