@@ -582,7 +582,7 @@ class ElloxAPI:
                 f"{self.base_url}/api/terminalmonitorings",
                 headers={**self.headers, "Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=15
+                timeout=30
             )
             
             if response.status_code == 200:
@@ -740,8 +740,15 @@ def get_default_api_client() -> ElloxAPI:
     # Tentar usar credenciais do session state primeiro
     try:
         import streamlit as st
-        email = st.session_state.get("api_email", ELLOX_API_CONFIG.get("email"))
-        password = st.session_state.get("api_password", ELLOX_API_CONFIG.get("password"))
+        from app_config import ELLOX_API_CONFIG
+
+        email = st.session_state.get("api_email")
+        password = st.session_state.get("api_password")
+
+        if not email or not password:
+            email = ELLOX_API_CONFIG.get("email")
+            password = ELLOX_API_CONFIG.get("password")
+
         base_url = st.session_state.get("api_base_url", ELLOX_API_CONFIG.get("base_url"))
         # Reutiliza token se disponível e válido
         api_token = st.session_state.get("api_token")

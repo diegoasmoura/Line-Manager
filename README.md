@@ -159,6 +159,22 @@ graph TD
 - **Vinculação**: `ELLOX_MONITORING_ID` conecta ambos os sistemas de forma eficiente
 - **Resultado**: Dados limpos, performance otimizada e integridade garantida
 
+> **⚠️ Problema Crítico Identificado e Resolvido:** Durante o desenvolvimento, foi identificado um problema crítico no botão "Booking Approved" que impedia o funcionamento correto do sistema de prevenção de duplicidade. O problema estava relacionado ao gerenciamento de estado complexo no arquivo `history.py`, onde uma "máquina de estados" com múltiplos recarregamentos de página (`st.rerun`) causava perda de estado e impediam que as mensagens de sucesso da API fossem exibidas corretamente.
+>
+> **🔧 Solução Implementada:** O problema foi resolvido através de uma refatoração completa que:
+> - **Eliminou a máquina de estados complexa** que causava múltiplos `st.rerun()`
+> - **Centralizou a lógica de validação** diretamente no botão "Booking Approved"
+> - **Simplificou o fluxo** para um único `st.rerun()` após o processamento
+> - **Garantiu a exibição correta** das mensagens de sucesso e formulários manuais
+>
+> **📊 Resultado:** O sistema agora funciona perfeitamente, exibindo corretamente:
+> - ✅ Mensagens de sucesso quando dados são encontrados na API
+> - ✅ Formulários manuais quando a API falha ou requer entrada manual
+> - ✅ Validação completa de dados de monitoramento
+> - ✅ Prevenção de duplicidade funcionando como esperado
+>
+> **📋 Documentação Técnica:** Para detalhes completos do processo de debugging, análise da causa raiz e implementação da solução, consulte o arquivo `ANALISE_DEBUG_LOOP_INFINITO.md`.
+
 ---
 
 - **Interface de validação** com correção manual de dados
