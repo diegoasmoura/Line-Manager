@@ -891,36 +891,50 @@ def display_attachments_section(farol_reference):
     # Interface de validação agora está integrada na aba de processamento de PDF
 
 def exibir_history():
+    print(f"🔍 DEBUG: exibir_history() chamada")
     st.header("📜 Return Carriers History")
 
     # --- State Machine for Approval Flow (Refactored to prevent UI blocking) ---
     if st.session_state.get('approval_flow_state'):
+        print(f"🔍 DEBUG: approval_flow_state encontrado: {st.session_state.get('approval_flow_state')}")
         state = st.session_state['approval_flow_state']
         step = state.get('step')
         adjustment_id = state.get('adjustment_id')
         farol_ref = state.get('farol_ref')
+        print(f"🔍 DEBUG: step: {step}, adjustment_id: {adjustment_id}, selected_row_status: {state.get('selected_row_status')}")
 
         if step == 'validate_voyage':
+            print(f"🔍 DEBUG: Entrando no bloco validate_voyage")
             if state.get('selected_row_status') == "Received from Carrier":
+                print(f"🔍 DEBUG: Status é Received from Carrier, iniciando validação...")
                 with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
+                    print(f"🔍 DEBUG: Dentro do spinner, importando função...")
                     from database import validate_and_collect_voyage_monitoring
+                    print(f"🔍 DEBUG: Função importada, obtendo conexão...")
                     conn = get_database_connection()
+                    print(f"🔍 DEBUG: Conexão obtida, executando query...")
                     vessel_data = conn.execute(text("""
                         SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
                         FROM LogTransp.F_CON_RETURN_CARRIERS 
                         WHERE ADJUSTMENT_ID = :adj_id
                     """), {"adj_id": adjustment_id}).mappings().fetchone()
+                    print(f"🔍 DEBUG: Query executada, dados: {vessel_data}")
                     conn.close()
+                    print(f"🔍 DEBUG: Conexão fechada")
                     
                     if vessel_data:
                         vessel_name = vessel_data.get("b_vessel_name")
                         voyage_code = vessel_data.get("b_voyage_code") or ""
                         terminal = vessel_data.get("b_terminal") or ""
+                        print(f"🔍 DEBUG: vessel_name: {vessel_name}, voyage_code: {voyage_code}, terminal: {terminal}")
                         
                         if vessel_name and terminal:
-                            voyage_validation_result = validate_and_collect_voyage_monitoring(adjustment_id, farol_ref, vessel_name, voyage_code, terminal, save_to_db=False)
+                            print(f"🔍 DEBUG: Chamando validate_and_collect_voyage_monitoring...")
+                            voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                            print(f"🔍 DEBUG: Função retornou: {voyage_validation_result}")
                             
                             if voyage_validation_result.get("requires_manual"):
+                                print(f"🔍 DEBUG: Entrando no bloco requires_manual")
                                 st.session_state["voyage_manual_entry_required"] = {
                                     "adjustment_id": adjustment_id, "vessel_name": vessel_name,
                                     "voyage_code": voyage_code, "terminal": terminal,
@@ -929,6 +943,7 @@ def exibir_history():
                                     "pending_approval": True
                                 }
                             elif voyage_validation_result.get("success"):
+                                print(f"🔍 DEBUG: Entrando no bloco success")
                                 api_buf = {
                                     "NAVIO": vessel_name, "VIAGEM": voyage_code, "TERMINAL": terminal,
                                     "CNPJ_TERMINAL": voyage_validation_result.get("cnpj_terminal"),
@@ -942,11 +957,23 @@ def exibir_history():
                                        f"Foram encontrados dados de monitoramento na API\n"
                                        f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
                                 st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
+                                print(f"🔍 DEBUG: Bloco success executado")
                             else:
+                                print(f"🔍 DEBUG: Entrando no bloco else (erro)")
                                 st.error(voyage_validation_result.get("message", ""))
+                        else:
+                            print(f"🔍 DEBUG: vessel_name ou terminal vazios - vessel_name: {vessel_name}, terminal: {terminal}")
+                    else:
+                        print(f"🔍 DEBUG: vessel_data é None ou vazio")
+            else:
+                print(f"🔍 DEBUG: Status não é Received from Carrier: {state.get('selected_row_status')}")
             
+            print(f"🔍 DEBUG: Limpando approval_flow_state e chamando st.rerun()")
             st.session_state['approval_flow_state'] = None
-            # O rerun foi removido para evitar que a aba seja trocada inesperadamente.
+            # Atualizar a interface após processar a validação
+            st.rerun()
+    else:
+        print(f"🔍 DEBUG: Nenhum approval_flow_state encontrado")
     # --- End of State Machine ---
     
     # Exibe mensagens persistentes da última ação (flash)
@@ -2164,6 +2191,10 @@ def exibir_history():
                             key=f"status_booking_approved_{farol_reference}",
                             type="secondary",
                             disabled=disable_approved):
+                    print(f"🔍 DEBUG: Botão Booking Approved clicado - adjustment_id: {adjustment_id}")
+                    print(f"🔍 DEBUG: selected_row_status: {selected_row_status}")
+                    print(f"🔍 DEBUG: disable_approved: {disable_approved}")
+                    
                     # Define o status pendente para acionar a próxima etapa do fluxo
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
                     
@@ -2175,6 +2206,8 @@ def exibir_history():
                         'farol_ref': farol_ref,
                         'selected_row_status': selected_row_status
                     }
+                    print(f"🔍 DEBUG: approval_flow_state definido: {st.session_state['approval_flow_state']}")
+                    print(f"🔍 DEBUG: Chamando st.rerun()")
                     st.rerun()
             
             with subcol2:

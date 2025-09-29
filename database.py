@@ -100,30 +100,47 @@ def update_return_carrier_monitoring_id(conn, adjustment_id: str, monitoring_id:
     Returns:
         bool: True se a atualização foi bem-sucedida, False caso contrário
     """
-    try:
-        update_query = text("""
-            UPDATE LogTransp.F_CON_RETURN_CARRIERS
-            SET ELLOX_MONITORING_ID = :monitoring_id,
-                USER_UPDATE = 'System',
-                DATE_UPDATE = SYSDATE
-            WHERE ADJUSTMENT_ID = :adjustment_id
-        """)
-        
-        result = conn.execute(update_query, {
-            "monitoring_id": monitoring_id,
-            "adjustment_id": adjustment_id
-        })
-        
-        # Verifica se a atualização afetou alguma linha
-        if result.rowcount > 0:
-            return True
-        else:
-            st.warning(f"⚠️ Nenhum registro encontrado com ADJUSTMENT_ID: {adjustment_id}")
-            return False
+    import time
+    max_retries = 3
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"🔍 DEBUG: update_return_carrier_monitoring_id - attempt {attempt + 1}/{max_retries} - adjustment_id: {adjustment_id}, monitoring_id: {monitoring_id}")
+            update_query = text("""
+                UPDATE LogTransp.F_CON_RETURN_CARRIERS
+                SET ELLOX_MONITORING_ID = :monitoring_id,
+                    USER_UPDATE = 'System',
+                    DATE_UPDATE = SYSDATE
+                WHERE ADJUSTMENT_ID = :adjustment_id
+            """)
             
-    except Exception as e:
-        st.error(f"❌ Erro ao vincular monitoramento de viagem: {str(e)}")
-        return False
+            print(f"🔍 DEBUG: Executando query de update...")
+            result = conn.execute(update_query, {
+                "monitoring_id": monitoring_id,
+                "adjustment_id": adjustment_id
+            })
+            print(f"🔍 DEBUG: Query executada com sucesso, rowcount: {result.rowcount}")
+            
+            # Verifica se a atualização afetou alguma linha
+            if result.rowcount > 0:
+                print(f"🔍 DEBUG: Update bem-sucedido, retornando True")
+                return True
+            else:
+                print(f"🔍 DEBUG: Nenhum registro encontrado, retornando False")
+                st.warning(f"⚠️ Nenhum registro encontrado com ADJUSTMENT_ID: {adjustment_id}")
+                return False
+                
+        except Exception as e:
+            print(f"🔍 DEBUG: Erro na tentativa {attempt + 1}: {str(e)}")
+            if attempt < max_retries - 1:
+                print(f"🔍 DEBUG: Aguardando {retry_delay} segundos antes da próxima tentativa...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print(f"🔍 DEBUG: Todas as tentativas falharam")
+                st.error(f"❌ Erro ao vincular monitoramento de viagem após {max_retries} tentativas: {str(e)}")
+                return False
 
 # --- RETURN CARRIERS ---
 def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
@@ -1825,7 +1842,7 @@ def _normalize_value(val):
 
     return val
 
-def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: str, vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True) -> dict:
+def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, terminal: str, save_to_db: bool = True) -> dict:
     """
     Valida e coleta dados de monitoramento da viagem usando a API Ellox.
     
@@ -1841,65 +1858,60 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
         from ellox_api import get_default_api_client
         import pandas as pd
         
+        # 1. Verificar se os dados já existem no banco
         conn = get_database_connection()
-        tx = conn.begin() # Inicia uma transação para garantir atomicidade
         
-        # Garante que a coluna ELLOX_MONITORING_ID exista
-        ensure_ellox_monitoring_id_column(conn)
-
-        # 1. Verificar se os dados de monitoramento já existem no banco
-        existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
+        # Verificar se há dados VÁLIDOS (não apenas registro vazio)
+        existing_query = text("""
+            SELECT COUNT(*) as count
+            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
+            WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+            AND UPPER(VIAGEM) = UPPER(:voyage_code)
+            AND UPPER(TERMINAL) = UPPER(:terminal)
+            AND (DATA_DEADLINE IS NOT NULL 
+                OR DATA_ESTIMATIVA_SAIDA IS NOT NULL 
+                OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL 
+                OR DATA_ABERTURA_GATE IS NOT NULL)
+        """)
         
-        if existing_monitoring_id:
-            # Se o monitoramento já existe, apenas vincula o F_CON_RETURN_CARRIERS a ele
-            update_return_carrier_monitoring_id(conn, adjustment_id, existing_monitoring_id)
-            tx.commit()
-            conn.close()
+        existing_count = conn.execute(existing_query, {
+            "vessel_name": vessel_name,
+            "voyage_code": voyage_code, 
+            "terminal": terminal
+        }).scalar()
+        
+        conn.close()
+        
+        if existing_count > 0:
             return {
                 "success": True,
                 "data": None,
-                "message": f"✅ Dados de monitoramento já existem e foram vinculados para {vessel_name} - {voyage_code} - {terminal}",
+                "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
                 "requires_manual": False
             }
         
-        # 2. Tentar obter dados da API Ellox (sempre para validação, independente de save_to_db)
-        try:
-            api_client = get_default_api_client()
-            
-            # Verificar autenticação primeiro
-            if not api_client.authenticated:
-                return {
-                    "success": False,
-                    "data": None,
-                    "message": "🔴 Erro na Conexão com a API Ellox\n\nNão foi possível autenticar ou a API está temporariamente indisponível.\n\n- Tente novamente em alguns minutos.\n- Caso o problema continue, um formulário será aberto automaticamente para preenchimento manual.",
-                    "requires_manual": True,
-                    "error_type": "authentication_failed"
-                }
-        except Exception as e:
+        # 2. Tentar obter dados da API Ellox
+        api_client = get_default_api_client()
+        
+        # Verificar autenticação primeiro
+        if not api_client.authenticated:
             return {
                 "success": False,
                 "data": None,
-                "message": f"❌ Erro ao inicializar cliente da API: {str(e)}",
-                "requires_manual": True
+                "message": "🔴 Falha na Autenticação da API Ellox\n\nAs credenciais da API estão inválidas ou expiraram. Contate o administrador para atualizar as credenciais.",
+                "requires_manual": True,
+                "error_type": "authentication_failed"
             }
         
         # Testar conexão
-        try:
-            api_test = api_client.test_connection()
-            if not api_test.get("success"):
-                return {
-                    "success": False,
-                    "data": None,
-                    "message": "🟡 API Ellox Temporariamente Indisponível\n\nNão foi possível conectar com o servidor da API. Tente novamente em alguns minutos.",
-                    "requires_manual": True,
-                    "error_type": "connection_failed"
-                }
-        except Exception as e:
+        api_test = api_client.test_connection()
+        if not api_test.get("success"):
             return {
                 "success": False,
                 "data": None,
-                "message": f"❌ Erro ao testar conexão com API: {str(e)}",
-                "requires_manual": True
+                "message": "🟡 API Ellox Temporariamente Indisponível\n\nNão foi possível conectar com o servidor da API. Tente novamente em alguns minutos.",
+                "requires_manual": True,
+                "error_type": "connection_failed"
             }
         
         # 3. Resolver CNPJ do terminal (com normalização)
@@ -2058,45 +2070,13 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
             processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
             
             if processed_count > 0:
-                # Após salvar, obter o ID do registro criado e vincular ao F_CON_RETURN_CARRIERS
-                try:
-                    # Buscar o ID do registro recém-criado
-                    new_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
-                    
-                    if new_monitoring_id:
-                        # Vincular o registro de retorno ao monitoramento
-                        update_return_carrier_monitoring_id(conn, adjustment_id, new_monitoring_id)
-                        tx.commit()
-                        conn.close()
-                        
-                        return {
-                            "success": True,
-                            "data": api_data,
-                            "message": f"✅ Dados de monitoramento coletados da API, salvos e vinculados ({len(api_data)} campos)",
-                            "requires_manual": False,
-                            "monitoring_id": new_monitoring_id
-                        }
-                    else:
-                        tx.rollback()
-                        conn.close()
-                        return {
-                            "success": False,
-                            "data": None,
-                            "message": "❌ Erro ao vincular dados de monitoramento",
-                            "requires_manual": True
-                        }
-                except Exception as e:
-                    tx.rollback()
-                    conn.close()
-                    return {
-                        "success": False,
-                        "data": None,
-                        "message": f"❌ Erro ao vincular monitoramento: {str(e)}",
-                        "requires_manual": True
-                    }
+                return {
+                    "success": True,
+                    "data": api_data,
+                    "message": f"✅ Dados de monitoramento coletados da API e salvos ({len(api_data)} campos)",
+                    "requires_manual": False
+                }
             else:
-                tx.rollback()
-                conn.close()
                 return {
                     "success": False,
                     "data": None,
@@ -2119,6 +2099,7 @@ def validate_and_collect_voyage_monitoring(adjustment_id: str, farol_reference: 
             "message": f"❌ Erro na validação da API: {str(e)}",
             "requires_manual": True
         }
+
 
 def approve_carrier_return(adjustment_id: str, related_reference: str, justification: dict, manual_voyage_data: dict = None) -> bool:
     """
