@@ -1837,10 +1837,13 @@ def exibir_history():
                                     # Campos a monitorar
                                     monitored_fields = {
                                         'data_deadline': 'Deadline',
+                                        'data_draft_deadline': 'Draft Deadline',
                                         'data_abertura_gate': 'Abertura de Gate',
                                         'data_abertura_gate_reefer': 'Abertura de Gate Reefer', 
                                         'data_estimativa_chegada': 'ETA',
                                         'data_estimativa_saida': 'ETD',
+                                        'data_estimativa_atracacao': 'Estimativa Atracação ETB',
+                                        'data_atracacao': 'Atracação ATB',
                                         'data_chegada': 'Data de Chegada',
                                         'data_partida': 'Data de Partida'
                                     }
