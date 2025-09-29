@@ -2145,6 +2145,27 @@ def format_date_safe(date_val):
 - **Interface (Brasil)**: `29/09/2025 15:23`
 - **Diferença**: 3 horas (UTC-3)
 
+#### 🔧 **Correção Específica: Campo ROW_INSERTED_DATE**
+
+**Problema Identificado**: O campo `ROW_INSERTED_DATE` da tabela `F_CON_RETURN_CARRIERS` não estava sendo definido explicitamente nas funções de inserção, fazendo com que o Oracle usasse o valor padrão (UTC).
+
+**Funções Corrigidas**:
+- `insert_return_carrier_from_ui()` - PDFs processados, splits e ajustes
+- `upsert_return_carrier_from_unified()` - Snapshots da tabela unificada  
+- `insert_return_carrier_snapshot()` - Inserção de snapshots
+
+**Implementação**:
+```python
+# Adiciona ROW_INSERTED_DATE com horário local do Brasil
+def get_brazil_time():
+    brazil_tz = pytz.timezone('America/Sao_Paulo')
+    return datetime.now(brazil_tz)
+
+db_data["ROW_INSERTED_DATE"] = get_brazil_time()
+```
+
+**Resultado**: Todos os novos registros na tabela `F_CON_RETURN_CARRIERS` agora são inseridos com o horário local do Brasil.
+
 #### 🚢 Casos Especiais de Fusões/Aquisições
 
 **COSCO e OOCL - Mesmo CNPJ no Brasil:**

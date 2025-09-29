@@ -1383,6 +1383,17 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         data["USER_INSERT"] = user_insert
         data["USER_UPDATE"] = None
         data["DATE_UPDATE"] = None
+        
+        # Adiciona ROW_INSERTED_DATE com horário local do Brasil
+        import pytz
+        from datetime import datetime
+        
+        def get_brazil_time():
+            """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
+            brazil_tz = pytz.timezone('America/Sao_Paulo')
+            return datetime.now(brazil_tz)
+        
+        data["ROW_INSERTED_DATE"] = get_brazil_time()
 
         if exists and int(exists[0]) > 0:
             # Atualiza
@@ -1448,7 +1459,8 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                                 B_DATA_ABERTURA_GATE,
                                 USER_INSERT,
                                 ADJUSTMENT_ID,
-                                ELLOX_MONITORING_ID
+                                ELLOX_MONITORING_ID,
+                                ROW_INSERTED_DATE
                             ) VALUES (
                                 :FAROL_REFERENCE,
                                 :B_BOOKING_STATUS,
@@ -1474,7 +1486,8 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                                 :B_DATA_ABERTURA_GATE,
                                 :USER_INSERT,
                                 :ADJUSTMENT_ID,
-                                NULL -- Temporariamente definido como NULL
+                                NULL, -- Temporariamente definido como NULL
+                                :ROW_INSERTED_DATE
                             )
                             """
                         )
@@ -1556,7 +1569,8 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                             B_DATA_ABERTURA_GATE,
                             USER_INSERT,
                             ADJUSTMENT_ID,
-                            ELLOX_MONITORING_ID
+                            ELLOX_MONITORING_ID,
+                            ROW_INSERTED_DATE
                         ) VALUES (
                             :FAROL_REFERENCE,
                             :B_BOOKING_STATUS,
@@ -1582,7 +1596,8 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                             :B_DATA_ABERTURA_GATE,
                             :USER_INSERT,
                             :ADJUSTMENT_ID,
-                            NULL -- Temporariamente definido como NULL
+                            NULL, -- Temporariamente definido como NULL
+                            :ROW_INSERTED_DATE
                         )            """
         )
 
@@ -1612,8 +1627,19 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "B_DATA_ABERTURA_GATE": rd.get("B_DATA_ABERTURA_GATE"),
             "USER_INSERT": user_insert,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
-            "ELLOX_MONITORING_ID": None, 
+            "ELLOX_MONITORING_ID": None,
         }
+        
+        # Adiciona ROW_INSERTED_DATE com horário local do Brasil
+        import pytz
+        from datetime import datetime
+        
+        def get_brazil_time():
+            """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
+            brazil_tz = pytz.timezone('America/Sao_Paulo')
+            return datetime.now(brazil_tz)
+        
+        params["ROW_INSERTED_DATE"] = get_brazil_time()
 
         # Garante binds quando SELECT não retornar colunas (compatibilidade)
         for k in (
@@ -1793,6 +1819,17 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         
         # Adiciona ELLOX_MONITORING_ID ao db_data antes de construir a query
         db_data["ELLOX_MONITORING_ID"] = None # Temporariamente definido como NULL
+        
+        # Adiciona ROW_INSERTED_DATE com horário local do Brasil
+        import pytz
+        from datetime import datetime
+        
+        def get_brazil_time():
+            """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
+            brazil_tz = pytz.timezone('America/Sao_Paulo')
+            return datetime.now(brazil_tz)
+        
+        db_data["ROW_INSERTED_DATE"] = get_brazil_time()
         
         # SQL de inserção
         columns = list(db_data.keys())
