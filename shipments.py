@@ -326,40 +326,54 @@ def exibir_shipments():
             idx_carrier = colunas_ordenadas.index("Voyage Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
         
-        # Reordena as colunas de datas seguindo a ordem do voyage_update.py
-        # Ordem: ETD, ETA, Deadline, Draft Deadline, Abertura Gate, Confirmação Embarque, Atracação, Partida, Chegada, Estimativa Atracação, Transbordos
+        # Reordena as colunas seguindo a ordem específica enviada pelo usuário
+        # Ordem: Creation Of Booking, data_booking_request, Voyage Carrier, Vessel Name, Voyage Code, Terminal, 
+        # Freight Forwarder, Transhipment Port, POD Country, POD Country Acronym, Destination Trade Region,
+        # data_booking_confirmation, data_estimativa_saida, data_estimativa_chegada, data_deadline, 
+        # data_draft_deadline, data_abertura_gate, data_confirmacao_embarque, data_atracacao, 
+        # data_partida, data_chegada, data_estimativa_atracacao, data_estimada_transbordo, data_transbordo
         
-        # Lista das colunas de datas na ordem correta
-        date_columns_order = [
-            "data_estimativa_saida",      # ETD
-            "data_estimativa_chegada",    # ETA
-            "data_deadline",              # Deadline
-            "data_draft_deadline",        # Draft Deadline
-            "data_abertura_gate",         # Abertura Gate
-            "data_confirmacao_embarque",  # Confirmação Embarque
-            "data_atracacao",             # Atracação (ATB)
-            "data_partida",               # Partida (ATD)
-            "data_chegada",               # Chegada (ATA)
-            "data_estimativa_atracacao",  # Estimativa Atracação (ETB)
-            "data_estimada_transbordo",   # Estimada Transbordo (ETD)
-            "data_transbordo"             # Transbordo (ATD)
+        # Lista das colunas na ordem específica solicitada
+        specific_order = [
+            "Creation Of Booking",
+            "data_booking_request", 
+            "Voyage Carrier",
+            "Vessel Name", 
+            "Voyage Code",
+            "Terminal",
+            "Freight Forwarder",
+            "Transhipment Port",
+            "POD Country",
+            "POD Country Acronym", 
+            "Destination Trade Region",
+            "data_booking_confirmation",
+            "data_estimativa_saida",
+            "data_estimativa_chegada", 
+            "data_deadline",
+            "data_draft_deadline",
+            "data_abertura_gate",
+            "data_confirmacao_embarque",
+            "data_atracacao",
+            "data_partida",
+            "data_chegada",
+            "data_estimativa_atracacao",
+            "data_estimada_transbordo",
+            "data_transbordo"
         ]
         
-        # Remove todas as colunas de datas da lista atual
-        for col in date_columns_order:
+        # Remove todas as colunas da ordem específica da lista atual
+        for col in specific_order:
             if col in colunas_ordenadas:
                 colunas_ordenadas.remove(col)
         
-        # Encontra a posição após "data_booking_confirmation" para inserir as datas
-        if "data_booking_confirmation" in colunas_ordenadas:
-            insert_position = colunas_ordenadas.index("data_booking_confirmation") + 1
-        elif "Creation Of Booking" in colunas_ordenadas:
-            insert_position = colunas_ordenadas.index("Creation Of Booking") + 1
+        # Encontra a posição após "Final Destination" para inserir as colunas
+        if "Final Destination" in colunas_ordenadas:
+            insert_position = colunas_ordenadas.index("Final Destination") + 1
         else:
             insert_position = len(colunas_ordenadas)
         
-        # Insere as colunas de datas na ordem correta
-        for i, col in enumerate(date_columns_order):
+        # Insere as colunas na ordem específica solicitada
+        for i, col in enumerate(specific_order):
             if col in df.columns:
                 colunas_ordenadas.insert(insert_position + i, col)
 
