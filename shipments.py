@@ -190,11 +190,11 @@ def exibir_shipments():
         return int(actions_count.get(ref, 0))
 
     def format_carrier_returns_status(count: int) -> str:
-        """Formata o status de retornos com badges coloridos"""
+        """Formata o status de retornos com badges coloridos e quantidade"""
         if count == 0:
-            return "🟢 OK"  # Verde - Sem pendências
+            return "🟢 OK (0)"  # Verde - Sem pendências
         else:
-            return "🟡 PENDING"  # Amarelo - Pendente
+            return f"🟡 PENDING ({count})"  # Amarelo - Pendente com quantidade
 
     df["Carrier Returns"] = df[farol_ref_col].apply(branch_count).astype(int)
     df["Carrier Returns Status"] = df["Carrier Returns"].apply(format_carrier_returns_status)
@@ -300,7 +300,7 @@ def exibir_shipments():
     # Configuração da coluna Carrier Returns Status
     column_config["Carrier Returns Status"] = st.column_config.TextColumn(
         "Carrier Returns", 
-        help="Status of returns received from carriers (🟢 OK = No pending, 🟡 PENDING = Has returns to evaluate)",
+        help="Status of returns received from carriers (🟢 OK (0) = No pending, 🟡 PENDING (X) = X returns to evaluate)",
         disabled=True
     )
 
