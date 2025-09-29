@@ -192,7 +192,7 @@ def exibir_shipments():
     def format_carrier_returns_status(count: int) -> str:
         """Formata o status de retornos com badges coloridos e quantidade"""
         if count == 0:
-            return "🟢 OK (0)"  # Verde - Sem pendências
+            return "🔵 OK (0)"  # Azul - Sem pendências
         else:
             return f"🟡 PENDING ({count})"  # Amarelo - Pendente com quantidade
 
@@ -300,7 +300,7 @@ def exibir_shipments():
     # Configuração da coluna Carrier Returns Status
     column_config["Carrier Returns Status"] = st.column_config.TextColumn(
         "Carrier Returns", 
-        help="Status of returns received from carriers (🟢 OK (0) = No pending, 🟡 PENDING (X) = X returns to evaluate)",
+        help="Status of returns received from carriers (🔵 OK (0) = No pending, 🟡 PENDING (X) = X returns to evaluate)",
         disabled=True
     )
 
