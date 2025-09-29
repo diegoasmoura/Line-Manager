@@ -207,6 +207,31 @@ def get_voyage_monitoring_for_reference(farol_reference):
         conn.close()
         
         df = pd.DataFrame([dict(r) for r in result]) if result else pd.DataFrame()
+        
+        # Converter APROVACAO_DATE de UTC para horário local do Brasil
+        if not df.empty and 'aprovacao_date' in df.columns:
+            import pytz
+            from datetime import datetime
+            
+            def convert_utc_to_brazil_time(utc_timestamp):
+                if utc_timestamp is None:
+                    return None
+                try:
+                    # Se já tem timezone, não converter (já está no horário correto)
+                    if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
+                        return utc_timestamp
+                    
+                    # Se não tem timezone, assumir que JÁ ESTÁ no horário local do Brasil
+                    # (não converter, apenas adicionar timezone para consistência)
+                    brazil_tz = pytz.timezone('America/Sao_Paulo')
+                    brazil_dt = brazil_tz.localize(utc_timestamp)
+                    return brazil_dt
+                except Exception:
+                    return utc_timestamp
+            
+            # Aplicar conversão
+            df['aprovacao_date'] = df['aprovacao_date'].apply(convert_utc_to_brazil_time)
+        
         return df
         
     except Exception as e:
@@ -1756,6 +1781,26 @@ def exibir_history():
                             except Exception:
                                 return 'N/A'
                         
+                        # Função helper para formatar datas já convertidas para horário do Brasil
+                        def format_date_safe_brazil(date_val):
+                            if date_val is None:
+                                return 'N/A'
+                            
+                            try:
+                                import pandas as pd
+                                # Verificar se é NaT (pandas Not a Time)
+                                if pd.isna(date_val):
+                                    return 'N/A'
+                                
+                                # Se é um pandas Timestamp válido
+                                if hasattr(date_val, 'strftime'):
+                                    return date_val.strftime('%d/%m/%Y %H:%M')
+                                
+                                # Para outros tipos, converter para string
+                                return str(date_val)
+                            except Exception:
+                                return 'N/A'
+                        
                         # Layout card expandido mantendo o estilo original
                         st.markdown(f"""
                         <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
@@ -1764,7 +1809,7 @@ def exibir_history():
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 0.1rem; text-transform: uppercase;">✅ Aprovado:</div>
                                     <div style="font-weight: 600; color: #27ae60; font-size: 0.85em;">
-                                        {format_date_safe(latest_record.get('aprovacao_date'))}
+                                        {format_date_safe_brazil(latest_record.get('aprovacao_date'))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
@@ -1875,7 +1920,16 @@ def exibir_history():
                                             
                                             # Detectar mudança
                                             if current_formatted != previous_formatted:
-                                                update_time = current.get('data_atualizacao')
+                                                # Usar horário atual em vez do data_atualizacao do registro
+                                                # para mostrar quando a alteração foi detectada
+                                                from datetime import datetime
+                                                import pytz
+                                                
+                                                def get_brazil_time():
+                                                    brazil_tz = pytz.timezone('America/Sao_Paulo')
+                                                    return datetime.now(brazil_tz)
+                                                
+                                                update_time = get_brazil_time()
                                                 
                                                 # Função helper para formatar data de atualização
                                                 def format_update_time(date_val):

@@ -11,6 +11,12 @@ import uuid
  
 # Data e hora atuais
 now = datetime.now()
+
+def get_brazil_time():
+    """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
+    import pytz
+    brazil_tz = pytz.timezone('America/Sao_Paulo')
+    return datetime.now(brazil_tz)
  
 # Configurações do banco de dados (podem ser sobrescritas por variáveis de ambiente)
 DB_CONFIG = {
@@ -1385,14 +1391,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         data["DATE_UPDATE"] = None
         
         # Adiciona ROW_INSERTED_DATE com horário local do Brasil
-        import pytz
-        from datetime import datetime
-        
-        def get_brazil_time():
-            """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
-            brazil_tz = pytz.timezone('America/Sao_Paulo')
-            return datetime.now(brazil_tz)
-        
         data["ROW_INSERTED_DATE"] = get_brazil_time()
 
         if exists and int(exists[0]) > 0:
@@ -1631,14 +1629,6 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
         }
         
         # Adiciona ROW_INSERTED_DATE com horário local do Brasil
-        import pytz
-        from datetime import datetime
-        
-        def get_brazil_time():
-            """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
-            brazil_tz = pytz.timezone('America/Sao_Paulo')
-            return datetime.now(brazil_tz)
-        
         params["ROW_INSERTED_DATE"] = get_brazil_time()
 
         # Garante binds quando SELECT não retornar colunas (compatibilidade)
@@ -1821,14 +1811,6 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         db_data["ELLOX_MONITORING_ID"] = None # Temporariamente definido como NULL
         
         # Adiciona ROW_INSERTED_DATE com horário local do Brasil
-        import pytz
-        from datetime import datetime
-        
-        def get_brazil_time():
-            """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
-            brazil_tz = pytz.timezone('America/Sao_Paulo')
-            return datetime.now(brazil_tz)
-        
         db_data["ROW_INSERTED_DATE"] = get_brazil_time()
         
         # SQL de inserção
@@ -2575,14 +2557,6 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                     new_monitoring_record[field_name.lower()] = new_val
             
             # FIX: Explicitly set new timestamps for the new record
-            import pytz
-            from datetime import datetime
-            
-            def get_brazil_time():
-                """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
-                brazil_tz = pytz.timezone('America/Sao_Paulo')
-                return datetime.now(brazil_tz)
-            
             now = get_brazil_time()
             new_monitoring_record['data_atualizacao'] = now
             if 'row_inserted_date' in new_monitoring_record:

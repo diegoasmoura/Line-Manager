@@ -2112,8 +2112,10 @@ exibicao_errada = timestamp_do_banco.strftime('%d/%m/%Y %H:%M')  # Mostra UTC
 - ✅ **SEMPRE** usar `get_brazil_time()` para novos timestamps
 - ✅ **SEMPRE** usar `convert_utc_to_brazil_time()` para exibição de dados do banco
 - ✅ **SEMPRE** testar a conversão com dados reais
+- ✅ **SEMPRE** verificar se o timestamp tem timezone antes de converter
 - ✅ **NUNCA** usar `datetime.now()` diretamente para timestamps de usuário
 - ✅ **NUNCA** exibir timestamps do banco sem conversão
+- ✅ **NUNCA** assumir que timestamps "naive" são UTC (podem já estar no horário local)
 
 #### 🔧 **Implementação em Funções de Formatação**
 
@@ -2144,6 +2146,39 @@ def format_date_safe(date_val):
 - **Banco (UTC)**: `2025-09-29 18:23:35+00:00`
 - **Interface (Brasil)**: `29/09/2025 15:23`
 - **Diferença**: 3 horas (UTC-3)
+
+#### ⚠️ **Caso Especial: Timestamps "Naive" do Banco**
+
+**Problema Identificado**: Alguns campos do banco (como `ROW_INSERTED_DATE`) retornam timestamps "naive" (sem timezone) que **já estão no horário local do Brasil**, não em UTC.
+
+**Sintomas**:
+- Campo "Inserted Date" mostra horário correto: `2025-09-29 16:03:41`
+- Campo "✅ Aprovado" mostra horário incorreto: `29/09/2025 13:03` (3 horas a menos)
+
+**Solução Específica**:
+```python
+def convert_utc_to_brazil_time(utc_timestamp):
+    """Converte timestamp do banco para horário local do Brasil"""
+    if utc_timestamp is None:
+        return None
+    
+    try:
+        # Se já tem timezone, não converter (já está no horário correto)
+        if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
+            return utc_timestamp
+        
+        # Se não tem timezone, assumir que JÁ ESTÁ no horário local do Brasil
+        # (não converter, apenas adicionar timezone para consistência)
+        brazil_tz = pytz.timezone('America/Sao_Paulo')
+        brazil_dt = brazil_tz.localize(utc_timestamp)
+        return brazil_dt
+    except Exception:
+        return utc_timestamp
+```
+
+**Regra de Ouro**:
+- **Timestamps com timezone**: Tratar como UTC e converter
+- **Timestamps "naive"**: Assumir que já estão no horário local do Brasil
 
 #### 🔧 **Correção Específica: Campo ROW_INSERTED_DATE**
 
