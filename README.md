@@ -16,6 +16,7 @@ Sistema completo de gerenciamento de embarques marítimos com interface web intu
 - [Fluxos de Trabalho](#-fluxos-de-trabalho)
 - [API e Integrações](#-api-e-integrações)
 - [Boas Práticas](#-boas-práticas---identificação-de-carriers)
+- [Boas Práticas - Coleta de Hora Atual](#-boas-práticas---coleta-de-hora-atual)
 - [Contribuição](#-contribuição)
 - [Suporte](#-suporte)
 
@@ -2043,6 +2044,106 @@ Esta abordagem revolucionou a experiência do usuário no sistema Voyage Monitor
 #### ⚠️ Importante: Uso de CNPJs vs Nomes de Carriers
 
 **Recomendação**: Sempre utilize **CNPJs** ao invés de nomes de carriers para consultas e identificações no sistema.
+
+### 🕐 Boas Práticas - Coleta de Hora Atual
+
+#### ⚠️ Importante: Fuso Horário Correto para Timestamps
+
+**Problema Comum**: O sistema Oracle armazena timestamps em UTC, mas a interface deve exibir o horário local do Brasil (UTC-3).
+
+#### ✅ **Solução Padrão para Coleta de Hora Atual**
+
+**1. Para Novos Timestamps (Inserção no Banco):**
+```python
+import pytz
+from datetime import datetime
+
+def get_brazil_time():
+    """Retorna o horário atual no fuso horário do Brasil (UTC-3)"""
+    brazil_tz = pytz.timezone('America/Sao_Paulo')
+    return datetime.now(brazil_tz)
+
+# ✅ CORRETO - Para inserção no banco
+timestamp_para_banco = get_brazil_time()
+```
+
+**2. Para Conversão de Timestamps do Banco (Exibição):**
+```python
+def convert_utc_to_brazil_time(utc_timestamp):
+    """Converte timestamp UTC do banco para horário local do Brasil"""
+    if utc_timestamp is None:
+        return None
+    
+    try:
+        # Se já é timezone-aware, assumir que é UTC
+        if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
+            utc_dt = utc_timestamp
+        else:
+            # Se é naive, assumir que é UTC
+            utc_dt = pytz.UTC.localize(utc_timestamp)
+        
+        # Converter para fuso horário do Brasil
+        brazil_tz = pytz.timezone('America/Sao_Paulo')
+        brazil_dt = utc_dt.astimezone(brazil_tz)
+        
+        return brazil_dt
+    except Exception:
+        return utc_timestamp  # Retorna original se houver erro
+
+# ✅ CORRETO - Para exibição na interface
+timestamp_do_banco = datetime.now(pytz.UTC)  # Simula dados do Oracle
+timestamp_para_exibicao = convert_utc_to_brazil_time(timestamp_do_banco)
+print(timestamp_para_exibicao.strftime('%d/%m/%Y %H:%M'))  # 29/09/2025 15:23
+```
+
+#### ❌ **Evitar - Padrões Incorretos**
+
+```python
+# ❌ ERRADO - Usa UTC em vez do horário local
+timestamp_errado = datetime.now()  # UTC, não Brasil
+
+# ❌ ERRADO - Não converte timestamps do banco
+timestamp_do_banco = datetime.now(pytz.UTC)
+exibicao_errada = timestamp_do_banco.strftime('%d/%m/%Y %H:%M')  # Mostra UTC
+```
+
+#### 📋 **Checklist para Desenvolvedores**
+
+- ✅ **SEMPRE** usar `get_brazil_time()` para novos timestamps
+- ✅ **SEMPRE** usar `convert_utc_to_brazil_time()` para exibição de dados do banco
+- ✅ **SEMPRE** testar a conversão com dados reais
+- ✅ **NUNCA** usar `datetime.now()` diretamente para timestamps de usuário
+- ✅ **NUNCA** exibir timestamps do banco sem conversão
+
+#### 🔧 **Implementação em Funções de Formatação**
+
+```python
+def format_date_safe(date_val):
+    """Função padrão para formatação de datas na interface"""
+    if date_val is None:
+        return 'N/A'
+    
+    try:
+        import pandas as pd
+        if pd.isna(date_val):
+            return 'N/A'
+        
+        # Converter UTC para horário do Brasil
+        brazil_time = convert_utc_to_brazil_time(date_val)
+        
+        if hasattr(brazil_time, 'strftime'):
+            return brazil_time.strftime('%d/%m/%Y %H:%M')
+        
+        return str(brazil_time)
+    except Exception:
+        return 'N/A'
+```
+
+#### 📊 **Resultado Esperado**
+
+- **Banco (UTC)**: `2025-09-29 18:23:35+00:00`
+- **Interface (Brasil)**: `29/09/2025 15:23`
+- **Diferença**: 3 horas (UTC-3)
 
 #### 🚢 Casos Especiais de Fusões/Aquisições
 
