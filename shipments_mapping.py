@@ -196,6 +196,7 @@ def drop_downs(data_show, df_udc):
         "data_lc_received": "date",
         "data_allocation": "date",
         "data_producer_nomination": "date",
+        "Creation Of Shipment": "datetime",  # Adiciona coluna de criação como datetime
         # "First Vessel ETD": "date",  # coluna removida na unificada
         "Volume in Tons": "numeric",
         "Sales Quantity of Containers": "numeric",
@@ -210,6 +211,7 @@ def drop_downs(data_show, df_udc):
         "Voyage Carrier": "select",
         "data_booking_request": "date",
         "data_booking_confirmation": "date",
+        "Creation Of Booking": "datetime",  # Adiciona coluna de criação como datetime
         "data_draft_deadline": "datetime",
         "data_deadline": "datetime",
         "data_estimativa_saida": "datetime",
