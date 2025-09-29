@@ -736,12 +736,13 @@ def get_default_api_client() -> ElloxAPI:
     Returns:
         Cliente da API Ellox autenticado
     """
+    from app_config import ELLOX_API_CONFIG
     # Tentar usar credenciais do session state primeiro
     try:
         import streamlit as st
-        email = st.session_state.get("api_email", "diego_moura@cargill.com")
-        password = st.session_state.get("api_password", "Cargill@25")
-        base_url = st.session_state.get("api_base_url", "https://apidtz.comexia.digital")
+        email = st.session_state.get("api_email", ELLOX_API_CONFIG.get("email"))
+        password = st.session_state.get("api_password", ELLOX_API_CONFIG.get("password"))
+        base_url = st.session_state.get("api_base_url", ELLOX_API_CONFIG.get("base_url"))
         # Reutiliza token se disponível e válido
         api_token = st.session_state.get("api_token")
         token_expires_raw = st.session_state.get("api_token_expires_at")
@@ -753,8 +754,12 @@ def get_default_api_client() -> ElloxAPI:
             token_expires_at = None
         return ElloxAPI(email=email, password=password, api_key=api_token, base_url=base_url, token_expires_at=token_expires_at)
     except:
-        # Fallback para credenciais padrão se streamlit não estiver disponível
-        return ElloxAPI(email="diego_moura@cargill.com", password="Cargill@25", base_url="https://apidtz.comexia.digital")
+        # Fallback para credenciais do app_config se streamlit não estiver disponível
+        return ElloxAPI(
+            email=ELLOX_API_CONFIG.get("email"), 
+            password=ELLOX_API_CONFIG.get("password"), 
+            base_url=ELLOX_API_CONFIG.get("base_url")
+        )
 
 def enrich_booking_data(booking_data: Dict[str, Any], client: ElloxAPI = None) -> Dict[str, Any]:
     """

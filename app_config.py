@@ -8,7 +8,9 @@ from typing import Dict, List
 
 # Configurações da API Ellox
 ELLOX_API_CONFIG = {
-    "base_url": "https://api.comexia.digital",
+    "base_url": "https://apidtz.comexia.digital",
+    "email": "diego_moura@cargill.com",
+    "password": "Cargill@25",
     "timeout": 30,
     "max_retries": 3,
     "documentation_url": "https://developers.comexia.digital/"
