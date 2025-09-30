@@ -282,12 +282,13 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
  
 #Obter os dados das tabelas principais Sales
 #@st.cache_data(ttl=300)
-def get_data_salesData():
-    """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
+def get_data_salesData(page_number: int = 1, page_size: int = 25):
+    """Executa a consulta SQL com paginação, aplica o mapeamento de colunas e retorna um DataFrame formatado e o total de registros."""
     conn = None
- 
-    # Consulta SQL (tabela unificada) com aliases para manter compatibilidade
-    query = '''
+    offset = (page_number - 1) * page_size
+
+    # Consulta SQL paginada e ordenada pelos mais recentes
+    query = f'''
     SELECT 
         FAROL_REFERENCE                    AS s_farol_reference,
         FAROL_STATUS                       AS s_farol_status,
@@ -316,7 +317,7 @@ def get_data_salesData():
         S_AFLOAT                           AS s_afloat,
         S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
         S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
-        S_REQUIRED_ARRIVAL_DATE_EXPECTED            AS s_required_arrival_date_expected,
+        S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
         S_PARTIAL_ALLOWED                  AS s_partial_allowed,
@@ -328,11 +329,15 @@ def get_data_salesData():
         S_SALE_OWNER                       AS s_sales_owner,
         S_COMMENTS                         AS s_comments
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY FAROL_REFERENCE'''
- 
+    ORDER BY S_CREATION_OF_SHIPMENT DESC
+    OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
+
+    count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
+
     try:
         conn = get_database_connection()
         df = pd.read_sql_query(text(query), conn)
+        total_records = conn.execute(text(count_query)).scalar() or 0
 
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
@@ -362,19 +367,20 @@ def get_data_salesData():
         # Adiciona ícones ao Farol Status para exibição
         df = process_farol_status_for_display(df)
 
-        return df
+        return df, total_records
     finally:
         if conn:
             conn.close()
  
  #Obter os dados das tabelas principais Booking
 #@st.cache_data(ttl=300)
-def get_data_bookingData():
-    """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
+def get_data_bookingData(page_number: int = 1, page_size: int = 25):
+    """Executa a consulta SQL com paginação, aplica o mapeamento de colunas e retorna um DataFrame formatado e o total de registros."""
     conn = None
- 
-    # Consulta SQL (tabela unificada) com aliases para manter compatibilidade
-    query = '''
+    offset = (page_number - 1) * page_size
+
+    # Consulta SQL paginada e ordenada pelos mais recentes
+    query = f'''
     SELECT 
         ID                                  AS b_id,
         FAROL_REFERENCE                      AS b_farol_reference,
@@ -423,11 +429,15 @@ def get_data_bookingData():
         S_PORT_OF_LOADING_POL                AS b_port_of_loading_pol,
         S_PORT_OF_DELIVERY_POD               AS b_port_of_delivery_pod
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY FAROL_REFERENCE'''
- 
+    ORDER BY B_CREATION_OF_BOOKING DESC
+    OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
+
+    count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
+
     try:
         conn = get_database_connection()
         df = pd.read_sql_query(text(query), conn)
+        total_records = conn.execute(text(count_query)).scalar() or 0
 
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
@@ -472,7 +482,7 @@ def get_data_bookingData():
         # Adiciona ícones ao Farol Status para exibição
         df = process_farol_status_for_display(df)
 
-        return df
+        return df, total_records
     finally:
         if conn:
             conn.close()

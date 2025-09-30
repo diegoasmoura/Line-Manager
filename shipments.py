@@ -137,10 +137,22 @@ def exibir_shipments():
     # Salva o stage atual na sessão
     st.session_state["current_stage"] = choose
 
+    # --- LÓGICA DE PAGINAÇÃO ---
+    if 'shipments_current_page' not in st.session_state:
+        st.session_state.shipments_current_page = 1
+
+    page_size = 25  # Tamanho fixo de página
+
+    # Carrega os dados paginados
     if choose == "Sales Data":
-        df = get_data_salesData()
+        df, total_records = get_data_salesData(page_number=st.session_state.shipments_current_page, page_size=page_size)
     elif choose == "Booking Management":
-        df = get_data_bookingData()
+        df, total_records = get_data_bookingData(page_number=st.session_state.shipments_current_page, page_size=page_size)
+
+    total_pages = (total_records // page_size) + (1 if total_records % page_size > 0 else 0)
+
+    # --- FIM DA LÓGICA DE PAGINAÇÃO ---
+
 
     # Padroniza o rótulo exibido para a referência Farol
     rename_map = {}
@@ -437,8 +449,21 @@ def exibir_shipments():
     )
 
     # Contador discreto de registros
-    total_records = len(edited_df)
-    st.caption(f"Total: {total_records} shipping records")
+    st.caption(f"Mostrando {len(edited_df)} de {total_records} registros")
+
+    # --- BOTÕES DE NAVEGAÇÃO DA PAGINAÇÃO ---
+    nav_cols = st.columns(5)
+    with nav_cols[0]:
+        if st.button("⬅️ Previous", disabled=(st.session_state.shipments_current_page <= 1)):
+            st.session_state.shipments_current_page -= 1
+            st.rerun()
+    with nav_cols[2]:
+        st.caption(f"Page {st.session_state.shipments_current_page} of {total_pages}")
+    with nav_cols[4]:
+        if st.button("Next ➡️", disabled=(st.session_state.shipments_current_page >= total_pages)):
+            st.session_state.shipments_current_page += 1
+            st.rerun()
+
     
     # Remove "Select" para comparação
     edited_df_clean = edited_df.drop(columns=["Select"], errors="ignore")
