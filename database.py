@@ -329,7 +329,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
         S_SALE_OWNER                       AS s_sales_owner,
         S_COMMENTS                         AS s_comments
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY S_CREATION_OF_SHIPMENT DESC
+    ORDER BY FAROL_REFERENCE DESC
     OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
 
     count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
@@ -429,7 +429,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
         S_PORT_OF_LOADING_POL                AS b_port_of_loading_pol,
         S_PORT_OF_DELIVERY_POD               AS b_port_of_delivery_pod
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY B_CREATION_OF_BOOKING DESC
+    ORDER BY FAROL_REFERENCE DESC
     OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
 
     count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'

@@ -2951,6 +2951,28 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v3.9.15 - Setembro 2025 - Ordenação da Grade Principal por Farol Reference**
+
+**✨ Nova Funcionalidade:**
+- **Ordenação Automática**: Grade principal agora ordena automaticamente por Farol Reference em ordem decrescente (mais recentes primeiro)
+- **Consistência entre Páginas**: Ordenação aplicada no nível do banco de dados garante sequência correta entre páginas
+- **Aplicado em Ambas as Seções**: Sales Data e Booking Management utilizam a mesma ordenação
+
+**🔧 Implementação Técnica:**
+
+1. **`database.py`** → `get_data_salesData()` e `get_data_bookingData()`:
+   - Alterado `ORDER BY` de `S_CREATION_OF_SHIPMENT DESC` e `B_CREATION_OF_BOOKING DESC` para `FAROL_REFERENCE DESC`
+   - Ordenação aplicada antes da paginação para garantir sequência correta
+
+2. **`shipments.py`** → `exibir_shipments()`:
+   - Removida ordenação duplicada no frontend
+   - Dados já vêm ordenados do banco de dados
+
+**📋 Resultado:**
+- **Página 1**: FR_25.09_0030 até FR_25.09_0006 (25 registros)
+- **Página 2**: FR_25.09_0005 até FR_25.09_0001 (5 registros)
+- **Registros mais recentes aparecem primeiro** facilitando visualização
+
 ### 🔧 **v3.9.14 - Setembro 2025 - Correção de Formatação de Datas no History**
 
 **🐛 Problema Corrigido:**

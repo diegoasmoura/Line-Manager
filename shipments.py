@@ -436,8 +436,8 @@ def exibir_shipments():
  
     # Guarda cópias sem a coluna "Select" para comparação
     df_filtered_original = df.drop(columns=["Select"], errors="ignore").copy()
- 
-    # Exibe data_editor
+
+    # Exibe data_editor (os dados já vêm ordenados do banco por Farol Reference)
     edited_df = st.data_editor(
         df[colunas_ordenadas],
         key=st.session_state["grid_update_key"],
