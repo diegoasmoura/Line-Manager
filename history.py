@@ -6,7 +6,7 @@ from database import (
     get_return_carrier_status_by_adjustment_id, get_terminal_monitorings,
     approve_carrier_return, update_record_status
 )
-from shipments_mapping import get_column_mapping
+from shipments_mapping import get_column_mapping, process_farol_status_for_display
 from sqlalchemy import text
 from datetime import datetime
 import os
@@ -1522,6 +1522,9 @@ def exibir_history():
         except Exception:
             pass
         
+        # Aplica a formatação de ícones no Farol Status
+        df_processed = process_farol_status_for_display(df_processed)
+
         return df_processed
 
     # Função para exibir grade em uma aba

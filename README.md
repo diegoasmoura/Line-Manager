@@ -432,9 +432,8 @@ O arquivo `shipments_mapping.py` contém um conjunto de funções para gerenciar
 A integração ocorre em três pontos principais para garantir que o usuário sempre veja os ícones, mas o banco de dados nunca os receba.
 
 **1. Exibição dos Dados (Carregamento)**
-- **Onde**: `database.py`
-- **Como**: As funções que carregam dados para as grades (`get_data_salesData`, `get_data_bookingData`, etc.) agora chamam `process_farol_status_for_display` antes de retornar o DataFrame. Isso garante que os dados já cheguem na interface com os ícones.
-
+        - **Onde**: `database.py` e `history.py`
+        - **Como**: As funções que carregam dados para as grades (`get_data_salesData`, etc.) e a que processa o histórico (`process_dataframe` em `history.py`) chamam `process_farol_status_for_display` antes de exibir os dados.
 ```python
 # Em database.py -> get_data_salesData()
 def get_data_salesData():
