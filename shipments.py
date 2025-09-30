@@ -452,17 +452,21 @@ def exibir_shipments():
     st.caption(f"Mostrando {len(edited_df)} de {total_records} registros")
 
     # --- BOTÕES DE NAVEGAÇÃO DA PAGINAÇÃO ---
-    prev_col, mid_col, next_col = st.columns([1, 8, 1])
+    prev_col, mid_col, next_col = st.columns(3) # Three equal columns for main layout
     with prev_col:
         if st.button("⬅️ Previous", disabled=(st.session_state.shipments_current_page <= 1)):
             st.session_state.shipments_current_page -= 1
             st.rerun()
     with mid_col:
-        st.caption(f"Page {st.session_state.shipments_current_page} of {total_pages}")
+        st.markdown(f"<p style='text-align: center; color: #6c757d;'>Page {st.session_state.shipments_current_page} of {total_pages}</p>", unsafe_allow_html=True)
     with next_col:
-        if st.button("Next ➡️", disabled=(st.session_state.shipments_current_page >= total_pages)):
-            st.session_state.shipments_current_page += 1
-            st.rerun()
+        # Usa sub-colunas para empurrar o botão para a direita dentro da sua coluna
+        # Dando mais espaço para o botão não achatar
+        _, button_align_col = st.columns([2, 1]) # Spacer (2/3) then button (1/3) of next_col
+        with button_align_col:
+            if st.button("Next ➡️", disabled=(st.session_state.shipments_current_page >= total_pages)):
+                st.session_state.shipments_current_page += 1
+                st.rerun()
 
     
     # Remove "Select" para comparação
