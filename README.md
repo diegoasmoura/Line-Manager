@@ -2884,6 +2884,39 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v3.9.14 - Setembro 2025 - Correção de Formatação de Datas no History**
+
+**🐛 Problema Corrigido:**
+- **Formatação Incorreta de Datas**: Colunas de data no `history.py` estavam sendo exibidas como timestamps em milissegundos (ex: `1756684800000`) em vez do formato brasileiro `DD/MM/YYYY HH:mm`
+- **Detecção Incorreta de Colunas**: Sistema não identificava corretamente colunas como "Required Arrival Expected" como colunas de data
+
+**🔧 Correções Aplicadas:**
+
+1. **`database.py`** → `get_return_carriers_by_farol()`:
+   - Adicionada conversão de datetime para colunas da tabela `F_CON_RETURN_CARRIERS`
+   - Incluídas colunas: `S_REQUIRED_ARRIVAL_DATE_EXPECTED`, `S_REQUESTED_DEADLINE_START_DATE`, `S_REQUESTED_DEADLINE_END_DATE`
+   - Resolvido problema de timestamps em milissegundos
+
+2. **`history.py`** → `generate_dynamic_column_config()`:
+   - Expandida detecção de colunas de data para incluir palavras-chave: `"required"`, `"arrival"`, `"expected"`
+   - Garantida configuração correta como `DatetimeColumn` com formato brasileiro
+   - Melhorada consistência visual na interface
+
+3. **`database.py`** → `get_data_bookingData()`:
+   - Adicionadas colunas de data faltantes na lista `datetime_columns`
+   - Incluídas: `data_required_arrival_expected`, `data_requested_deadline_start`, `data_requested_deadline_end`
+
+**✅ Resultado Final:**
+- Todas as colunas de data no `history.py` agora exibem formato brasileiro correto (`DD/MM/YYYY HH:mm`)
+- Resolvido problema de exibição de timestamps em milissegundos
+- Melhorada detecção automática de colunas de data
+- Consistência visual aprimorada em toda a interface
+
+**📁 Arquivos Modificados:**
+- `database.py` (conversão de datetime em duas funções)
+- `history.py` (detecção de colunas de data)
+- `README.md` (documentação das correções)
+
 ### 🔧 **v3.9.9 - Janeiro 2025 - Correção Crítica da Voyage Timeline**
 
 **🐛 Problema Corrigido:**
