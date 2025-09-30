@@ -406,6 +406,74 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
                     └────────────────────┘
 ```
 
+### 🎨 Farol Status - Ícones Visuais
+
+Para melhorar a experiência do usuário, o sistema Farol utiliza ícones visuais para representar cada `Farol Status`. Esta funcionalidade foi implementada de forma a não impactar a integridade dos dados no banco de dados.
+
+**Princípio Chave**: A lógica de ícones é uma camada de **apresentação (frontend)**. O banco de dados continua armazenando apenas o texto puro do status (ex: `Booking Approved`), enquanto a interface se encarrega de adicionar e remover os ícones (ex: `✅ Booking Approved`) dinamicamente.
+
+#### Arquivo Central da Lógica
+
+Toda a funcionalidade de mapeamento de ícones está centralizada no arquivo:
+- `shipments_mapping.py`
+
+#### Funções Principais
+
+O arquivo `shipments_mapping.py` contém um conjunto de funções para gerenciar os ícones:
+
+- `get_farol_status_icons()`: Retorna um dicionário que mapeia cada string de status ao seu ícone correspondente.
+- `get_display_from_status(status)`: Recebe um status (texto puro) и retorna a string formatada com o ícone.
+- `get_status_from_display(display_status)`: Recebe uma string formatada com ícone e a converte de volta para o texto puro. `clean_farol_status_value` é um apelido (alias) para esta função.
+- `process_farol_status_for_display(df)`: Aplica a formatação com ícones a um DataFrame inteiro (usado ao carregar dados).
+- `process_farol_status_for_database(df)`: Remove os ícones de um DataFrame inteiro (usado antes de salvar).
+
+#### Fluxo de Integração
+
+A integração ocorre em três pontos principais para garantir que o usuário sempre veja os ícones, mas o banco de dados nunca os receba.
+
+**1. Exibição dos Dados (Carregamento)**
+- **Onde**: `database.py`
+- **Como**: As funções que carregam dados para as grades (`get_data_salesData`, `get_data_bookingData`, etc.) agora chamam `process_farol_status_for_display` antes de retornar o DataFrame. Isso garante que os dados já cheguem na interface com os ícones.
+
+```python
+# Em database.py -> get_data_salesData()
+def get_data_salesData():
+    # ... lógica de busca no banco ...
+    df = pd.read_sql_query(text(query), conn)
+    # ...
+    # Adiciona ícones ao Farol Status para exibição
+    df = process_farol_status_for_display(df)
+    return df
+```
+
+**2. Opções do Dropdown (Edição)**
+- **Onde**: `shipments_mapping.py`
+- **Como**: A função `drop_downs` formata as opções do dropdown do `Farol Status` usando `get_display_from_status`. Isso faz com que a lista de seleção na grade também contenha os ícones, permitindo que os valores correspondam.
+
+```python
+# Em shipments_mapping.py -> drop_downs()
+"Farol Status": [get_display_from_status(s) for s in df_udc[...].tolist()],
+```
+
+**3. Salvamento dos Dados (Gravação)**
+- **Onde**: `shipments.py`
+- **Como**: No laço que detecta alterações na grade, há uma verificação específica para a coluna `Farol Status`. A função `clean_farol_status_value` é usada para remover o ícone do valor antigo e do novo valor antes que a alteração seja registrada e enviada para o banco de dados.
+
+```python
+# Em shipments.py -> exibir_shipments()
+if col == "Farol Status":
+    from_status = clean_farol_status_value(old_val)
+    to_status = clean_farol_status_value(new_val)
+    # ...
+    changes.append({
+        # ...
+        "Previous Value": from_status, # Valor limpo
+        "New Value": to_status,       # Valor limpo
+        # ...
+    })
+```
+
+
 ## 🧩 Módulos do Sistema
 
 ### 🔄 `voyage_update.py`

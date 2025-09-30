@@ -157,7 +157,7 @@ def drop_downs(data_show, df_udc):
         "Mode": df_udc[df_udc["grupo"] == "Mode"]["dado"].dropna().unique().tolist(),
         "SKU": df_udc[df_udc["grupo"] == "Sku"]["dado"].dropna().unique().tolist(),
         "VIP PNL Risk": df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist(),
-        "Farol Status": df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist(),
+        "Farol Status": [get_display_from_status(s) for s in df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().unique().tolist()],
 
         # Booking Management
         "Booking Status": df_udc[df_udc["grupo"] == "Booking Status"]["dado"].dropna().unique().tolist(),
@@ -351,3 +351,68 @@ def drop_downs(data_show, df_udc):
 def get_reverse_mapping():
     column_mapping = get_column_mapping()
     return {v: k for k, v in column_mapping.items()}
+
+# --- Bloco de Funções para Ícones do Farol Status ---
+
+def get_farol_status_icons():
+    """Retorna o dicionário que mapeia o status do Farol para um ícone."""
+    return {
+        "New Request": "🆕",
+        "Booking Requested": "📋",
+        "Received from Carrier": "📨",
+        "Booking Under Review": "🔍",
+        "Adjustment Requested": "✏️",
+        "Booking Approved": "✅",
+        "Booking Cancelled": "❌",
+        "Booking Rejected": "🚫",
+    }
+
+def get_icon_only(status: str) -> str:
+    """Retorna apenas o ícone para um determinado status."""
+    icons = get_farol_status_icons()
+    # Limpa o status para garantir a correspondência
+    clean_status = get_status_from_display(status)
+    return icons.get(clean_status, "⚫")
+
+def get_display_from_status(status: str) -> str:
+    """Adiciona o ícone a uma string de status limpa."""
+    if not isinstance(status, str) or not status:
+        return status
+    icon = get_icon_only(status)
+    # Evita adicionar ícone se já tiver um
+    if not status.startswith(icon):
+        return f"{icon} {status}"
+    return status
+
+def get_status_from_display(display_status: str) -> str:
+    """Remove o ícone de uma string de status formatada."""
+    if not isinstance(display_status, str) or not display_status:
+        return display_status
+    
+    icons = get_farol_status_icons()
+    # Itera sobre os ícones para encontrar e remover o prefixo
+    for icon in icons.values():
+        if display_status.startswith(icon):
+            return display_status.replace(f"{icon} ", "").strip()
+    return display_status
+
+# Alias para consistência com o guia
+clean_farol_status_value = get_status_from_display
+
+def get_farol_status_with_icons() -> list:
+    """Retorna uma lista de status formatados com ícones."""
+    # Esta função agora pode ser usada para popular dropdowns
+    icons = get_farol_status_icons()
+    return [f"{icon} {status}" for status, icon in icons.items()]
+
+def process_farol_status_for_display(df: pd.DataFrame) -> pd.DataFrame:
+    """Aplica a formatação com ícones na coluna 'Farol Status' de um DataFrame."""
+    if "Farol Status" in df.columns:
+        df["Farol Status"] = df["Farol Status"].apply(get_display_from_status)
+    return df
+
+def process_farol_status_for_database(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove a formatação com ícones da coluna 'Farol Status' de um DataFrame."""
+    if "Farol Status" in df.columns:
+        df["Farol Status"] = df["Farol Status"].apply(get_status_from_display)
+    return df

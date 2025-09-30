@@ -4,9 +4,8 @@ import os
 import streamlit as st
 from sqlalchemy import create_engine, text
 import pandas as pd
-from shipments_mapping import get_column_mapping
+from shipments_mapping import get_column_mapping, get_reverse_mapping, process_farol_status_for_display
 from datetime import datetime
-from shipments_mapping import get_reverse_mapping
 import uuid
  
 # Data e hora atuais
@@ -360,6 +359,9 @@ def get_data_salesData():
             "Comments Sales"
         ]]
  
+        # Adiciona ícones ao Farol Status para exibição
+        df = process_farol_status_for_display(df)
+
         return df
     finally:
         if conn:
@@ -467,6 +469,9 @@ def get_data_bookingData():
             "Comments Booking"
         ]]
  
+        # Adiciona ícones ao Farol Status para exibição
+        df = process_farol_status_for_display(df)
+
         return df
     finally:
         if conn:
@@ -508,6 +513,9 @@ def get_data_loadingData():
             "Container Release Issue Responsibility", "Quantity Containers Released Different Shore",
             "Shore Container Release Different"]]
  
+        # Adiciona ícones ao Farol Status para exibição
+        df = process_farol_status_for_display(df)
+
         return df
     finally:
         if conn:

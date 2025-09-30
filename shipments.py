@@ -19,7 +19,7 @@ from database import (
 )
  
 # Importa funções auxiliares de mapeamento e formulários
-from shipments_mapping import  non_editable_columns, drop_downs
+from shipments_mapping import  non_editable_columns, drop_downs, clean_farol_status_value, process_farol_status_for_database
 from shipments_new import show_add_form
 from shipments_split import show_split_form
 from booking_new import show_booking_management_form
@@ -449,10 +449,19 @@ def exibir_shipments():
                 if pd.isna(original_row[col]) and pd.isna(row[col]):
                     continue
                 if original_row[col] != row[col]:
-                    # Verifica se a alteração é proibida para 'Farol Status'
+                    old_val = original_row[col]
+                    new_val = row[col]
+
+                    # Se a coluna for 'Farol Status', limpa os valores antes de registrar a mudança
+                    # e realiza a verificação de status bloqueado com os valores limpos.
                     if col == "Farol Status":
-                        from_status = original_row[col]
-                        to_status = row[col]
+                        from_status = clean_farol_status_value(old_val)
+                        to_status = clean_farol_status_value(new_val)
+                        
+                        # Atualiza os valores para registrar a versão limpa
+                        old_val = from_status
+                        new_val = to_status
+
                         if (
                             from_status == "Adjustment Requested" and to_status != "Adjustment Requested"
                         ) or (
@@ -460,11 +469,12 @@ def exibir_shipments():
                         ):
                             status_blocked = True
                             status_blocked_message = "⚠️ Status 'Adjustment Requested' cannot be changed directly. Use the adjustments module to request changes."
+                    
                     changes.append({
                         'Farol Reference': row.get(farol_ref_col, index),
                         "Column": col,
-                        "Previous Value": original_row[col],
-                        "New Value": row[col],
+                        "Previous Value": old_val,
+                        "New Value": new_val,
                         "Stage": "Sales Data"
                     })
         if status_blocked:
