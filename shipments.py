@@ -452,14 +452,14 @@ def exibir_shipments():
     st.caption(f"Mostrando {len(edited_df)} de {total_records} registros")
 
     # --- BOTÕES DE NAVEGAÇÃO DA PAGINAÇÃO ---
-    nav_cols = st.columns(5)
-    with nav_cols[0]:
+    prev_col, mid_col, next_col = st.columns([1, 8, 1])
+    with prev_col:
         if st.button("⬅️ Previous", disabled=(st.session_state.shipments_current_page <= 1)):
             st.session_state.shipments_current_page -= 1
             st.rerun()
-    with nav_cols[2]:
+    with mid_col:
         st.caption(f"Page {st.session_state.shipments_current_page} of {total_pages}")
-    with nav_cols[4]:
+    with next_col:
         if st.button("Next ➡️", disabled=(st.session_state.shipments_current_page >= total_pages)):
             st.session_state.shipments_current_page += 1
             st.rerun()
