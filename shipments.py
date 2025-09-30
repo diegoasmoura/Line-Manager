@@ -218,7 +218,8 @@ def exibir_shipments():
     k1, k2, k3, k4 = st.columns(4)
 
     if "Farol Status" in df.columns:
-        status_series = df["Farol Status"].astype(str).str.strip().str.lower()
+        # Limpa os ícones da série de status antes de fazer a contagem
+        status_series = df["Farol Status"].astype(str).apply(clean_farol_status_value).str.strip().str.lower()
         booking_requested = int((status_series == "booking requested").sum())
         # valor base (fallback) a partir da grade
         received_from_carrier = int((status_series == "received from carrier").sum())
