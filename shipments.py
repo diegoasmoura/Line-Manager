@@ -307,6 +307,10 @@ def exibir_shipments():
 
     # Reordena colunas e posiciona "Carrier Returns" após "Farol Status"
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
+
+    # Remove a coluna de contagem bruta para evitar duplicidade na exibição
+    if "Carrier Returns" in colunas_ordenadas:
+        colunas_ordenadas.remove("Carrier Returns")
     
     # Posiciona "Carrier Returns Status" após "Farol Status"
     if "Carrier Returns Status" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
