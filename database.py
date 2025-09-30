@@ -206,6 +206,21 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
         df = pd.DataFrame([dict(r) for r in rows]) if rows else pd.DataFrame()
         if not df.empty:
             df.columns = [str(c).upper() for c in df.columns]
+            
+            # Converter colunas de data/hora para datetime
+            datetime_columns = [
+                'B_DATA_DRAFT_DEADLINE', 'B_DATA_DEADLINE', 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
+                'B_DATA_ESTIMATIVA_CHEGADA_ETA', 'B_DATA_ABERTURA_GATE', 'B_DATA_CONFIRMACAO_EMBARQUE',
+                'B_DATA_PARTIDA_ATD', 'B_DATA_ESTIMADA_TRANSBORDO_ETD', 'B_DATA_CHEGADA_ATA', 
+                'B_DATA_TRANSBORDO_ATD', 'B_DATA_ESTIMATIVA_ATRACACAO_ETB', 'B_DATA_ATRACACAO_ATB',
+                'S_REQUESTED_DEADLINE_START_DATE', 'S_REQUESTED_DEADLINE_END_DATE', 
+                'S_REQUIRED_ARRIVAL_DATE_EXPECTED', 'ROW_INSERTED_DATE', 'PDF_BOOKING_EMISSION_DATE'
+            ]
+            
+            for col in datetime_columns:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                    
         return df
     finally:
         conn.close()
@@ -421,7 +436,8 @@ def get_data_bookingData():
             'data_draft_deadline', 'data_deadline', 'data_estimativa_saida', 
             'data_estimativa_chegada', 'data_abertura_gate', 'data_confirmacao_embarque',
             'data_partida', 'data_estimada_transbordo', 'data_chegada', 
-            'data_transbordo', 'data_estimativa_atracacao', 'data_atracacao'
+            'data_transbordo', 'data_estimativa_atracacao', 'data_atracacao',
+            'data_required_arrival_expected', 'data_requested_deadline_start', 'data_requested_deadline_end'
         ]
         
         for col in datetime_columns:

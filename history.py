@@ -1330,8 +1330,8 @@ def exibir_history():
                 width = "medium"  # Todas as outras colunas são medium
             
             # Determina o tipo de coluna baseado no nome
-            if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate", "atd", "ata", "etb", "atb"]):
-                config[col] = st.column_config.DatetimeColumn(col, width=width)
+            if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate", "atd", "ata", "etb", "atb", "required", "arrival", "expected"]):
+                config[col] = st.column_config.DatetimeColumn(col, format="DD/MM/YYYY HH:mm", width=width)
             elif col in ["Quantity of Containers"]:
                 config[col] = st.column_config.NumberColumn(col, width=width)
             else:
@@ -1374,21 +1374,10 @@ def exibir_history():
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
-            "B_DATA_ABERTURA_GATE": "Abertura Gate",
-            "B_DATA_CONFIRMACAO_EMBARQUE": "Confirmação Embarque",
-            "B_DATA_ESTIMADA_TRANSBORDO_ETD": "Estimada Transbordo (ETD)",
-            "B_DATA_TRANSBORDO_ATD": "Transbordo (ATD)",
             "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",
-            "B_DATA_DRAFT_DEADLINE": "Draft Deadline",
-            "B_DATA_DEADLINE": "Deadline",
-            "S_REQUESTED_DEADLINE_START_DATE": "Requested Deadline Start",
-            "S_REQUESTED_DEADLINE_END_DATE": "Requested Deadline End",
-            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": "Required Arrival Expected",
-            "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
-            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
             "B_VOYAGE_CODE": "Voyage Code",
             "B_VESSEL_NAME": "Vessel Name",
             "B_VOYAGE_CARRIER": "Voyage Carrier",
@@ -1396,6 +1385,42 @@ def exibir_history():
             "B_TERMINAL": "Port Terminal City",
             "S_PORT_OF_LOADING_POL": "Port of Loading POL",
             "S_PORT_OF_DELIVERY_POD": "Port of Delivery POD",
+            "S_PLACE_OF_RECEIPT": "Place of Receipt",
+            "S_FINAL_DESTINATION": "Final Destination",
+            
+            # Mapeamento para colunas padronizadas com data_ prefix
+            "data_required_arrival_expected": "Required Arrival Expected",
+            "data_requested_deadline_start": "Requested Deadline Start",
+            "data_requested_deadline_end": "Requested Deadline End",
+            "data_draft_deadline": "Draft Deadline",
+            "data_deadline": "Deadline",
+            "data_estimativa_saida": "ETD",
+            "data_estimativa_chegada": "ETA",
+            "data_abertura_gate": "Abertura Gate",
+            "data_confirmacao_embarque": "Confirmação Embarque",
+            "data_estimada_transbordo": "Estimada Transbordo (ETD)",
+            "data_transbordo": "Transbordo (ATD)",
+            "data_estimativa_atracacao": "Estimativa Atracação (ETB)",
+            "data_atracacao": "Atracação (ATB)",
+            "data_partida": "Partida (ATD)",
+            "data_chegada": "Chegada (ATA)",
+            
+            # Mapeamento para colunas antigas (compatibilidade)
+            "B_DATA_ABERTURA_GATE": "Abertura Gate",
+            "B_DATA_CONFIRMACAO_EMBARQUE": "Confirmação Embarque",
+            "B_DATA_ESTIMADA_TRANSBORDO_ETD": "Estimada Transbordo (ETD)",
+            "B_DATA_TRANSBORDO_ATD": "Transbordo (ATD)",
+            "B_DATA_DRAFT_DEADLINE": "Draft Deadline",
+            "B_DATA_DEADLINE": "Deadline",
+            "S_REQUESTED_DEADLINE_START_DATE": "Requested Deadline Start",
+            "S_REQUESTED_DEADLINE_END_DATE": "Requested Deadline End",
+            "S_REQUIRED_ARRIVAL_DATE_EXPECTED": "Required Arrival Expected",
+            "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
+            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA",
+            "B_DATA_ESTIMATIVA_ATRACACAO_ETB": "Estimativa Atracação (ETB)",
+            "B_DATA_ATRACACAO_ATB": "Atracação (ATB)",
+            "B_DATA_PARTIDA_ATD": "Partida (ATD)",
+            "B_DATA_CHEGADA_ATA": "Chegada (ATA)",
         }
 
         # Aplica aliases ao DataFrame
@@ -1518,8 +1543,10 @@ def exibir_history():
             "Chegada (ATA)", "Transbordo (ATD)", "Estimativa Atracação (ETB)", "Atracação (ATB)",
             "PDF Booking Emission Date"
         ]
+        
         for col in date_cols:
             if col in df_processed.columns:
+                # Converte para datetime - deixa o Streamlit fazer a formatação
                 df_processed[col] = pd.to_datetime(df_processed[col], errors='coerce')
 
         # Ordena por Inserted Date e, dentro do mesmo dia/hora, por raiz e sufixo da Farol Reference
@@ -1989,17 +2016,17 @@ def exibir_history():
                                     'terminal': 'Terminal',
                                     'cnpj_terminal': 'Terminal CNPJ',
                                     'agencia': 'Agência',
-                                    'data_deadline': 'data_deadline',
-                                    'data_draft_deadline': 'data_draft_deadline',
-                                    'data_abertura_gate': 'data_abertura_gate',
-                                    'data_abertura_gate_reefer': 'data_abertura_gate_reefer',
-                                    'data_estimativa_saida': 'data_estimativa_saida',
-                                    'data_estimativa_chegada': 'data_estimativa_chegada',
-                                    'data_estimativa_atracacao': 'data_estimativa_atracacao',
-                                    'data_atracacao': 'data_atracacao',
-                                    'data_partida': 'data_partida',
-                                    'data_chegada': 'data_chegada',
-                                    'data_atualizacao': 'data_atualizacao',
+                                    'data_deadline': 'Deadline',
+                                    'data_draft_deadline': 'Draft Deadline',
+                                    'data_abertura_gate': 'Abertura Gate',
+                                    'data_abertura_gate_reefer': 'Abertura Gate Reefer',
+                                    'data_estimativa_saida': 'ETD',
+                                    'data_estimativa_chegada': 'ETA',
+                                    'data_estimativa_atracacao': 'Estimativa Atracação (ETB)',
+                                    'data_atracacao': 'Atracação (ATB)',
+                                    'data_partida': 'Partida (ATD)',
+                                    'data_chegada': 'Chegada (ATA)',
+                                    'data_atualizacao': 'Data Atualização',
                                     'row_inserted_date': 'Inserted Date',
                                 }
                                 voyage_display = voyage_display.rename(columns=rename_map_voyage)
