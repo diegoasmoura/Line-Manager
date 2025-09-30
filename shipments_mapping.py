@@ -344,6 +344,45 @@ def drop_downs(data_show, df_udc):
             )
 
     return column_config
+
+def get_display_names():
+    """Retorna o mapeamento de nomes internos para nomes amigáveis de exibição"""
+    return {
+        # Sales Data
+        "data_sales_order": "Sales Order Date",
+        "data_requested_deadline_start": "Requested Deadline Start",
+        "data_requested_deadline_end": "Requested Deadline End",
+        "data_shipment_period_start": "Shipment Period Start",
+        "data_shipment_period_end": "Shipment Period End",
+        "data_required_arrival_expected": "Required Arrival Expected",
+        "data_lc_received": "LC Received",
+        "data_allocation": "Allocation Date",
+        "data_producer_nomination": "Producer Nomination",
+        
+        # Booking Management
+        "data_booking_request": "Booking Request Date",
+        "data_booking_confirmation": "Booking Confirmation Date",
+        "data_draft_deadline": "Draft Deadline",
+        "data_deadline": "Deadline",
+        "data_estimativa_saida": "ETD",
+        "data_estimativa_chegada": "ETA",
+        "data_abertura_gate": "Abertura Gate",
+        "data_confirmacao_embarque": "Confirmação Embarque",
+        "data_partida": "Partida (ATD)",
+        "data_estimada_transbordo": "Estimada Transbordo (ETD)",
+        "data_chegada": "Chegada (ATA)",
+        "data_transbordo": "Transbordo (ATD)",
+        "data_estimativa_atracacao": "Estimativa Atracação (ETB)",
+        "data_atracacao": "Atracação (ATB)",
+        
+        # Loading Data
+        "data_expected_truck_load_start": "Expected Truck Load Start",
+        "data_expected_truck_load_end": "Expected Truck Load End",
+        "data_actual_truck_load": "Actual Truck Load",
+        "data_expected_container_release_start": "Expected Container Release Start",
+        "data_expected_container_release_end": "Expected Container Release End",
+        "data_actual_container_release": "Actual Container Release"
+    }
  
  
  

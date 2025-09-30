@@ -2951,6 +2951,32 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v3.9.16 - Setembro 2025 - Melhorias nos Filtros Avançados**
+
+**✨ Novas Funcionalidades:**
+- **Nomes Amigáveis**: Filtros agora mostram nomes de colunas como aparecem na tabela (ex: "Sales Order Date" em vez de "data_sales_order")
+- **Ordem Consistente**: Opções de filtro seguem a mesma ordem das colunas na tabela
+- **Interface Melhorada**: Coluna "Select" removida das opções de filtro
+- **Tratamento de Erros**: Corrigido erro de slider quando min_val = max_val
+
+**🔧 Implementação Técnica:**
+
+1. **`shipments_mapping.py`** → Nova função `get_display_names()`:
+   - Mapeamento de nomes internos para nomes amigáveis de exibição
+   - Suporte para Sales Data, Booking Management e Loading Data
+
+2. **`shipments.py`** → `aplicar_filtros_interativos()`:
+   - Filtros aplicados APÓS reordenação das colunas
+   - Uso de nomes amigáveis na interface
+   - Tratamento especial para colunas com valor único
+   - Remoção da coluna "Select" das opções
+
+**📋 Resultado:**
+- **Filtros intuitivos** com nomes legíveis
+- **Ordem consistente** entre tabela e filtros
+- **Interface limpa** sem colunas desnecessárias
+- **Sem erros** de slider ou interface
+
 ### 🔧 **v3.9.15 - Setembro 2025 - Ordenação da Grade Principal por Farol Reference**
 
 **✨ Nova Funcionalidade:**

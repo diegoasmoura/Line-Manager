@@ -27,40 +27,66 @@ from history import exibir_history
  
  
 # Função para aplicar filtros avançados interativos no DataFrame
-def aplicar_filtros_interativos(df):
+def aplicar_filtros_interativos(df, colunas_ordenadas):
     # Inicializa o estado da expansão, se não existir
     if "expander_filtros_aberto" not in st.session_state:
         st.session_state["expander_filtros_aberto"] = False
  
     with st.expander(" Advanced Filters (optional)", expanded=st.session_state["expander_filtros_aberto"]):
  
+        # Remove "Select" das opções de filtro
+        colunas_disponiveis = [col for col in colunas_ordenadas if col != "Select"]
+        
+        # Importa o mapeamento de nomes de exibição
+        from shipments_mapping import get_display_names
+        display_names = get_display_names()
+        
+        # Cria opções com nomes amigáveis para exibição mantendo a ordem da tabela
+        opcoes_filtro = []
+        for col in colunas_disponiveis:
+            nome_amigavel = display_names.get(col, col)
+            opcoes_filtro.append((nome_amigavel, col))  # (nome_exibido, nome_interno)
+        
+        # Mantém a ordem da tabela (não ordena alfabeticamente)
+        
         colunas_filtradas = st.multiselect(
             "Columns to filter:",
-            df.columns.tolist(),
+            options=[opcao[0] for opcao in opcoes_filtro],  # Mostra nomes amigáveis
             default=[],
             key="colunas_filtradas_filtros"
         )
+        
+        # Converte nomes amigáveis de volta para nomes internos
+        nome_para_interno = {opcao[0]: opcao[1] for opcao in opcoes_filtro}
+        colunas_filtradas_internas = [nome_para_interno[nome] for nome in colunas_filtradas]
         filtros = {}
  
  
-        for col in colunas_filtradas:
+        for col in colunas_filtradas_internas:
             col_data = df[col]
+            # Obtém o nome amigável para exibição
+            nome_amigavel = display_names.get(col, col)
  
             if col_data.dtype == "object":
                 unique_vals = sorted(col_data.dropna().unique().tolist())
-                filtros[col] = st.multiselect(f"Filter {col}", unique_vals, default=unique_vals, key=f"{col}_multiselect")
+                filtros[col] = st.multiselect(f"Filter {nome_amigavel}", unique_vals, default=unique_vals, key=f"{col}_multiselect")
  
             elif pd.api.types.is_numeric_dtype(col_data):
                 min_val, max_val = int(col_data.min()), int(col_data.max())
-                filtros[col] = st.slider(f"{col} between", min_val, max_val, (min_val, max_val), key=f"{col}_slider")
+                # Evita erro quando min_val = max_val
+                if min_val == max_val:
+                    st.write(f"**{nome_amigavel}**: {min_val} (valor único)")
+                    filtros[col] = (min_val, max_val)
+                else:
+                    filtros[col] = st.slider(f"{nome_amigavel} between", min_val, max_val, (min_val, max_val), key=f"{col}_slider")
  
             elif pd.api.types.is_bool_dtype(col_data):
-                filtros[col] = st.radio(f"Include {col}?", ["All", True, False], horizontal=True, key=f"{col}_radio")
+                filtros[col] = st.radio(f"Include {nome_amigavel}?", ["All", True, False], horizontal=True, key=f"{col}_radio")
  
             elif pd.api.types.is_datetime64_any_dtype(col_data):
                 min_date = col_data.min().date()
                 max_date = col_data.max().date()
-                selected_range = st.date_input(f"Period for {col}", value=(min_date, max_date), key=f"{col}_date")
+                selected_range = st.date_input(f"Period for {nome_amigavel}", value=(min_date, max_date), key=f"{col}_date")
                 if isinstance(selected_range, (tuple, list, pd.DatetimeIndex)):
                     srange = list(selected_range)
                 else:
@@ -224,9 +250,7 @@ def exibir_shipments():
     else:
         st.session_state["previous_stage"] = choose
  
-    df = aplicar_filtros_interativos(df)
-
-    # KPIs abaixo do título, após filtros e antes da grid
+    # KPIs abaixo do título, antes da grid
     k1, k2, k3, k4 = st.columns(4)
 
     if "Farol Status" in df.columns:
@@ -393,6 +417,9 @@ def exibir_shipments():
         for i, col in enumerate(specific_order):
             if col in df.columns:
                 colunas_ordenadas.insert(insert_position + i, col)
+
+    # Aplica filtros avançados APÓS a reordenação das colunas
+    df = aplicar_filtros_interativos(df, colunas_ordenadas)
 
     # Fixar largura da coluna Carrier Returns Status aproximadamente ao tamanho do título
     if "Carrier Returns Status" in colunas_ordenadas:
