@@ -487,18 +487,6 @@ if col == "Farol Status":
 
 ## 🧩 Módulos do Sistema
 
-### 🔄 `voyage_update.py`
-**Módulo de Atualização Manual de Datas de Viagem**
-- **Dados Sempre Atuais**: A tela não utiliza cache e consulta o banco de dados a cada carregamento, garantindo que os dados exibidos são sempre um reflexo em tempo real do sistema.
-- **Filtro de Relevância**: Por padrão, a grade exibe apenas viagens que possuem pelo menos uma `Farol Reference` associada (`INNER JOIN`), ocultando monitoramentos antigos ou não relacionados.
-- **Interface Intuitiva**: Tela dedicada para visualização do último status de cada viagem, com filtros por navio e terminal.
-- **Edição em Grade**: Permite a edição de datas (ETD, ETA, Deadline, etc.) diretamente na grade, de forma ágil como em uma planilha.
-- **Detalhes do Booking**: A visão de "Ver Refs" foi enriquecida para incluir datas importantes do ciclo de vida do booking (`Shipment Creation`, `Booking Creation`, `Booking Request Date`), oferecendo um contexto mais completo.
-- **Salvar em Lote**: Um único botão "Salvar Alterações" processa todas as modificações feitas na tela de uma só vez.
-- **Lógica de Atualização Transacional**: Ao salvar, o sistema executa uma transação segura que:
-  1.  **Insere um novo estado** na tabela `F_ELLOX_TERMINAL_MONITORINGS` com as datas atualizadas.
-  2.  **Atualiza os registros principais** na tabela `F_CON_SALES_BOOKING_DATA`, propagando a nova data para todas as `Farol References` associadas à viagem.
-- **Auditoria Completa**: Cada alteração é registrada na nova tabela `LogTransp.F_CON_VOYAGE_MANUAL_UPDATES`, garantindo um histórico completo de quem alterou, o quê, e quando.
 
 ### 📦 `shipments.py`
 **Módulo principal** de gestão de embarques
@@ -1021,19 +1009,17 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - Análise de tendências
 
 ### 🔍 `tracking.py`
-**Sistema de Tracking via API Ellox**
-- Interface completa para rastreamento de navios em tempo real
-- Integração com API Ellox da Comexia
-- Busca manual por navio, carrier e voyage
-- Tracking automático de bookings existentes no banco
-- Consulta de cronogramas de navios
-- Status visual da conectividade da API
-- Configuração interativa de credenciais
-- Aba "🔔 Monitoramento" com subtabs:
-  - "📝 Solicitar Monitoramento": POST `/api/monitor/navio` e `/api/monitor/shipowner`
-  - "👁️ Visualizar Monitoramento": POST `/api/terminalmonitorings` e `/api/shipownermonitorings`
-- Formatação e validação de CNPJ; checagem prévia de existência (`check_company_exists`)
-- Autenticação automática (sem chave manual no sidebar) e indicador 🟢/🟡/🔴
+**Sistema de Atualização Manual de Datas de Viagem**
+- **Dados Sempre Atuais**: A tela não utiliza cache e consulta o banco de dados a cada carregamento, garantindo que os dados exibidos são sempre um reflexo em tempo real do sistema.
+- **Filtro de Relevância**: Por padrão, a grade exibe apenas viagens que possuem pelo menos uma `Farol Reference` associada (`INNER JOIN`), ocultando monitoramentos antigos ou não relacionados.
+- **Interface Intuitiva**: Tela dedicada para visualização do último status de cada viagem, com filtros por navio e terminal.
+- **Edição em Grade**: Permite a edição de datas (ETD, ETA, Deadline, etc.) diretamente na grade, de forma ágil como em uma planilha.
+- **Detalhes do Booking**: A visão de "Ver Refs" foi enriquecida para incluir datas importantes do ciclo de vida do booking (`Shipment Creation`, `Booking Creation`, `Booking Request Date`), oferecendo um contexto mais completo.
+- **Salvar em Lote**: Um único botão "Salvar Alterações" processa todas as modificações feitas na tela de uma só vez.
+- **Lógica de Atualização Transacional**: Ao salvar, o sistema executa uma transação segura que:
+  1.  **Insere um novo estado** na tabela `F_ELLOX_TERMINAL_MONITORINGS` com as datas atualizadas.
+  2.  **Atualiza os registros principais** na tabela `F_CON_SALES_BOOKING_DATA`, propagando a nova data para todas as `Farol References` associadas à viagem.
+- **Auditoria Completa**: Cada alteração é registrada na nova tabela `LogTransp.F_CON_VOYAGE_MANUAL_UPDATES`, garantindo um histórico completo de quem alterou, o quê, e quando.
 
 ### 🚢 `ellox_api.py`
 **Cliente da API Ellox**
@@ -1254,7 +1240,7 @@ A coluna `DATA_SOURCE` foi adicionada para rastrear a origem dos dados de monito
 
 Os dados extraídos pelos arquivos Ellox são utilizados em:
 
-1. **Tracking de Navios** (`tracking.py`)
+1. **Atualização Manual de Datas de Viagem** (`tracking.py`)
 2. **Voyage Monitoring** (`voyage_monitoring.py`)
 3. **Processamento de PDFs** (`pdf_booking_processor.py`)
 4. **Histórico de Viagens** (`history.py`)
@@ -2632,6 +2618,13 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **📋 Estrutura de Abas Preparada**: Mantida estrutura de abas com uma aba atual para futuras expansões
 - **✨ Interface Mais Limpa**: Foco nas funcionalidades principais (testes de conexão e formulários de credenciais)
 
+### 📌 v3.9.17 - Reorganização do Menu e Consolidação de Funcionalidades (Janeiro 2025)
+- **🗂️ Remoção da Opção "Voyage Update"**: Removida opção separada do menu lateral para simplificar a navegação
+- **🔄 Consolidação de Funcionalidades**: Funcionalidades de atualização manual de datas de viagem agora integradas ao módulo Tracking
+- **📝 Migração de Código**: Movidas todas as funcionalidades do `voyage_update.py` para o `tracking.py`
+- **🗑️ Limpeza de Arquivos**: Removido arquivo `voyage_update.py` após migração completa
+- **📚 Documentação Atualizada**: README.md atualizado para refletir a nova estrutura do sistema
+
 ### 📌 v3.9.16 - Correção de Navegação do Menu Shipments (Janeiro 2025)
 - **🔄 Reset de Estado do Menu**: Corrigido problema onde a tela Shipments ficava em branco ao navegar de outros menus
 - **🎯 Lógica de Navegação**: Ajustado `current_page` para usar valor correto (`"main"`) que o módulo shipments espera
@@ -2652,8 +2645,8 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 
 ### 📌 v3.9.12 - Módulo de Atualização Manual de Viagens (Setembro 2025)
-- **🚢 Nova Tela "Voyage Update"**: Adicionada uma nova tela ao menu principal para permitir a atualização manual de datas de viagens (ETD, ETA, Deadlines, etc.).
-- **✏️ Edição Direta na Grade**: A nova interface permite que os usuários editem as datas diretamente na tabela, de forma rápida e intuitiva, como em uma planilha.
+- **🚢 Funcionalidade de Atualização de Viagens**: Implementada funcionalidade para permitir a atualização manual de datas de viagens (ETD, ETA, Deadlines, etc.) integrada ao módulo Tracking.
+- **✏️ Edição Direta na Grade**: A interface permite que os usuários editem as datas diretamente na tabela, de forma rápida e intuitiva, como em uma planilha.
 - **⚙️ Lógica de Atualização em Massa**: Ao salvar, o sistema atualiza a data correspondente em todos os registros da `F_CON_SALES_BOOKING_DATA` associados àquela viagem.
 - **🗄️ Auditoria de Alterações**: Criada a tabela `F_CON_VOYAGE_MANUAL_UPDATES` para registrar um log detalhado de toda e qualquer alteração manual de data, garantindo total rastreabilidade.
 - **🔄 Inserção de Histórico de Monitoramento**: Cada atualização manual também gera um novo registro de estado na tabela `F_ELLOX_TERMINAL_MONITORINGS`.
@@ -2995,7 +2988,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - Remoção da validação "navio pertence ao carrier" na confirmação de PDF
 - Campo "Voyage do Navio" simplificado para texto com sugestões por API
 - Cache de listas com TTL de 300s em `load_ships_from_database` e `load_terminals_from_database`
-- Novas abas de Monitoramento no `tracking.py` (solicitar/visualizar, terminal e shipowner)
+- Migração das funcionalidades de `voyage_update.py` para `tracking.py` (atualização manual de datas de viagem)
 - Novos módulos: `ellox_data_extractor.py`, `ellox_data_queries.py`, `setup_ellox_database.py`
 - Novas tabelas locais Ellox: `F_ELLOX_TERMINALS`, `F_ELLOX_SHIPS`, `F_ELLOX_VOYAGES`, `F_ELLOX_CARRIERS`
 - Correções de API: base URL `apidtz`, payload de auth com `senha`, endpoint de voyages
