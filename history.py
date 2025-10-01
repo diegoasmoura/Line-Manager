@@ -2034,7 +2034,7 @@ def exibir_history():
                                     for change in changes:
                                         st.markdown(f"""
                                         <div style="padding: 0.5rem; margin: 0.25rem 0; border-left: 3px solid #1f77b4; background-color: #f8f9fa;">
-                                            <strong>Alteração de {change['field']}</strong> de <em>{change['from']}</em> para <em>{change['to']}</em><br>
+                                            <strong>Alteração de {change['field']}</strong> de <span style="color: #e74c3c; font-weight: 600; background-color: #fdf2f2; padding: 2px 6px; border-radius: 4px;">{change['from']}</span> para <span style="color: #27ae60; font-weight: 600; background-color: #f0f9f0; padding: 2px 6px; border-radius: 4px;">{change['to']}</span><br>
                                             <small>Origem: {change['source']} | Atualizado em {change['updated_at']}</small>
                                         </div>
                                         """, unsafe_allow_html=True)

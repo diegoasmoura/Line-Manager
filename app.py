@@ -63,6 +63,14 @@ with st.sidebar:
     # Atualiza o estado do menu se houve mudança
     if choice != st.session_state.menu_choice:
         st.session_state.menu_choice = choice
+        # Reset do estado quando muda de menu
+        if choice == "Shipments":
+            # Limpa estados específicos do Shipments para voltar à primeira tela
+            for key in ["shipments_data", "original_data", "changes", "grid_update_key"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            # Força reset para primeira página (main = tela principal do shipments)
+            st.session_state["current_page"] = "main"
 
 # Usa o estado do menu para determinar qual página exibir
 if st.session_state.menu_choice == "Shipments":

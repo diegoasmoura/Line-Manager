@@ -2565,6 +2565,12 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.16 - Correção de Navegação do Menu Shipments (Janeiro 2025)
+- **🔄 Reset de Estado do Menu**: Corrigido problema onde a tela Shipments ficava em branco ao navegar de outros menus
+- **🎯 Lógica de Navegação**: Ajustado `current_page` para usar valor correto (`"main"`) que o módulo shipments espera
+- **🧹 Limpeza Seletiva**: Implementada limpeza apenas de estados desnecessários, preservando funcionalidade do módulo
+- **✅ Navegação Fluida**: Agora ao alternar entre menus e voltar para Shipments, a tela principal carrega corretamente
+
 ### 📌 v3.9.14 - Correções de Interface e Validação da API (Janeiro 2025)
 - **🎨 Alinhamento de Campos**: Corrigido desalinhamento dos campos de data e hora no formulário manual de voyage monitoring, restaurando a estrutura original do commit `ee2ed356`
 - **🔧 Validação da API Melhorada**: Função `validate_and_collect_voyage_monitoring` agora sempre consulta a API para validação, mesmo quando `save_to_db=False`, retornando mensagens específicas baseadas no resultado
@@ -2991,6 +2997,32 @@ Todos os PRs passam por revisão técnica focando em:
 - **Manutenibilidade**: O código é fácil de manter?
 
 ## 📋 Changelog
+
+### 🔧 **v3.9.16 - Janeiro 2025 - Correção de Navegação do Menu Shipments**
+
+**🐛 Problema Corrigido:**
+- Tela Shipments ficava em branco ao navegar de outros menus
+- Causa: `current_page` definido incorretamente como `"shipments"` em vez de `"main"`
+
+**🔧 Implementação Técnica:**
+
+1. **`app.py`** → Lógica de reset do menu:
+   - Corrigido valor de `current_page` de `"shipments"` para `"main"`
+   - Removido `current_page` da lista de estados a serem limpos
+   - Mantida limpeza apenas de estados desnecessários
+
+2. **Lógica do Módulo Shipments:**
+   - `current_page = "main"` → Exibe tela principal (`exibir_shipments()`)
+   - `current_page = "add"` → Exibe formulário de adição
+   - `current_page = "split"` → Exibe formulário de split
+   - `current_page = "booking"` → Exibe formulário de booking
+   - `current_page = "history"` → Exibe histórico
+
+**📋 Resultado:**
+- **Navegação fluida** entre menus
+- **Tela principal** carrega corretamente ao voltar para Shipments
+- **Estados preservados** para funcionalidade do módulo
+- **Sem tela em branco** durante navegação
 
 ### 🔧 **v3.9.16 - Setembro 2025 - Melhorias nos Filtros Avançados**
 
