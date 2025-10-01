@@ -94,10 +94,16 @@ O sistema implementa **dois mecanismos distintos** de prevenção de duplicidade
 3. **Se não é duplicata exata** → **INSERIR** (permitir evolução temporal)
 4. **Se é duplicata exata** → **PULAR** (evitar duplicação)
 
+**Rastreamento de Origem**:
+- **`DATA_SOURCE='API'`**: Dados coletados automaticamente da API Ellox
+- **`DATA_SOURCE='MANUAL'`**: Dados preenchidos manualmente pelo usuário
+- **Interface**: Exibição clara na aba "Voyage Timeline" com ícone "✍️ Origem"
+
 **Vantagens**:
 - 🔗 **Compartilhamento**: Múltiplas Farol References podem usar os mesmos dados de monitoramento
 - 📊 **Eficiência**: Evita consultas desnecessárias à API Ellox
 - 🛡️ **Integridade**: Previne poluição da tabela com dados idênticos
+- 🔍 **Rastreabilidade**: Identifica origem dos dados (API vs Manual)
 - 📈 **Histórico**: Permite evolução temporal dos dados (ETD/ETA atualizados)
 
 **Comportamento**:
@@ -826,6 +832,7 @@ values["s_required_arrival_date_expected"] = st.date_input(...)
 #### 📅 Voyage Timeline
 - **Exibição do Histórico**: A tabela de histórico de monitoramento de uma viagem agora é exibida mesmo que haja apenas um registro. Anteriormente, a tabela só aparecia se houvesse mais de um registro.
 - **Expansível**: O histórico de cada viagem é apresentado dentro de um painel expansível (`expander`) para manter a interface limpa, mostrando o card principal com os dados mais recentes da viagem.
+- **Rastreamento de Origem**: Nova coluna "✍️ Origem" exibe se os dados foram coletados da API Ellox (`API`) ou preenchidos manualmente (`MANUAL`), posicionada na segunda coluna do resumo da viagem.
 
 #### Limitação de Interatividade em Formulários e Fluxo de Aprovação Manual
 
@@ -1199,7 +1206,26 @@ python setup_ellox_database.py --ships-sample 100
 - DATA_ATRACACAO
 - DATA_PARTIDA
 - ROW_INSERTED_DATE
+- DATA_SOURCE (Nova coluna - rastreia origem dos dados)
 ```
+
+**📊 Rastreamento de Origem dos Dados (`DATA_SOURCE`)**
+
+A coluna `DATA_SOURCE` foi adicionada para rastrear a origem dos dados de monitoramento:
+
+- **`'API'`**: Dados coletados automaticamente da API Ellox (Comexia)
+- **`'MANUAL'`**: Dados preenchidos manualmente pelo usuário através da interface
+
+**Benefícios**:
+- 🔍 **Rastreabilidade**: Identifica se os dados vieram da API ou foram inseridos manualmente
+- 📊 **Auditoria**: Facilita a análise da qualidade e origem dos dados
+- 🎯 **Interface**: Exibição clara na aba "Voyage Timeline" com ícone "✍️ Origem"
+- 🛡️ **Integridade**: Mantém histórico completo da origem dos dados
+
+**Implementação**:
+- **Backend**: Função `upsert_terminal_monitorings_from_dataframe()` atualizada com parâmetro `data_source`
+- **Frontend**: Coluna "✍️ Origem" exibida na segunda posição do resumo da viagem
+- **Compatibilidade**: Valor padrão `'MANUAL'` garante retrocompatibilidade
 
 ### 🔧 **Correções Implementadas**
 
@@ -2594,6 +2620,21 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🎯 Compatibilidade Total**: Sistema funciona tanto com usuários que têm permissão de criação no LogTransp quanto com usuários que só têm leitura/escrita
 - **⚡ Performance**: Eliminado erro de permissão que impedia funcionamento do sistema em ambientes corporativos
 - **🔧 Schema Detection**: Sistema detecta automaticamente o schema correto a usar baseado nas permissões disponíveis
+
+### 📌 v3.10.0 - Rastreamento de Origem dos Dados (Janeiro 2025)
+- **🔍 Nova Coluna DATA_SOURCE**: Implementada coluna `DATA_SOURCE` na tabela `F_ELLOX_TERMINAL_MONITORINGS` para rastrear origem dos dados
+- **📊 Valores Suportados**: 
+  - `'API'`: Dados coletados automaticamente da API Ellox (Comexia)
+  - `'MANUAL'`: Dados preenchidos manualmente pelo usuário
+- **🎯 Interface Atualizada**: Nova coluna "✍️ Origem" na aba "Voyage Timeline" posicionada na segunda coluna do resumo da viagem
+- **🛡️ Compatibilidade Garantida**: Valor padrão `'MANUAL'` mantém retrocompatibilidade com código existente
+- **🔧 Backend Atualizado**: Função `upsert_terminal_monitorings_from_dataframe()` modificada para aceitar parâmetro `data_source`
+- **📈 Benefícios**: 
+  - Rastreabilidade completa da origem dos dados
+  - Auditoria facilitada para análise de qualidade
+  - Interface mais informativa para usuários
+  - Histórico completo de origem dos dados
+- **✅ Auditoria Completa**: Todas as funcionalidades existentes preservadas, incluindo sistema de prevenção de duplicidade
 
 ### 📌 v3.9.9 - Sistema Ellox Otimizado (Janeiro 2025)
 - **🔧 Correção de Integridade**: Resolvido erro `ORA-02292` na exclusão de dados Ellox implementando ordem correta de exclusão (ships → voyages → terminals)

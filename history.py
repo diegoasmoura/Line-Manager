@@ -186,7 +186,7 @@ def get_voyage_monitoring_for_reference(farol_reference):
         # Só mostra registros que tenham vinculação com registros APROVADOS
         placeholders = ", ".join([f":vessel_{i}" for i in range(len(vessel_names))])
         monitoring_query = text(f"""
-            SELECT DISTINCT m.*, r.ROW_INSERTED_DATE as APROVACAO_DATE
+            SELECT DISTINCT m.DATA_SOURCE, m.*, r.ROW_INSERTED_DATE as APROVACAO_DATE
             FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
             INNER JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
                 UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME)
@@ -1835,11 +1835,17 @@ def exibir_history():
                         st.markdown(f"""
                         <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
                                    padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: center;">
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 0.1rem; text-transform: uppercase;">✅ Aprovado:</div>
                                     <div style="font-weight: 600; color: #27ae60; font-size: 0.85em;">
                                         {format_date_safe_brazil(latest_record.get('aprovacao_date'))}
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 0.1rem; text-transform: uppercase;">✍️ Origem:</div>
+                                    <div style="font-weight: 500; color: #34495e; font-size: 0.85em;">
+                                        {latest_record.get('DATA_SOURCE', latest_record.get('data_source', 'N/A'))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
@@ -2239,7 +2245,7 @@ def exibir_history():
                                             }
                                             
                                             df_monitoring = pd.DataFrame([monitoring_data])
-                                            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                                            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
                                             
                                             if processed_count > 0:
                                                 msg = (f"🟢 **Dados de Voyage Monitoring encontrados e salvos da API**\n\n"
@@ -2589,7 +2595,7 @@ def exibir_history():
                     try:
                         from database import upsert_terminal_monitorings_from_dataframe
                         df_monitoring = pd.DataFrame([monitoring_data])
-                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='MANUAL')
                         
                         if processed_count > 0:
                             st.success("✅ Dados de monitoramento salvos com sucesso!")

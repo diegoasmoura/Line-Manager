@@ -2120,7 +2120,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             
             # Usar a função existente para salvar
             df_monitoring = pd.DataFrame([monitoring_data])
-            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
             
             if processed_count > 0:
                 return {
@@ -2309,7 +2309,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                                         }
                                         
                                         df_monitoring = pd.DataFrame([monitoring_data])
-                                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
                                         
                                         if processed_count > 0:
                                             print(f"✅ Dados da API salvos para {vessel_name} - {voyage_code} - {terminal}")
@@ -2848,7 +2848,7 @@ def ensure_table_f_ellox_terminal_monitorings():
     except Exception as e:
         print(f"❌ Erro ao verificar tabela: {e}")
         return False
-def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
+def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame, data_source: str = 'MANUAL') -> int:
     """Realiza upsert (MERGE) em LogTransp.F_ELLOX_TERMINAL_MONITORINGS a partir de um DataFrame.
 
     Espera colunas (case-insensitive):
@@ -2900,7 +2900,8 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                 "DATA_ESTIMATIVA_ATRACACAO": _parse_iso_datetime(g('data_estimativa_atracacao')),
                 "DATA_ATRACACAO": _parse_iso_datetime(g('data_atracacao')),
                 "DATA_PARTIDA": _parse_iso_datetime(g('data_partida')),
-                "ROW_INSERTED_DATE": _datetime.now()
+                "ROW_INSERTED_DATE": _datetime.now(),
+                "DATA_SOURCE": data_source
             }
 
             # Se não há ID vindo da API, gera ID determinístico a partir de campos-chave
@@ -2969,12 +2970,14 @@ def upsert_terminal_monitorings_from_dataframe(df: pd.DataFrame) -> int:
                     ID, NAVIO, VIAGEM, AGENCIA, DATA_DEADLINE, DATA_DRAFT_DEADLINE,
                     DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER, DATA_ESTIMATIVA_SAIDA,
                     DATA_ESTIMATIVA_CHEGADA, DATA_ATUALIZACAO, TERMINAL, CNPJ_TERMINAL,
-                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE
+                    DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO, DATA_ATRACACAO, DATA_PARTIDA, ROW_INSERTED_DATE,
+                    DATA_SOURCE
                 ) VALUES (
                     :ID, :NAVIO, :VIAGEM, :AGENCIA, :DATA_DEADLINE, :DATA_DRAFT_DEADLINE,
                     :DATA_ABERTURA_GATE, :DATA_ABERTURA_GATE_REEFER, :DATA_ESTIMATIVA_SAIDA,
                     :DATA_ESTIMATIVA_CHEGADA, :DATA_ATUALIZACAO, :TERMINAL, :CNPJ_TERMINAL,
-                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE
+                    :DATA_CHEGADA, :DATA_ESTIMATIVA_ATRACACAO, :DATA_ATRACACAO, :DATA_PARTIDA, :ROW_INSERTED_DATE,
+                    :DATA_SOURCE
                 )
             """)
             conn.execute(insert_sql, params)

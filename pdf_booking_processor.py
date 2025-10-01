@@ -2508,7 +2508,7 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
             if not df_monitoring.empty:
                 # Salvar no Oracle (LogTransp.F_ELLOX_TERMINAL_MONITORINGS)
                 try:
-                    processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring)
+                    processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
                     if processed_count > 0:
                         st.success(f"✅ {processed_count} registros de monitoramento coletados via API Ellox!")
                         st.info(f"🚢 Navio: **{vessel_name}** | 🏗️ Terminal: **{cnpj_terminal}**")
