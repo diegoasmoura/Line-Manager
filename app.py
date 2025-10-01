@@ -27,6 +27,10 @@ if "navigate_to" in st.session_state:
     st.session_state.menu_choice = st.session_state["navigate_to"]
     del st.session_state["navigate_to"]  # Remove após usar
 
+# Redireciona "History" para "Shipments" (opção removida do menu)
+if st.session_state.menu_choice == "History":
+    st.session_state.menu_choice = "Shipments"
+
 # Sidebar personalizada com SVG
 with st.sidebar:
     st.markdown(f"""
