@@ -10,10 +10,34 @@ def exibir_setup():
 
     # NEW: Function to test general internet/proxy connection
     def test_general_connection():
-        with st.spinner("Testando conexão geral via proxy/direta..."):
+        with st.spinner(st.session_state.get('general_connection_message', 'Testando conexão geral...')):
             try:
-                # Use a common, reliable external site
-                response = requests.get("https://www.google.com", timeout=10)
+                proxies = {}
+                # Check if proxy credentials are set in session state
+                if (st.session_state.proxy_host and st.session_state.proxy_port and
+                    st.session_state.proxy_username and st.session_state.proxy_password):
+                    
+                    proxy_url = f"http://{st.session_state.proxy_username}:{st.session_state.proxy_password}@{st.session_state.proxy_host}:{st.session_state.proxy_port}"
+                    proxies = {
+                        "http": proxy_url,
+                        "https": proxy_url,
+                    }
+                    st.session_state.general_connection_message = "Testando conexão via proxy..."
+                else:
+                    st.session_state.general_connection_message = "Testando conexão direta (sem proxy)..."
+                    # Ensure no proxy environment variables interfere if not set by the app
+                    # Temporarily clear proxy env vars for this request
+                    original_http_proxy = os.environ.get('http_proxy')
+                    original_https_proxy = os.environ.get('https_proxy')
+                    if 'http_proxy' in os.environ: del os.environ['http_proxy']
+                    if 'https_proxy' in os.environ: del os.environ['https_proxy']
+
+                response = requests.get("https://www.google.com", timeout=10, proxies=proxies)
+
+                # Restore original proxy env vars if they existed
+                if original_http_proxy: os.environ['http_proxy'] = original_http_proxy
+                if original_https_proxy: os.environ['https_proxy'] = original_https_proxy
+
                 if response.status_code == 200:
                     st.session_state.general_connection_result = {
                         "success": True,
@@ -26,6 +50,12 @@ def exibir_setup():
                         "message": f"Falha na conexão (Status: {response.status_code})",
                         "error": f"HTTP Status Code: {response.status_code}"
                     }
+            except requests.exceptions.ProxyError as e:
+                st.session_state.general_connection_result = {
+                    "success": False,
+                    "message": "Falha na conexão via proxy",
+                    "error": str(e)
+                }
             except requests.exceptions.RequestException as e:
                 st.session_state.general_connection_result = {
                     "success": False,
@@ -60,6 +90,8 @@ def exibir_setup():
         st.session_state.general_connection_result = {"success": False, "message": "Nunca testado"}
     if 'general_connection_last_validated' not in st.session_state:
         st.session_state.general_connection_last_validated = "Nunca validado"
+    if 'general_connection_message' not in st.session_state:
+        st.session_state.general_connection_message = "Testando conexão geral..."
 
     # Function to test connection and update session state for Ellox API
     def test_api_connection():

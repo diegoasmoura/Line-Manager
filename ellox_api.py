@@ -101,30 +101,11 @@ def _setup_proxy_and_certs():
     """
     environment = detect_environment()
     print(f"[SETUP] Ambiente detectado: {environment.upper()}")
-    
-    # Caminho do certificado (baseado no código da empresa)
     script_dir = os.path.dirname(__file__)
     cert_path = os.path.join(script_dir, 'certificados', 'ca_bundle.pem')
     
     if environment == 'production':
         print("[SETUP] Configurando ambiente de PRODUÇÃO...")
-        
-        # Configuração do proxy (exatamente como no código da empresa)
-        username = os.environ.get('ELLOX_PROXY_USERNAME') or PROXY_CONFIG.get('username', 'ps301761')
-        password = os.environ.get('ELLOX_PROXY_PASSWORD') or PROXY_CONFIG.get('password', '@Cotacoes08')
-        proxy_host = PROXY_CONFIG.get('host', 'web.prod.proxy.cargill.com')
-        proxy_port = PROXY_CONFIG.get('port', '4300')
-        
-        # Cria proxy exatamente como no código da empresa
-        proxy = f'http://{username}:{password}@{proxy_host}:{proxy_port}'
-        
-        # Define variáveis de ambiente (exatamente como no código da empresa)
-        os.environ['http_proxy'] = proxy
-        os.environ['HTTP_PROXY'] = proxy
-        os.environ['https_proxy'] = proxy
-        os.environ['HTTPS_PROXY'] = proxy
-        
-        print(f"[SETUP] Proxy configurado: {proxy_host}:{proxy_port}")
         
         # Configuração do certificado (exatamente como no código da empresa)
         if os.path.isfile(cert_path):
@@ -137,26 +118,19 @@ def _setup_proxy_and_certs():
     else:
         print("[SETUP] Configurando ambiente de DESENVOLVIMENTO...")
         
-        # Desenvolvimento - limpa variáveis de proxy se existirem
-        proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
-        for var in proxy_vars:
-            if var in os.environ:
-                del os.environ[var]
-        
         # Remove certificado se existir
         if 'REQUESTS_CA_BUNDLE' in os.environ:
             del os.environ['REQUESTS_CA_BUNDLE']
             print("[SETUP] Removido REQUESTS_CA_BUNDLE")
         
         print("[SETUP] Ambiente de desenvolvimento configurado - conexão direta")
-
 # Executa a configuração ao carregar o módulo
 _setup_proxy_and_certs()
 
 class ElloxAPI:
     """Cliente para integração com a API Ellox da Comexia"""
     
-    def __init__(self, email: str = None, password: str = None, api_key: str = None, base_url: str = "https://apidtz.comexia.digital", token_expires_at: Optional[datetime] = None):
+    def __init__(self, email: str = None, password: str = None, api_key: str = None, base_url: str = "https://apidtz.comexia.digital", token_expires_at: Optional[datetime] = None, proxy_config: Optional[Dict[str, str]] = None):
         """
         Inicializa o cliente da API Ellox
         
@@ -165,6 +139,7 @@ class ElloxAPI:
             password: Senha para autenticação (opcional se api_key fornecida)
             api_key: Chave de API da Comexia (opcional se email/password fornecidos)
             base_url: URL base da API
+            proxy_config: Dicionário com configurações de proxy (host, port, username, password)
         """
         self.base_url = base_url
         self.email = email
@@ -172,6 +147,8 @@ class ElloxAPI:
         self.api_key = api_key
         self.authenticated = False
         self.token_expires_at = token_expires_at
+        self.proxy_config = proxy_config
+        print(f"[ElloxAPI.__init__] Proxy config recebido: {self.proxy_config}")
         
         # Se temos api_key e não está expirada, utiliza; senão tenta autenticar
         if self.api_key and self.token_expires_at and datetime.utcnow() < self.token_expires_at:
@@ -191,7 +168,39 @@ class ElloxAPI:
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             }
-    
+
+    def _get_effective_proxies(self) -> Dict[str, Optional[str]]:
+        """
+        Determines the effective proxy settings to be used for a requests call.
+        Prioritizes explicit proxy_config from the instance, then checks os.environ.
+        Returns {'http': None, 'https': None} if no proxy should be used.
+        """
+        # 1. Prioritize proxy_config from instance (explicitly set in app)
+        if self.proxy_config and \
+           self.proxy_config.get('host') and \
+           self.proxy_config.get('port') and \
+           self.proxy_config.get('username') and \
+           self.proxy_config.get('password'):
+            
+            username = self.proxy_config['username']
+            password = self.proxy_config['password']
+            host = self.proxy_config['host']
+            port = self.proxy_config['port']
+            proxy_url = f"http://{username}:{password}@{host}:{port}"
+            print(f"[PROXY_DEBUG] Usando proxy da instância: {host}:{port}")
+            return {"http": proxy_url, "https": proxy_url}
+        
+        # 2. Fallback to os.environ (system-wide or set by _setup_proxy_and_certs if it did)
+        http_proxy_env = os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY')
+        https_proxy_env = os.environ.get('https_proxy') or os.environ.get('HTTPS_PROXY')
+
+        if http_proxy_env or https_proxy_env:
+            print(f"[PROXY_DEBUG] Usando proxy do ambiente: http={http_proxy_env}, https={https_proxy_env}")
+            return {"http": http_proxy_env, "https": https_proxy_env}
+        
+        # 3. No proxy configured, explicitly disable
+        print("[PROXY_DEBUG] Nenhuma configuração de proxy encontrada. Conexão direta.")
+        return {'http': None, 'https': None}
     def _authenticate(self) -> str:
         """
         Autentica usando email e senha para obter token de acesso com fallback resiliente
@@ -215,6 +224,19 @@ class ElloxAPI:
         """
         Autentica usando configuração atual (proxy + certificado se configurado)
         """
+        effective_proxies = self._get_effective_proxies()
+        print(f"[AUTH_CURRENT] Tentando autenticar com proxies efetivos: {effective_proxies}")
+        
+        original_proxies_env = {}
+        if effective_proxies.get('http') is None and effective_proxies.get('https') is None:
+            # Se a intenção é conexão direta, limpar variáveis de ambiente de proxy temporariamente
+            proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
+            for var in proxy_vars:
+                if var in os.environ:
+                    original_proxies_env[var] = os.environ[var]
+                    del os.environ[var]
+            print("[AUTH_CURRENT] Variáveis de ambiente de proxy limpas temporariamente para conexão direta.")
+
         try:
             import json
             
@@ -231,7 +253,9 @@ class ElloxAPI:
                 f"{self.base_url}/api/auth",
                 data=auth_payload,
                 headers=headers,
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -241,14 +265,20 @@ class ElloxAPI:
                     self._set_auth_token(token, data)
                     return token
             
+            print(f"[AUTH_CURRENT] Autenticação falhou com status {response.status_code}: {response.text}")
             return None
             
         except requests.exceptions.ProxyError as e:
-            print(f"[AUTH] Erro de proxy na autenticação: {str(e)}")
+            print(f"[AUTH_CURRENT] Erro de proxy na autenticação: {str(e)}")
             return None
         except Exception as e:
-            print(f"[AUTH] Erro na autenticação com configuração atual: {str(e)}")
+            print(f"[AUTH_CURRENT] Erro na autenticação com configuração atual: {str(e)}")
             return None
+        finally:
+            # Restaurar variáveis de ambiente de proxy
+            for var, value in original_proxies_env.items():
+                os.environ[var] = value
+            if original_proxies_env: print("[AUTH_CURRENT] Variáveis de ambiente de proxy restauradas.")
     
     def _authenticate_with_fallback(self) -> str:
         """
@@ -344,8 +374,11 @@ class ElloxAPI:
         Returns:
             Resultado do teste de conexão
         """
+        effective_proxies = self._get_effective_proxies()
+        print(f"[TEST_CONN] Testando conexão com API Ellox. Base URL: {self.base_url}, Proxies efetivos: {effective_proxies}")
         try:
             if not self.authenticated:
+                print("[TEST_CONN] Não autenticado antes de testar conexão.")
                 return {
                     "success": False,
                     "error": "Não autenticado",
@@ -356,16 +389,20 @@ class ElloxAPI:
             response = requests.get(
                 f"{self.base_url}/api/terminals",
                 headers=self.headers,
-                timeout=10
+                timeout=10,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
+                print(f"[TEST_CONN] Conexão bem-sucedida. Status: {response.status_code}")
                 return {
                     "success": True,
                     "status": "connected",
                     "response_time": response.elapsed.total_seconds()
                 }
             else:
+                print(f"[TEST_CONN] Conexão falhou. HTTP Status: {response.status_code}, Response: {response.text}")
                 return {
                     "success": False,
                     "error": f"HTTP {response.status_code}",
@@ -373,18 +410,28 @@ class ElloxAPI:
                 }
                 
         except requests.exceptions.Timeout:
+            print("[TEST_CONN] Timeout na requisição.")
             return {
                 "success": False,
                 "error": "Timeout",
                 "status": "timeout"
             }
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.ProxyError as e:
+            print(f"[TEST_CONN] Erro de proxy: {str(e)}")
             return {
                 "success": False,
-                "error": "Erro de conexão",
+                "error": f"Erro de proxy: {str(e)}",
+                "status": "proxy_error"
+            }
+        except requests.exceptions.ConnectionError as e:
+            print(f"[TEST_CONN] Erro de conexão: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Erro de conexão: {str(e)}",
                 "status": "connection_error"
             }
         except Exception as e:
+            print(f"[TEST_CONN] Erro inesperado: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),
@@ -487,6 +534,18 @@ class ElloxAPI:
         """
         Faz requisição com configuração atual (proxy + certificado se configurado)
         """
+        effective_proxies = self._get_effective_proxies()
+        
+        original_proxies_env = {}
+        if effective_proxies.get('http') is None and effective_proxies.get('https') is None:
+            # Se a intenção é conexão direta, limpar variáveis de ambiente de proxy temporariamente
+            proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
+            for var in proxy_vars:
+                if var in os.environ:
+                    original_proxies_env[var] = os.environ[var]
+                    del os.environ[var]
+            print("[API_CURRENT] Variáveis de ambiente de proxy limpas temporariamente para conexão direta.")
+
         try:
             # Garante autenticação válida antes da chamada
             if not endpoint.startswith("/api/auth"):
@@ -496,18 +555,24 @@ class ElloxAPI:
                 f"{self.base_url}{endpoint}",
                 headers=self.headers,
                 params=params,
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             # Se o token expirou e retornou 401, tentar reautenticar e refazer uma vez
             if response.status_code == 401 and self.email and self.password:
                 print("[API] Token expirado, reautenticando...")
                 self._authenticate()
+                # Re-fetch effective proxies after re-authentication, in case proxy config changed
+                effective_proxies_reauth = self._get_effective_proxies()
                 response = requests.get(
                     f"{self.base_url}{endpoint}",
                     headers=self.headers,
                     params=params,
-                    timeout=30
+                    timeout=30,
+                    proxies=effective_proxies_reauth,
+                    trust_env=(effective_proxies_reauth.get('http') is not None or effective_proxies_reauth.get('https') is not None)
                 )
 
             if response.status_code == 200:
@@ -555,6 +620,11 @@ class ElloxAPI:
                 "error": f"Erro inesperado: {str(e)}",
                 "method": "current_config"
             }
+        finally:
+            # Restaurar variáveis de ambiente de proxy
+            for var, value in original_proxies_env.items():
+                os.environ[var] = value
+            if original_proxies_env: print("[API_CURRENT] Variáveis de ambiente de proxy restauradas.")
     
     def _make_api_request_with_fallback(self, endpoint: str, params: dict = None) -> Dict[str, Any]:
         """
@@ -586,7 +656,8 @@ class ElloxAPI:
                     f"{self.base_url}{endpoint}",
                     headers=self.headers,
                     params=params,
-                    timeout=30
+                    timeout=30,
+                    proxies={}
                 )
                 
                 # Se o token expirou e retornou 401, tentar reautenticar e refazer uma vez
@@ -597,7 +668,8 @@ class ElloxAPI:
                         f"{self.base_url}{endpoint}",
                         headers=self.headers,
                         params=params,
-                        timeout=30
+                        timeout=30,
+                        proxies={}
                     )
 
                 if response.status_code == 200:
@@ -781,13 +853,16 @@ class ElloxAPI:
         Returns:
             Dicionário com resultado da verificação
         """
+        effective_proxies = self._get_effective_proxies()
         try:
             # Tenta buscar informações da empresa via API
             # Usando endpoint de terminais que pode retornar info sobre empresas
             response = requests.get(
                 f"{self.base_url}/api/terminals",
                 headers=self.headers,
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -839,6 +914,7 @@ class ElloxAPI:
         Returns:
             Dicionário com resultado da solicitação
         """
+        effective_proxies = self._get_effective_proxies()
         try:
             import json
             
@@ -851,7 +927,9 @@ class ElloxAPI:
                 f"{self.base_url}/api/monitor/navio",
                 headers={**self.headers, "Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 201:
@@ -913,6 +991,7 @@ class ElloxAPI:
         Returns:
             Dicionário com informações do monitoramento
         """
+        effective_proxies = self._get_effective_proxies()
         try:
             import json
             
@@ -927,7 +1006,9 @@ class ElloxAPI:
                 f"{self.base_url}/api/terminalmonitorings",
                 headers={**self.headers, "Content-Type": "application/json"},
                 data=json.dumps(payload),
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -1000,6 +1081,7 @@ class ElloxAPI:
         Returns:
             Cronograma do navio com próximas escalas
         """
+        effective_proxies = self._get_effective_proxies()
         try:
             normalized_carrier = self.normalize_carrier_name(carrier)
             normalized_vessel = self.normalize_vessel_name(vessel_name)
@@ -1013,7 +1095,9 @@ class ElloxAPI:
                 f"{self.base_url}/v1/vessels/schedule",
                 headers=self.headers,
                 params=params,
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -1045,6 +1129,7 @@ class ElloxAPI:
         Returns:
             Informações do porto (terminais, operadores, etc.)
         """
+        effective_proxies = self._get_effective_proxies()
         try:
             params = {"port_name": port_name.strip()}
             
@@ -1052,7 +1137,9 @@ class ElloxAPI:
                 f"{self.base_url}/v1/ports/info",
                 headers=self.headers,
                 params=params,
-                timeout=30
+                timeout=30,
+                proxies=effective_proxies,
+                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -1095,6 +1182,14 @@ def get_default_api_client() -> ElloxAPI:
             password = ELLOX_API_CONFIG.get("password")
 
         base_url = st.session_state.get("api_base_url", ELLOX_API_CONFIG.get("base_url"))
+
+        proxy_config = {
+            "host": st.session_state.get("proxy_host"),
+            "port": st.session_state.get("proxy_port"),
+            "username": st.session_state.get("proxy_username"),
+            "password": st.session_state.get("proxy_password"),
+        }
+
         # Reutiliza token se disponível e válido
         api_token = st.session_state.get("api_token")
         token_expires_raw = st.session_state.get("api_token_expires_at")
@@ -1104,13 +1199,19 @@ def get_default_api_client() -> ElloxAPI:
                 token_expires_at = datetime.fromisoformat(token_expires_raw)
         except Exception:
             token_expires_at = None
-        return ElloxAPI(email=email, password=password, api_key=api_token, base_url=base_url, token_expires_at=token_expires_at)
+        return ElloxAPI(email=email, password=password, api_key=api_token, base_url=base_url, token_expires_at=token_expires_at, proxy_config=proxy_config)
     except:
         # Fallback para credenciais do app_config se streamlit não estiver disponível
         return ElloxAPI(
             email=ELLOX_API_CONFIG.get("email"), 
             password=ELLOX_API_CONFIG.get("password"), 
-            base_url=ELLOX_API_CONFIG.get("base_url")
+            base_url=ELLOX_API_CONFIG.get("base_url"),
+            proxy_config={
+                "host": PROXY_CONFIG.get("host"),
+                "port": PROXY_CONFIG.get("port"),
+                "username": PROXY_CONFIG.get("username"),
+                "password": PROXY_CONFIG.get("password"),
+            }
         )
 
 def enrich_booking_data(booking_data: Dict[str, Any], client: ElloxAPI = None) -> Dict[str, Any]:
