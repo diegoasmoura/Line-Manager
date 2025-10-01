@@ -2612,6 +2612,12 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.17 - Simplificação da Interface de Configurações (Janeiro 2025)
+- **🎨 Interface Simplificada**: Removido subtítulo redundante "⚙️ Configurações do Sistema Farol" da tela de configurações
+- **🔽 Expander Removido**: Eliminada seção "Ver Detalhes do Ambiente e Conexão" para interface mais limpa
+- **📋 Estrutura de Abas Preparada**: Mantida estrutura de abas com uma aba atual para futuras expansões
+- **✨ Interface Mais Limpa**: Foco nas funcionalidades principais (testes de conexão e formulários de credenciais)
+
 ### 📌 v3.9.16 - Correção de Navegação do Menu Shipments (Janeiro 2025)
 - **🔄 Reset de Estado do Menu**: Corrigido problema onde a tela Shipments ficava em branco ao navegar de outros menus
 - **🎯 Lógica de Navegação**: Ajustado `current_page` para usar valor correto (`"main"`) que o módulo shipments espera
