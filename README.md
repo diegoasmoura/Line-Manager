@@ -195,6 +195,12 @@ graph TD
 - **Solução**: Adição do import no início da função
 - **Status**: ✅ **Resolvido**
 
+##### **Problema 6: Experiência do Usuário na Página de Configurações (setup.py)**
+- **Sintoma**: Tela "piscava" ao salvar credenciais; mensagens de sucesso apareciam fora de ordem ou desapareciam rapidamente; necessidade de clicar duas vezes para feedback.
+- **Causa**: `st.rerun()` desnecessário ou mal posicionado; mensagens de `st.session_state` eram deletadas imediatamente; ordem de renderização de spinners e mensagens invertida.
+- **Solução**: Remoção de `st.rerun()` desnecessários; mensagens de `st.session_state` agora persistem; ordem de exibição ajustada para que spinners apareçam antes das mensagens de sucesso; mensagens de salvamento agora aparecem abaixo dos quadros expansíveis.
+- **Status**: ✅ **Resolvido**
+
 #### 📊 **Fluxo de Aprovação Corrigido**
 
 **Cenário 1: PDF com Dados da API** ✅

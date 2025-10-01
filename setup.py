@@ -108,7 +108,6 @@ def exibir_setup():
             st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
             if st.button("Testar Conexão Geral", key="test_general_conn_card_btn"):
                 test_general_connection()
-                st.rerun()
 
         with col_api_conn:
             st.subheader("Conexão API Ellox")
@@ -138,8 +137,10 @@ def exibir_setup():
                 st.session_state.api_base_url = base_url_input
                 # Trigger re-test of API connection after saving credentials
                 test_api_connection()
-                st.success("Credenciais da API Ellox salvas para a sessão atual!")
-                st.rerun()
+                st.session_state.api_save_message = "✅ Credenciais da API Ellox salvas para a sessão atual!"
+
+        if 'api_save_message' in st.session_state:
+            st.success(st.session_state.api_save_message)
 
         # --- Proxy Credentials Section ---
         with st.form("proxy_credentials_form_individual"): # NEW: Separate form for Proxy credentials
@@ -165,16 +166,20 @@ def exibir_setup():
                     os.environ['HTTP_PROXY'] = proxy_url
                     os.environ['https_proxy'] = proxy_url
                     os.environ['HTTPS_PROXY'] = proxy_url
-                    st.success("Credenciais do Proxy aplicadas ao ambiente da sessão.")
+                    st.session_state.proxy_save_message = "✅ Credenciais do Proxy aplicadas ao ambiente da sessão."
                 else:
                     for var in ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']:
                         if var in os.environ:
                             del os.environ[var]
-                    st.warning("Credenciais do Proxy incompletas ou removidas. Proxy desativado para a sessão.")
+                    st.session_state.proxy_save_message = "⚠️ Credenciais do Proxy incompletas ou removidas. Proxy desativado para a sessão."
 
                 if 'api_connection_result' in st.session_state:
                     del st.session_state.api_connection_result
-                st.success("Credenciais da API Ellox salvas para a sessão atual! Verifique o status da conexão acima para testar a conexão.")
-                st.rerun()
+
+        if 'proxy_save_message' in st.session_state:
+            if "✅" in st.session_state.proxy_save_message:
+                st.success(st.session_state.proxy_save_message)
+            else:
+                st.warning(st.session_state.proxy_save_message)
 
     print("⚙️ Setup") # Keep the original print for now, can remove later if not needed
