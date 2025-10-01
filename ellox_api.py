@@ -254,8 +254,7 @@ class ElloxAPI:
                 data=auth_payload,
                 headers=headers,
                 timeout=30,
-                proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
+                proxies=effective_proxies
             )
             
             if response.status_code == 200:
@@ -391,7 +390,6 @@ class ElloxAPI:
                 headers=self.headers,
                 timeout=10,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -557,7 +555,6 @@ class ElloxAPI:
                 params=params,
                 timeout=30,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             # Se o token expirou e retornou 401, tentar reautenticar e refazer uma vez
@@ -862,7 +859,6 @@ class ElloxAPI:
                 headers=self.headers,
                 timeout=30,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -929,7 +925,6 @@ class ElloxAPI:
                 data=json.dumps(payload),
                 timeout=30,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 201:
@@ -1008,7 +1003,6 @@ class ElloxAPI:
                 data=json.dumps(payload),
                 timeout=30,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -1097,7 +1091,6 @@ class ElloxAPI:
                 params=params,
                 timeout=30,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
@@ -1139,7 +1132,6 @@ class ElloxAPI:
                 params=params,
                 timeout=30,
                 proxies=effective_proxies,
-                trust_env=(effective_proxies.get('http') is not None or effective_proxies.get('https') is not None)
             )
             
             if response.status_code == 200:
