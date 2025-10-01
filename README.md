@@ -890,33 +890,6 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - 🔄 **Limpeza de Estado**: Ao mudar a seleção de linha, o sistema limpa automaticamente status pendentes e mensagens de erro (`approval_error`, `manual_save_error`) da sessão anterior. Isso previne que erros antigos apareçam fora de contexto em novas ações.
 - 🎯 **Rastreamento por ID**: Usa ADJUSTMENT_ID para detectar mudanças de seleção
 
-### 🚢 `voyage_monitoring.py`
-**Gerenciamento de Monitoramento de Viagens**
-- Interface dedicada para visualizar e editar dados de monitoramento da API Ellox
-- **Último Registro por Combinação**: Exibe apenas o último registro de cada combinação única (Vessel + Voyage + Terminal)
-- **Sem Histórico**: Não mostra histórico completo - apenas o estado mais atual de cada combinação
-- **Colunas Principais Sempre Preenchidas**: Vessel Name, Voyage Code, Terminal sempre preenchidas
-- **Colunas de Dados Condicionais**: Outras colunas preenchidas apenas se houver dados da API Ellox
-- **Botão de Status da API**: Indicador visual do status da API Ellox no canto superior direito
-- **Modal de Detalhes da API**: Expander com informações detalhadas, configurações e teste de conectividade
-- Exibe dados unificados de navios, viagens e terminais com Farol References associados
-- Edição inline de dados de monitoramento com validação automática
-- Filtros avançados por navio, terminal e presença de Farol References
-- Estatísticas em tempo real de navios, viagens, terminais e referências
-- Resolução de problemas quando a API Ellox está indisponível
-- Atualização automática de timestamps ao modificar dados
-
-#### 🎯 **Funcionalidades Principais**
-- **Visualização Única**: Mostra apenas o último registro de cada combinação única
-- **Sem Histórico**: Foco no estado atual, não no histórico completo
-- **Colunas Garantidas**: Vessel Name, Voyage Code, Terminal sempre preenchidas
-- **Dados Condicionais**: Outras colunas preenchidas apenas com dados da API
-- **Status da API**: Botão indicador com cores (🟢 Online, 🟡 Lenta, 🔴 Erro)
-- **Detalhes da API**: Modal com informações de conectividade e configurações
-- **Edição Inline**: Modificação direta de dados de monitoramento na interface
-- **Filtros Dinâmicos**: Filtros por navio, terminal e status de Farol References
-- **Validação de Dados**: Verificação automática de alterações antes de salvar
-- **Estatísticas**: Métricas em tempo real sobre o volume de dados
 
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
@@ -1241,9 +1214,8 @@ A coluna `DATA_SOURCE` foi adicionada para rastrear a origem dos dados de monito
 Os dados extraídos pelos arquivos Ellox são utilizados em:
 
 1. **Atualização Manual de Datas de Viagem** (`tracking.py`)
-2. **Voyage Monitoring** (`voyage_monitoring.py`)
-3. **Processamento de PDFs** (`pdf_booking_processor.py`)
-4. **Histórico de Viagens** (`history.py`)
+2. **Processamento de PDFs** (`pdf_booking_processor.py`)
+3. **Histórico de Viagens** (`history.py`)
 
 ### 📊 **Estatísticas de Dados**
 
@@ -2617,6 +2589,17 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🔽 Expander Removido**: Eliminada seção "Ver Detalhes do Ambiente e Conexão" para interface mais limpa
 - **📋 Estrutura de Abas Preparada**: Mantida estrutura de abas com uma aba atual para futuras expansões
 - **✨ Interface Mais Limpa**: Foco nas funcionalidades principais (testes de conexão e formulários de credenciais)
+
+### 📌 v3.9.19 - Remoção da Opção History do Menu (Janeiro 2025)
+- **🗂️ Remoção da Opção "History"**: Removida opção do menu lateral para simplificar a navegação
+- **🔗 Acesso via Shipments**: Funcionalidade History mantida e acessível através da tela Shipments
+- **🎯 Interface Simplificada**: Menu lateral agora com 5 opções principais
+
+### 📌 v3.9.18 - Remoção do Módulo Voyage Monitoring (Janeiro 2025)
+- **🗂️ Remoção da Opção "Voyage Monitoring"**: Removida opção do menu lateral para simplificar a navegação
+- **🗑️ Exclusão de Arquivos**: Removido arquivo `voyage_monitoring.py` e suas dependências
+- **📚 Documentação Atualizada**: README.md atualizado para refletir a remoção do módulo
+- **🎯 Interface Simplificada**: Menu lateral agora com 5 opções principais
 
 ### 📌 v3.9.17 - Reorganização do Menu e Consolidação de Funcionalidades (Janeiro 2025)
 - **🗂️ Remoção da Opção "Voyage Update"**: Removida opção separada do menu lateral para simplificar a navegação
