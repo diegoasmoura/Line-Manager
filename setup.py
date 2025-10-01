@@ -1,6 +1,231 @@
-#setup.py
 import streamlit as st
- 
+from ellox_api import get_default_api_client, ElloxAPI # Import ElloxAPI class for direct use
+from app_config import ELLOX_API_CONFIG, PROXY_CONFIG # Import config for default values
+from datetime import datetime # NEW
+import os # NEW
+import requests # NEW
+
 def exibir_setup():
-    print("⚙️ Setup")
- 
+    st.title("⚙️ Configurações do Sistema Farol")
+
+    # NEW: Function to test general internet/proxy connection
+    def test_general_connection():
+        with st.spinner("Testando conexão geral via proxy/direta..."):
+            try:
+                # Use a common, reliable external site
+                response = requests.get("https://www.google.com", timeout=10)
+                if response.status_code == 200:
+                    st.session_state.general_connection_result = {
+                        "success": True,
+                        "message": f"Conexão bem-sucedida (Status: {response.status_code})",
+                        "response_time": response.elapsed.total_seconds()
+                    }
+                else:
+                    st.session_state.general_connection_result = {
+                        "success": False,
+                        "message": f"Falha na conexão (Status: {response.status_code})",
+                        "error": f"HTTP Status Code: {response.status_code}"
+                    }
+            except requests.exceptions.RequestException as e:
+                st.session_state.general_connection_result = {
+                    "success": False,
+                    "message": "Falha na conexão geral",
+                    "error": str(e)
+                }
+            st.session_state.general_connection_last_validated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Initialize session state for credentials if not already present
+    if 'api_email' not in st.session_state:
+        st.session_state.api_email = ELLOX_API_CONFIG.get("email", "")
+    if 'api_password' not in st.session_state:
+        st.session_state.api_password = ELLOX_API_CONFIG.get("password", "")
+    if 'api_base_url' not in st.session_state:
+        st.session_state.api_base_url = ELLOX_API_CONFIG.get("base_url", "https://apidtz.comexia.digital")
+    # NEW: Initialize last validated time
+    if 'api_last_validated' not in st.session_state:
+        st.session_state.api_last_validated = "Nunca validado"
+
+    # Initialize session state for proxy credentials
+    if 'proxy_username' not in st.session_state:
+        st.session_state.proxy_username = PROXY_CONFIG.get("username", "")
+    if 'proxy_password' not in st.session_state:
+        st.session_state.proxy_password = PROXY_CONFIG.get("password", "")
+    if 'proxy_host' not in st.session_state:
+        st.session_state.proxy_host = PROXY_CONFIG.get("host", "")
+    if 'proxy_port' not in st.session_state:
+        st.session_state.proxy_port = PROXY_CONFIG.get("port", "")
+
+    # NEW: Initialize session state for general connection test
+    if 'general_connection_result' not in st.session_state:
+        st.session_state.general_connection_result = {"success": False, "message": "Nunca testado"}
+    if 'general_connection_last_validated' not in st.session_state:
+        st.session_state.general_connection_last_validated = "Nunca validado"
+
+    tab1, tab2, tab3 = st.tabs(["Status da API Ellox", "Gerenciamento de Credenciais", "Configurações Gerais"])
+
+    with tab1:
+        st.header("Status da API Ellox")
+
+        # Function to test connection and update session state
+        def test_api_connection():
+            with st.spinner("Testando conexão com a API Ellox..."):
+                # Create a client with current session state credentials
+                client = ElloxAPI(
+                    email=st.session_state.api_email,
+                    password=st.session_state.api_password,
+                    base_url=st.session_state.api_base_url
+                )
+                connection_result = client.test_connection()
+                st.session_state.api_connection_result = connection_result
+                st.session_state.api_last_validated = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # NEW
+
+        # Run test on first load or if explicitly requested
+        if 'api_connection_result' not in st.session_state:
+            test_api_connection()
+
+        connection_result = st.session_state.api_connection_result
+
+        # --- Ellox API Status Section ---
+        st.subheader("Status da Conexão com a API Ellox")
+        col_api_status, col_auth_status = st.columns([1, 1])
+        with col_api_status:
+            if connection_result["success"]:
+                st.metric(label="Status da API", value="Online ✅", delta=f"{connection_result['response_time']:.2f}s")
+            else:
+                st.metric(label="Status da API", value="Offline ❌")
+        with col_auth_status:
+            if connection_result.get("status") == "connected":
+                st.success("Autenticado com sucesso!")
+            elif connection_result.get("status") == "disconnected":
+                st.warning("Não autenticado.")
+            else:
+                st.error("Falha na autenticação.")
+
+        st.write(f"**Última validação:** {st.session_state.api_last_validated}")
+
+        if not connection_result["success"]:
+            st.error(f"Detalhes do Erro: {connection_result.get('error', 'Erro desconhecido')}")
+
+        st.button("Testar Conexão Novamente", on_click=test_api_connection) # Use on_click for cleaner rerun
+
+        st.markdown("---") # Separator
+
+        # --- Environment and Proxy Details Section ---
+        st.subheader("Status do Ambiente e Proxy")
+        with st.expander("Ver Detalhes do Ambiente e Conexão"):
+            st.write(f"**Ambiente Detectado (FAROL_ENVIRONMENT):** `{os.environ.get('FAROL_ENVIRONMENT', 'Não definido')}`")
+
+            col_proxy, col_cert = st.columns(2)
+            with col_proxy:
+                proxy_active = False
+                proxy_info = []
+                if os.environ.get('http_proxy'):
+                    proxy_active = True
+                    proxy_info.append(f"HTTP Proxy: `{os.environ.get('http_proxy')}`")
+                if os.environ.get('https_proxy'):
+                    proxy_active = True
+                    proxy_info.append(f"HTTPS Proxy: `{os.environ.get('https_proxy')}`")
+
+                if proxy_active:
+                    st.success("Proxy Ativo ✅")
+                    for info in proxy_info:
+                        st.write(f"- {info}")
+                else:
+                    st.warning("Proxy Inativo ❌ (Conexão Direta)")
+
+            with col_cert:
+                cert_path = os.environ.get('REQUESTS_CA_BUNDLE')
+                if cert_path:
+                    st.success(f"Certificado CA Bundle Configurado ✅: `{cert_path}`")
+                else:
+                    st.warning("Certificado CA Bundle Inativo ❌")
+
+            st.info("No ambiente corporativo, o Proxy e o Certificado CA Bundle devem estar Ativos.")
+
+            st.markdown("---") # Separator for the test button
+
+            # NEW: General Connection Test Button
+            st.write("Testar Conexão Geral (via Proxy/Direta):")
+            col_test_btn, col_test_status = st.columns([0.5, 1.5])
+            with col_test_btn:
+                if st.button("Testar Conexão Geral", key="test_general_conn_btn"):
+                    test_general_connection()
+                    st.rerun()
+            with col_test_status:
+                general_result = st.session_state.general_connection_result
+                if general_result["success"]:
+                    st.success(f"{general_result['message']} ({general_result['response_time']:.2f}s)")
+                elif general_result["message"] != "Nunca testado":
+                    st.error(f"{general_result['message']}: {general_result.get('error', '')}")
+                else:
+                    st.info(general_result["message"])
+                st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
+
+
+    with tab2:
+        st.info("As credenciais salvas aqui são usadas para autenticar com a API Ellox e o Proxy corporativo. As alterações são temporárias para esta sessão.")
+
+        # --- Ellox API Credentials Section ---
+        with st.form("api_credentials_form_individual"): # NEW: Separate form for API credentials
+            with st.expander("Credenciais da API Ellox", expanded=False):
+                email_input = st.text_input("Email da API Ellox", value=st.session_state.api_email, key="email_input")
+                password_input = st.text_input("Senha da API Ellox", value=st.session_state.api_password, type="password", key="password_input")
+                base_url_input = st.text_input("URL Base da API Ellox", value=st.session_state.api_base_url, key="base_url_input")
+                submitted_api = st.form_submit_button("Salvar Credenciais da API Ellox") # MOVED INSIDE EXPANDER
+            
+            if submitted_api:
+                st.session_state.api_email = email_input
+                st.session_state.api_password = password_input
+                st.session_state.api_base_url = base_url_input
+                if 'api_connection_result' in st.session_state:
+                    del st.session_state.api_connection_result
+                st.success("Credenciais da API Ellox salvas para a sessão atual!")
+                st.rerun()
+
+
+
+        # --- Proxy Credentials Section ---
+        with st.form("proxy_credentials_form_individual"): # NEW: Separate form for Proxy credentials
+            with st.expander("Credenciais do Proxy Corporativo", expanded=False):
+                proxy_username_input = st.text_input("Usuário do Proxy", value=st.session_state.proxy_username, key="proxy_username_input")
+                proxy_password_input = st.text_input("Senha do Proxy", value=st.session_state.proxy_password, type="password", key="proxy_password_input")
+                col_proxy_host, col_proxy_port = st.columns(2)
+                with col_proxy_host:
+                    proxy_host_input = st.text_input("Host do Proxy", value=st.session_state.proxy_host, key="proxy_host_input")
+                with col_proxy_port:
+                    proxy_port_input = st.text_input("Porta do Proxy", value=st.session_state.proxy_port, key="proxy_port_input")
+                submitted_proxy = st.form_submit_button("Salvar Credenciais do Proxy") # MOVED INSIDE EXPANDER
+            
+            if submitted_proxy:
+                st.session_state.proxy_username = proxy_username_input
+                st.session_state.proxy_password = proxy_password_input
+                st.session_state.proxy_host = proxy_host_input
+                st.session_state.proxy_port = proxy_port_input
+
+                if st.session_state.proxy_username and st.session_state.proxy_password and st.session_state.proxy_host and st.session_state.proxy_port:
+                    proxy_url = f"http://{st.session_state.proxy_username}:{st.session_state.proxy_password}@{st.session_state.proxy_host}:{st.session_state.proxy_port}"
+                    os.environ['http_proxy'] = proxy_url
+                    os.environ['HTTP_PROXY'] = proxy_url
+                    os.environ['https_proxy'] = proxy_url
+                    os.environ['HTTPS_PROXY'] = proxy_url
+                    st.success("Credenciais do Proxy aplicadas ao ambiente da sessão.")
+                else:
+                    for var in ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']:
+                        if var in os.environ:
+                            del os.environ[var]
+                    st.warning("Credenciais do Proxy incompletas ou removidas. Proxy desativado para a sessão.")
+
+                if 'api_connection_result' in st.session_state:
+                    del st.session_state.api_connection_result
+                st.success("Credenciais do Proxy salvas para a sessão atual! Verifique o 'Status da API Ellox' para testar a conexão.")
+                st.rerun()
+
+    with tab3:
+        st.header("Configurações Gerais do Sistema")
+        st.write("Aqui você pode ajustar outras configurações da aplicação.")
+
+        st.subheader("Configurações da API Ellox (app_config.py)")
+        st.json(ELLOX_API_CONFIG) # Display current config from app_config.py
+        st.write("Estas são as configurações padrão carregadas do arquivo `app_config.py`.")
+
+    print("⚙️ Setup") # Keep the original print for now, can remove later if not needed

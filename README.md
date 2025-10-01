@@ -1998,6 +1998,53 @@ else:
 - **Dados Mais Atualizados**: Acesso direto aos dados de monitoramento
 - **Experiência do Usuário**: Resposta mais rápida e consistente
 
+## 🚀 **Melhorias Recentes e Gerenciamento de Configurações (Outubro 2025)**
+
+Esta seção detalha as atualizações implementadas para otimizar o gerenciamento de configurações, a conectividade da API Ellox e a experiência do usuário (UX) na tela de setup.
+
+#### **1. Gerenciamento Inteligente de Ambiente e Conectividade da API Ellox**
+
+O sistema agora possui um mecanismo robusto para garantir a conectividade da API Ellox em diferentes ambientes (desenvolvimento local vs. corporativo com proxy/VPN).
+
+*   **Detecção Automática de Ambiente**: A função `detect_environment()` em `ellox_api.py` identifica automaticamente o ambiente de execução (`development` ou `production`) com base em múltiplas verificações (variáveis de ambiente, presença de certificados, acessibilidade de proxy, etc.).
+*   **Configuração Resiliente de Proxy e Certificados**: A função `_setup_proxy_and_certs()` configura dinamicamente as variáveis de ambiente de proxy (`http_proxy`, `https_proxy`) e o caminho do certificado CA (`REQUESTS_CA_BUNDLE`) conforme o ambiente detectado.
+    *   No ambiente de `production`, utiliza as credenciais e configurações de proxy definidas em `app_config.py`.
+    *   No ambiente de `development`, garante uma conexão direta, limpando quaisquer configurações de proxy ativas.
+*   **Requisições de API Robustas**: O cliente `ElloxAPI` implementa um mecanismo de fallback para requisições, tentando primeiro com a configuração atual e, em caso de falha, retentando sem proxy/certificados. Ele também gerencia a reautenticação automática em caso de tokens expirados.
+*   **Resolução de Problemas de Conectividade**: Para garantir o funcionamento em ambiente de desenvolvimento pessoal, a variável de ambiente `FAROL_ENVIRONMENT=development` pode ser definida para forçar a detecção do ambiente de desenvolvimento, evitando tentativas de conexão via proxy corporativo.
+
+#### **2. Nova Tela de Configurações Interativa (`setup.py`)**
+
+O arquivo `setup.py` foi transformado em uma tela de setup interativa e intuitiva no Streamlit, com foco em UX e diagnóstico.
+
+*   **Interface Baseada em Abas**: A tela é organizada em três abas principais:
+    *   **Status da API Ellox**
+    *   **Gerenciamento de Credenciais**
+    *   **Configurações Gerais**
+
+*   **Aba "Status da API Ellox"**:
+    *   **Visão Geral Clara**: Exibe o status da API Ellox (Online/Offline), tempo de resposta e status de autenticação (Autenticado/Não Autenticado) com indicadores visuais.
+    *   **Data e Hora da Validação**: Mostra a data e hora da última verificação de status.
+    *   **Botão "Testar Conexão Novamente"**: Permite revalidar o status da API sob demanda.
+    *   **Seção "Status do Ambiente e Proxy" (Expansível)**:
+        *   Um `st.expander` (`"Ver Detalhes do Ambiente e Conexão"`) agrupa informações detalhadas.
+        *   Exibe o `Ambiente Detectado` (valor de `FAROL_ENVIRONMENT` ou detectado automaticamente).
+        *   Mostra o `Status do Proxy` (Ativo/Inativo) e detalhes (host, porta, usuário) se configurado.
+        *   Indica o `Status do Certificado CA Bundle` (Configurado/Inativo).
+        *   **Novo Botão "Testar Conexão Geral"**: Permite verificar a conectividade geral da internet (via proxy ou direta) para diagnóstico da infraestrutura de rede.
+        *   Layout aprimorado com `st.columns` para melhor organização visual.
+
+*   **Aba "Gerenciamento de Credenciais"**:
+    *   **Organização por Expander**: As credenciais são agrupadas em `st.expander`s recolhíveis por padrão para uma interface mais limpa:
+        *   **"Credenciais da API Ellox"**: Campos para Email, Senha e URL Base da API Ellox.
+        *   **"Credenciais do Proxy Corporativo"**: Campos para Usuário, Senha, Host e Porta do Proxy.
+    *   **Valores Pré-preenchidos**: Todos os campos são pré-preenchidos com os valores configurados em `app_config.py`.
+    *   **Salvamento Individual**: Cada `st.expander` possui seu próprio botão "Salvar Credenciais", permitindo que o usuário salve as configurações de API ou de Proxy de forma independente.
+    *   **Alterações Temporárias**: As alterações feitas na interface são aplicadas às variáveis de ambiente da sessão atual do Streamlit e não são persistidas permanentemente nos arquivos de configuração.
+
+*   **Aba "Configurações Gerais"**:
+    *   Exibe as configurações padrão da API Ellox carregadas de `app_config.py` em formato JSON, oferecendo uma visão rápida das configurações estáticas do sistema.
+
 ##### 🔧 Implementação Técnica
 
 ```python

@@ -12,6 +12,146 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import streamlit as st
 import re
+import os
+import sys
+from app_config import ELLOX_API_CONFIG, PROXY_CONFIG
+
+def detect_environment():
+    """
+    Detecta automaticamente o ambiente de execução com múltiplas verificações
+    Returns: 'development', 'production', ou 'unknown'
+    """
+    import socket
+    import platform
+    
+    print("[DETECT] Iniciando detecção de ambiente...")
+    
+    # 1. Verifica variável de ambiente explícita (prioridade máxima)
+    env_var = os.environ.get('FAROL_ENVIRONMENT', '').lower()
+    if env_var in ['development', 'dev', 'local']:
+        print("[DETECT] Ambiente definido explicitamente como DESENVOLVIMENTO")
+        return 'development'
+    elif env_var in ['production', 'prod', 'corporate', 'empresa']:
+        print("[DETECT] Ambiente definido explicitamente como PRODUÇÃO")
+        return 'production'
+    
+    # 2. Verifica se existe pasta certificados/ (indicador forte de ambiente corporativo)
+    script_dir = os.path.dirname(__file__)
+    cert_dir = os.path.join(script_dir, 'certificados')
+    cert_file = os.path.join(cert_dir, 'ca_bundle.pem')
+    
+    if os.path.isdir(cert_dir) and os.path.isfile(cert_file):
+        print(f"[DETECT] Pasta certificados/ encontrada - indicador de ambiente corporativo")
+        # Verifica se o certificado é válido (não vazio)
+        try:
+            if os.path.getsize(cert_file) > 0:
+                print(f"[DETECT] Certificado válido encontrado: {cert_file}")
+                return 'production'
+            else:
+                print(f"[DETECT] Certificado vazio - ignorando")
+        except:
+            print(f"[DETECT] Erro ao verificar certificado - ignorando")
+    
+    # 3. Verifica se está em rede corporativa (proxy acessível)
+    try:
+        socket.gethostbyname('web.prod.proxy.cargill.com')
+        print("[DETECT] Proxy corporativo acessível - ambiente de produção")
+        return 'production'
+    except socket.gaierror:
+        print("[DETECT] Proxy corporativo não acessível")
+    
+    # 4. Verifica se está em rede Cargill (outros indicadores)
+    try:
+        hostname = platform.node().lower()
+        if any(indicator in hostname for indicator in ['cargill', 'corp', 'prod', 'empresa']):
+            print(f"[DETECT] Hostname indica ambiente corporativo: {hostname}")
+            return 'production'
+    except:
+        print("[DETECT] Erro ao verificar hostname")
+    
+    # 5. Verifica se há configuração de proxy ativa
+    proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
+    active_proxies = [var for var in proxy_vars if var in os.environ]
+    if active_proxies:
+        print(f"[DETECT] Variáveis de proxy ativas: {active_proxies}")
+        return 'production'
+    
+    # 6. Verifica se está em rede corporativa (outros domínios)
+    try:
+        # Verifica se consegue resolver domínios corporativos
+        corporate_domains = ['cargill.com', 'corp.cargill.com']
+        for domain in corporate_domains:
+            try:
+                socket.gethostbyname(domain)
+                print(f"[DETECT] Domínio corporativo acessível: {domain}")
+                return 'production'
+            except:
+                pass
+    except:
+        pass
+    
+    # 7. Padrão: desenvolvimento
+    print("[DETECT] Nenhum indicador de produção encontrado - ambiente de desenvolvimento")
+    return 'development'
+
+def _setup_proxy_and_certs():
+    """
+    Configura proxy e certificados baseado no código da empresa
+    Implementa detecção inteligente de ambiente e fallback resiliente
+    """
+    environment = detect_environment()
+    print(f"[SETUP] Ambiente detectado: {environment.upper()}")
+    
+    # Caminho do certificado (baseado no código da empresa)
+    script_dir = os.path.dirname(__file__)
+    cert_path = os.path.join(script_dir, 'certificados', 'ca_bundle.pem')
+    
+    if environment == 'production':
+        print("[SETUP] Configurando ambiente de PRODUÇÃO...")
+        
+        # Configuração do proxy (exatamente como no código da empresa)
+        username = os.environ.get('ELLOX_PROXY_USERNAME') or PROXY_CONFIG.get('username', 'ps301761')
+        password = os.environ.get('ELLOX_PROXY_PASSWORD') or PROXY_CONFIG.get('password', '@Cotacoes08')
+        proxy_host = PROXY_CONFIG.get('host', 'web.prod.proxy.cargill.com')
+        proxy_port = PROXY_CONFIG.get('port', '4300')
+        
+        # Cria proxy exatamente como no código da empresa
+        proxy = f'http://{username}:{password}@{proxy_host}:{proxy_port}'
+        
+        # Define variáveis de ambiente (exatamente como no código da empresa)
+        os.environ['http_proxy'] = proxy
+        os.environ['HTTP_PROXY'] = proxy
+        os.environ['https_proxy'] = proxy
+        os.environ['HTTPS_PROXY'] = proxy
+        
+        print(f"[SETUP] Proxy configurado: {proxy_host}:{proxy_port}")
+        
+        # Configuração do certificado (exatamente como no código da empresa)
+        if os.path.isfile(cert_path):
+            os.environ['REQUESTS_CA_BUNDLE'] = cert_path
+            print(f"[SETUP] Certificado configurado: {cert_path}")
+        else:
+            print(f"[SETUP] AVISO: Certificado não encontrado em: {cert_path}")
+            print("[SETUP] Tentando sem certificado...")
+    
+    else:
+        print("[SETUP] Configurando ambiente de DESENVOLVIMENTO...")
+        
+        # Desenvolvimento - limpa variáveis de proxy se existirem
+        proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
+        for var in proxy_vars:
+            if var in os.environ:
+                del os.environ[var]
+        
+        # Remove certificado se existir
+        if 'REQUESTS_CA_BUNDLE' in os.environ:
+            del os.environ['REQUESTS_CA_BUNDLE']
+            print("[SETUP] Removido REQUESTS_CA_BUNDLE")
+        
+        print("[SETUP] Ambiente de desenvolvimento configurado - conexão direta")
+
+# Executa a configuração ao carregar o módulo
+_setup_proxy_and_certs()
 
 class ElloxAPI:
     """Cliente para integração com a API Ellox da Comexia"""
@@ -54,10 +194,26 @@ class ElloxAPI:
     
     def _authenticate(self) -> str:
         """
-        Autentica usando email e senha para obter token de acesso
+        Autentica usando email e senha para obter token de acesso com fallback resiliente
         
         Returns:
             Token de acesso da API
+        """
+        print("[AUTH] Iniciando autenticação...")
+        
+        # Tenta primeiro com configuração atual
+        token = self._authenticate_with_current_config()
+        if token:
+            print("[AUTH] Autenticação bem-sucedida com configuração atual")
+            return token
+        
+        # Se falhou, tenta com fallback
+        print("[AUTH] Falha com configuração atual, tentando fallback...")
+        return self._authenticate_with_fallback()
+    
+    def _authenticate_with_current_config(self) -> str:
+        """
+        Autentica usando configuração atual (proxy + certificado se configurado)
         """
         try:
             import json
@@ -81,36 +237,105 @@ class ElloxAPI:
             if response.status_code == 200:
                 data = response.json()
                 token = data.get("access_token") or data.get("token")
-                # Muitos endpoints retornam também 'expiracao' (segundos)
-                expires_in = data.get("expiracao") or data.get("expires_in")
                 if token:
-                    self.api_key = token
-                    self.authenticated = True
-                    # Define expiração se disponível
-                    try:
-                        if expires_in:
-                            self.token_expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
-                    except Exception:
-                        self.token_expires_at = None
-                    # Atualiza headers
-                    self.headers = {
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    }
-                    # Persiste em session_state para reutilização
-                    try:
-                        st.session_state.api_token = self.api_key
-                        st.session_state.api_token_expires_at = self.token_expires_at.isoformat() if self.token_expires_at else None
-                    except Exception:
-                        pass
-                    return self.api_key
+                    self._set_auth_token(token, data)
+                    return token
             
             return None
             
+        except requests.exceptions.ProxyError as e:
+            print(f"[AUTH] Erro de proxy na autenticação: {str(e)}")
+            return None
         except Exception as e:
-            print(f"Erro na autenticação: {str(e)}")
+            print(f"[AUTH] Erro na autenticação com configuração atual: {str(e)}")
             return None
+    
+    def _authenticate_with_fallback(self) -> str:
+        """
+        Autentica sem proxy e sem certificado (fallback)
+        """
+        try:
+            import json
+            
+            auth_payload = json.dumps({
+                "email": self.email,
+                "senha": self.password
+            })
+            
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            # Salva configuração atual
+            original_proxies = {}
+            original_cert = None
+            
+            proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
+            for var in proxy_vars:
+                if var in os.environ:
+                    original_proxies[var] = os.environ[var]
+                    del os.environ[var]
+            
+            if 'REQUESTS_CA_BUNDLE' in os.environ:
+                original_cert = os.environ['REQUESTS_CA_BUNDLE']
+                del os.environ['REQUESTS_CA_BUNDLE']
+
+            try:
+                response = requests.post(
+                    f"{self.base_url}/api/auth",
+                    data=auth_payload,
+                    headers=headers,
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    token = data.get("access_token") or data.get("token")
+                    if token:
+                        self._set_auth_token(token, data)
+                        return token
+                
+                return None
+            finally:
+                # Restaura configuração original
+                for var, value in original_proxies.items():
+                    os.environ[var] = value
+                
+                if original_cert:
+                    os.environ['REQUESTS_CA_BUNDLE'] = original_cert
+                
+        except Exception as e:
+            print(f"[AUTH] Erro na autenticação de fallback: {str(e)}")
+            return None
+    
+    def _set_auth_token(self, token: str, data: dict):
+        """
+        Configura o token de autenticação e headers
+        """
+        self.api_key = token
+        self.authenticated = True
+        
+        # Define expiração se disponível
+        expires_in = data.get("expiracao") or data.get("expires_in")
+        try:
+            if expires_in:
+                self.token_expires_at = datetime.utcnow() + timedelta(seconds=int(expires_in))
+        except Exception:
+            self.token_expires_at = None
+        
+        # Atualiza headers
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        # Persiste em session_state para reutilização
+        try:
+            st.session_state.api_token = self.api_key
+            st.session_state.api_token_expires_at = self.token_expires_at.isoformat() if self.token_expires_at else None
+        except Exception:
+            pass
     
     def test_connection(self) -> Dict[str, Any]:
         """
@@ -236,7 +461,8 @@ class ElloxAPI:
     
     def _make_api_request(self, endpoint: str, params: dict = None) -> Dict[str, Any]:
         """
-        Faz uma requisição à API com tratamento de erros
+        Faz uma requisição à API com fallback resiliente
+        Tenta primeiro com configuração atual, depois com fallback
         
         Args:
             endpoint: Endpoint da API
@@ -244,6 +470,22 @@ class ElloxAPI:
             
         Returns:
             Dicionário com resultado da requisição
+        """
+        print(f"[API] Fazendo requisição para: {endpoint}")
+        
+        # Tenta primeiro com configuração atual
+        result = self._make_api_request_with_current_config(endpoint, params)
+        if result.get('success'):
+            print(f"[API] Sucesso com configuração atual - método: {result.get('method', 'N/A')}")
+            return result
+        
+        # Se falhou, tenta com fallback
+        print(f"[API] Falha com configuração atual, tentando fallback...")
+        return self._make_api_request_with_fallback(endpoint, params)
+    
+    def _make_api_request_with_current_config(self, endpoint: str, params: dict = None) -> Dict[str, Any]:
+        """
+        Faz requisição com configuração atual (proxy + certificado se configurado)
         """
         try:
             # Garante autenticação válida antes da chamada
@@ -259,6 +501,7 @@ class ElloxAPI:
             
             # Se o token expirou e retornou 401, tentar reautenticar e refazer uma vez
             if response.status_code == 401 and self.email and self.password:
+                print("[API] Token expirado, reautenticando...")
                 self._authenticate()
                 response = requests.get(
                     f"{self.base_url}{endpoint}",
@@ -271,29 +514,131 @@ class ElloxAPI:
                 return {
                     "success": True,
                     "data": response.json(),
-                    "status_code": response.status_code
+                    "status_code": response.status_code,
+                    "method": "current_config"
                 }
             else:
                 return {
                     "success": False,
                     "error": f"HTTP {response.status_code}: {response.text}",
-                    "status_code": response.status_code
+                    "status_code": response.status_code,
+                    "method": "current_config"
                 }
                 
         except requests.exceptions.Timeout:
             return {
                 "success": False,
-                "error": "Timeout na requisição"
+                "error": "Timeout na requisição com configuração atual",
+                "method": "current_config"
+            }
+        except requests.exceptions.ProxyError as e:
+            return {
+                "success": False,
+                "error": f"Erro de proxy: {str(e)}",
+                "method": "current_config"
+            }
+        except requests.exceptions.ConnectionError as e:
+            return {
+                "success": False,
+                "error": f"Erro de conexão: {str(e)}",
+                "method": "current_config"
             }
         except requests.exceptions.RequestException as e:
             return {
                 "success": False,
-                "error": f"Erro na requisição: {str(e)}"
+                "error": f"Erro na requisição: {str(e)}",
+                "method": "current_config"
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Erro inesperado: {str(e)}"
+                "error": f"Erro inesperado: {str(e)}",
+                "method": "current_config"
+            }
+    
+    def _make_api_request_with_fallback(self, endpoint: str, params: dict = None) -> Dict[str, Any]:
+        """
+        Faz requisição com fallback (sem proxy, sem certificado)
+        """
+        try:
+            print("[API] Tentando fallback - conexão direta...")
+            
+            # Garante autenticação válida antes da chamada
+            if not endpoint.startswith("/api/auth"):
+                self._ensure_auth()
+
+            # Salva configuração atual
+            original_proxies = {}
+            original_cert = None
+            
+            proxy_vars = ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']
+            for var in proxy_vars:
+                if var in os.environ:
+                    original_proxies[var] = os.environ[var]
+                    del os.environ[var]
+            
+            if 'REQUESTS_CA_BUNDLE' in os.environ:
+                original_cert = os.environ['REQUESTS_CA_BUNDLE']
+                del os.environ['REQUESTS_CA_BUNDLE']
+
+            try:
+                response = requests.get(
+                    f"{self.base_url}{endpoint}",
+                    headers=self.headers,
+                    params=params,
+                    timeout=30
+                )
+                
+                # Se o token expirou e retornou 401, tentar reautenticar e refazer uma vez
+                if response.status_code == 401 and self.email and self.password:
+                    print("[API] Token expirado no fallback, reautenticando...")
+                    self._authenticate()
+                    response = requests.get(
+                        f"{self.base_url}{endpoint}",
+                        headers=self.headers,
+                        params=params,
+                        timeout=30
+                    )
+
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "data": response.json(),
+                        "status_code": response.status_code,
+                        "method": "fallback"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"HTTP {response.status_code}: {response.text}",
+                        "status_code": response.status_code,
+                        "method": "fallback"
+                    }
+            finally:
+                # Restaura configuração original
+                for var, value in original_proxies.items():
+                    os.environ[var] = value
+                
+                if original_cert:
+                    os.environ['REQUESTS_CA_BUNDLE'] = original_cert
+                
+        except requests.exceptions.Timeout:
+            return {
+                "success": False,
+                "error": "Timeout na requisição de fallback",
+                "method": "fallback"
+            }
+        except requests.exceptions.ConnectionError as e:
+            return {
+                "success": False,
+                "error": f"Erro de conexão no fallback: {str(e)}",
+                "method": "fallback"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Erro inesperado no fallback: {str(e)}",
+                "method": "fallback"
             }
     
     def search_voyage_tracking(self, vessel_name: str, carrier: str, voyage: str, 

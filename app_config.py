@@ -175,3 +175,11 @@ def get_environment_config() -> Dict:
         "environment": os.getenv("ENVIRONMENT", "development")
     }
 
+# Configuração de proxy (baseada no código da empresa)
+PROXY_CONFIG = {
+    'username': 'ps301761',
+    'password': '@Cotacoes08',
+    'host': 'web.prod.proxy.cargill.com',
+    'port': '4300'
+}
+
