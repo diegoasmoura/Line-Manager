@@ -2618,6 +2618,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.18 - Melhorias no Sistema de Teste de Conexão (Janeiro 2025)
+- **🔧 Teste de Conexão Inteligente**: Implementado sistema dinâmico que detecta automaticamente se deve usar proxy ou conexão direta
+- **📡 Mensagens Contextuais**: Spinner agora mostra mensagens específicas ("Testando conexão via proxy..." ou "Testando conexão direta...")
+- **🛡️ Proteção contra Interferência**: Limpeza temporária de variáveis de ambiente de proxy quando conexão direta é necessária
+- **⚡ Tratamento de Erros Aprimorado**: Adicionado tratamento específico para `ProxyError` com mensagens claras
+- **🔄 Restauração Automática**: Variáveis de ambiente de proxy são automaticamente restauradas após o teste
+- **✨ Feedback Visual Melhorado**: Mensagens de sucesso/erro dos formulários agora aparecem imediatamente após submissão
+
 ### 📌 v3.9.17 - Simplificação da Interface de Configurações (Janeiro 2025)
 - **🎨 Interface Simplificada**: Removido subtítulo redundante "⚙️ Configurações do Sistema Farol" da tela de configurações
 - **🔽 Expander Removido**: Eliminada seção "Ver Detalhes do Ambiente e Conexão" para interface mais limpa
