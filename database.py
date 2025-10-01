@@ -2595,6 +2595,9 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
             new_monitoring_record['data_atualizacao'] = now
             if 'row_inserted_date' in new_monitoring_record:
                 new_monitoring_record['row_inserted_date'] = now
+            
+            # Definir DATA_SOURCE como 'MANUAL' para alterações via Voyage Update
+            new_monitoring_record['data_source'] = 'MANUAL'
 
             monitoring_cols = ", ".join(new_monitoring_record.keys())
             monitoring_placeholders = ", ".join([f":{k}" for k in new_monitoring_record.keys()])

@@ -1831,6 +1831,15 @@ def exibir_history():
                             except Exception:
                                 return 'N/A'
                         
+                        # Função helper para formatar origem dos dados
+                        def format_source_display(source):
+                            if source == 'API':
+                                return 'API'
+                            elif source == 'MANUAL':
+                                return 'Manual'
+                            else:
+                                return f'{source}'
+                        
                         # Layout card expandido mantendo o estilo original
                         st.markdown(f"""
                         <div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; 
@@ -1845,7 +1854,7 @@ def exibir_history():
                                 <div style="text-align: center;">
                                     <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 0.1rem; text-transform: uppercase;">✍️ Origem:</div>
                                     <div style="font-weight: 500; color: #34495e; font-size: 0.85em;">
-                                        {latest_record.get('DATA_SOURCE', latest_record.get('data_source', 'N/A'))}
+                                        {format_source_display(latest_record.get('DATA_SOURCE', latest_record.get('data_source', 'N/A')))}
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
@@ -1992,10 +2001,27 @@ def exibir_history():
                                                 
                                                 update_str = format_update_time(update_time)
                                                 
+                                                # Obter origem dos dados
+                                                current_source = current.get('data_source', current.get('DATA_SOURCE', 'N/A'))
+                                                previous_source = previous.get('data_source', previous.get('DATA_SOURCE', 'N/A'))
+                                                
+                                                # Formatar origem para exibição
+                                                def format_source(source):
+                                                    if source == 'API':
+                                                        return 'API'
+                                                    elif source == 'MANUAL':
+                                                        return 'Manual'
+                                                    else:
+                                                        return f'{source}'
+                                                
+                                                current_source_formatted = format_source(current_source)
+                                                previous_source_formatted = format_source(previous_source)
+                                                
                                                 changes.append({
                                                     'field': label,
                                                     'from': previous_formatted,
                                                     'to': current_formatted,
+                                                    'source': current_source_formatted,
                                                     'updated_at': update_str
                                                 })
                                     
@@ -2009,7 +2035,7 @@ def exibir_history():
                                         st.markdown(f"""
                                         <div style="padding: 0.5rem; margin: 0.25rem 0; border-left: 3px solid #1f77b4; background-color: #f8f9fa;">
                                             <strong>Alteração de {change['field']}</strong> de <em>{change['from']}</em> para <em>{change['to']}</em><br>
-                                            <small>Atualizado em {change['updated_at']}</small>
+                                            <small>Origem: {change['source']} | Atualizado em {change['updated_at']}</small>
                                         </div>
                                         """, unsafe_allow_html=True)
                                 else:
@@ -2025,6 +2051,7 @@ def exibir_history():
                                     'terminal': 'Terminal',
                                     'cnpj_terminal': 'Terminal CNPJ',
                                     'agencia': 'Agência',
+                                    'data_source': 'Source',
                                     'data_deadline': 'Deadline',
                                     'data_draft_deadline': 'Draft Deadline',
                                     'data_abertura_gate': 'Abertura Gate',
@@ -2040,6 +2067,10 @@ def exibir_history():
                                 }
                                 voyage_display = voyage_display.rename(columns=rename_map_voyage)
                                 
+                                # Formatar coluna Source para exibição
+                                if 'Source' in voyage_display.columns:
+                                    voyage_display['Source'] = voyage_display['Source'].apply(format_source_display)
+                                
                                 # Hide ID column
                                 id_cols_to_drop = [col for col in voyage_display.columns if col.strip().lower() == 'id']
                                 if id_cols_to_drop:
@@ -2047,7 +2078,7 @@ def exibir_history():
 
                                 # Define desired column order, hiding Agência and moving Terminal
                                 desired_cols = [
-                                    'Vessel Name', 'Voyage Code', 'Terminal', 'Deadline', 
+                                    'Source', 'Vessel Name', 'Voyage Code', 'Terminal', 'Deadline', 
                                     'Draft Deadline', 'Abertura Gate', 
                                     'ETD', 'ETA', 
                                     'Estimativa Atracação (ETB)', 'Atracação (ATB)', 'Partida (ATD)', 
