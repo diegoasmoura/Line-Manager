@@ -267,19 +267,18 @@ def exibir_tracking():
                     date_cols_to_format = [col for col in history_df.columns if 'data' in col or 'date' in col]
                     for col in date_cols_to_format:
                         history_df[col] = pd.to_datetime(history_df[col], errors='coerce')
-                        # Aplica formatação igual ao history.py
-                        history_df[col] = history_df[col].dt.strftime('%d/%m/%Y %H:%M').replace({pd.NaT: 'N/A'})
-                        # Garante que valores None também sejam convertidos para N/A
-                        history_df[col] = history_df[col].replace({None: 'N/A', 'None': 'N/A', '': 'N/A'})
+                        # Aplica a formatação de data, preservando valores nulos (NaT),
+                        # que o Streamlit renderiza como células vazias.
+                        history_df[col] = history_df[col].dt.strftime('%d/%m/%Y %H:%M')
 
-                    # Oculta a coluna ID e renomeia as outras para exibição
+                    # Oculta a coluna ID e renomeia as outras para exibição (padrão history.py)
                     display_df = history_df.drop(columns=['id'], errors='ignore')
                     
                     rename_map = {
                         'navio': 'Vessel Name',
                         'viagem': 'Voyage Code',
-                        'terminal': 'Terminal',
-                        'data_source': 'Source',
+                        'terminal': 'Port Terminal City',
+                        'data_source': 'Status',
                         'data_estimativa_saida': 'ETD',
                         'data_estimativa_chegada': 'ETA',
                         'data_deadline': 'Deadline',
@@ -295,13 +294,24 @@ def exibir_tracking():
                     }
                     display_df = display_df.rename(columns=rename_map)
 
-                    # Define a ordem de exibição das colunas (igual ao history.py)
+                    # Define a ordem de exibição das colunas (padrão history.py)
                     display_order = [
-                        'Source', 'Vessel Name', 'Voyage Code', 'Terminal', 'Deadline', 
-                        'Draft Deadline', 'Abertura Gate', 'Abertura Gate Reefer',
-                        'ETD', 'ETA', 
-                        'Estimativa Atracação (ETB)', 'Atracação (ATB)', 'Partida (ATD)', 
-                        'Chegada (ATA)', 'Data Atualização', 'Inserted Date'
+                        'Status', 
+                        'Inserted Date',
+                        'Vessel Name', 
+                        'Voyage Code', 
+                        'Port Terminal City', 
+                        'Deadline', 
+                        'Draft Deadline', 
+                        'Abertura Gate', 
+                        'Abertura Gate Reefer',
+                        'ETD', 
+                        'ETA', 
+                        'Estimativa Atracação (ETB)', 
+                        'Atracação (ATB)', 
+                        'Partida (ATD)', 
+                        'Chegada (ATA)', 
+                        'Data Atualização'
                     ]
                     
                     # Filtra a ordem para incluir apenas colunas que existem no dataframe
