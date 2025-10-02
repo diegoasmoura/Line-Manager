@@ -2094,6 +2094,8 @@ def exibir_history():
                                 existing_cols = [col for col in desired_cols if col in voyage_display.columns]
                                 voyage_display = voyage_display[existing_cols]
 
+                                # Força limpeza de cache para garantir que as mudanças sejam aplicadas
+                                st.cache_data.clear()
                                 st.dataframe(voyage_display, use_container_width=True, hide_index=True)
                         
                         # Separador visual entre viagens
