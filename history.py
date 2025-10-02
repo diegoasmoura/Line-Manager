@@ -2071,19 +2071,26 @@ def exibir_history():
                                 if 'Source' in voyage_display.columns:
                                     voyage_display['Source'] = voyage_display['Source'].apply(format_source_display)
                                 
-                                # Hide ID column
-                                id_cols_to_drop = [col for col in voyage_display.columns if col.strip().lower() == 'id']
+                                # Hide ID columns (qualquer coluna que termine com 'id' ou seja exatamente 'id')
+                                id_cols_to_drop = [col for col in voyage_display.columns 
+                                                 if col.strip().lower() == 'id' or col.strip().lower().endswith('_id')]
                                 if id_cols_to_drop:
                                     voyage_display = voyage_display.drop(columns=id_cols_to_drop)
 
-                                # Define desired column order, hiding Agência and moving Terminal
+                                # Define desired column order, hiding Agência and other technical columns
                                 desired_cols = [
                                     'Source', 'Vessel Name', 'Voyage Code', 'Terminal', 'Deadline', 
-                                    'Draft Deadline', 'Abertura Gate', 
+                                    'Draft Deadline', 'Abertura Gate', 'Abertura Gate Reefer',
                                     'ETD', 'ETA', 
                                     'Estimativa Atracação (ETB)', 'Atracação (ATB)', 'Partida (ATD)', 
                                     'Chegada (ATA)', 'Data Atualização', 'Inserted Date'
                                 ]
+                                # Remove colunas técnicas que não devem ser exibidas
+                                technical_cols_to_hide = ['Terminal CNPJ', 'Agência']
+                                for col in technical_cols_to_hide:
+                                    if col in voyage_display.columns:
+                                        voyage_display = voyage_display.drop(columns=[col])
+                                
                                 existing_cols = [col for col in desired_cols if col in voyage_display.columns]
                                 voyage_display = voyage_display[existing_cols]
 
