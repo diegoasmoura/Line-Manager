@@ -112,8 +112,8 @@ def get_voyage_history(vessel_name, voyage_code, terminal):
             params = {'vessel_name': vessel_name, 'voyage_code': voyage_code, 'terminal': terminal}
             df = pd.read_sql(query, conn, params=params)
             
-            # Converte todas as colunas de data
-            date_columns = [col for col in df.columns if 'data' in col.lower()]
+            # Converte todas as colunas de data (exceto data_source)
+            date_columns = [col for col in df.columns if 'data' in col.lower() and col != 'data_source']
             for col in date_columns:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
 
@@ -247,24 +247,9 @@ def exibir_tracking():
             with st.spinner("Buscando histórico..."):
                 history_df = get_voyage_history(selected_row['navio'], selected_row['viagem'], selected_row['terminal'])
                 if not history_df.empty:
-                    # Garante que a coluna 'data_source' tenha um valor padrão (igual ao history.py)
-                    if 'data_source' in history_df.columns:
-                        history_df['data_source'] = history_df['data_source'].fillna('MANUAL').apply(lambda x: 'MANUAL' if str(x).strip() == '' else x)
-                        
-                    # Formata coluna Source para exibição (igual ao history.py)
-                    def format_source_display(source):
-                        if source == 'API':
-                            return 'API'
-                        elif source == 'MANUAL':
-                            return 'Manual'
-                        else:
-                            return f'{source}'
-                    
-                    if 'data_source' in history_df.columns:
-                        history_df['data_source'] = history_df['data_source'].apply(format_source_display)
 
                     # Formata as colunas de data para o padrão DD/MM/YYYY HH:MM (igual ao history.py)
-                    date_cols_to_format = [col for col in history_df.columns if 'data' in col or 'date' in col]
+                    date_cols_to_format = [col for col in history_df.columns if ('data' in col or 'date' in col) and col != 'data_source']
                     for col in date_cols_to_format:
                         history_df[col] = pd.to_datetime(history_df[col], errors='coerce')
                         # Aplica a formatação de data, preservando valores nulos (NaT),
@@ -278,7 +263,7 @@ def exibir_tracking():
                         'navio': 'Vessel Name',
                         'viagem': 'Voyage Code',
                         'terminal': 'Port Terminal City',
-                        'data_source': 'Status',
+                        'data_source': 'Source',
                         'data_estimativa_saida': 'ETD',
                         'data_estimativa_chegada': 'ETA',
                         'data_deadline': 'Deadline',
@@ -296,7 +281,7 @@ def exibir_tracking():
 
                     # Define a ordem de exibição das colunas (padrão history.py)
                     display_order = [
-                        'Status', 
+                        'Source', 
                         'Inserted Date',
                         'Vessel Name', 
                         'Voyage Code', 

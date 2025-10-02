@@ -988,6 +988,11 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - **Interface Intuitiva**: Tela dedicada para visualização do último status de cada viagem, com filtros por navio e terminal.
 - **Edição em Grade**: Permite a edição de datas (ETD, ETA, Deadline, etc.) diretamente na grade, de forma ágil como em uma planilha.
 - **Detalhes do Booking**: A visão de "Ver Refs" foi enriquecida para incluir datas importantes do ciclo de vida do booking (`Shipment Creation`, `Booking Creation`, `Booking Request Date`), oferecendo um contexto mais completo.
+- **Histórico de Viagem**: Nova funcionalidade "Ver Histórico da Viagem" exibe o histórico completo de monitoramento com:
+  - **Coluna Source**: Exibe diretamente o valor da coluna `data_source` da tabela (API, Manual, etc.)
+  - **Dados Originais**: Sem normalização ou formatação, mostrando exatamente o que está armazenado no banco
+  - **Ordenação Temporal**: Registros mais recentes aparecem primeiro
+  - **Formatação de Datas**: Todas as datas são exibidas no formato DD/MM/YYYY HH:MM
 - **Salvar em Lote**: Um único botão "Salvar Alterações" processa todas as modificações feitas na tela de uma só vez.
 - **Lógica de Atualização Transacional**: Ao salvar, o sistema executa uma transação segura que:
   1.  **Insere um novo estado** na tabela `F_ELLOX_TERMINAL_MONITORINGS` com as datas atualizadas.
