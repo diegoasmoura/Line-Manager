@@ -12,6 +12,10 @@ def exibir_setup():
     def test_general_connection():
         with st.spinner(st.session_state.get('general_connection_message', 'Testando conexão geral...')):
             try:
+                # Initialize variables to None to ensure they exist in all code paths
+                original_http_proxy = None
+                original_https_proxy = None
+
                 proxies = {}
                 # Check if proxy credentials are set in session state
                 if (st.session_state.proxy_host and st.session_state.proxy_port and
