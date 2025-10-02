@@ -990,7 +990,9 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - **Nomenclatura Padronizada**: Colunas com nomes em inglês (Vessel Name, Voyage Code, Port Terminal City, Select) para consistência com o sistema.
 - **Controle de Edição**: Apenas campos de data são editáveis; campos de identificação (Vessel Name, Voyage Code, Port Terminal City, Refs) são somente leitura.
 - **Ordem de Colunas Consistente**: Sequência de datas alinhada com o padrão do Voyage Timeline (Deadline → Draft Deadline → Abertura Gate → ETD/ETA → Atracação/Partida/Chegada).
-- **Interface Inteligente**: Dados dos botões "Ver Requests Relacionados" e "Ver Histórico da Viagem" são automaticamente ocultados quando há alterações na grade principal.
+- **Interface Inteligente**: Dados dos botões "Associated Farol References" e "Voyage Records" são automaticamente ocultados quando há alterações na grade principal.
+- **Descarte Automático**: Ao clicar nos botões, alterações pendentes são automaticamente descartadas para exibir dados limpos.
+- **Nomenclatura em Inglês**: Botões com nomes profissionais em inglês para consistência do sistema.
 - **Detalhes do Booking**: A visão de "Ver Refs" foi enriquecida para incluir datas importantes do ciclo de vida do booking (`Shipment Creation`, `Booking Creation`, `Booking Request Date`), oferecendo um contexto mais completo.
 - **Histórico de Viagem**: Nova funcionalidade "Ver Histórico da Viagem" exibe o histórico completo de monitoramento com:
   - **Coluna Source**: Exibe diretamente o valor da coluna `data_source` da tabela (API, Manual, etc.)

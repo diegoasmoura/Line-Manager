@@ -203,6 +203,11 @@ def exibir_tracking():
     # Detecta se há mudanças nos dados
     has_changes = not df_original_for_comparison.reset_index(drop=True).equals(edited_for_comparison.reset_index(drop=True))
     
+    # Se foi solicitado descarte de alterações, limpa o flag
+    if st.session_state.get('tracking_discard_changes'):
+        st.session_state.pop('tracking_discard_changes', None)
+        has_changes = False  # Força has_changes = False para ocultar resumo
+    
     # Limpa a escolha se a seleção mudar, desaparecer ou se houver alterações na grade
     if len(selected_rows) != 1 or has_changes:
         if 'tracking_selected_voyage' in st.session_state:
@@ -226,10 +231,16 @@ def exibir_tracking():
         col1, col2, _ = st.columns([2, 2, 5])
         with col1:
             if st.button("🔗 Associated Farol References", key=f"btn_req_{voyage_key}"):
+                # Limpa alterações pendentes ao clicar no botão
                 st.session_state['tracking_view_choice'] = 'requests'
+                st.session_state['tracking_discard_changes'] = True
+                st.rerun()
         with col2:
             if st.button("📜 Voyage Records", key=f"btn_hist_{voyage_key}"):
+                # Limpa alterações pendentes ao clicar no botão
                 st.session_state['tracking_view_choice'] = 'history'
+                st.session_state['tracking_discard_changes'] = True
+                st.rerun()
 
         # Exibe o conteúdo com base na escolha
         if st.session_state.get('tracking_view_choice') == 'requests':
@@ -355,7 +366,7 @@ def exibir_tracking():
                         "new_value": changed_df.loc[index, col]
                     })
 
-    if changes:
+    if changes and has_changes:
         st.subheader("Resumo das Alterações")
         st.warning(f"{len(changes)} alterações detectadas. Verifique e clique em salvar.")
         
