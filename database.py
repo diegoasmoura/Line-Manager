@@ -486,7 +486,149 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
     finally:
         if conn:
             conn.close()
- 
+
+# Obter os dados da visão geral (todos os campos)
+#@st.cache_data(ttl=300)
+def get_data_generalView(page_number: int = 1, page_size: int = 25):
+    """Executa a consulta SQL com paginação para a visão geral, retornando todas as colunas das visões de Sales e Booking."""
+    conn = None
+    offset = (page_number - 1) * page_size
+
+    # Consulta explícita combinando todos os campos necessários para ambas as visões
+    query = f'''
+    SELECT 
+        ID                                 AS s_id,
+        FAROL_REFERENCE                    AS s_farol_reference,
+        FAROL_STATUS                       AS s_farol_status,
+        S_SHIPMENT_STATUS                  AS s_shipment_status,
+        S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
+        S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
+        S_CUSTOMER_PO                      AS s_customer_po,
+        S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
+        S_SALE_ORDER_DATE                  AS s_sales_order_date,
+        S_BUSINESS                         AS s_business,
+        S_CUSTOMER                         AS s_customer,
+        S_MODE                             AS s_mode,
+        S_INCOTERM                         AS s_incoterm,
+        S_SKU                              AS s_sku,
+        S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
+        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
+        S_VOLUME_IN_TONS                   AS s_volume_in_tons,
+        S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
+        S_CONTAINER_TYPE                   AS s_container_type,
+        S_PORT_OF_LOADING_POL              AS s_port_of_loading_pol,
+        S_PORT_OF_DELIVERY_POD             AS s_port_of_delivery_pod,
+        S_PLACE_OF_RECEIPT                 AS s_place_of_receipt,
+        S_FINAL_DESTINATION                AS s_final_destination,
+        S_REQUESTED_SHIPMENT_WEEK          AS s_requested_shipment_week,
+        S_DTHC_PREPAID                     AS s_dthc_prepaid,
+        S_AFLOAT                           AS s_afloat,
+        S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
+        S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
+        S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
+        S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
+        S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
+        S_PARTIAL_ALLOWED                  AS s_partial_allowed,
+        S_VIP_PNL_RISK                     AS s_vip_pnl_risk,
+        S_PNL_DESTINATION                  AS s_pnl_destination,
+        S_LC_RECEIVED                      AS s_lc_received,
+        S_ALLOCATION_DATE                  AS s_allocation_date,
+        S_PRODUCER_NOMINATION_DATE         AS s_producer_nomination_date,
+        S_SALE_OWNER                       AS s_sales_owner,
+        S_COMMENTS                         AS s_comments,
+        B_CREATION_OF_BOOKING                AS b_creation_of_booking,
+        B_BOOKING_REFERENCE                  AS b_booking_reference,
+        B_BOOKING_STATUS                     AS b_booking_status,
+        B_BOOKING_OWNER                      AS b_booking_owner,
+        B_VOYAGE_CARRIER                     AS b_voyage_carrier,
+        B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
+        B_BOOKING_REQUEST_DATE               AS b_booking_request_date,
+        B_BOOKING_CONFIRMATION_DATE          AS b_booking_confirmation_date,
+        B_VESSEL_NAME                        AS b_vessel_name,
+        B_VOYAGE_CODE                        AS b_voyage_code,
+        B_TERMINAL                           AS b_terminal,
+        B_TRANSHIPMENT_PORT                  AS b_transhipment_port,
+        B_POD_COUNTRY                        AS b_pod_country,
+        B_POD_COUNTRY_ACRONYM                AS b_pod_country_acronym,
+        B_DESTINATION_TRADE_REGION           AS b_destination_trade_region,
+        B_DATA_DRAFT_DEADLINE                AS b_data_draft_deadline,
+        B_DATA_DEADLINE                      AS b_data_deadline,
+        B_DATA_ESTIMATIVA_SAIDA_ETD          AS b_data_estimativa_saida_etd,
+        B_DATA_ESTIMATIVA_CHEGADA_ETA        AS b_data_estimativa_chegada_eta,
+        B_DATA_ABERTURA_GATE                 AS b_data_abertura_gate,
+        B_DATA_CONFIRMACAO_EMBARQUE          AS b_data_confirmacao_embarque,
+        B_DATA_PARTIDA_ATD                   AS b_data_partida_atd,
+        B_DATA_ESTIMADA_TRANSBORDO_ETD       AS b_data_estimada_transbordo_etd,
+        B_DATA_CHEGADA_ATA                   AS b_data_chegada_ata,
+        B_DATA_TRANSBORDO_ATD                AS b_data_transbordo_atd,
+        B_DATA_ESTIMATIVA_ATRACACAO_ETB      AS b_data_estimativa_atracacao_etb,
+        B_DATA_ATRACACAO_ATB                 AS b_data_atracacao_atb,
+        B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
+        B_BOGEY_SALE_PRICE_USD               AS b_bogey_sale_price_usd,
+        B_FreightPpnl                        AS b_freightppnl,
+        B_AWARD_STATUS                       AS b_award_status,
+        B_COMMENTS                           AS b_comments,
+        ADJUSTMENT_ID                        AS adjustment_id
+    FROM LogTransp.F_CON_SALES_BOOKING_DATA
+    ORDER BY FAROL_REFERENCE DESC
+    OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
+
+    count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
+
+    try:
+        conn = get_database_connection()
+        df = pd.read_sql_query(text(query), conn)
+        total_records = conn.execute(text(count_query)).scalar() or 0
+
+        # Aplicar o mapeamento de colunas para nomes amigáveis
+        column_mapping = get_column_mapping()
+        df.rename(columns=column_mapping, inplace=True)
+
+        # Processar o status do Farol para exibição com ícones
+        df = process_farol_status_for_display(df)
+
+        # Lista de colunas de Sales e Booking para garantir que apenas elas apareçam
+        sales_cols = [
+            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Shipment Status",
+            "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+            "Creation Of Shipment", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
+            "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
+            "Sales Order Reference", "data_sales_order", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
+            "Sales Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
+            "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
+            "Comments Sales"
+        ]
+        booking_cols = [
+            "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
+            "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+            "Creation Of Booking", "data_booking_request", "data_booking_confirmation",
+            "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
+            "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
+            "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
+            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+            "Booking Owner",
+            "Comments Booking"
+        ]
+
+        # Combina as colunas, remove duplicatas e mantém a ordem
+        seen = set()
+        combined_cols = [x for x in sales_cols + booking_cols if not (x in seen or seen.add(x))]
+        
+        # Garante que a coluna de referência seja a de Sales (padrão que definimos na query)
+        if "Booking Farol Reference" in combined_cols:
+            combined_cols.remove("Booking Farol Reference")
+
+        # Filtra o DataFrame para conter apenas as colunas da união que realmente existem no DF
+        final_cols = [col for col in combined_cols if col in df.columns]
+        df = df[final_cols]
+
+        return df, total_records
+    finally:
+        if conn:
+            conn.close()
+
+
  #Obter os dados das tabelas principais Loading
 #@st.cache_data(ttl=300)
 def get_data_loadingData():

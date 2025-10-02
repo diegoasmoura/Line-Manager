@@ -2,6 +2,18 @@
 
 Este documento detalha as melhorias implementadas nos últimos pedidos do sistema de gestão de embarques de algodão.
 
+## 🚢 **Tela de Shipments (shipments.py)**
+
+### ✨ **Nova Funcionalidade: Visão Geral (General View)**
+- **Visão Unificada**: Foi adicionada uma nova opção de visualização chamada "General View".
+- **Combinação de Dados**: Esta visão combina todas as colunas das abas "Sales Data" e "Booking Management" em um único lugar.
+- **Benefício**: Permite uma análise completa e consolidada dos embarques, facilitando a busca e o cruzamento de informações sem a necessidade de alternar entre as abas.
+
+### 🔧 **Detalhes Técnicos**
+- Uma nova função, `get_data_generalView`, foi criada em `database.py` para buscar o conjunto completo de dados.
+- A consulta SQL agora seleciona explicitamente todas as colunas necessárias para garantir consistência.
+- A tela de `shipments.py` foi ajustada para incluir a nova opção e carregar os dados correspondentes.
+
 ## 📜 **Histórico (history.py)**
 
 ### ✅ **Mudanças Implementadas**

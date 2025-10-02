@@ -11,6 +11,7 @@ import uuid
 from database import (
     get_data_salesData,           # Carrega os dados dos embarques na tabela de Sales Data
     get_data_bookingData,         # Carrega os dados dos embarques na tabela Booking management
+    get_data_generalView,         # Carrega os dados da visão geral
     get_data_loadingData,         # Carrega os dados dos embarques na tabela Container Loading
     load_df_udc,                  # Carrega as opções de UDC (dropdowns)
     insert_adjustments_basics,    #Função para inserir ajustes básicos na tabela de log
@@ -156,7 +157,7 @@ def exibir_shipments():
  
     choose = st.radio(
         "Choose the stage",
-        ["Sales Data", "Booking Management"],
+        ["Sales Data", "Booking Management", "General View"],
         horizontal=True,
     )
     
@@ -174,6 +175,8 @@ def exibir_shipments():
         df, total_records = get_data_salesData(page_number=st.session_state.shipments_current_page, page_size=page_size)
     elif choose == "Booking Management":
         df, total_records = get_data_bookingData(page_number=st.session_state.shipments_current_page, page_size=page_size)
+    elif choose == "General View":
+        df, total_records = get_data_generalView(page_number=st.session_state.shipments_current_page, page_size=page_size)
 
     total_pages = (total_records // page_size) + (1 if total_records % page_size > 0 else 0)
 
@@ -188,6 +191,9 @@ def exibir_shipments():
         rename_map["Booking Farol Reference"] = "Farol Reference"
     if "Loading Farol Reference" in df.columns:
         rename_map["Loading Farol Reference"] = "Farol Reference"
+    # Adiciona verificação para a coluna original da General View
+    if "FAROL_REFERENCE" in df.columns:
+        rename_map["FAROL_REFERENCE"] = "Farol Reference"
     if rename_map:
         df.rename(columns=rename_map, inplace=True)
     farol_ref_col = "Farol Reference"
