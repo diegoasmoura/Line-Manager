@@ -382,7 +382,7 @@ def exibir_shipments():
         
         # Lista das colunas na ordem específica solicitada
         specific_order = [
-            "Creation Of Booking",
+            "Booking Registered Date",
             "data_booking_request", 
             "Voyage Carrier",
             "Vessel Name", 

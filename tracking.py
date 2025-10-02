@@ -274,14 +274,14 @@ def exibir_tracking():
                     rename_map = {
                         'farol_reference': 'Farol Reference', 'b_booking_reference': 'Booking Ref',
                         'b_booking_status': 'Booking Status', 'p_status': 'P Status',
-                        'row_inserted_date': 'Latest Update', 's_creation_of_shipment': 'Shipment Creation',
-                        'b_creation_of_booking': 'Booking Creation', 'b_booking_request_date': 'Booking Request Date',
+                        'row_inserted_date': 'Latest Update', 's_creation_of_shipment': 'Shipment Requested Date',
+                        'b_creation_of_booking': 'Booking Registered Date', 'b_booking_request_date': 'Booking Requested Date',
                         'b_data_estimativa_saida_etd': 'ETD', 'b_data_estimativa_chegada_eta': 'ETA'
                     }
                     display_df_details = details_df.rename(columns=rename_map)
                     display_cols = [
                         'Farol Reference', 'Booking Ref', 'Booking Status', 'P Status', 'Latest Update',
-                        'Shipment Creation', 'Booking Creation', 'Booking Request Date', 'ETD', 'ETA'
+                        'Shipment Requested Date', 'Booking Registered Date', 'Booking Requested Date', 'ETD', 'ETA'
                     ]
                     final_cols = [col for col in display_cols if col in display_df_details.columns]
                     st.dataframe(display_df_details[final_cols], hide_index=True, use_container_width=True)

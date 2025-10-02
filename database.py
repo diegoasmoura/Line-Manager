@@ -352,7 +352,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas
-            "Creation Of Shipment", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
+            "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
             "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
             # Pedido e cliente
             "Sales Order Reference", "data_sales_order", "Business", "Customer",
@@ -465,7 +465,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
-            "Creation Of Booking", "data_booking_request", "data_booking_confirmation",
+            "Booking Registered Date", "data_booking_request", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
@@ -591,7 +591,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         sales_cols = [
             "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Shipment Status",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
-            "Creation Of Shipment", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
+            "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
             "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
             "Sales Order Reference", "data_sales_order", "Business", "Customer",
             "Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
@@ -601,7 +601,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         booking_cols = [
             "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
-            "Creation Of Booking", "data_booking_request", "data_booking_confirmation",
+            "Booking Registered Date", "data_booking_request", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",

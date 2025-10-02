@@ -13,7 +13,7 @@ def get_column_mapping():
         "s_farol_status" : "Farol Status",
 
         "s_farol_reference": "Sales Farol Reference",
-        "s_creation_of_shipment": "Creation Of Shipment",
+        "s_creation_of_shipment": "Shipment Requested Date",
         "s_customer_po": "Customer PO",
         "s_sales_order_reference": "Sales Order Reference",
         "s_sales_order_date": "data_sales_order",
@@ -56,7 +56,7 @@ def get_column_mapping():
         # Booking Management
         "b_id": "ID Booking",
         "b_farol_reference": "Booking Farol Reference",
-        "b_creation_of_booking": "Creation Of Booking",
+        "b_creation_of_booking": "Booking Registered Date",
         "b_booking_reference": "Booking Reference",
         "b_booking_status": "Booking Status",
         "b_farol_status" : "Farol Status",
@@ -64,7 +64,7 @@ def get_column_mapping():
         "b_booking_owner": "Booking Owner",
         "b_voyage_carrier": "Voyage Carrier",
         "b_freight_forwarder": "Freight Forwarder",
-        "b_booking_request_date": "data_booking_request",
+        "b_booking_request_date": "Booking Requested Date",
         "b_booking_confirmation_date": "data_booking_confirmation",
         "b_vessel_name": "Vessel Name",
         "b_voyage_code": "Voyage Code",
@@ -130,13 +130,13 @@ def get_column_mapping():
 def non_editable_columns(stage):
  
     if stage == "Sales Data":
-        non_editable = ["Sales Farol Reference", "Creation Of Shipment", "Adjusts Basic", "Adjusts Critic", "Farol Status"]
+        non_editable = ["Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic", "Farol Status"]
     elif stage == "Booking Management":
-        non_editable = ["Booking Farol Reference", "Creation Of Booking", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Farol Status"]
+        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Farol Status"]
     elif stage == "General View":
         non_editable = list(dict.fromkeys([
-            "Sales Farol Reference", "Creation Of Shipment", "Adjusts Basic", "Adjusts Critic",
-            "Creation Of Booking", "Type of Shipment", "Sales Quantity of Containers", "Container Type", 
+            "Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic",
+            "Booking Registered Date", "Type of Shipment", "Sales Quantity of Containers", "Container Type", 
             "Port of Loading POL", "Port of Delivery POD", "Farol Status"
         ]))
     elif stage == "Container Delivery at Port":
@@ -202,7 +202,7 @@ def drop_downs(data_show, df_udc):
         "data_lc_received": "date",
         "data_allocation": "date",
         "data_producer_nomination": "date",
-        "Creation Of Shipment": "datetime",  # Adiciona coluna de criação como datetime
+        "Shipment Requested Date": "datetime",  # Adiciona coluna de criação como datetime
         # "First Vessel ETD": "date",  # coluna removida na unificada
         "Volume in Tons": "numeric",
         "Sales Quantity of Containers": "numeric",
@@ -217,7 +217,7 @@ def drop_downs(data_show, df_udc):
         "Voyage Carrier": "select",
         "data_booking_request": "date",
         "data_booking_confirmation": "date",
-        "Creation Of Booking": "datetime",  # Adiciona coluna de criação como datetime
+        "Booking Registered Date": "datetime",  # Adiciona coluna de criação como datetime
         "data_draft_deadline": "datetime",
         "data_deadline": "datetime",
         "data_estimativa_saida": "datetime",
