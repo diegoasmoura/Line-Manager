@@ -175,7 +175,18 @@ def exibir_tracking():
         "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para ver as opções")
     }
     
-    display_order_preferred = ["Selecionar", "navio", "viagem", "terminal", "farol_references_count", "data_estimativa_saida", "data_estimativa_chegada", "data_deadline"] + [col for col in df_display.columns if col not in ["Selecionar", "navio", "viagem", "terminal", "farol_references_count", "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "id", "rn", "farol_references_list"]]
+    # Ordem das colunas seguindo o padrão do history.py Voyage Timeline
+    display_order_preferred = [
+        "Selecionar", "navio", "viagem", "terminal", "farol_references_count",
+        "data_deadline", "data_draft_deadline", "data_abertura_gate", "data_abertura_gate_reefer",
+        "data_estimativa_saida", "data_estimativa_chegada", "data_estimativa_atracacao",
+        "data_atracacao", "data_partida", "data_chegada"
+    ] + [col for col in df_display.columns if col not in [
+        "Selecionar", "navio", "viagem", "terminal", "farol_references_count",
+        "data_deadline", "data_draft_deadline", "data_abertura_gate", "data_abertura_gate_reefer",
+        "data_estimativa_saida", "data_estimativa_chegada", "data_estimativa_atracacao",
+        "data_atracacao", "data_partida", "data_chegada", "id", "rn", "farol_references_list"
+    ]]
     display_order_safe = [col for col in display_order_preferred if col in df_display.columns]
 
     edited_df = st.data_editor(
@@ -185,8 +196,15 @@ def exibir_tracking():
 
     selected_rows = edited_df[edited_df["Selecionar"] == True]
 
-    # Limpa a escolha se a seleção mudar ou desaparecer
-    if len(selected_rows) != 1:
+    # Verifica se houve alterações na grade (comparando com dados originais)
+    df_original_for_comparison = df_filtered[edited_df.columns.drop('Selecionar')]
+    edited_for_comparison = edited_df.drop(columns=['Selecionar'])
+    
+    # Detecta se há mudanças nos dados
+    has_changes = not df_original_for_comparison.reset_index(drop=True).equals(edited_for_comparison.reset_index(drop=True))
+    
+    # Limpa a escolha se a seleção mudar, desaparecer ou se houver alterações na grade
+    if len(selected_rows) != 1 or has_changes:
         if 'tracking_selected_voyage' in st.session_state:
             del st.session_state['tracking_selected_voyage']
         if 'tracking_view_choice' in st.session_state:
