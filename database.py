@@ -465,7 +465,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
-            "Booking Registered Date", "b_booking_request_date", "b_booking_confirmation_date",
+            "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
@@ -601,7 +601,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         booking_cols = [
             "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
-            "Booking Registered Date", "b_booking_request_date", "b_booking_confirmation_date",
+            "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
