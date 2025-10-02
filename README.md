@@ -987,6 +987,8 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - **Filtro de Relevância**: Por padrão, a grade exibe apenas viagens que possuem pelo menos uma `Farol Reference` associada (`INNER JOIN`), ocultando monitoramentos antigos ou não relacionados.
 - **Interface Intuitiva**: Tela dedicada para visualização do último status de cada viagem, com filtros por navio e terminal.
 - **Edição em Grade**: Permite a edição de datas (ETD, ETA, Deadline, etc.) diretamente na grade, de forma ágil como em uma planilha.
+- **Nomenclatura Padronizada**: Colunas com nomes em inglês (Vessel Name, Voyage Code, Port Terminal City, Select) para consistência com o sistema.
+- **Controle de Edição**: Apenas campos de data são editáveis; campos de identificação (Vessel Name, Voyage Code, Port Terminal City, Refs) são somente leitura.
 - **Detalhes do Booking**: A visão de "Ver Refs" foi enriquecida para incluir datas importantes do ciclo de vida do booking (`Shipment Creation`, `Booking Creation`, `Booking Request Date`), oferecendo um contexto mais completo.
 - **Histórico de Viagem**: Nova funcionalidade "Ver Histórico da Viagem" exibe o histórico completo de monitoramento com:
   - **Coluna Source**: Exibe diretamente o valor da coluna `data_source` da tabela (API, Manual, etc.)

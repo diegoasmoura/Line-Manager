@@ -159,10 +159,10 @@ def exibir_tracking():
 
     column_config = {
         "id": None, "rn": None, "farol_references_list": None,
-        "navio": st.column_config.TextColumn("Navio", disabled=True),
-        "viagem": st.column_config.TextColumn("Viagem", disabled=True),
-        "terminal": st.column_config.TextColumn("Terminal", disabled=True),
-        "farol_references_count": st.column_config.NumberColumn("Refs", help="Número de Farol References associadas"),
+        "navio": st.column_config.TextColumn("Vessel Name", disabled=True),
+        "viagem": st.column_config.TextColumn("Voyage Code", disabled=True),
+        "terminal": st.column_config.TextColumn("Port Terminal City", disabled=True),
+        "farol_references_count": st.column_config.NumberColumn("Refs", help="Número de Farol References associadas", disabled=True),
         "data_estimativa_saida": st.column_config.DatetimeColumn("ETD", format="DD/MM/YYYY HH:mm"),
         "data_estimativa_chegada": st.column_config.DatetimeColumn("ETA", format="DD/MM/YYYY HH:mm"),
         "data_deadline": st.column_config.DatetimeColumn("Deadline", format="DD/MM/YYYY HH:mm"),
@@ -172,7 +172,7 @@ def exibir_tracking():
         "data_partida": st.column_config.DatetimeColumn("Partida (ATD)", format="DD/MM/YYYY HH:mm"),
         "data_chegada": st.column_config.DatetimeColumn("Chegada (ATA)", format="DD/MM/YYYY HH:mm"),
         "data_estimativa_atracacao": st.column_config.DatetimeColumn("Estimativa Atracação (ETB)", format="DD/MM/YYYY HH:mm"),
-        "Selecionar": st.column_config.CheckboxColumn("Selecionar", help="Selecione uma linha para ver as opções")
+        "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para ver as opções")
     }
     
     display_order_preferred = ["Selecionar", "navio", "viagem", "terminal", "farol_references_count", "data_estimativa_saida", "data_estimativa_chegada", "data_deadline"] + [col for col in df_display.columns if col not in ["Selecionar", "navio", "viagem", "terminal", "farol_references_count", "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "id", "rn", "farol_references_list"]]
