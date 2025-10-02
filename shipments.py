@@ -634,21 +634,18 @@ def exibir_shipments():
     # Botões sempre visíveis, mas desabilitados se não houver seleção única
     with col_booking:
         new_booking_disabled = True
-        if selected_farol_ref and original_status is not None:
-            new_booking_disabled = not (str(original_status).strip().lower() == "new request".lower())
-        # Se não há seleção única, desabilita
-        if len(selected_rows) != 1:
-            new_booking_disabled = True
+        if len(selected_rows) == 1 and original_status is not None:
+            cleaned_status = clean_farol_status_value(original_status)
+            new_booking_disabled = not (cleaned_status.strip().lower() == "new request".lower())
         st.button("📦 New Booking", disabled=new_booking_disabled, key="new_booking_btn")
         if st.session_state.get("new_booking_btn") and not new_booking_disabled:
             st.session_state["current_page"] = "booking"
             st.rerun()
     with col_history:
         history_disabled = True
-        if selected_farol_ref and original_status is not None:
-            history_disabled = not (str(original_status).strip().lower() != "new request".lower())
-        if len(selected_rows) != 1:
-            history_disabled = True
+        if len(selected_rows) == 1 and original_status is not None:
+            cleaned_status = clean_farol_status_value(original_status)
+            history_disabled = not (cleaned_status.strip().lower() != "new request".lower())
         st.button("🎫 Ticket Journey", disabled=history_disabled, key="history_btn")
         if st.session_state.get("history_btn") and not history_disabled:
             st.session_state["selected_reference"] = selected_farol_ref
@@ -656,11 +653,9 @@ def exibir_shipments():
             st.rerun()
     with col_split:
         adjustments_disabled = True
-        if selected_farol_ref and original_status is not None:
-            adjustments_disabled = not (str(original_status).strip().lower() != "new request".lower())
-        # Se não há seleção única, desabilita
-        if len(selected_rows) != 1:
-            adjustments_disabled = True
+        if len(selected_rows) == 1 and original_status is not None:
+            cleaned_status = clean_farol_status_value(original_status)
+            adjustments_disabled = not (cleaned_status.strip().lower() != "new request".lower())
         st.button("🛠️ Adjustments", disabled=adjustments_disabled, key="adjustments_btn")
         if st.session_state.get("adjustments_btn") and not adjustments_disabled:
             st.session_state["original_data"] = df
