@@ -30,6 +30,8 @@ if "navigate_to" in st.session_state:
 # Redireciona "History" para "Shipments" (opção removida do menu)
 if st.session_state.menu_choice == "History":
     st.session_state.menu_choice = "Shipments"
+    # Força limpeza de cache do Streamlit
+    st.cache_data.clear()
 
 # Sidebar personalizada com SVG
 with st.sidebar:
@@ -39,8 +41,8 @@ with st.sidebar:
     </h2>
     """, unsafe_allow_html=True)
  
-    # Lista de opções
-    options = ["Shipments", "Op. Control", "Performance", "Tracking", "Setup"]  # Removido "Adjustments" - funcionalidade movida para History
+    # Lista de opções (History removido - acessível via Shipments)
+    options = ["Shipments", "Op. Control", "Performance", "Tracking", "Setup"]
     
     # Encontra o índice da opção atual
     current_index = options.index(st.session_state.menu_choice) if st.session_state.menu_choice in options else 0
