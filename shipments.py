@@ -374,16 +374,16 @@ def exibir_shipments():
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
         
         # Reordena as colunas seguindo a ordem específica enviada pelo usuário
-        # Ordem: Creation Of Booking, data_booking_request, Voyage Carrier, Vessel Name, Voyage Code, Terminal, 
+        # Ordem: Creation Of Booking, b_booking_request_date, Voyage Carrier, Vessel Name, Voyage Code, Terminal, 
         # Freight Forwarder, Transhipment Port, POD Country, POD Country Acronym, Destination Trade Region,
-        # data_booking_confirmation, data_estimativa_saida, data_estimativa_chegada, data_deadline, 
+        # b_booking_confirmation_date, data_estimativa_saida, data_estimativa_chegada, data_deadline, 
         # data_draft_deadline, data_abertura_gate, data_confirmacao_embarque, data_atracacao, 
         # data_partida, data_chegada, data_estimativa_atracacao, data_estimada_transbordo, data_transbordo
         
         # Lista das colunas na ordem específica solicitada
         specific_order = [
             "Booking Registered Date",
-            "data_booking_request", 
+            "b_booking_request_date", 
             "Voyage Carrier",
             "Vessel Name", 
             "Voyage Code",
@@ -393,7 +393,7 @@ def exibir_shipments():
             "POD Country",
             "POD Country Acronym", 
             "Destination Trade Region",
-            "data_booking_confirmation",
+            "b_booking_confirmation_date",
             "data_estimativa_saida",
             "data_estimativa_chegada", 
             "data_deadline",
