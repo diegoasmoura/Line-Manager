@@ -1005,6 +1005,21 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
   2.  **Atualiza os registros principais** na tabela `F_CON_SALES_BOOKING_DATA`, propagando a nova data para todas as `Farol References` associadas à viagem.
 - **Auditoria Completa**: Cada alteração é registrada na nova tabela `LogTransp.F_CON_VOYAGE_MANUAL_UPDATES`, garantindo um histórico completo de quem alterou, o quê, e quando.
 
+#### 🐞 **Correções de Gerenciamento de Estado (Outubro 2025)**
+
+Foi identificado e corrigido um problema complexo de gerenciamento de estado na tela de atualização manual (`tracking.py`), que causava a reaparição de alterações descartadas.
+
+- **Problema**: Ao editar um campo, clicar em um botão de ação (como "Associated Farol References" ou "Cancel") para descartar a alteração e, em seguida, editar um novo campo, a alteração original descartada reaparecia no resumo de alterações.
+- **Causa Raiz**: A metodologia anterior para limpar o estado do widget `st.data_editor` (deleção da chave ou redefinição) não era totalmente eficaz, fazendo com que o Streamlit recuperasse um estado antigo do componente em execuções subsequentes.
+- **Solução Implementada**:
+    - **Reset por Chave Dinâmica**: A solução definitiva foi implementar um padrão de reset robusto. Agora, toda vez que uma ação de descarte é acionada, um contador na `session_state` é incrementado. Esse contador é usado para gerar uma **chave (`key`) dinâmica** para o `st.data_editor`.
+    - **Recriação Forçada**: Ao mudar a chave, o Streamlit é forçado a destruir a instância antiga do widget e criar uma completamente nova, com estado limpo, garantindo que nenhuma alteração "fantasma" persista entre as execuções.
+- **Melhorias de UX**:
+    - **Botão "Cancel"**: Adicionado um botão "Cancel" na seção "Changes Summary" para permitir o descarte explícito das alterações.
+    - **Tradução**: A seção "Changes Summary" e seus botões foram traduzidos para o inglês ("Save Changes", "Cancel") para manter a consistência da interface.
+
+- **Status**: ✅ **Resolvido**
+
 ### 🚢 `ellox_api.py`
 **Cliente da API Ellox**
 - Autenticação automática com email/senha

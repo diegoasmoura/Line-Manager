@@ -126,6 +126,16 @@ def exibir_tracking():
     """
     Exibe a página para atualização manual de datas de viagem.
     """
+    # Inicializa a chave do editor se não existir
+    if 'voyage_editor_key_suffix' not in st.session_state:
+        st.session_state.voyage_editor_key_suffix = 0
+
+    # Se foi solicitado descarte de alterações, incrementa a chave do editor para forçar a recriação
+    if st.session_state.get('tracking_discard_changes'):
+        st.session_state.pop('tracking_discard_changes', None)
+        st.session_state.voyage_editor_key_suffix += 1
+        st.rerun()
+
     if "page_flash_message" in st.session_state:
         flash = st.session_state.pop("page_flash_message")
         st.success(flash["message"])
@@ -156,6 +166,18 @@ def exibir_tracking():
 
     df_display = df_filtered.copy()
     df_display["Selecionar"] = False
+
+    # Restaura a seleção se ela existir na session_state, para que não se perca ao descartar alterações
+    if 'tracking_selected_voyage' in st.session_state:
+        voyage_key = st.session_state['tracking_selected_voyage']
+        selected_row_indices = df_display[
+            (df_display['navio'] == voyage_key[0]) &
+            (df_display['viagem'] == voyage_key[1]) &
+            (df_display['terminal'] == voyage_key[2])
+        ].index
+        
+        if not selected_row_indices.empty:
+            df_display.loc[selected_row_indices, 'Selecionar'] = True
 
     column_config = {
         "id": None, "rn": None, "farol_references_list": None,
@@ -191,7 +213,7 @@ def exibir_tracking():
 
     edited_df = st.data_editor(
         df_display[display_order_safe],
-        column_config=column_config, use_container_width=True, num_rows="fixed", key="voyage_editor", hide_index=True
+        column_config=column_config, use_container_width=True, num_rows="fixed", key=f"voyage_editor_{st.session_state.voyage_editor_key_suffix}", hide_index=True
     )
 
     selected_rows = edited_df[edited_df["Selecionar"] == True]
@@ -202,11 +224,6 @@ def exibir_tracking():
     
     # Detecta se há mudanças nos dados
     has_changes = not df_original_for_comparison.reset_index(drop=True).equals(edited_for_comparison.reset_index(drop=True))
-    
-    # Se foi solicitado descarte de alterações, limpa o flag
-    if st.session_state.get('tracking_discard_changes'):
-        st.session_state.pop('tracking_discard_changes', None)
-        has_changes = False  # Força has_changes = False para ocultar resumo
     
     # Limpa a escolha se a seleção mudar, desaparecer ou se houver alterações na grade
     if len(selected_rows) != 1 or has_changes:
@@ -367,26 +384,32 @@ def exibir_tracking():
                     })
 
     if changes and has_changes:
-        st.subheader("Resumo das Alterações")
-        st.warning(f"{len(changes)} alterações detectadas. Verifique e clique em salvar.")
+        st.subheader("Changes Summary")
+        st.warning(f"{len(changes)} changes detected. Please review and save.")
         
         changes_df = pd.DataFrame(changes)
         st.dataframe(changes_df[["vessel_name", "voyage_code", "field_name", "old_value", "new_value"]].rename(
-            columns={"vessel_name": "Navio", "voyage_code": "Viagem", "field_name": "Campo Alterado", "old_value": "Valor Antigo", "new_value": "Novo Valor"}
+            columns={"vessel_name": "Vessel", "voyage_code": "Voyage", "field_name": "Changed Field", "old_value": "Old Value", "new_value": "New Value"}
         ), use_container_width=True)
 
-        if st.button("💾 Salvar Alterações", type="primary"):
-            with st.spinner("Salvando alterações no banco de dados..."):
-                try:
-                    success, message = update_booking_from_voyage(changes)
-                    
-                    if success:
-                        st.session_state.page_flash_message = {"type": "success", "message": "✅ Alterações salvas com sucesso!"}
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Falha ao salvar: {message}")
-                except Exception as e:
-                    st.error(f"❌ Ocorreu um erro inesperado: {e}")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Changes", type="primary"):
+                with st.spinner("Saving changes to the database..."):
+                    try:
+                        success, message = update_booking_from_voyage(changes)
+                        
+                        if success:
+                            st.session_state.page_flash_message = {"type": "success", "message": "✅ Changes saved successfully!"}
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Failed to save: {message}")
+                    except Exception as e:
+                        st.error(f"❌ An unexpected error occurred: {e}")
+        with col2:
+            if st.button("❌ Cancel"):
+                st.session_state['tracking_discard_changes'] = True
+                st.rerun()
 
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
