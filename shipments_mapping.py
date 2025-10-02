@@ -20,7 +20,7 @@ def get_column_mapping():
         "s_business": "Business",
         "s_customer": "Customer",
         "s_mode": "Mode",
-        "s_incoterm": "Sales Incoterm",
+        "s_incoterm": "Incoterm",
         "s_sku": "SKU",
         "s_plant_of_origin": "Plant of Origin",
         "s_type_of_shipment": "Type of Shipment",

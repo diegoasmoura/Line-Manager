@@ -100,7 +100,7 @@ Notas:
 O sistema carrega opções da tabela `F_CON_GLOBAL_VARIABLES` para dropdowns. Garanta que os grupos estejam populados (vide `Preenchendo tabela GLOBAL.sql`). Grupos utilizados incluem, entre outros:
 
 - Porto Origem, Porto Destino, Carrier, DTHC, VIP PNL Risk, Yes No
-- Business, Mode, Sku, Farol Status, Type of Shipment, Booking Status
+- Business, Farol Status, Type of Shipment, Booking Status
 - Truck Loading Status, Status ITAS
 
 ## 🧠 Ícones do Farol Status
@@ -248,7 +248,7 @@ Planejamento (sujeito a mudanças, ainda não implementado):
 - Timeline de volumes (mensal/semanal, comparação ano a ano)
 - Tempo médio entre etapas (KPIs por status)
 - Análise por localização (Top POL/POD)
-- Performance por Business/SKU
+- Performance por Business
 
 Observação: ao entrar na aba Performance atualmente, será exibida apenas uma indicação de que o módulo está em desenvolvimento.
 

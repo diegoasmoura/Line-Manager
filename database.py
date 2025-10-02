@@ -355,9 +355,9 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
             "Creation Of Shipment", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
             "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
             # Pedido e cliente
-            "Sales Order Reference", "data_sales_order", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
+            "Sales Order Reference", "data_sales_order", "Business", "Customer",
             # Condições
-            "Sales Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
+            "Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
             # Administração
             "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
             # Observações
@@ -593,8 +593,8 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             "Creation Of Shipment", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
             "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
-            "Sales Order Reference", "data_sales_order", "Business", "Customer", "Mode", "SKU", "Plant of Origin",
-            "Sales Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
+            "Sales Order Reference", "data_sales_order", "Business", "Customer",
+            "Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
             "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
             "Comments Sales"
         ]
