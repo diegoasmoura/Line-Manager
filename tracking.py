@@ -225,10 +225,10 @@ def exibir_tracking():
 
         col1, col2, _ = st.columns([2, 2, 5])
         with col1:
-            if st.button("🔍 Ver Requests Relacionados", key=f"btn_req_{voyage_key}"):
+            if st.button("🔗 Associated Farol References", key=f"btn_req_{voyage_key}"):
                 st.session_state['tracking_view_choice'] = 'requests'
         with col2:
-            if st.button("📜 Ver Histórico da Viagem", key=f"btn_hist_{voyage_key}"):
+            if st.button("📜 Voyage Records", key=f"btn_hist_{voyage_key}"):
                 st.session_state['tracking_view_choice'] = 'history'
 
         # Exibe o conteúdo com base na escolha
