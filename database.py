@@ -597,41 +597,53 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         # Processar o status do Farol para exibição com ícones
         df = process_farol_status_for_display(df)
 
-        # Lista de colunas de Sales e Booking para garantir que apenas elas apareçam
-        sales_cols = [
-            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Shipment Status",
+        # Lista de colunas seguindo ordem específica solicitada pelo usuário
+        combined_cols = [
+            # 1. IDENTIFICAÇÃO BÁSICA
+            "Sales Farol Reference", "Farol Status", "Carrier Returns Status", "Type of Shipment", "Shipment Status",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
-            "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
+            
+            # 2. DATAS INICIAIS
+            "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date",
+            
+            # 3. INFORMAÇÕES DE NAVEGAÇÃO
+            "Voyage Carrier", "Vessel Name", "Voyage Code", "Terminal", "Freight Forwarder", 
+            "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            
+            # 4. PRAZOS E PERÍODOS
+            "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
             "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
-            "Sales Order Reference", "data_sales_order", "Business", "Customer",
-            "Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
-            "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
-            "Comments Sales"
-        ]
-        booking_cols = [
-            "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
-            "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
-            "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
-            "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
-            "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
-            "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
-            "data_chegada_destino_eta", "data_chegada_destino_ata",
-            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
-            "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
-            "Booking Owner",
-            "Comments Booking"
+            
+            # 5. PROCESSO DE BOOKING
+            "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada", 
+            "data_deadline", "data_draft_deadline", "data_abertura_gate", "data_confirmacao_embarque",
+            
+            # 6. PROCESSO MARÍTIMO (Estimativas vs Real)
+            "data_atracacao", "data_partida", "data_chegada", "data_estimativa_atracacao", 
+            "data_estimada_transbordo", "data_transbordo", "data_chegada_destino_eta", "data_chegada_destino_ata",
+            
+            # 7. FRETE
+            "Freight Rate USD",
+            
+            # 8. INFORMAÇÕES DE SALES
+            "Sales Order Reference", "data_sales_order", "Business", "Customer", "Incoterm", "DTHC", "Afloat", 
+            "VIP PNL Risk", "PNL Destination", "data_allocation", "data_producer_nomination", "data_lc_received", 
+            "Sales Owner", "Splitted Booking Reference", "Comments Sales",
+            
+            # 9. INFORMAÇÕES DE BOOKING
+            "Booking Status", "Booking Reference", "Booking Owner", "Bogey Sale Price USD", "Freight PNL", "Comments Booking"
         ]
 
-        # Combina as colunas, remove duplicatas e mantém a ordem
+        # Remove duplicatas mantendo a ordem lógica
         seen = set()
-        combined_cols = [x for x in sales_cols + booking_cols if not (x in seen or seen.add(x))]
+        final_combined_cols = [x for x in combined_cols if not (x in seen or seen.add(x))]
         
         # Garante que a coluna de referência seja a de Sales (padrão que definimos na query)
-        if "Booking Farol Reference" in combined_cols:
-            combined_cols.remove("Booking Farol Reference")
+        if "Booking Farol Reference" in final_combined_cols:
+            final_combined_cols.remove("Booking Farol Reference")
 
         # Filtra o DataFrame para conter apenas as colunas da união que realmente existem no DF
-        final_cols = [col for col in combined_cols if col in df.columns]
+        final_cols = [col for col in final_combined_cols if col in df.columns]
         df = df[final_cols]
 
         return df, total_records
