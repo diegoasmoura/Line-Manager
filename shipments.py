@@ -663,7 +663,7 @@ def exibir_shipments():
             original_status = df_filtered_original.loc[selected_index, "Farol Status"]
     
     st.markdown("---")
-    col_new, col_booking, col_history, col_split, _ = st.columns([1, 1, 1, 1, 4])
+    col_new, col_booking, col_history, col_split, col_attachments, col_export = st.columns([1, 1, 1, 1, 1, 1])
     with col_new:
         if st.button("🚢 New Shipment"):
             st.session_state["current_page"] = "add"
@@ -699,12 +699,7 @@ def exibir_shipments():
             st.session_state["selected_reference"] = selected_farol_ref
             st.session_state["current_page"] = "split"
             st.rerun()
-    # Botões View Attachments e Export XLSX lado a lado
-    cols = st.columns([2, 1, 1])
-    attachments_col = cols[1]
-    export_col = cols[2]
-    
-    with attachments_col:
+    with col_attachments:
         view_attachments_open = st.session_state.get("show_shipments_attachments", False)
         if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
             if view_attachments_open:
@@ -714,8 +709,7 @@ def exibir_shipments():
                 st.session_state["show_shipments_attachments"] = True
                 st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
             st.rerun()
-
-    with export_col:
+    with col_export:
         # Botão de exportação XLSX - sempre ativo
         from datetime import datetime
         
