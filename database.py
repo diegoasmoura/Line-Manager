@@ -187,6 +187,8 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                             B_DATA_ESTIMADA_TRANSBORDO_ETD,
                             B_DATA_CHEGADA_ATA,
                             B_DATA_TRANSBORDO_ATD,
+                            B_DATA_CHEGADA_DESTINO_ETA,
+                            B_DATA_CHEGADA_DESTINO_ATA,
                             B_DATA_ESTIMATIVA_ATRACACAO_ETB,
                             B_DATA_ATRACACAO_ATB,
                             USER_INSERT,
@@ -211,7 +213,8 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                 'B_DATA_DRAFT_DEADLINE', 'B_DATA_DEADLINE', 'B_DATA_ESTIMATIVA_SAIDA_ETD', 
                 'B_DATA_ESTIMATIVA_CHEGADA_ETA', 'B_DATA_ABERTURA_GATE', 'B_DATA_CONFIRMACAO_EMBARQUE',
                 'B_DATA_PARTIDA_ATD', 'B_DATA_ESTIMADA_TRANSBORDO_ETD', 'B_DATA_CHEGADA_ATA', 
-                'B_DATA_TRANSBORDO_ATD', 'B_DATA_ESTIMATIVA_ATRACACAO_ETB', 'B_DATA_ATRACACAO_ATB',
+                'B_DATA_TRANSBORDO_ATD', 'B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA',
+                'B_DATA_ESTIMATIVA_ATRACACAO_ETB', 'B_DATA_ATRACACAO_ATB',
                 'S_REQUESTED_DEADLINE_START_DATE', 'S_REQUESTED_DEADLINE_END_DATE', 
                 'S_REQUIRED_ARRIVAL_DATE_EXPECTED', 'ROW_INSERTED_DATE', 'PDF_BOOKING_EMISSION_DATE'
             ]
@@ -413,6 +416,8 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
         B_DATA_ESTIMADA_TRANSBORDO_ETD       AS b_data_estimada_transbordo_etd,
         B_DATA_CHEGADA_ATA                   AS b_data_chegada_ata,
         B_DATA_TRANSBORDO_ATD                AS b_data_transbordo_atd,
+        B_DATA_CHEGADA_DESTINO_ETA           AS b_data_chegada_destino_eta,
+        B_DATA_CHEGADA_DESTINO_ATA           AS b_data_chegada_destino_ata,
         B_DATA_ESTIMATIVA_ATRACACAO_ETB      AS b_data_estimativa_atracacao_etb,
         B_DATA_ATRACACAO_ATB                 AS b_data_atracacao_atb,
         /* demais valores */
@@ -449,7 +454,8 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
             'data_draft_deadline', 'data_deadline', 'data_estimativa_saida', 
             'data_estimativa_chegada', 'data_abertura_gate', 'data_confirmacao_embarque',
             'data_partida', 'data_estimada_transbordo', 'data_chegada', 
-            'data_transbordo', 'data_estimativa_atracacao', 'data_atracacao',
+            'data_transbordo', 'data_chegada_destino_eta', 'data_chegada_destino_ata',
+            'data_estimativa_atracacao', 'data_atracacao',
             'data_required_arrival_expected', 'data_requested_deadline_start', 'data_requested_deadline_end'
         ]
         
@@ -470,6 +476,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
+            "data_chegada_destino_eta", "data_chegada_destino_ata",
             # Armador/viagem
             "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
@@ -562,6 +569,8 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         B_DATA_ESTIMADA_TRANSBORDO_ETD       AS b_data_estimada_transbordo_etd,
         B_DATA_CHEGADA_ATA                   AS b_data_chegada_ata,
         B_DATA_TRANSBORDO_ATD                AS b_data_transbordo_atd,
+        B_DATA_CHEGADA_DESTINO_ETA           AS b_data_chegada_destino_eta,
+        B_DATA_CHEGADA_DESTINO_ATA           AS b_data_chegada_destino_ata,
         B_DATA_ESTIMATIVA_ATRACACAO_ETB      AS b_data_estimativa_atracacao_etb,
         B_DATA_ATRACACAO_ATB                 AS b_data_atracacao_atb,
         B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
@@ -606,6 +615,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
+            "data_chegada_destino_eta", "data_chegada_destino_ata",
             "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
             "Booking Owner",
@@ -1878,7 +1888,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE, S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                         B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, 
                         B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, 
-                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATD, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
+                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
                         B_BOOKING_STATUS, ROW_INSERTED_DATE
                     FROM LogTransp.F_CON_RETURN_CARRIERS
                     WHERE FAROL_REFERENCE = :farol_ref 

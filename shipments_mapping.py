@@ -88,6 +88,8 @@ def get_column_mapping():
         "b_data_estimada_transbordo_etd": "data_estimada_transbordo",
         "b_data_chegada_ata": "data_chegada",
         "b_data_transbordo_atd": "data_transbordo",
+        "b_data_chegada_destino_eta": "data_chegada_destino_eta",
+        "b_data_chegada_destino_ata": "data_chegada_destino_ata",
         "b_data_estimativa_atracacao_etb": "data_estimativa_atracacao",
         "b_data_atracacao_atb": "data_atracacao",
         "b_freight_rate_usd": "Freight Rate USD",
@@ -300,6 +302,8 @@ def drop_downs(data_show, df_udc):
         "data_estimada_transbordo": "Estimada Transbordo (ETD)",
         "data_chegada": "Chegada (ATA)",
         "data_transbordo": "Transbordo (ATD)",
+        "data_chegada_destino_eta": "Estimativa Chegada Destino (ETA)",
+        "data_chegada_destino_ata": "Chegada no Destino (ATA)",
         "data_estimativa_atracacao": "Estimativa Atracação (ETB)",
         "data_atracacao": "Atracação (ATB)",
         
@@ -378,6 +382,8 @@ def get_display_names():
         "data_estimada_transbordo": "Estimada Transbordo (ETD)",
         "data_chegada": "Chegada (ATA)",
         "data_transbordo": "Transbordo (ATD)",
+        "data_chegada_destino_eta": "Estimativa Chegada Destino (ETA)",
+        "data_chegada_destino_ata": "Chegada no Destino (ATA)",
         "data_estimativa_atracacao": "Estimativa Atracação (ETB)",
         "data_atracacao": "Atracação (ATB)",
         

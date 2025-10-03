@@ -1358,20 +1358,34 @@ O sistema agora inclui três novas colunas para monitoramento avançado de booki
 - **Posicionamento**: Após "Data Chegada ATA"
 - **Uso**: Controle de execução real dos transbordos
 
+##### **B_DATA_CHEGADA_DESTINO_ETA**
+- **Descrição**: Data estimada de chegada do booking no destino
+- **Tipo**: DATE
+- **Posicionamento**: Após "Transbordo (ATD)"
+- **Uso**: Planejamento de chegada no destino final
+
+##### **B_DATA_CHEGADA_DESTINO_ATA**
+- **Descrição**: Data real de chegada do booking no destino
+- **Tipo**: DATE
+- **Posicionamento**: Após "Estimativa Chegada Destino (ETA)"
+- **Uso**: Controle de chegada real no destino final
+
 #### Implementação Técnica
 
 **Tabelas Afetadas:**
 - ✅ `F_CON_SALES_BOOKING_DATA` - Colunas criadas e funcionais
 - ✅ `F_CON_RETURN_CARRIERS` - Colunas criadas e funcionais
+- ✅ `F_ELLOX_TERMINAL_MONITORINGS` - Colunas criadas e funcionais
 
 **Interfaces Atualizadas:**
 - ✅ **Booking Management** (`shipments.py`) - Exibição entre colunas existentes
+- ✅ **General View** (`shipments.py`) - Exibição na tela principal
 - ✅ **Request Timeline** (`history.py`) - Exibição na aba de histórico
 - ✅ **Mapeamentos** (`shipments_mapping.py`) - Configuração de editores datetime
 
 **Formato de Exibição:**
-- **Interface**: `DD/MM/YYYY HH:mm` (padrão datetime)
-- **Banco**: `TIMESTAMP(6)` (precisão de microssegundos)
+- **Interface**: `DD/MM/YYYY` (para B_DATA_CHEGADA_DESTINO_*), `DD/MM/YYYY HH:mm` (para outras colunas datetime)
+- **Banco**: `DATE` (para B_DATA_CHEGADA_DESTINO_*), `TIMESTAMP(6)` (para outras colunas)
 - **Validação**: Conversão automática com tratamento de erros
 
 ### Relacionamentos
@@ -2662,15 +2676,18 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 
 ### 📌 v3.9.11 - Novas Colunas de Monitoramento de Booking (Janeiro 2025)
-- **📅 Novas Colunas de Data**: Implementadas 3 novas colunas para monitoramento avançado de bookings:
+- **📅 Novas Colunas de Data**: Implementadas 5 novas colunas para monitoramento avançado de bookings:
   - **B_DATA_CONFIRMACAO_EMBARQUE**: Confirmação do booking no site do armador
   - **B_DATA_ESTIMADA_TRANSBORDO_ETD**: Data programada para saída do booking do transbordo  
   - **B_DATA_TRANSBORDO_ATD**: Data real de saída do booking do transbordo
-- **🗃️ Estrutura do Banco**: Colunas criadas em ambas as tabelas `F_CON_SALES_BOOKING_DATA` e `F_CON_RETURN_CARRIERS`
+  - **B_DATA_CHEGADA_DESTINO_ETA**: Data estimada de chegada do booking no destino
+  - **B_DATA_CHEGADA_DESTINO_ATA**: Data real de chegada do booking no destino
+- **🗃️ Estrutura do Banco**: Colunas criadas em todas as tabelas `F_CON_SALES_BOOKING_DATA`, `F_CON_RETURN_CARRIERS` e `F_ELLOX_TERMINAL_MONITORINGS`
 - **🎨 Interfaces Atualizadas**:
-  - **Booking Management**: Colunas exibidas entre colunas existentes conforme posicionamento solicitado
+  - **Booking Management**: Colunas exibidas entre "Transbordo (ATD)" e "Freight Rate USD"
+  - **General View**: Colunas incluídas na tela principal com posicionamento correto
   - **Request Timeline**: Colunas incluídas na aba de histórico com mapeamento correto
-  - **Mapeamentos**: Configuração de editores datetime com formato `DD/MM/YYYY HH:mm`
+  - **Mapeamentos**: Configuração de editores Date com formato `DD/MM/YYYY` para as novas colunas
 - **🔧 Implementação Técnica**:
   - Consultas SQL atualizadas em `database.py` para incluir as novas colunas
   - Mapeamentos corrigidos em `shipments_mapping.py` e `history.py`

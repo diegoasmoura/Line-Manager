@@ -405,7 +405,8 @@ def exibir_shipments():
         # Freight Forwarder, Transhipment Port, POD Country, POD Country Acronym, Destination Trade Region,
         # data_booking_confirmation, data_estimativa_saida, data_estimativa_chegada, data_deadline, 
         # data_draft_deadline, data_abertura_gate, data_confirmacao_embarque, data_atracacao, 
-        # data_partida, data_chegada, data_estimativa_atracacao, data_estimada_transbordo, data_transbordo
+        # data_partida, data_chegada, data_estimativa_atracacao, data_estimada_transbordo, data_transbordo,
+        # data_chegada_destino_eta, data_chegada_destino_ata, Freight Rate USD
         
         # Lista das colunas na ordem específica solicitada
         specific_order = [
@@ -432,7 +433,10 @@ def exibir_shipments():
             "data_chegada",
             "data_estimativa_atracacao",
             "data_estimada_transbordo",
-            "data_transbordo"
+            "data_transbordo",
+            "data_chegada_destino_eta",
+            "data_chegada_destino_ata",
+            "Freight Rate USD"
         ]
         
         # Remove todas as colunas da ordem específica da lista atual
@@ -498,12 +502,28 @@ def exibir_shipments():
 
     # Removido seletor de espaçamento para manter padrão
  
-    # Guarda cópias sem a coluna "Select" para comparação
-    df_filtered_original = df.drop(columns=["Select"], errors="ignore").copy()
+    # Aplicar nomes amigáveis para exibição
+    from shipments_mapping import get_display_names
+    display_names = get_display_names()
+    df_display = df[colunas_ordenadas].copy()
+    
+    # Renomear colunas para nomes amigáveis
+    renamed_columns = {}
+    for col in df_display.columns:
+        if col in display_names:
+            renamed_columns[col] = display_names[col]
+    if renamed_columns:
+        df_display.rename(columns=renamed_columns, inplace=True)
+    
+    # Criar mapeamento reverso (nome amigável -> nome técnico)
+    reverse_mapping = {v: k for k, v in renamed_columns.items()}
+
+    # Guarda cópias sem a coluna "Select" para comparação (com nomes amigáveis)
+    df_filtered_original = df_display.drop(columns=["Select"], errors="ignore").copy()
 
     # Exibe data_editor (os dados já vêm ordenados do banco por Farol Reference)
     edited_df = st.data_editor(
-        df[colunas_ordenadas],
+        df_display,
         key=st.session_state["grid_update_key"],
         use_container_width=True,
         num_rows="fixed",
@@ -549,6 +569,9 @@ def exibir_shipments():
                 if original_row[col] != row[col]:
                     old_val = original_row[col]
                     new_val = row[col]
+                    
+                    # Mapear nome amigável de volta para nome técnico
+                    technical_col = reverse_mapping.get(col, col)
 
                     # Se a coluna for 'Farol Status', limpa os valores antes de registrar a mudança
                     # e realiza a verificação de status bloqueado com os valores limpos.
@@ -570,7 +593,7 @@ def exibir_shipments():
                     
                     changes.append({
                         'Farol Reference': row.get(farol_ref_col, index),
-                        "Column": col,
+                        "Column": technical_col,
                         "Previous Value": old_val,
                         "New Value": new_val,
                         "Stage": "Sales Data"
