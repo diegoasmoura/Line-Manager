@@ -36,6 +36,7 @@ df_udc = load_df_udc()
 carriers = df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist()
 ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
 ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
+dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist()
  
 # ---------- 3. Constantes ----------
 required_fields = {
@@ -119,15 +120,28 @@ def show_booking_management_form():
         # Nova linha: DTHC e Requested Shipment Week (layout de 3, mas só 2 campos)
         col_dthc, col_week, _ = st.columns(3)
         with col_dthc:
-            st.text_input("DTHC", value=booking_data.get("dthc", ""), disabled=True)
+            current_dthc = booking_data.get("dthc", "") or ""
+            dthc_with_blank = [""] + dthc_options
+            selected_dthc_index = dthc_with_blank.index(current_dthc) if current_dthc in dthc_with_blank else 0
+            values["s_dthc_prepaid"] = st.selectbox("DTHC", dthc_with_blank, index=selected_dthc_index)
         with col_week:
-            st.text_input("Requested Shipment Week", value=booking_data.get("requested_shipment_week", ""), disabled=True)
+            current_week = booking_data.get("requested_shipment_week", "") or ""
+            try:
+                week_value = int(current_week) if current_week else 1
+            except (ValueError, TypeError):
+                week_value = 1
+            values["s_requested_shipment_week"] = st.number_input("Requested Shipment Week", min_value=1, max_value=53, step=1, value=week_value)
         # A terceira coluna fica vazia para manter o alinhamento
 
         # Segunda linha: Quantity, Cut off Start, Cut off End
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.text_input("Quantity of Containers", value=booking_data.get("sales_quantity_of_containers", ""), disabled=True)
+            current_qty = booking_data.get("sales_quantity_of_containers", "") or ""
+            try:
+                qty_value = int(current_qty) if current_qty else 0
+            except (ValueError, TypeError):
+                qty_value = 0
+            values["s_quantity_of_containers"] = st.number_input("Quantity of Containers", min_value=0, step=1, value=qty_value)
         with col2:
             st.text_input("Requested Deadline Start Date", value=format_date_only(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
         with col3:
@@ -145,19 +159,23 @@ def show_booking_management_form():
         # Quarta linha: POL, POD, Final Destination
         col4, col5, col6 = st.columns(3)
         with col4:
+            pol_val = booking_data.get("booking_port_of_loading_pol") or ""
+            pol_options = [pol_val] + [opt for opt in ports_pol_options if opt != pol_val]
             values["booking_port_of_loading_pol"] = st.selectbox(
                 "Port of Loading POL",
-                [booking_data.get("booking_port_of_loading_pol", "")] + [opt for opt in ports_pol_options if opt != booking_data.get("booking_port_of_loading_pol", "")],
-                index=0 if booking_data.get("booking_port_of_loading_pol", "") else 0
+                pol_options,
+                index=0
             )
         with col5:
+            pod_val = booking_data.get("booking_port_of_delivery_pod") or ""
+            pod_options = [pod_val] + [opt for opt in ports_pod_options if opt != pod_val]
             values["booking_port_of_delivery_pod"] = st.selectbox(
                 "Port of Delivery POD",
-                [booking_data.get("booking_port_of_delivery_pod", "")] + [opt for opt in ports_pod_options if opt != booking_data.get("booking_port_of_delivery_pod", "")],
-                index=0 if booking_data.get("booking_port_of_delivery_pod", "") else 0
+                pod_options,
+                index=0
             )
         with col6:
-            st.text_input("Final Destination", value=booking_data.get("final_destination", ""), disabled=True)
+            values["s_final_destination"] = st.text_input("Final Destination", value=booking_data.get("final_destination", "") or "")
 
         col1, col2 = st.columns(2)
         with col1:

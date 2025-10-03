@@ -1496,7 +1496,11 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             B_BOOKING_REQUEST_DATE = :b_booking_request_date,
             B_COMMENTS = :b_comments,
             S_PORT_OF_LOADING_POL = :pol,
-            S_PORT_OF_DELIVERY_POD = :pod
+            S_PORT_OF_DELIVERY_POD = :pod,
+            S_QUANTITY_OF_CONTAINERS = :s_quantity_of_containers,
+            S_DTHC_PREPAID = :s_dthc_prepaid,
+            S_REQUESTED_SHIPMENT_WEEK = :s_requested_shipment_week,
+            S_FINAL_DESTINATION = :s_final_destination
         WHERE FAROL_REFERENCE = :ref
         """
         # Atualiza a tabela de Loading
@@ -1517,6 +1521,10 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                 "b_comments": values["b_comments"],
                 "pol": values.get("booking_port_of_loading_pol", ""),
                 "pod": values.get("booking_port_of_delivery_pod", ""),
+                "s_quantity_of_containers": values.get("s_quantity_of_containers") if values.get("s_quantity_of_containers") else None,
+                "s_dthc_prepaid": values.get("s_dthc_prepaid") if values.get("s_dthc_prepaid") else None,
+                "s_requested_shipment_week": values.get("s_requested_shipment_week") if values.get("s_requested_shipment_week") else None,
+                "s_final_destination": values.get("s_final_destination") if values.get("s_final_destination") else None,
                 "ref": farol_reference,
             },
         )

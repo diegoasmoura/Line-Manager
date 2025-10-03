@@ -2826,6 +2826,17 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **📊 Status Exibido Melhorado**: Interface mostra status mais intuitivos e descritivos
 - **🔧 Confirmação Técnica**: Status exibido na interface não tem relação direta com P_STATUS (gerado dinamicamente)
 
+### 📌 v3.9.4 - Campos Editáveis no Formulário de Novo Booking (Outubro 2025)
+- **📝 Edição de Campos**: Habilitada edição de 4 campos no formulário de novo booking:
+  - Quantity of Containers (number_input com validação min_value=0)
+  - DTHC (selectbox com opções do UDC)
+  - Requested Shipment Week (number_input com validação 1-53)
+  - Final Destination (text_input editável)
+- **🎨 Interface Melhorada**: Corrigida exibição de POL/POD quando `None` - agora mostra campo vazio em vez de "None"
+- **💾 Persistência**: Dados editados são salvos corretamente na tabela `F_CON_SALES_BOOKING_DATA`
+- **🔧 Validação**: Implementadas validações de limites para quantidade (≥0) e semana (1-53)
+- **📊 UDC Integration**: DTHC carregado dinamicamente do UDC (grupo "DTHC")
+
 ### 📌 v3.9.3 - Pré-preenchimento Automático de Datas em Ajustes (Setembro 2025)
 - **🔄 Pré-preenchimento Inteligente**: Novos ajustes agora herdam automaticamente as datas da tabela principal F_CON_SALES_BOOKING_DATA (última versão atualizada pelo Tracking)
 - **📅 Campos Preenchidos**: Sistema copia automaticamente 14 campos de data: Draft Deadline, Deadline, ETD, ETA, Abertura Gate, ATD, ATA, ETB, ATB, Confirmação Embarque, Estimativa Transbordo (ETD), Transbordo (ATD), Estimativa Chegada Destino (ETA), Chegada no Destino (ATA)
