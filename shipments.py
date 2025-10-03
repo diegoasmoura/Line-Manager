@@ -719,8 +719,25 @@ def exibir_shipments():
         
         # Criar um writer do pandas para Excel
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Obter o dataframe com as colunas ordenadas (antes dos filtros serem aplicados)
-            df_to_export = df[colunas_ordenadas].copy()  # Usar o dataframe atual com colunas ordenadas
+            # Obter o dataframe com as colunas ordenadas, removendo a coluna "Select"
+            columns_to_export = [col for col in colunas_ordenadas if col != "Select"]
+            df_to_export = df[columns_to_export].copy()  # Usar o dataframe atual com colunas ordenadas (exceto "Select")
+            
+            # Aplicar nomes amigáveis de exibição às colunas, se disponível
+            from shipments_mapping import get_display_names
+            display_names = get_display_names()
+            
+            # Renomear as colunas usando os nomes amigáveis, se existirem
+            renamed_columns = {}
+            for col in df_to_export.columns:
+                if col in display_names:
+                    renamed_columns[col] = display_names[col]
+                else:
+                    # Para colunas que não estão no mapeamento, converter nomes técnicos para nomes mais amigáveis
+                    friendly_name = col.replace("data_", "").replace("_", " ").title()
+                    renamed_columns[col] = friendly_name
+            
+            df_to_export.rename(columns=renamed_columns, inplace=True)
             df_to_export.to_excel(writer, index=False, sheet_name='Data')
         
         # Obter o conteúdo do buffer
