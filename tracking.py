@@ -17,7 +17,9 @@ def get_voyage_data_for_update():
                         m.ID, m.NAVIO, m.VIAGEM, m.TERMINAL, m.DATA_ESTIMATIVA_SAIDA,
                         m.DATA_ESTIMATIVA_CHEGADA, m.DATA_DEADLINE, m.DATA_DRAFT_DEADLINE,
                         m.DATA_ABERTURA_GATE, m.DATA_ATRACACAO, m.DATA_PARTIDA, m.DATA_CHEGADA,
-                        m.DATA_ESTIMATIVA_ATRACACAO,
+                        m.DATA_ESTIMATIVA_ATRACACAO, m.B_DATA_CONFIRMACAO_EMBARQUE, 
+                        m.B_DATA_ESTIMADA_TRANSBORDO_ETD, m.B_DATA_TRANSBORDO_ATD,
+                        m.B_DATA_CHEGADA_DESTINO_ETA, m.B_DATA_CHEGADA_DESTINO_ATA,
                         ROW_NUMBER() OVER (
                             PARTITION BY UPPER(m.NAVIO), UPPER(m.VIAGEM), UPPER(m.TERMINAL)
                             ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
@@ -28,7 +30,9 @@ def get_voyage_data_for_update():
                     lm.ID, lm.NAVIO, lm.VIAGEM, lm.TERMINAL, lm.DATA_ESTIMATIVA_SAIDA,
                     lm.DATA_ESTIMATIVA_CHEGADA, lm.DATA_DEADLINE, lm.DATA_DRAFT_DEADLINE,
                     lm.DATA_ABERTURA_GATE, lm.DATA_ATRACACAO, lm.DATA_PARTIDA, lm.DATA_CHEGADA,
-                    lm.DATA_ESTIMATIVA_ATRACACAO,
+                    lm.DATA_ESTIMATIVA_ATRACACAO, lm.B_DATA_CONFIRMACAO_EMBARQUE, 
+                    lm.B_DATA_ESTIMADA_TRANSBORDO_ETD, lm.B_DATA_TRANSBORDO_ATD,
+                    lm.B_DATA_CHEGADA_DESTINO_ETA, lm.B_DATA_CHEGADA_DESTINO_ATA,
                     LISTAGG(DISTINCT r.FAROL_REFERENCE, ', ') WITHIN GROUP (ORDER BY r.FAROL_REFERENCE) as "farol_references_list",
                     COUNT(DISTINCT r.FAROL_REFERENCE) as "farol_references_count"
                 FROM latest_monitoring lm
@@ -43,7 +47,9 @@ def get_voyage_data_for_update():
                     lm.ID, lm.NAVIO, lm.VIAGEM, lm.TERMINAL, lm.DATA_ESTIMATIVA_SAIDA,
                     lm.DATA_ESTIMATIVA_CHEGADA, lm.DATA_DEADLINE, lm.DATA_DRAFT_DEADLINE,
                     lm.DATA_ABERTURA_GATE, lm.DATA_ATRACACAO, lm.DATA_PARTIDA, lm.DATA_CHEGADA,
-                    lm.DATA_ESTIMATIVA_ATRACACAO
+                    lm.DATA_ESTIMATIVA_ATRACACAO, lm.B_DATA_CONFIRMACAO_EMBARQUE, 
+                    lm.B_DATA_ESTIMADA_TRANSBORDO_ETD, lm.B_DATA_TRANSBORDO_ATD,
+                    lm.B_DATA_CHEGADA_DESTINO_ETA, lm.B_DATA_CHEGADA_DESTINO_ATA
                 ORDER BY lm.NAVIO, lm.VIAGEM
             """)
             df = pd.read_sql(query, conn)
@@ -102,6 +108,8 @@ def get_voyage_history(vessel_name, voyage_code, terminal):
                     DATA_ESTIMATIVA_SAIDA, DATA_ESTIMATIVA_CHEGADA, DATA_DEADLINE,
                     DATA_DRAFT_DEADLINE, DATA_ABERTURA_GATE, DATA_ABERTURA_GATE_REEFER,
                     DATA_ATRACACAO, DATA_PARTIDA, DATA_CHEGADA, DATA_ESTIMATIVA_ATRACACAO,
+                    B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_ESTIMADA_TRANSBORDO_ETD, B_DATA_TRANSBORDO_ATD,
+                    B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA,
                     ROW_INSERTED_DATE, DATA_ATUALIZACAO
                 FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
                 WHERE UPPER(TRIM(NAVIO)) = UPPER(TRIM(:vessel_name))
@@ -194,6 +202,11 @@ def exibir_tracking():
         "data_partida": st.column_config.DatetimeColumn("Partida (ATD)", format="DD/MM/YYYY HH:mm"),
         "data_chegada": st.column_config.DatetimeColumn("Chegada (ATA)", format="DD/MM/YYYY HH:mm"),
         "data_estimativa_atracacao": st.column_config.DatetimeColumn("Estimativa Atracação (ETB)", format="DD/MM/YYYY HH:mm"),
+        "b_data_confirmacao_embarque": st.column_config.DatetimeColumn("Confirmação Embarque", format="DD/MM/YYYY HH:mm"),
+        "b_data_estimada_transbordo_etd": st.column_config.DatetimeColumn("Estimativa Transbordo (ETD)", format="DD/MM/YYYY HH:mm"),
+        "b_data_transbordo_atd": st.column_config.DatetimeColumn("Transbordo (ATD)", format="DD/MM/YYYY HH:mm"),
+        "b_data_chegada_destino_eta": st.column_config.DatetimeColumn("Estimativa Chegada Destino (ETA)", format="DD/MM/YYYY HH:mm"),
+        "b_data_chegada_destino_ata": st.column_config.DatetimeColumn("Chegada no Destino (ATA)", format="DD/MM/YYYY HH:mm"),
         "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione uma linha para ver as opções")
     }
     
@@ -202,12 +215,17 @@ def exibir_tracking():
         "Selecionar", "navio", "viagem", "terminal", "farol_references_count",
         "data_deadline", "data_draft_deadline", "data_abertura_gate", "data_abertura_gate_reefer",
         "data_estimativa_saida", "data_estimativa_chegada", "data_estimativa_atracacao",
-        "data_atracacao", "data_partida", "data_chegada"
+        "data_atracacao", "data_partida", "data_chegada",
+        "b_data_confirmacao_embarque", "b_data_estimada_transbordo_etd", "b_data_transbordo_atd",
+        "b_data_chegada_destino_eta", "b_data_chegada_destino_ata"
     ] + [col for col in df_display.columns if col not in [
         "Selecionar", "navio", "viagem", "terminal", "farol_references_count",
         "data_deadline", "data_draft_deadline", "data_abertura_gate", "data_abertura_gate_reefer",
         "data_estimativa_saida", "data_estimativa_chegada", "data_estimativa_atracacao",
-        "data_atracacao", "data_partida", "data_chegada", "id", "rn", "farol_references_list"
+        "data_atracacao", "data_partida", "data_chegada",
+        "b_data_confirmacao_embarque", "b_data_estimada_transbordo_etd", "b_data_transbordo_atd",
+        "b_data_chegada_destino_eta", "b_data_chegada_destino_ata",
+        "id", "rn", "farol_references_list"
     ]]
     display_order_safe = [col for col in display_order_preferred if col in df_display.columns]
 
@@ -320,6 +338,11 @@ def exibir_tracking():
                         'data_partida': 'Partida (ATD)',
                         'data_chegada': 'Chegada (ATA)',
                         'data_estimativa_atracacao': 'Estimativa Atracação (ETB)',
+                        'b_data_confirmacao_embarque': 'Confirmação Embarque',
+                        'b_data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
+                        'b_data_transbordo_atd': 'Transbordo (ATD)',
+                        'b_data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
+                        'b_data_chegada_destino_ata': 'Chegada no Destino (ATA)',
                         'row_inserted_date': 'Inserted Date',
                         'data_atualizacao': 'Data Atualização'
                     }
@@ -342,6 +365,11 @@ def exibir_tracking():
                         'Atracação (ATB)', 
                         'Partida (ATD)', 
                         'Chegada (ATA)', 
+                        'Confirmação Embarque',
+                        'Estimativa Transbordo (ETD)',
+                        'Transbordo (ATD)',
+                        'Estimativa Chegada Destino (ETA)',
+                        'Chegada no Destino (ATA)',
                         'Data Atualização'
                     ]
                     
