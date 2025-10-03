@@ -2827,13 +2827,15 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🔧 Confirmação Técnica**: Status exibido na interface não tem relação direta com P_STATUS (gerado dinamicamente)
 
 ### 📌 v3.9.3 - Pré-preenchimento Automático de Datas em Ajustes (Setembro 2025)
-- **🔄 Pré-preenchimento Inteligente**: Novos ajustes agora herdam automaticamente as datas do último registro aprovado da mesma Farol Reference
-- **📅 Campos Preenchidos**: Sistema copia automaticamente 9 campos de data: Draft Deadline, Deadline, ETD, ETA, Abertura Gate, ATD, ATA, ETB, ATB
+- **🔄 Pré-preenchimento Inteligente**: Novos ajustes agora herdam automaticamente as datas da tabela principal F_CON_SALES_BOOKING_DATA (última versão atualizada pelo Tracking)
+- **📅 Campos Preenchidos**: Sistema copia automaticamente 14 campos de data: Draft Deadline, Deadline, ETD, ETA, Abertura Gate, ATD, ATA, ETB, ATB, Confirmação Embarque, Estimativa Transbordo (ETD), Transbordo (ATD), Estimativa Chegada Destino (ETA), Chegada no Destino (ATA)
 - **⚡ Ativação Automática**: Funcionalidade ativa apenas para `status_override="Adjustment Requested"` criados via shipments_split.py
 - **🧹 Limpeza de Dados**: Datas antigas são removidas antes do processamento para permitir pré-preenchimento correto
 - **✅ Consistência Garantida**: Elimina diferenças de datas entre ajustes e registros aprovados anteriores
-- **🔧 Otimização do Fluxo**: Melhoria na função `insert_return_carrier_from_ui()` com consulta SQL otimizada ao último registro aprovado
+- **🔧 Otimização do Fluxo**: Melhoria na função `insert_return_carrier_from_ui()` com consulta SQL otimizada à tabela principal
 - **🎯 Preenchimento do Booking Confirmation Date**: Campo agora é automaticamente preenchido com a data de emissão do PDF após aprovação
+- **📊 Fonte Única de Verdade**: Dados são copiados exclusivamente de F_CON_SALES_BOOKING_DATA (não mais de F_CON_RETURN_CARRIERS) para garantir que sempre reflitam a última versão atualizada pelo Tracking
+- **🔧 Tratamento de Tipos**: Colunas de destino (ETA/ATA) são convertidas para DATE, demais permanecem como DATETIME
 
 ### 📌 v3.9.2 - Remoção da Coleta Automática de ETD/ETA (Setembro 2025)
 - **🔄 Mudança de Responsabilidade**: Datas ETD e ETA não são mais coletadas automaticamente do processamento de PDFs

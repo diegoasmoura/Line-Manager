@@ -1904,31 +1904,26 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "PDF Name": "P_PDF_NAME",
         }
         
-        # PRÉ-PREENCHIMENTO: Buscar datas do último registro para a mesma Farol Reference
+        # PRÉ-PREENCHIMENTO: Buscar datas da tabela principal F_CON_SALES_BOOKING_DATA
         prefill_dates = {}
         if status_override in ["Adjustment Requested", "Received from Carrier"] and "Farol Reference" in ui_data:
             farol_ref = ui_data["Farol Reference"]
             try:
-                # Buscar último registro da mesma Farol Reference (independentemente do status)
+                # Buscar dados da tabela principal (última versão atualizada pelo Tracking)
                 prefill_query = text("""
                     SELECT 
                         B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE, 
                         S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE, S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                         B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, 
                         B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, 
-                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
-                        B_BOOKING_STATUS, ROW_INSERTED_DATE
-                    FROM LogTransp.F_CON_RETURN_CARRIERS
-                    WHERE FAROL_REFERENCE = :farol_ref 
-                    AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
-                         OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
-                         OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
-                    ORDER BY ROW_INSERTED_DATE DESC
-                    FETCH FIRST 1 ROWS ONLY
+                        B_DATA_CHEGADA_ATA, B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA, 
+                        B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB
+                    FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                    WHERE FAROL_REFERENCE = :farol_ref
                 """)
                 result = conn.execute(prefill_query, {"farol_ref": farol_ref}).mappings().fetchone()
                 if result:
-                    # Mapear campos para pré-preenchimento
+                    # Mapear campos para pré-preenchimento (14 colunas B_* conforme especificado)
                     date_fields_mapping = {
                         'B_DATA_DRAFT_DEADLINE': 'B_DATA_DRAFT_DEADLINE',
                         'B_DATA_DEADLINE': 'B_DATA_DEADLINE', 
@@ -1943,6 +1938,8 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                         'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'B_DATA_ESTIMADA_TRANSBORDO_ETD',
                         'B_DATA_CHEGADA_ATA': 'B_DATA_CHEGADA_ATA',
                         'B_DATA_TRANSBORDO_ATD': 'B_DATA_TRANSBORDO_ATD',
+                        'B_DATA_CHEGADA_DESTINO_ETA': 'B_DATA_CHEGADA_DESTINO_ETA',
+                        'B_DATA_CHEGADA_DESTINO_ATA': 'B_DATA_CHEGADA_DESTINO_ATA',
                         'B_DATA_ESTIMATIVA_ATRACACAO_ETB': 'B_DATA_ESTIMATIVA_ATRACACAO_ETB',
                         'B_DATA_ATRACACAO_ATB': 'B_DATA_ATRACACAO_ATB'
                     }
@@ -2002,7 +1999,16 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             current_value = db_data.get(date_field)
             # Aplicar pré-preenchimento se o campo estiver None ou for string vazia
             if current_value is None or (isinstance(current_value, str) and current_value.strip() == ""):
-                db_data[date_field] = date_value
+                # Tratar tipos: colunas de destino são DATE, demais são DATETIME
+                if date_field in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
+                    # Converter para date() se for datetime
+                    if hasattr(date_value, 'date'):
+                        db_data[date_field] = date_value.date()
+                    else:
+                        db_data[date_field] = date_value
+                else:
+                    # Manter como datetime para as demais colunas
+                    db_data[date_field] = date_value
 
         # Campos obrigatórios e padrões
         db_data["B_BOOKING_STATUS"] = status_override or "Adjustment Requested"

@@ -22,7 +22,8 @@ def resetar_estado():
         "selected_reference",
         "original_df_selected",
         "editor_key",
-        "button_disabled"
+        "button_disabled",
+        "processing"
     ]
     for key in keys_to_remove:
         st.session_state.pop(key, None)
@@ -32,6 +33,13 @@ def show_split_form():
  
     # Inicializa estado do botão se necessário
     if "button_disabled" not in st.session_state:
+        st.session_state.button_disabled = False
+
+    # Inicializa e saneia estado de processamento/disable para evitar travas
+    if "processing" not in st.session_state:
+        st.session_state.processing = False
+    # Se não está processando e o botão ficou desabilitado por engano, reabilita
+    if not st.session_state.processing and st.session_state.get("button_disabled", False):
         st.session_state.button_disabled = False
 
     # Inicializa a chave do editor se não existir
@@ -267,123 +275,138 @@ def show_split_form():
                 "✅ Confirm",
                 disabled=st.session_state.get("button_disabled", False)
             ):
-                if not st.session_state.get("button_disabled", False):
-                    # Validação 1: sempre exigir alteração na linha principal (com ou sem splits)
-                    if not changes:
-                        st.warning("⚠️ Nenhuma alteração detectada no item principal.")
-                    # Validação 2: justificativas obrigatórias
-                    elif not area or not reason or not responsibility:
-                        st.warning("⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
-                    else:
-                        # Validação 3 (quando houver splits): quantidades dos splits devem ser > 0
-                        split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
-                        if num_splits > 0 and (split_quantities <= 0).any():
-                            st.warning("⚠️ Todos os splits devem ter quantidade maior que 0.")
-                        else:
-                            # Desabilita o botão imediatamente
-                            st.session_state.button_disabled = True
-                            original_quantity = st.session_state["original_quantity"]
-                            total_split = split_quantities.sum()
-
-                            # Recalcula a quantidade do item original APENAS quando há splits
-                            if num_splits > 0:
-                                edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
-                            df_split.update(edited_display)
- 
-                            # Gera um único UUID para toda a requisição
-                            request_uuid = str(uuid4())
-                            try:
-                                with st.spinner("Processando ajustes, por favor aguarde..."):
-                                    # Processa os ajustes da linha principal
-                                    if changes:
-                                        success = insert_adjustments_critic(
-                                            changes_df=pd.DataFrame(changes),
-                                            random_uuid=request_uuid,  # Usa o mesmo UUID
-                                            area=area,
-                                            reason=reason,
-                                            responsibility=responsibility,
-                                            comment=comment,
-                                        )
- 
-                                    # Processa os splits apenas se houver splits
-                                    new_split_refs = []
-                                    if num_splits > 0:
-                                        new_split_refs = perform_split_operation(
-                                            farol_ref_original=selected_farol,
-                                            edited_display=edited_display,
-                                            num_splits=num_splits,
-                                            comment=comment,
-                                            area=area,
-                                            reason=reason,
-                                            responsibility=responsibility,
-                                            request_uuid=request_uuid  # Passa o UUID para a função
-                                        )
-                                        success = True if new_split_refs is not None else False
-                                    else:
-                                        # Se não há splits, considera sucesso se os ajustes da linha principal foram processados
-                                        success = True if not changes else success
- 
-                                if success:
-                                    # Upsert de Return Carriers para a referência original e splits
-                                    try:
-                                        # Insere snapshot baseado na UI para original e splits (valores exatos do editor)
-                                        # Para original (índice 0) e splits (1..num_splits), usa o que está no editor
-                                        for i in range(0, 1 + (num_splits or 0)):
-                                            ui_row = edited_display.iloc[i].to_dict()
-                                            # Mapeia manualmente o nome do campo da UI para o nome da coluna no banco de histórico
-                                            # NÃO remover o campo da UI - a função insert_return_carrier_from_ui precisa dele
-                                            if "Required Arrival Date Expected" in ui_row:
-                                                # Mantém o campo original para a função processar corretamente
-                                                pass
-                                            
-                                            # Remover campos de data do ui_row para permitir pré-preenchimento
-                                            # do último registro aprovado (apenas para Adjustment Requested)
-                                            date_fields_to_remove = [
-                                                "B Data Draft Deadline", "B Data Deadline",
-                                                "B Data Estimativa Saida ETD", "B Data Estimativa Chegada ETA",
-                                                "B Data Abertura Gate", "B Data Partida ATD", "B Data Chegada ATA",
-                                                "B Data Estimativa Atracacao ETB", "B Data Atracacao ATB"
-                                            ]
-                                            for date_field in date_fields_to_remove:
-                                                ui_row.pop(date_field, None)
-                                            
-                                            insert_return_carrier_from_ui(
-                                                ui_row, 
-                                                user_insert=st.session_state.get('current_user', 'system'),
-                                                status_override="Adjustment Requested",  # Explicitamente definir para ativar pré-preenchimento
-                                                p_status_override="Adjusts Cargill",  # Define P_STATUS para ajustes da Cargill
-                                                area=area,
-                                                request_reason=reason,
-                                                adjustments_owner=responsibility,
-                                                comments=comment
-                                            )
-                                    except Exception as _e:
-                                        # Não bloqueia o fluxo se a criação de retorno falhar; apenas informa
-                                        st.warning(f"Aviso: não foi possível registrar retorno de carrier: {str(_e)}")
-                                    st.success("✅ Ajuste realizado com sucesso!")
-                                    time.sleep(2)  # Aguarda 2 segundos
-                                    # Limpa os estados antes de redirecionar
-                                    resetar_estado()
-                                    st.session_state["current_page"] = "main"
-                                    st.rerun()
+                # Debounce: se já está processando, ignora novo clique
+                if st.session_state.get("processing", False):
+                    st.warning("⌛ Em processamento, aguarde finalizar o envio anterior...")
+                    
+                else:
+                        if not st.session_state.get("button_disabled", False):
+                            # Validação 1: sempre exigir alteração na linha principal (com ou sem splits)
+                            if not changes:
+                                st.warning("⚠️ Nenhuma alteração detectada no item principal.")
+                            # Validação 2: justificativas obrigatórias
+                            elif not area or not reason or not responsibility:
+                                st.warning("⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
+                            else:
+                                # Validação 3 (quando houver splits): quantidades dos splits devem ser > 0
+                                split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
+                                if num_splits > 0 and (split_quantities <= 0).any():
+                                    st.warning("⚠️ Todos os splits devem ter quantidade maior que 0.")
                                 else:
-                                    # Reabilita o botão em caso de erro
-                                    st.session_state.button_disabled = False
-                                    st.error("Erro ao registrar os ajustes no banco de dados.")
-                            except Exception as e:
-                                # Reabilita o botão em caso de erro
-                                st.session_state.button_disabled = False
-                                st.error(f"Erro ao processar os ajustes: {str(e)}")
+                                    # Desabilita o botão imediatamente
+                                    st.session_state.button_disabled = True
+                                    # Ativa lock de processamento para evitar duplo submit
+                                    st.session_state.processing = True
+                                    original_quantity = st.session_state["original_quantity"]
+                                    total_split = split_quantities.sum()
+
+                                    # Recalcula a quantidade do item original APENAS quando há splits
+                                    if num_splits > 0:
+                                        edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
+                                    df_split.update(edited_display)
+         
+                                    # Gera um único UUID para toda a requisição
+                                    request_uuid = str(uuid4())
+                                    try:
+                                        with st.spinner("Processando ajustes, por favor aguarde..."):
+                                            # Processa os ajustes da linha principal
+                                            if changes:
+                                                success = insert_adjustments_critic(
+                                                    changes_df=pd.DataFrame(changes),
+                                                    random_uuid=request_uuid,  # Usa o mesmo UUID
+                                                    area=area,
+                                                    reason=reason,
+                                                    responsibility=responsibility,
+                                                    comment=comment,
+                                                )
+         
+                                            # Processa os splits apenas se houver splits
+                                            new_split_refs = []
+                                            if num_splits > 0:
+                                                new_split_refs = perform_split_operation(
+                                                    farol_ref_original=selected_farol,
+                                                    edited_display=edited_display,
+                                                    num_splits=num_splits,
+                                                    comment=comment,
+                                                    area=area,
+                                                    reason=reason,
+                                                    responsibility=responsibility,
+                                                    request_uuid=request_uuid  # Passa o UUID para a função
+                                                )
+                                                success = True if new_split_refs is not None else False
+                                            else:
+                                                # Se não há splits, considera sucesso se os ajustes da linha principal foram processados
+                                                success = True if not changes else success
+         
+                                        if success:
+                                            # Upsert de Return Carriers para a referência original e splits
+                                            try:
+                                                # Insere snapshot baseado na UI para original e splits (valores exatos do editor)
+                                                # Para original (índice 0) e splits (1..num_splits), usa o que está no editor
+                                                for i in range(0, 1 + (num_splits or 0)):
+                                                    ui_row = edited_display.iloc[i].to_dict()
+                                                    # Mapeia manualmente o nome do campo da UI para o nome da coluna no banco de histórico
+                                                    # NÃO remover o campo da UI - a função insert_return_carrier_from_ui precisa dele
+                                                    if "Required Arrival Date Expected" in ui_row:
+                                                        # Mantém o campo original para a função processar corretamente
+                                                        pass
+                                                    
+                                                    # Remover campos de data do ui_row para permitir pré-preenchimento
+                                                    # do último registro aprovado (apenas para Adjustment Requested)
+                                                    date_fields_to_remove = [
+                                                        "B Data Draft Deadline", "B Data Deadline",
+                                                        "B Data Estimativa Saida ETD", "B Data Estimativa Chegada ETA",
+                                                        "B Data Abertura Gate", "B Data Partida ATD", "B Data Chegada ATA",
+                                                        "B Data Estimativa Atracacao ETB", "B Data Atracacao ATB"
+                                                    ]
+                                                    for date_field in date_fields_to_remove:
+                                                        ui_row.pop(date_field, None)
+                                                    
+                                                    insert_return_carrier_from_ui(
+                                                        ui_row, 
+                                                        user_insert=st.session_state.get('current_user', 'system'),
+                                                        status_override="Adjustment Requested",  # Explicitamente definir para ativar pré-preenchimento
+                                                        p_status_override="Adjusts Cargill",  # Define P_STATUS para ajustes da Cargill
+                                                        area=area,
+                                                        request_reason=reason,
+                                                        adjustments_owner=responsibility,
+                                                        comments=comment
+                                                    )
+                                            except Exception as _e:
+                                                # Não bloqueia o fluxo se a criação de retorno falhar; apenas informa
+                                                st.warning(f"Aviso: não foi possível registrar retorno de carrier: {str(_e)}")
+                                            st.success("✅ Ajuste realizado com sucesso!")
+                                            time.sleep(2)  # Aguarda 2 segundos
+                                            # Limpa os estados antes de redirecionar
+                                            resetar_estado()
+                                            st.session_state["current_page"] = "main"
+                                            st.rerun()
+                                        else:
+                                            # Reabilita o botão em caso de erro
+                                            st.session_state.button_disabled = False
+                                            st.session_state.processing = False
+                                            st.error("Erro ao registrar os ajustes no banco de dados.")
+                                    except Exception as e:
+                                        # Reabilita o botão em caso de erro
+                                        st.session_state.button_disabled = False
+                                        st.session_state.processing = False
+                                        st.error(f"Erro ao processar os ajustes: {str(e)}")
  
         with col_btn2:
             if st.button("🗑️ Discard Changes"):
                 # Gera uma nova chave para forçar a recriação do editor
                 st.session_state.editor_key = f"split_editor_{time.time()}"
+                # Reabilita interações ao descartar
+                st.session_state.button_disabled = False
+                st.session_state.processing = False
                 st.success("Alterações descartadas com sucesso.")
                 st.rerun()
  
         with col_btn3:
             if st.button("🔙 Back to Shipments"):
+                # Reabilita interações ao voltar
+                st.session_state.button_disabled = False
+                st.session_state.processing = False
                 st.session_state["current_page"] = "main"
                 st.rerun()
  
