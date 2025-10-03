@@ -373,6 +373,33 @@ def exibir_shipments():
             idx_carrier = colunas_ordenadas.index("Voyage Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
         
+        # Função helper para mover uma coluna para antes de outra específica
+        def _move_before(df, colunas_list, target_col, before_col, stage):
+            # Aplica a reordenação apenas para Booking Management e General View
+            if stage not in ["Booking Management", "General View"]:
+                return colunas_list
+                
+            if target_col in colunas_list and before_col in colunas_list:
+                # Verifica se a coluna de destino já não está antes da coluna de referência
+                target_idx = colunas_list.index(target_col)
+                before_idx = colunas_list.index(before_col)
+                
+                # Se a coluna já está na posição correta ou após a coluna de referência, não faz nada
+                if target_idx < before_idx and target_idx == before_idx - 1:
+                    # Coluna já está exatamente antes da desejada - não precisa mover
+                    return colunas_list
+                elif target_idx < before_idx:
+                    # Coluna está antes, mas não imediatamente antes - precisa reposicionar
+                    colunas_list.remove(target_col)
+                    new_idx = colunas_list.index(before_col)
+                    colunas_list.insert(new_idx, target_col)
+                else:
+                    # Coluna está depois da coluna de referência - move para antes
+                    colunas_list.remove(target_col)
+                    new_idx = colunas_list.index(before_col)
+                    colunas_list.insert(new_idx, target_col)
+            return colunas_list
+        
         # Reordena as colunas seguindo a ordem específica enviada pelo usuário
         # Ordem: Creation Of Booking, Booking Requested Date, Voyage Carrier, Vessel Name, Voyage Code, Terminal, 
         # Freight Forwarder, Transhipment Port, POD Country, POD Country Acronym, Destination Trade Region,
@@ -423,6 +450,10 @@ def exibir_shipments():
         for i, col in enumerate(specific_order):
             if col in df.columns:
                 colunas_ordenadas.insert(insert_position + i, col)
+        
+        # Reposiciona "Shipment Requested Date" imediatamente antes de "Booking Registered Date"
+        # apenas nas visões específicas
+        colunas_ordenadas = _move_before(df, colunas_ordenadas, "Shipment Requested Date", "Booking Registered Date", choose)
 
     # Aplica filtros avançados APÓS a reordenação das colunas
     df = aplicar_filtros_interativos(df, colunas_ordenadas)

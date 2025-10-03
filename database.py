@@ -423,6 +423,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
         B_COMMENTS                           AS b_comments,
         ADJUSTMENT_ID                        AS adjustment_id,
         /* Campos de Sales necessários para exibição no Booking */
+        S_CREATION_OF_SHIPMENT               AS s_creation_of_shipment,
         S_TYPE_OF_SHIPMENT                   AS s_type_of_shipment,
         S_QUANTITY_OF_CONTAINERS             AS s_quantity_of_containers,
         S_CONTAINER_TYPE                     AS s_container_type,
@@ -465,7 +466,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
-            "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
+            "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
@@ -601,7 +602,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         booking_cols = [
             "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
-            "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
+            "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
