@@ -700,43 +700,46 @@ def exibir_shipments():
             st.session_state["current_page"] = "split"
             st.rerun()
     # Botões View Attachments e Export XLSX lado a lado
-    with st.columns([2, 1, 1]) as (_, attachments_col, export_col):
-        with attachments_col:
-            view_attachments_open = st.session_state.get("show_shipments_attachments", False)
-            if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
-                if view_attachments_open:
-                    st.session_state["show_shipments_attachments"] = False
-                    st.session_state["shipments_attachments_farol_ref"] = None
-                else:
-                    st.session_state["show_shipments_attachments"] = True
-                    st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
-                st.rerun()
+    cols = st.columns([2, 1, 1])
+    attachments_col = cols[1]
+    export_col = cols[2]
+    
+    with attachments_col:
+        view_attachments_open = st.session_state.get("show_shipments_attachments", False)
+        if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
+            if view_attachments_open:
+                st.session_state["show_shipments_attachments"] = False
+                st.session_state["shipments_attachments_farol_ref"] = None
+            else:
+                st.session_state["show_shipments_attachments"] = True
+                st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
+            st.rerun()
+
+    with export_col:
+        # Botão de exportação XLSX - sempre ativo
+        from datetime import datetime
         
-        with export_col:
-            # Botão de exportação XLSX - sempre ativo
-            from datetime import datetime
-            
-            # Converter o dataframe atual (filtrado) para XLSX
-            import io
-            output = io.BytesIO()
-            
-            # Criar um writer do pandas para Excel
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Obter o dataframe com as colunas ordenadas (antes dos filtros serem aplicados)
-                df_to_export = df[colunas_ordenadas].copy()  # Usar o dataframe atual com colunas ordenadas
-                df_to_export.to_excel(writer, index=False, sheet_name='Data')
-            
-            # Obter o conteúdo do buffer
-            processed_data = output.getvalue()
-            
-            # Criar botão de download
-            st.download_button(
-                label="📊 Export XLSX",
-                data=processed_data,
-                file_name=f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"download_xlsx_{int(datetime.now().timestamp())}"
-            )
+        # Converter o dataframe atual (filtrado) para XLSX
+        import io
+        output = io.BytesIO()
+        
+        # Criar um writer do pandas para Excel
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Obter o dataframe com as colunas ordenadas (antes dos filtros serem aplicados)
+            df_to_export = df[colunas_ordenadas].copy()  # Usar o dataframe atual com colunas ordenadas
+            df_to_export.to_excel(writer, index=False, sheet_name='Data')
+        
+        # Obter o conteúdo do buffer
+        processed_data = output.getvalue()
+        
+        # Criar botão de download
+        st.download_button(
+            label="📊 Export XLSX",
+            data=processed_data,
+            file_name=f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_xlsx_{int(datetime.now().timestamp())}"
+        )
     # Seção de anexos
     if st.session_state.get("show_shipments_attachments", False):
         # Sincroniza referência se seleção mudar
