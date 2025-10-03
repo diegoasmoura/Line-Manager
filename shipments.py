@@ -714,11 +714,10 @@ def exibir_shipments():
         
         with export_col:
             # Botão de exportação XLSX - sempre ativo
-            import io
-            import pandas as pd
             from datetime import datetime
             
             # Converter o dataframe atual (filtrado) para XLSX
+            import io
             output = io.BytesIO()
             
             # Criar um writer do pandas para Excel
