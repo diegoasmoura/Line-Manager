@@ -2732,6 +2732,11 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
         "DATA_PARTIDA": "B_DATA_PARTIDA_ATD",
         "DATA_CHEGADA": "B_DATA_CHEGADA_ATA",
         "DATA_ESTIMATIVA_ATRACACAO": "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+        "B_DATA_CONFIRMACAO_EMBARQUE": "B_DATA_CONFIRMACAO_EMBARQUE",
+        "B_DATA_ESTIMADA_TRANSBORDO_ETD": "B_DATA_ESTIMADA_TRANSBORDO_ETD",
+        "B_DATA_TRANSBORDO_ATD": "B_DATA_TRANSBORDO_ATD",
+        "B_DATA_CHEGADA_DESTINO_ETA": "B_DATA_CHEGADA_DESTINO_ETA",
+        "B_DATA_CHEGADA_DESTINO_ATA": "B_DATA_CHEGADA_DESTINO_ATA",
     }
 
     try:
@@ -2802,6 +2807,12 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                         new_val = values['new_value']
                         if isinstance(new_val, pd.Timestamp):
                             new_val = new_val.to_pydatetime()
+                        
+                        # Para colunas de destino (DATE), converter datetime para date
+                        if main_table_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
+                            if new_val is not None and hasattr(new_val, 'date'):
+                                new_val = new_val.date()
+                        
                         update_params[main_table_col] = new_val
 
                         log_entries.append({
