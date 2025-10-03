@@ -594,6 +594,22 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
 
+        # Converter colunas de data/hora para datetime (igual aos outros ratios)
+        datetime_columns = [
+            'data_draft_deadline', 'data_deadline', 'data_estimativa_saida', 
+            'data_estimativa_chegada', 'data_abertura_gate', 'data_confirmacao_embarque',
+            'data_partida', 'data_estimada_transbordo', 'data_chegada', 
+            'data_transbordo', 'data_chegada_destino_eta', 'data_chegada_destino_ata',
+            'data_estimativa_atracacao', 'data_atracacao',
+            'data_required_arrival_expected', 'data_requested_deadline_start', 'data_requested_deadline_end',
+            'data_shipment_period_start', 'data_shipment_period_end', 'data_sales_order',
+            'data_allocation', 'data_producer_nomination', 'data_lc_received', 'data_booking_confirmation'
+        ]
+        
+        for col in datetime_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+
         # Processar o status do Farol para exibição com ícones
         df = process_farol_status_for_display(df)
 
