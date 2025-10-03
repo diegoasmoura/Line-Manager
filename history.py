@@ -1943,7 +1943,22 @@ def exibir_history():
                                         'data_estimativa_atracacao': 'Estimativa Atracação ETB',
                                         'data_atracacao': 'Atracação ATB',
                                         'data_chegada': 'Data de Chegada',
-                                        'data_partida': 'Data de Partida'
+                                        'data_partida': 'Data de Partida',
+                                        'b_data_confirmacao_embarque': 'Confirmação Embarque',
+                                        'b_data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
+                                        'b_data_transbordo_atd': 'Transbordo (ATD)',
+                                        'b_data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
+                                        'b_data_chegada_destino_ata': 'Chegada no Destino (ATA)',
+                                        'data_confirmacao_embarque': 'Confirmação Embarque',
+                                        'data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
+                                        'data_transbordo_atd': 'Transbordo (ATD)',
+                                        'data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
+                                        'data_chegada_destino_ata': 'Chegada no Destino (ATA)',
+                                        'B_DATA_CONFIRMACAO_EMBARQUE': 'Confirmação Embarque',
+                                        'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'Estimativa Transbordo (ETD)',
+                                        'B_DATA_TRANSBORDO_ATD': 'Transbordo (ATD)',
+                                        'B_DATA_CHEGADA_DESTINO_ETA': 'Estimativa Chegada Destino (ETA)',
+                                        'B_DATA_CHEGADA_DESTINO_ATA': 'Chegada no Destino (ATA)'
                                     }
                                     
                                     # Comparar registros consecutivos (do mais novo para o mais antigo)
@@ -2070,6 +2085,21 @@ def exibir_history():
                                     'data_atracacao': 'Atracação (ATB)',
                                     'data_partida': 'Partida (ATD)',
                                     'data_chegada': 'Chegada (ATA)',
+                                    'b_data_confirmacao_embarque': 'Confirmação Embarque',
+                                    'b_data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
+                                    'b_data_transbordo_atd': 'Transbordo (ATD)',
+                                    'b_data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
+                                    'b_data_chegada_destino_ata': 'Chegada no Destino (ATA)',
+                                    'data_confirmacao_embarque': 'Confirmação Embarque',
+                                    'data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
+                                    'data_transbordo_atd': 'Transbordo (ATD)',
+                                    'data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
+                                    'data_chegada_destino_ata': 'Chegada no Destino (ATA)',
+                                    'B_DATA_CONFIRMACAO_EMBARQUE': 'Confirmação Embarque',
+                                    'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'Estimativa Transbordo (ETD)',
+                                    'B_DATA_TRANSBORDO_ATD': 'Transbordo (ATD)',
+                                    'B_DATA_CHEGADA_DESTINO_ETA': 'Estimativa Chegada Destino (ETA)',
+                                    'B_DATA_CHEGADA_DESTINO_ATA': 'Chegada no Destino (ATA)',
                                     'data_atualizacao': 'Data Atualização',
                                     'row_inserted_date': 'Inserted Date',
                                 }
@@ -2091,7 +2121,9 @@ def exibir_history():
                                     'Draft Deadline', 'Abertura Gate', 'Abertura Gate Reefer',
                                     'ETD', 'ETA', 
                                     'Estimativa Atracação (ETB)', 'Atracação (ATB)', 'Partida (ATD)', 
-                                    'Chegada (ATA)', 'Data Atualização', 'Inserted Date'
+                                    'Chegada (ATA)', 'Confirmação Embarque', 'Estimativa Transbordo (ETD)', 'Transbordo (ATD)',
+                                    'Estimativa Chegada Destino (ETA)', 'Chegada no Destino (ATA)', 
+                                    'Data Atualização', 'Inserted Date'
                                 ]
                                 # Remove colunas técnicas que não devem ser exibidas
                                 technical_cols_to_hide = ['Terminal CNPJ', 'Agência']
