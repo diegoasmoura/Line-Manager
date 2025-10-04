@@ -1263,7 +1263,7 @@ def exibir_history():
 
     # Adicionar aba Audit Trail
     audit_label = "🔍 Audit Trail"
-    
+
     active_tab = st.segmented_control(
         "",
         options=[other_label, received_label, voyages_label, audit_label],
@@ -1808,7 +1808,7 @@ def exibir_history():
     # Conteúdo da aba "Audit Trail"
     if active_tab == audit_label:
         display_audit_trail_tab(farol_reference)
-    
+
     # Conteúdo da aba "Histórico de Viagens" 
     if active_tab == voyages_label:
         if df_voyage_monitoring.empty:
@@ -3067,6 +3067,12 @@ def exibir_history():
             st.session_state["current_page"] = "main"
             st.rerun()
 
+    # Seção de anexos (toggle) - sempre visível no final
+    if st.session_state.get("history_show_attachments", False):
+        st.markdown("---")
+        st.subheader("📎 Attachment Management")
+        display_attachments_section(farol_reference)
+
 
 def display_audit_trail_tab(farol_reference):
     """Exibe a aba Audit Trail com histórico de mudanças"""
@@ -3253,10 +3259,3 @@ def display_audit_trail_tab(farol_reference):
     except Exception as e:
         st.error(f"❌ Erro ao carregar audit trail: {str(e)}")
         st.exception(e)
-
-    # Seção de anexos (toggle)
-    
-    if st.session_state.get("history_show_attachments", False):
-        st.markdown("---")
-        st.subheader("📎 Attachment Management")
-        display_attachments_section(farol_reference)
