@@ -1261,9 +1261,12 @@ def exibir_history():
         st.session_state[active_tab_key] = other_label
         st.session_state[last_active_tab_key] = other_label
 
+    # Adicionar aba Audit Trail
+    audit_label = "🔍 Audit Trail"
+    
     active_tab = st.segmented_control(
         "",
-        options=[other_label, received_label, voyages_label],
+        options=[other_label, received_label, voyages_label, audit_label],
         key=active_tab_key
     )
 
@@ -1278,8 +1281,14 @@ def exibir_history():
             # Limpamos seleção da aba "Request Timeline"
             if f"history_other_status_editor_{farol_reference}" in st.session_state:
                 del st.session_state[f"history_other_status_editor_{farol_reference}"]
-        else:  # voyages_label
+        elif active_tab == voyages_label:
             # Limpamos seleções de ambas as abas
+            if f"history_other_status_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_other_status_editor_{farol_reference}"]
+            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
+        elif active_tab == audit_label:
+            # Limpamos seleções das outras abas quando entrar na Audit Trail
             if f"history_other_status_editor_{farol_reference}" in st.session_state:
                 del st.session_state[f"history_other_status_editor_{farol_reference}"]
             if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
@@ -1796,6 +1805,10 @@ def exibir_history():
         if "Selecionar" in edited_df_received.columns and (edited_df_received["Selecionar"] == True).sum() > 1:
             st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
 
+    # Conteúdo da aba "Audit Trail"
+    if active_tab == audit_label:
+        display_audit_trail_tab(farol_reference)
+    
     # Conteúdo da aba "Histórico de Viagens" 
     if active_tab == voyages_label:
         if df_voyage_monitoring.empty:
@@ -3053,6 +3066,193 @@ def exibir_history():
         if st.button("🔙 Back to Shipments"):
             st.session_state["current_page"] = "main"
             st.rerun()
+
+
+def display_audit_trail_tab(farol_reference):
+    """Exibe a aba Audit Trail com histórico de mudanças"""
+    import pandas as pd
+    import pytz
+    from datetime import datetime
+    from database import get_database_connection
+    from sqlalchemy import text
+    
+    st.markdown("### 🔍 Audit Trail - Histórico de Mudanças")
+    st.markdown(f"**Referência:** `{farol_reference}`")
+    st.markdown("---")
+    
+    try:
+        conn = get_database_connection()
+        
+        # Query para buscar dados da view V_FAROL_AUDIT_TRAIL
+        query = text("""
+            SELECT 
+                EVENT_KIND,
+                FAROL_REFERENCE,
+                TABLE_NAME,
+                COLUMN_NAME,
+                OLD_VALUE,
+                NEW_VALUE,
+                USER_LOGIN,
+                CHANGE_SOURCE,
+                CHANGE_TYPE,
+                ADJUSTMENT_ID,
+                RELATED_REFERENCE,
+                CHANGE_AT
+            FROM LogTransp.V_FAROL_AUDIT_TRAIL
+            WHERE FAROL_REFERENCE = :farol_ref
+            ORDER BY CHANGE_AT DESC
+        """)
+        
+        df_audit = pd.read_sql(query, conn, params={"farol_ref": farol_reference})
+        conn.close()
+        
+        if df_audit.empty:
+            st.info("📋 Nenhum registro de auditoria encontrado para esta referência.")
+            return
+        
+        
+        # Converter timestamps para fuso do Brasil
+        def convert_utc_to_brazil_time(utc_timestamp):
+            if utc_timestamp is None:
+                return None
+            try:
+                if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
+                    utc_dt = utc_timestamp
+                else:
+                    utc_dt = pytz.UTC.localize(utc_timestamp)
+                
+                brazil_tz = pytz.timezone('America/Sao_Paulo')
+                brazil_dt = utc_dt.astimezone(brazil_tz)
+                return brazil_dt
+            except Exception:
+                return utc_timestamp
+        
+        # Verificar se a coluna existe (pode estar em minúsculas)
+        change_at_col = None
+        for col in df_audit.columns:
+            if col.upper() == 'CHANGE_AT':
+                change_at_col = col
+                break
+        
+        if change_at_col:
+            df_audit[change_at_col] = df_audit[change_at_col].apply(convert_utc_to_brazil_time)
+        else:
+            st.error("❌ Coluna CHANGE_AT não encontrada no resultado da query")
+            return
+        
+        # Renomear colunas para exibição (usar nomes reais das colunas)
+        rename_map = {}
+        for col in df_audit.columns:
+            if col.upper() == 'EVENT_KIND':
+                rename_map[col] = 'Tipo'
+            elif col.upper() == 'FAROL_REFERENCE':
+                rename_map[col] = 'Referência'
+            elif col.upper() == 'TABLE_NAME':
+                rename_map[col] = 'Tabela'
+            elif col.upper() == 'COLUMN_NAME':
+                rename_map[col] = 'Coluna'
+            elif col.upper() == 'OLD_VALUE':
+                rename_map[col] = 'Valor Anterior'
+            elif col.upper() == 'NEW_VALUE':
+                rename_map[col] = 'Novo Valor'
+            elif col.upper() == 'USER_LOGIN':
+                rename_map[col] = 'Usuário'
+            elif col.upper() == 'CHANGE_SOURCE':
+                rename_map[col] = 'Origem'
+            elif col.upper() == 'CHANGE_TYPE':
+                rename_map[col] = 'Ação'
+            elif col.upper() == 'ADJUSTMENT_ID':
+                rename_map[col] = 'ID Ajuste'
+            elif col.upper() == 'RELATED_REFERENCE':
+                rename_map[col] = 'Referência Relacionada'
+            elif col.upper() == 'CHANGE_AT':
+                rename_map[col] = 'Data/Hora'
+        
+        df_display = df_audit.rename(columns=rename_map)
+        
+        # Filtros
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            # Filtro por origem
+            origins = ['Todos'] + sorted(df_display['Origem'].dropna().unique().tolist())
+            selected_origin = st.selectbox("🔍 Filtrar por Origem", origins)
+            
+        with col2:
+            # Filtro por ação
+            actions = ['Todos'] + sorted(df_display['Ação'].dropna().unique().tolist())
+            selected_action = st.selectbox("🔍 Filtrar por Ação", actions)
+            
+        with col3:
+            # Filtro por coluna
+            columns = ['Todas'] + sorted(df_display['Coluna'].dropna().unique().tolist())
+            selected_column = st.selectbox("🔍 Filtrar por Coluna", columns)
+        
+        # Aplicar filtros
+        df_filtered = df_display.copy()
+        
+        if selected_origin != 'Todos':
+            df_filtered = df_filtered[df_filtered['Origem'] == selected_origin]
+        
+        if selected_action != 'Todos':
+            df_filtered = df_filtered[df_filtered['Ação'] == selected_action]
+            
+        if selected_column != 'Todas':
+            df_filtered = df_filtered[df_filtered['Coluna'] == selected_column]
+        
+        # Opção para mostrar apenas última alteração por coluna
+        show_only_latest = st.checkbox("📌 Mostrar apenas última alteração por coluna", value=False)
+        
+        if show_only_latest:
+            # Manter apenas a última alteração de cada coluna
+            df_filtered = df_filtered.sort_values('Data/Hora', ascending=False)
+            df_filtered = df_filtered.groupby('Coluna').first().reset_index()
+            df_filtered = df_filtered.sort_values('Data/Hora', ascending=False)
+        
+        # Exibir estatísticas
+        st.markdown(f"**📊 Total de registros:** {len(df_filtered)} de {len(df_display)}")
+        
+        if not df_filtered.empty:
+            # Configuração das colunas para exibição
+            column_config = {
+                'Data/Hora': st.column_config.DatetimeColumn(
+                    'Data/Hora',
+                    format='DD/MM/YYYY HH:mm:ss',
+                    width='medium'
+                ),
+                'Usuário': st.column_config.TextColumn('Usuário', width='small'),
+                'Origem': st.column_config.TextColumn('Origem', width='small'),
+                'Ação': st.column_config.TextColumn('Ação', width='small'),
+                'Tabela': st.column_config.TextColumn('Tabela', width='medium'),
+                'Coluna': st.column_config.TextColumn('Coluna', width='medium'),
+                'Valor Anterior': st.column_config.TextColumn('Valor Anterior', width='large'),
+                'Novo Valor': st.column_config.TextColumn('Novo Valor', width='large'),
+                'ID Ajuste': st.column_config.TextColumn('ID Ajuste', width='small'),
+                'Referência Relacionada': st.column_config.TextColumn('Referência Relacionada', width='medium'),
+            }
+            
+            # Exibir tabela
+            st.dataframe(
+                df_filtered,
+                column_config=column_config,
+                use_container_width=True,
+                height=400
+            )
+            
+            # Botão de export
+            csv_data = df_filtered.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "⬇️ Exportar CSV",
+                data=csv_data,
+                file_name=f"audit_trail_{farol_reference}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("📋 Nenhum registro encontrado com os filtros aplicados.")
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar audit trail: {str(e)}")
+        st.exception(e)
 
     # Seção de anexos (toggle)
     

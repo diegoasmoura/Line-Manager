@@ -48,6 +48,14 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Suporte a múltiplos carriers**: HAPAG-LLOYD, MAERSK, MSC, CMA CGM, COSCO, EVERGREEN, OOCL, PIL
 - **Extração automática** de campos-chave (booking reference, vessel name, voyage, portos)
 
+### 🔐 Sistema de Autenticação e Auditoria
+- **Login seguro** com controle de acesso por usuário
+- **Trilha de auditoria completa** com registro de todas as alterações
+- **Rastreabilidade total** de quem alterou o quê e quando
+- **Histórico de mudanças** campo-a-campo com timestamps
+- **Aba Audit Trail** no History com filtros avançados
+- **Export de dados** de auditoria em CSV
+
 ### 🛡️ Sistema de Prevenção de Duplicidade Duplo
 
 O sistema implementa **dois mecanismos distintos** de prevenção de duplicidade para garantir a integridade dos dados e evitar processamento desnecessário:
@@ -417,6 +425,34 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
                     │                    │
                     └────────────────────┘
 ```
+
+### 🔐 Sistema de Login e Auditoria
+
+#### **Login no Sistema**
+1. **Acesso**: Execute `streamlit run app.py`
+2. **Credenciais de Teste**:
+   - `admin` / `admin123`
+   - `user1` / `user123`
+   - `diego` / `diego123`
+3. **Sessão**: O sistema mantém a sessão ativa até logout
+4. **Informações**: Nome do usuário e duração da sessão exibidos na sidebar
+
+#### **Audit Trail - Histórico de Mudanças**
+1. **Acesso**: Navegue para uma referência no Shipments
+2. **History**: Clique no botão "History" da referência
+3. **Aba Audit Trail**: Selecione a aba "🔍 Audit Trail"
+4. **Funcionalidades**:
+   - **Filtros**: Por origem, ação e coluna
+   - **Última alteração**: Opção para mostrar apenas a última alteração por coluna
+   - **Export**: Download dos dados filtrados em CSV
+   - **Timestamps**: Conversão automática para fuso do Brasil
+
+#### **Rastreabilidade Completa**
+- **Todas as alterações** são registradas automaticamente
+- **Quem alterou**: Login do usuário responsável
+- **Quando alterou**: Timestamp preciso da mudança
+- **O que alterou**: Campo específico e valores anterior/novo
+- **De onde alterou**: Origem da mudança (booking_new, tracking, history, etc.)
 
 ### 🎨 Farol Status - Ícones Visuais
 
@@ -1332,6 +1368,52 @@ Gestão de anexos e documentos
 - FILE_EXTENSION
 - ATTACHMENT (BLOB)
 - UPLOAD_TIMESTAMP
+```
+
+### 🔐 Tabelas de Auditoria e Autenticação
+
+#### `F_CON_CHANGE_LOG`
+Trilha técnica de alterações campo-a-campo
+```sql
+- ID (PK) - Auto-incremento
+- FAROL_REFERENCE - Referência do embarque
+- TABLE_NAME - Tabela alterada
+- COLUMN_NAME - Coluna alterada
+- OLD_VALUE - Valor anterior (texto normalizado)
+- NEW_VALUE - Novo valor (texto normalizado)
+- USER_LOGIN - Usuário que fez a alteração
+- CHANGE_SOURCE - Origem da mudança (booking_new, tracking, history, etc.)
+- CHANGE_TYPE - Tipo (CREATE, UPDATE, DELETE)
+- ADJUSTMENT_ID - ID do ajuste relacionado
+- RELATED_REFERENCE - Referência relacionada
+- CHANGE_AT - Timestamp da alteração
+```
+
+#### `V_FAROL_AUDIT_TRAIL`
+View unificada para exibição de auditoria
+```sql
+- EVENT_KIND - Tipo de evento (ADJUSTMENT, CHANGE)
+- FAROL_REFERENCE - Referência do embarque
+- TABLE_NAME - Tabela afetada
+- COLUMN_NAME - Coluna alterada
+- OLD_VALUE - Valor anterior
+- NEW_VALUE - Novo valor
+- USER_LOGIN - Usuário responsável
+- CHANGE_SOURCE - Origem da mudança
+- CHANGE_TYPE - Tipo de operação
+- ADJUSTMENT_ID - ID do ajuste
+- RELATED_REFERENCE - Referência relacionada
+- CHANGE_AT - Data/hora da alteração
+```
+
+#### Colunas de Autoria Adicionadas
+```sql
+-- F_CON_SALES_BOOKING_DATA
+- USER_LOGIN_SALES_CREATED - Quem criou o registro Sales
+- USER_LOGIN_BOOKING_CREATED - Quem criou o Booking (primeira vez)
+
+-- F_CON_RETURN_CARRIERS  
+- USER_LOGIN - Usuário responsável pelo ajuste
 ```
 
 ### 📅 Colunas de Monitoramento de Booking
@@ -3096,6 +3178,56 @@ Todos os PRs passam por revisão técnica focando em:
 - **Manutenibilidade**: O código é fácil de manter?
 
 ## 📋 Changelog
+
+### 🔐 **v4.0.0 - Janeiro 2025 - Sistema Completo de Auditoria e Login**
+
+**🎯 Funcionalidades Implementadas:**
+
+#### **Sistema de Autenticação**
+- ✅ **Login seguro** com controle de acesso por usuário
+- ✅ **Guard de autenticação** no `app.py` com redirecionamento automático
+- ✅ **Gestão de sessão** com `st.session_state.current_user`
+- ✅ **Informações do usuário** na sidebar (nome, duração da sessão)
+- ✅ **Botão de logout** funcional
+
+#### **Sistema de Auditoria Completo**
+- ✅ **Tabela `F_CON_CHANGE_LOG`** para trilha técnica campo-a-campo
+- ✅ **View `V_FAROL_AUDIT_TRAIL`** unificada para exibição
+- ✅ **Funções de auditoria** em `database.py` (`get_current_user_login`, `audit_change`)
+- ✅ **Integração em todos os fluxos**:
+  - `booking_new.py` - Edição de campos editáveis
+  - `tracking.py` - Edição de datas de voyage
+  - `history.py` - Aprovação de PDF
+  - `shipments_new.py` - Criação de Sales
+  - Anexos - Upload/delete de arquivos
+
+#### **Aba Audit Trail no History**
+- ✅ **Nova aba "🔍 Audit Trail"** no segmented control
+- ✅ **Filtros dinâmicos** por origem, ação e coluna
+- ✅ **Opção "Mostrar apenas última alteração por coluna"**
+- ✅ **Conversão de timestamps** para fuso do Brasil
+- ✅ **Export CSV** dos dados filtrados
+- ✅ **Interface responsiva** com configuração de colunas
+
+#### **Colunas de Autoria Adicionadas**
+- ✅ **`USER_LOGIN_SALES_CREATED`** em `F_CON_SALES_BOOKING_DATA`
+- ✅ **`USER_LOGIN_BOOKING_CREATED`** em `F_CON_SALES_BOOKING_DATA`
+- ✅ **`USER_LOGIN`** em `F_CON_RETURN_CARRIERS`
+
+**🔧 Implementação Técnica:**
+- **Transações atômicas** com `conn.begin()` para garantir consistência
+- **Normalização de valores** para texto estável na auditoria
+- **Detecção automática** de mudanças (só registra se old != new)
+- **Mapeamento dinâmico** de colunas para funcionar com qualquer case
+- **Rastreabilidade completa** com `adjustment_id` e `related_reference`
+
+**📊 Dados de Teste:**
+- **Usuários disponíveis**: `admin`/`admin123`, `user1`/`user123`, `diego`/`diego123`
+- **23 registros** de auditoria já capturados para `FR_25.10_0001`
+- **20 registros** na tabela `F_CON_CHANGE_LOG`
+- **3 registros** de ajustes na `F_CON_RETURN_CARRIERS`
+
+---
 
 ### 🔧 **v3.9.16 - Janeiro 2025 - Correção de Navegação do Menu Shipments**
 

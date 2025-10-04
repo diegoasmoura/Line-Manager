@@ -2,6 +2,9 @@ import streamlit as st
  
 # Primeira linha: configurar a página
 st.set_page_config(page_title="Farol", layout="wide")
+
+# Importar sistema de login
+from auth.login import show_login_form, is_logged_in, get_user_info, logout
  
 from streamlit_option_menu import option_menu 
 import shipments
@@ -17,6 +20,11 @@ svg_lighthouse = """
 <path fill="currentColor" d="M12 15q1.25 0 2.125-.875T15 12t-.875-2.125T12 9t-2.125.875T9 12t.875 2.125T12 15m0 1q-1.671 0-2.835-1.164Q8 13.67 8 12t1.165-2.835T12 8t2.836 1.165T16 12t-1.164 2.836T12 16m-7-3.5H1.5v-1H5zm17.5 0H19v-1h3.5zM11.5 5V1.5h1V5zm0 17.5V19h1V3.5zM6.746 7.404l-2.16-2.098l.695-.745l2.111 2.135zM18.72 19.439l-2.117-2.141l.652-.702l2.16 2.098zM16.596 6.745l2.098-2.16l.745.695l-2.135 2.111zM4.562 18.72l2.14-2.117l.664.652l-2.08 2.179zM12 12"/>
 </svg>
 """
+
+# Guard de login - verificar se usuário está logado
+if not is_logged_in():
+    show_login_form()
+    st.stop()  # Para a execução se não estiver logado
 
 # Inicializa o estado do menu se não existir
 if "menu_choice" not in st.session_state:
@@ -40,6 +48,21 @@ with st.sidebar:
     {svg_lighthouse} Farol
     </h2>
     """, unsafe_allow_html=True)
+    
+    # Informações do usuário logado
+    user_info = get_user_info()
+    if user_info:
+        st.markdown("---")
+        st.markdown(f"**👤 Usuário:** {user_info['username']}")
+        if user_info.get('login_time'):
+            duration = user_info['session_duration']
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, _ = divmod(remainder, 60)
+            st.markdown(f"**⏱️ Sessão:** {int(hours)}h {int(minutes)}m")
+        
+        # Botão de logout
+        if st.button("🚪 Logout", use_container_width=True):
+            logout()
  
     # Lista de opções (History removido - acessível via Shipments)
     options = ["Shipments", "Op. Control", "Performance", "Tracking", "Setup"]
