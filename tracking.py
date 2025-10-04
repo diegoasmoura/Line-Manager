@@ -424,6 +424,10 @@ def exibir_tracking():
         with col1:
             if st.button("💾 Save Changes", type="primary"):
                 with st.spinner("Saving changes to the database..."):
+                    # Iniciar batch para agrupar todas as mudanças
+                    from database import begin_change_batch, end_change_batch
+                    batch_id = begin_change_batch()
+                    
                     try:
                         success, message = update_booking_from_voyage(changes)
                         
@@ -434,6 +438,9 @@ def exibir_tracking():
                             st.error(f"❌ Failed to save: {message}")
                     except Exception as e:
                         st.error(f"❌ An unexpected error occurred: {e}")
+                    finally:
+                        # Encerrar batch
+                        end_change_batch()
         with col2:
             if st.button("❌ Cancel"):
                 st.session_state['tracking_discard_changes'] = True

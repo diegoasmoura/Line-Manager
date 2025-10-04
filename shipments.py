@@ -641,22 +641,30 @@ def exibir_shipments():
                 comments = st.session_state.get("info_complementar", "").strip()
        
                 if comments:
-                    success = insert_adjustments_basics(
-                        st.session_state["changes"],
-                        comments,
-                        random_uuid
-                    )
-                    if success:
-                        st.success("✅ Changes successfully registered in the database!")
-                        st.session_state["changes"] = pd.DataFrame()
-                       
-                        #Liberando o cache salvo das consultas
-                        st.cache_data.clear()
-                        resetar_estado()
-                        st.rerun()
-                        
-                    else:
-                        st.error("❌ Error registering adjustments in the database.")
+                    # Iniciar batch para agrupar todas as mudanças
+                    from database import begin_change_batch, end_change_batch
+                    begin_change_batch(random_uuid)
+                    
+                    try:
+                        success = insert_adjustments_basics(
+                            st.session_state["changes"],
+                            comments,
+                            random_uuid
+                        )
+                        if success:
+                            st.success("✅ Changes successfully registered in the database!")
+                            st.session_state["changes"] = pd.DataFrame()
+                           
+                            #Liberando o cache salvo das consultas
+                            st.cache_data.clear()
+                            resetar_estado()
+                            st.rerun()
+                            
+                        else:
+                            st.error("❌ Error registering adjustments in the database.")
+                    finally:
+                        # Encerrar batch
+                        end_change_batch()
                 else:
                     st.error("⚠️ The 'Additional Information' field is required.")
  

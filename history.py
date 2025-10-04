@@ -353,23 +353,30 @@ def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
         """)
         
         with conn.begin():  # Transação para auditoria
-            conn.execute(insert_query, {
-                "id": None,
-                "farol_reference": farol_reference,
-                "adjustment_id": str(uuid.uuid4()),  # Gera UUID para adjustment_id
-                "process_stage": "Attachment Management",
-                "type_": file_type,
-                "file_name": file_name_without_ext,
-                "file_extension": file_extension,
-                "upload_timestamp": datetime.now(),
-                "attachment": file_content,
-                "user_insert": user_id
-            })
+            # Iniciar batch para agrupar mudanças
+            from database import begin_change_batch, end_change_batch, audit_change
+            batch_id = begin_change_batch()
             
-            # Auditoria para upload de anexo
-            from database import audit_change
-            audit_change(conn, farol_reference, 'F_CON_ANEXOS', 'ATTACHMENT', 
-                        'NULL', file_name, 'attachments', 'CREATE')
+            try:
+                conn.execute(insert_query, {
+                    "id": None,
+                    "farol_reference": farol_reference,
+                    "adjustment_id": batch_id,  # Usar o mesmo batch_id
+                    "process_stage": "Attachment Management",
+                    "type_": file_type,
+                    "file_name": file_name_without_ext,
+                    "file_extension": file_extension,
+                    "upload_timestamp": datetime.now(),
+                    "attachment": file_content,
+                    "user_insert": user_id
+                })
+                
+                # Auditoria para upload de anexo
+                audit_change(conn, farol_reference, 'F_CON_ANEXOS', 'ATTACHMENT', 
+                            'NULL', file_name, 'attachments', 'CREATE')
+            finally:
+                # Encerrar batch
+                end_change_batch()
         
         conn.close()
         return True
@@ -454,23 +461,30 @@ def delete_attachment(attachment_id, deleted_by="system"):
         attachment_info = conn.execute(info_query, {"attachment_id": attachment_id}).fetchone()
         
         with conn.begin():  # Transação para auditoria
-            # Atualiza metadados e marca o estágio como deletado
-            query = text("""
-                UPDATE LogTransp.F_CON_ANEXOS
-                   SET process_stage = 'Attachment Deleted',
-                       user_update = :user_update,
-                       date_update = SYSDATE
-                 WHERE id = :attachment_id
-            """)
-            result = conn.execute(query, {"attachment_id": attachment_id, "user_update": deleted_by})
+            # Iniciar batch para agrupar mudanças
+            from database import begin_change_batch, end_change_batch, audit_change
+            batch_id = begin_change_batch()
             
-            # Auditoria para exclusão de anexo
-            if attachment_info and result.rowcount > 0:
-                from database import audit_change
-                farol_ref = attachment_info[0]
-                file_name = f"{attachment_info[1]}.{attachment_info[2]}" if attachment_info[2] else attachment_info[1]
-                audit_change(conn, farol_ref, 'F_CON_ANEXOS', 'ATTACHMENT', 
-                            file_name, 'NULL', 'attachments', 'DELETE')
+            try:
+                # Atualiza metadados e marca o estágio como deletado
+                query = text("""
+                    UPDATE LogTransp.F_CON_ANEXOS
+                       SET process_stage = 'Attachment Deleted',
+                           user_update = :user_update,
+                           date_update = SYSDATE
+                     WHERE id = :attachment_id
+                """)
+                result = conn.execute(query, {"attachment_id": attachment_id, "user_update": deleted_by})
+                
+                # Auditoria para exclusão de anexo
+                if attachment_info and result.rowcount > 0:
+                    farol_ref = attachment_info[0]
+                    file_name = f"{attachment_info[1]}.{attachment_info[2]}" if attachment_info[2] else attachment_info[1]
+                    audit_change(conn, farol_ref, 'F_CON_ANEXOS', 'ATTACHMENT', 
+                                file_name, 'NULL', 'attachments', 'DELETE')
+            finally:
+                # Encerrar batch
+                end_change_batch()
         
         conn.close()
         return result.rowcount > 0

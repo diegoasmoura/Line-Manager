@@ -56,6 +56,14 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Filtros dinâmicos** por origem, ação e coluna
 - **Export CSV** dos dados filtrados
 
+### 🔗 Sistema de Batch ID para Auditoria
+- **Agrupamento automático** de mudanças relacionadas em uma única ação do usuário
+- **UUID único por ação** que identifica todas as alterações feitas no mesmo momento
+- **Rastreabilidade completa** de ciclos de mudança (ex: todas as colunas alteradas em um "Confirm Changes")
+- **Aplicação automática** em todas as telas: Shipments, Tracking, Booking, Attachments
+- **Consistência de dados** garantindo que mudanças relacionadas compartilhem o mesmo ID
+- **Facilita análise** de padrões de uso e impacto de alterações
+
 ### 🔐 Sistema de Autenticação e Auditoria
 - **Login seguro** com controle de acesso por usuário
 - **Trilha de auditoria inteligente** focada em mudanças reais do usuário
@@ -66,6 +74,7 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Histórico de mudanças** campo-a-campo com timestamps
 - **Aba Audit Trail** no History com filtros avançados
 - **Export de dados** de auditoria em CSV
+- **Sistema de Batch ID** para agrupar mudanças relacionadas
 
 ### 🛡️ Sistema de Prevenção de Duplicidade Duplo
 
@@ -3189,6 +3198,26 @@ Todos os PRs passam por revisão técnica focando em:
 - **Manutenibilidade**: O código é fácil de manter?
 
 ## 📋 Changelog
+
+### 🔧 **v4.2.0 - Janeiro 2025 - Sistema de Batch ID para Auditoria**
+
+**🎯 Nova Funcionalidade:**
+
+#### **Sistema de Batch ID**
+- ✅ **Agrupamento automático**: Todas as mudanças de uma ação do usuário recebem o mesmo `ADJUSTMENT_ID`
+- ✅ **UUID único por ação**: Cada clique de "Confirm Changes", "Save Changes", etc. gera um UUID v4
+- ✅ **Aplicação universal**: Implementado em todas as telas (Shipments, Tracking, Booking, Attachments)
+- ✅ **Funções helper**: `begin_change_batch()`, `get_current_change_batch_id()`, `end_change_batch()`
+- ✅ **Auto-preenchimento**: `audit_change()` usa automaticamente o batch ativo se não especificado
+- ✅ **Rastreabilidade completa**: Facilita análise de padrões e impacto de alterações
+
+**📁 Arquivos Modificados:**
+- `database.py`: Funções helper e auto-preenchimento de `adjustment_id`
+- `shipments.py`: Batch no "Confirm Changes"
+- `tracking.py`: Batch no "Save Changes"
+- `history.py`: Batch em upload/delete de anexos
+- `booking_new.py`: Batch na criação de bookings
+- `README.md`: Documentação do sistema de Batch ID
 
 ### 🔧 **v4.1.1 - Janeiro 2025 - Correção da Auditoria da Tabela Principal**
 

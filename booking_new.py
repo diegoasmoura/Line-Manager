@@ -227,21 +227,29 @@ def show_booking_management_form():
                 st.session_state.button_disabled = True
                 
                 try:
-                    values["b_farol_status"] = "Booking requested"
-                    # Adiciona os campos POL e POD para atualização
-                    values["booking_port_of_loading_pol"] = values.get("booking_port_of_loading_pol", "")
-                    values["booking_port_of_delivery_pod"] = values.get("booking_port_of_delivery_pod", "")
-                    update_booking_data_by_farol_reference(farol_reference, values)
-                    # Upsert na tabela de retorno de carriers com base nos dados da unificada
-                    upsert_return_carrier_from_unified(farol_reference, user_insert=st.session_state.get('current_user', 'system'))
-                    st.success("✅ Dados atualizados com sucesso!")
-                    time.sleep(2)  # Aguarda 2 segundos
-                    # Limpa os estados antes de redirecionar
-                    st.session_state.pop("selected_reference", None)
-                    st.session_state.pop("button_disabled", None)
-                    st.cache_data.clear()
-                    st.session_state["current_page"] = "main"
-                    st.rerun()
+                    # Iniciar batch para agrupar todas as mudanças
+                    from database import begin_change_batch, end_change_batch
+                    batch_id = begin_change_batch()
+                    
+                    try:
+                        values["b_farol_status"] = "Booking requested"
+                        # Adiciona os campos POL e POD para atualização
+                        values["booking_port_of_loading_pol"] = values.get("booking_port_of_loading_pol", "")
+                        values["booking_port_of_delivery_pod"] = values.get("booking_port_of_delivery_pod", "")
+                        update_booking_data_by_farol_reference(farol_reference, values)
+                        # Upsert na tabela de retorno de carriers com base nos dados da unificada
+                        upsert_return_carrier_from_unified(farol_reference, user_insert=st.session_state.get('current_user', 'system'))
+                        st.success("✅ Dados atualizados com sucesso!")
+                        time.sleep(2)  # Aguarda 2 segundos
+                        # Limpa os estados antes de redirecionar
+                        st.session_state.pop("selected_reference", None)
+                        st.session_state.pop("button_disabled", None)
+                        st.cache_data.clear()
+                        st.session_state["current_page"] = "main"
+                        st.rerun()
+                    finally:
+                        # Encerrar batch
+                        end_change_batch()
                 except Exception as e:
                     # Reabilita o botão em caso de erro
                     st.session_state.button_disabled = False

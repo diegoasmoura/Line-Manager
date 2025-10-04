@@ -53,6 +53,37 @@ def _normalize_value_for_log(value):
     except Exception:
         return str(value)[:1000] if value is not None else 'NULL'
 
+def begin_change_batch(optional_uuid=None) -> str:
+    """Inicia um novo batch de mudanças com UUID único.
+    Retorna o UUID do batch (novo ou reutilizado)."""
+    import uuid
+    if optional_uuid:
+        batch_id = str(optional_uuid)
+    else:
+        batch_id = str(uuid.uuid4())
+    
+    try:
+        st.session_state['change_batch_id'] = batch_id
+    except Exception:
+        # Fallback se session_state não estiver disponível
+        pass
+    
+    return batch_id
+
+def get_current_change_batch_id() -> str | None:
+    """Obtém o ID do batch atual de mudanças."""
+    try:
+        return st.session_state.get('change_batch_id')
+    except Exception:
+        return None
+
+def end_change_batch() -> None:
+    """Limpa o batch atual de mudanças da sessão."""
+    try:
+        st.session_state.pop('change_batch_id', None)
+    except Exception:
+        pass
+
 def audit_change(conn, farol_ref: str, table: str, column: str,
                  old, new, source: str,
                  change_type: str = 'UPDATE',
@@ -67,6 +98,11 @@ def audit_change(conn, farol_ref: str, table: str, column: str,
     if old_str == new_str:
         return
     user_login = (user or get_current_user_login())[:150]
+    
+    # Se não foi fornecido adjustment_id, usar o batch atual
+    if adjustment_id is None:
+        adjustment_id = get_current_change_batch_id()
+    
     conn.execute(text(
         """
         INSERT INTO LogTransp.F_CON_CHANGE_LOG
@@ -878,6 +914,10 @@ def insert_adjustments_basics(changes_df, comment, random_uuid):
         conn = get_database_connection()
         transaction = conn.begin()
 
+        # Iniciar batch se não houver um ativo
+        if not get_current_change_batch_id():
+            begin_change_batch(random_uuid)
+
         # Auditoria: registrar cada mudança na F_CON_CHANGE_LOG
         for _, row in changes_df.iterrows():
             audit_change(conn, row["Farol Reference"], 'F_CON_SALES_BOOKING_DATA', 
@@ -934,6 +974,8 @@ def insert_adjustments_basics(changes_df, comment, random_uuid):
     finally:
         if conn:
             conn.close()
+        # Encerrar batch
+        end_change_batch()
  
 def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, responsibility, user_insert=None):
     if changes_df is None or changes_df.empty:
