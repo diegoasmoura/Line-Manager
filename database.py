@@ -329,7 +329,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
         S_LC_RECEIVED                      AS s_lc_received,
         S_ALLOCATION_DATE                  AS s_allocation_date,
         S_PRODUCER_NOMINATION_DATE         AS s_producer_nomination_date,
-        S_SALE_OWNER                       AS s_sales_owner,
+        USER_LOGIN_SALES_CREATED           AS s_sales_owner,
         S_COMMENTS                         AS s_comments
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
     ORDER BY FAROL_REFERENCE DESC
@@ -391,7 +391,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
         B_BOOKING_STATUS                     AS b_booking_status,
-        B_BOOKING_OWNER                      AS b_booking_owner,
+        USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
         B_BOOKING_REQUEST_DATE               AS b_booking_request_date,
@@ -542,12 +542,12 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         S_LC_RECEIVED                      AS s_lc_received,
         S_ALLOCATION_DATE                  AS s_allocation_date,
         S_PRODUCER_NOMINATION_DATE         AS s_producer_nomination_date,
-        S_SALE_OWNER                       AS s_sales_owner,
+        USER_LOGIN_SALES_CREATED           AS s_sales_owner,
         S_COMMENTS                         AS s_comments,
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
         B_BOOKING_STATUS                     AS b_booking_status,
-        B_BOOKING_OWNER                      AS b_booking_owner,
+        USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
         B_BOOKING_REQUEST_DATE               AS b_booking_request_date,
@@ -757,7 +757,7 @@ def fetch_shipments_data_sales():
         S_LC_RECEIVED                      AS s_lc_received,
         S_ALLOCATION_DATE                  AS s_allocation_date,
         S_PRODUCER_NOMINATION_DATE         AS s_producer_nomination_date,
-        S_SALE_OWNER                       AS s_sales_owner,
+        USER_LOGIN_SALES_CREATED           AS s_sales_owner,
         S_COMMENTS                         AS s_comments
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
     ORDER BY FAROL_REFERENCE'''
@@ -1064,7 +1064,7 @@ def add_sales_record(form_values):
             "s_lc_received": "S_LC_RECEIVED",
             "s_allocation_date": "S_ALLOCATION_DATE",
             "s_producer_nomination_date": "S_PRODUCER_NOMINATION_DATE",
-            "s_sales_owner": "S_SALE_OWNER",
+            "s_sales_owner": "USER_LOGIN_SALES_CREATED",
             "s_comments": "S_COMMENTS",
         }
 
