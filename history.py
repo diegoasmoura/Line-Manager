@@ -3283,15 +3283,17 @@ def display_audit_trail_tab(farol_reference):
                 'tracking': 'Atualização de Viagem',
                 'history': 'Aprovação de PDF',
                 'shipments_split': 'Ajustes',
-                'Booking Request - Company': 'Timeline Inicial'
+                'Booking Request - Company': 'Timeline Inicial',
+                'Other Request - Company': 'Timeline Inicial'
             }
             df_display['Origem'] = df_display['Origem'].replace(origin_mapping)
         
         # Filtrar eventos iniciais (fallback caso a view não possa ser alterada)
         df_display = df_display[
             ~(
-                # Remover eventos de timeline inicial
-                ((df_display['Tipo'] == 'ADJUSTMENT') & (df_display['Origem'] == 'Timeline Inicial')) |
+                # Remover eventos de timeline inicial (todos os tipos)
+                ((df_display['Tipo'] == 'ADJUSTMENT') & 
+                 (df_display['Origem'].str.contains('Timeline Inicial|Request - Company', na=False))) |
                 # Remover criações iniciais de Sales
                 ((df_display['Tabela'] == 'F_CON_SALES_BOOKING_DATA') & 
                  (df_display['Coluna'].isin(['Farol Status', 'USER_LOGIN_SALES_CREATED'])) & 
