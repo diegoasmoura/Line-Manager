@@ -3314,8 +3314,8 @@ def display_audit_trail_tab(farol_reference):
         
         # Reordenar colunas para colocar "ID Ajuste" no final
         column_order = [
-            'Referência', 'Tabela', 'Coluna', 'Valor Anterior', 'Novo Valor',
-            'Usuário', 'Origem', 'Ação', 'Data/Hora', 'ID Ajuste'
+            'Referência', 'Ação', 'Coluna', 'Valor Anterior', 'Novo Valor',
+            'Usuário', 'Origem', 'Data/Hora', 'Tabela', 'ID Ajuste'
         ]
         
         # Manter apenas as colunas que existem no DataFrame

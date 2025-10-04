@@ -147,17 +147,9 @@ def show_add_form():
                     # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
                     values["s_pnl_destination"] = "Yes" if values.get("s_vip_pnl_risk") == "PNL" else "No"
                     
-                    # Mapeamento do s_final_destination baseado no s_vip_pnl_risk (apenas se não foi preenchido manualmente)
-                    if not values.get("s_final_destination"):
-                        vip_pnl_risk_val = values.get("s_vip_pnl_risk", "")
-                        if vip_pnl_risk_val == "PNL":
-                            values["s_final_destination"] = "PNL"
-                        elif vip_pnl_risk_val == "VIP":
-                            values["s_final_destination"] = "VIP"
-                        elif vip_pnl_risk_val == "RISK":
-                            values["s_final_destination"] = "RISK"
-                        else:
-                            values["s_final_destination"] = ""
+                    # REMOVIDO: Mapeamento incorreto que colocava VIP/PNL/RISK em s_final_destination
+                    # O campo s_final_destination deve ser preenchido manualmente pelo usuário
+                    # O campo s_vip_pnl_risk é independente e não deve afetar s_final_destination
                     
                     # Tratamento da data s_required_arrival_date_expected no formulário manual
                     if values.get("s_required_arrival_date_expected"):
@@ -252,15 +244,10 @@ def show_add_form():
                     # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
                     s_pnl_destination = "Yes" if s_vip_pnl_risk == "PNL" else "No"
                     
-                    # Mapeamento do s_final_destination baseado no s_vip_pnl_risk
-                    if s_vip_pnl_risk == "PNL":
-                        s_final_destination = "PNL"
-                    elif s_vip_pnl_risk == "VIP":
-                        s_final_destination = "VIP"
-                    elif s_vip_pnl_risk == "RISK":
-                        s_final_destination = "RISK"
-                    else:
-                        s_final_destination = ""
+                    # REMOVIDO: Mapeamento incorreto que colocava VIP/PNL/RISK em s_final_destination
+                    # O campo s_final_destination deve ser preenchido manualmente pelo usuário
+                    # O campo s_vip_pnl_risk é independente e não deve afetar s_final_destination
+                    s_final_destination = ""
                     
                     # Tratamento da coluna LIMITE EMBARQUE - PNL para validar se é uma data válida
                     limite_embarque_val = row.get("LIMITE EMBARQUE - PNL", "")
