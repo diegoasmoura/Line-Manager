@@ -16,6 +16,70 @@ def get_brazil_time():
     import pytz
     brazil_tz = pytz.timezone('America/Sao_Paulo')
     return datetime.now(brazil_tz)
+
+# ==============================================
+# FUNÇÕES DE AUDITORIA E TRILHA DE MUDANÇAS
+# ==============================================
+
+def get_current_user_login() -> str:
+    """Obtém o usuário logado no app; fallback para variável de ambiente ou 'system'."""
+    try:
+        u = st.session_state.get("current_user")
+        if u and str(u).strip():
+            return str(u)[:150]
+    except Exception:
+        pass
+    import os
+    return (os.getenv("USER") or "system")[:150]
+
+# Formato ISO para normalizar datas em texto
+ISO_FMT = "%Y-%m-%d %H:%M:%S"
+
+def _normalize_value_for_log(value):
+    """Converte diferentes tipos (None/NaT/datetime/number) para texto estável."""
+    try:
+        import pandas as pd
+        if value is None or (hasattr(pd, 'isna') and pd.isna(value)):
+            return 'NULL'
+        # pandas.Timestamp ou datetime
+        if hasattr(value, 'to_pydatetime'):
+            value = value.to_pydatetime()
+        import datetime as _dt
+        if isinstance(value, (_dt.datetime,)):
+            return value.strftime(ISO_FMT)
+        if isinstance(value, (_dt.date,)):
+            return f"{value.strftime('%Y-%m-%d')} 00:00:00"
+        return str(value)[:1000]
+    except Exception:
+        return str(value)[:1000] if value is not None else 'NULL'
+
+def audit_change(conn, farol_ref: str, table: str, column: str,
+                 old, new, source: str,
+                 change_type: str = 'UPDATE',
+                 user: str | None = None,
+                 adjustment_id: str | None = None,
+                 related_ref: str | None = None) -> None:
+    """Registra 1 linha por coluna alterada na F_CON_CHANGE_LOG.
+    Deve ser chamado dentro da mesma transação do UPDATE/INSERT.
+    """
+    old_str = _normalize_value_for_log(old)
+    new_str = _normalize_value_for_log(new)
+    if old_str == new_str:
+        return
+    user_login = (user or get_current_user_login())[:150]
+    conn.execute(text(
+        """
+        INSERT INTO LogTransp.F_CON_CHANGE_LOG
+          (FAROL_REFERENCE, TABLE_NAME, COLUMN_NAME, OLD_VALUE, NEW_VALUE,
+           USER_LOGIN, CHANGE_SOURCE, CHANGE_TYPE, ADJUSTMENT_ID, RELATED_REFERENCE)
+        VALUES (:fr, :tbl, :col, :old, :new, :user, :src, :type, :adj, :rel)
+        """
+    ), {
+        "fr": farol_ref, "tbl": table, "col": column,
+        "old": old_str, "new": new_str,
+        "user": user_login, "src": source, "type": change_type,
+        "adj": adjustment_id, "rel": related_ref,
+    })
  
 # Configurações do banco de dados (podem ser sobrescritas por variáveis de ambiente)
 DB_CONFIG = {
@@ -1077,6 +1141,10 @@ def add_sales_record(form_values):
         unified_values.setdefault("FAROL_STATUS", "New Request")
         unified_values.setdefault("STAGE", "Sales Data")
 
+        # Adicionar USER_LOGIN_SALES_CREATED se não estiver presente
+        if "USER_LOGIN_SALES_CREATED" not in unified_values:
+            unified_values["USER_LOGIN_SALES_CREATED"] = get_current_user_login()
+        
         fields = ", ".join(unified_values.keys())
         placeholders = ", ".join([f":{key}" for key in unified_values.keys()])
         insert_query = text(f"""
@@ -1084,6 +1152,15 @@ def add_sales_record(form_values):
             VALUES ({placeholders})
         """)
         conn.execute(insert_query, unified_values)
+        
+        # Auditoria para criação de registro Sales
+        farol_reference = unified_values.get("FAROL_REFERENCE")
+        if farol_reference:
+            # Auditar criação do registro (campos principais)
+            audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'FAROL_STATUS', 
+                        None, "New Request", 'shipments_new', 'CREATE')
+            audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'USER_LOGIN_SALES_CREATED', 
+                        None, unified_values.get("USER_LOGIN_SALES_CREATED"), 'shipments_new', 'CREATE')
  
         # Removido: criação automática de booking e container release
         # Commit final
@@ -1487,48 +1564,89 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
     })
     conn = get_database_connection()
     try:
-        query = """
-        UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-        SET FAROL_STATUS = :farol_status,
-            B_VOYAGE_CARRIER = :b_voyage_carrier,
-            B_CREATION_OF_BOOKING = :b_creation_of_booking,
-            B_FREIGHT_FORWARDER = :b_freight_forwarder,
-            B_BOOKING_REQUEST_DATE = :b_booking_request_date,
-            B_COMMENTS = :b_comments,
-            S_PORT_OF_LOADING_POL = :pol,
-            S_PORT_OF_DELIVERY_POD = :pod,
-            S_QUANTITY_OF_CONTAINERS = :s_quantity_of_containers,
-            S_DTHC_PREPAID = :s_dthc_prepaid,
-            S_REQUESTED_SHIPMENT_WEEK = :s_requested_shipment_week,
-            S_FINAL_DESTINATION = :s_final_destination
-        WHERE FAROL_REFERENCE = :ref
-        """
-        # Atualiza a tabela de Loading
-        query_loading = """
-        UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-        SET l_farol_status = :farol_status
-        WHERE l_farol_reference = :ref
-        """
-        # Executa ambas as queries
-        conn.execute(
-            text(query),
-            {
-                "farol_status": "Booking Requested", #values.get("b_booking_status", "Booking Requested")
-                "b_creation_of_booking": datetime.now(),
-                "b_voyage_carrier": values["b_voyage_carrier"],
-                "b_freight_forwarder": values["b_freight_forwarder"],
-                "b_booking_request_date": values["b_booking_request_date"],
-                "b_comments": values["b_comments"],
+        with conn.begin():  # Transação para auditoria
+            # Primeiro, buscar valores atuais para auditoria
+            current_values_query = text("""
+                SELECT S_PORT_OF_LOADING_POL, S_PORT_OF_DELIVERY_POD, S_QUANTITY_OF_CONTAINERS,
+                       S_DTHC_PREPAID, S_REQUESTED_SHIPMENT_WEEK, S_FINAL_DESTINATION,
+                       USER_LOGIN_BOOKING_CREATED
+                FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                WHERE FAROL_REFERENCE = :ref
+            """)
+            current_row = conn.execute(current_values_query, {"ref": farol_reference}).fetchone()
+            
+            # Preparar novos valores
+            new_values = {
                 "pol": values.get("booking_port_of_loading_pol", ""),
                 "pod": values.get("booking_port_of_delivery_pod", ""),
                 "s_quantity_of_containers": values.get("s_quantity_of_containers") if values.get("s_quantity_of_containers") else None,
                 "s_dthc_prepaid": values.get("s_dthc_prepaid") if values.get("s_dthc_prepaid") else None,
                 "s_requested_shipment_week": values.get("s_requested_shipment_week") if values.get("s_requested_shipment_week") else None,
                 "s_final_destination": values.get("s_final_destination") if values.get("s_final_destination") else None,
-                "ref": farol_reference,
-            },
-        )
-        conn.execute(
+            }
+            
+            # Auditoria para campos editáveis
+            if current_row:
+                audit_fields = [
+                    ("S_PORT_OF_LOADING_POL", current_row[0], new_values["pol"]),
+                    ("S_PORT_OF_DELIVERY_POD", current_row[1], new_values["pod"]),
+                    ("S_QUANTITY_OF_CONTAINERS", current_row[2], new_values["s_quantity_of_containers"]),
+                    ("S_DTHC_PREPAID", current_row[3], new_values["s_dthc_prepaid"]),
+                    ("S_REQUESTED_SHIPMENT_WEEK", current_row[4], new_values["s_requested_shipment_week"]),
+                    ("S_FINAL_DESTINATION", current_row[5], new_values["s_final_destination"]),
+                ]
+                
+                for col_name, old_val, new_val in audit_fields:
+                    audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', col_name, 
+                               old_val, new_val, 'booking_new', 'UPDATE')
+            
+            query = """
+            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+            SET FAROL_STATUS = :farol_status,
+                B_VOYAGE_CARRIER = :b_voyage_carrier,
+                B_CREATION_OF_BOOKING = :b_creation_of_booking,
+                B_FREIGHT_FORWARDER = :b_freight_forwarder,
+                B_BOOKING_REQUEST_DATE = :b_booking_request_date,
+                B_COMMENTS = :b_comments,
+                S_PORT_OF_LOADING_POL = :pol,
+                S_PORT_OF_DELIVERY_POD = :pod,
+                S_QUANTITY_OF_CONTAINERS = :s_quantity_of_containers,
+                S_DTHC_PREPAID = :s_dthc_prepaid,
+                S_REQUESTED_SHIPMENT_WEEK = :s_requested_shipment_week,
+                S_FINAL_DESTINATION = :s_final_destination,
+                USER_LOGIN_BOOKING_CREATED = CASE 
+                    WHEN USER_LOGIN_BOOKING_CREATED IS NULL THEN :user_login 
+                    ELSE USER_LOGIN_BOOKING_CREATED 
+                END
+            WHERE FAROL_REFERENCE = :ref
+            """
+            # Atualiza a tabela de Loading
+            query_loading = """
+            UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+            SET l_farol_status = :farol_status
+            WHERE l_farol_reference = :ref
+            """
+            # Executa ambas as queries
+            conn.execute(
+                text(query),
+                {
+                    "farol_status": "Booking Requested", #values.get("b_booking_status", "Booking Requested")
+                    "b_creation_of_booking": datetime.now(),
+                    "b_voyage_carrier": values["b_voyage_carrier"],
+                    "b_freight_forwarder": values["b_freight_forwarder"],
+                    "b_booking_request_date": values["b_booking_request_date"],
+                    "b_comments": values["b_comments"],
+                    "pol": new_values["pol"],
+                    "pod": new_values["pod"],
+                    "s_quantity_of_containers": new_values["s_quantity_of_containers"],
+                    "s_dthc_prepaid": new_values["s_dthc_prepaid"],
+                    "s_requested_shipment_week": new_values["s_requested_shipment_week"],
+                    "s_final_destination": new_values["s_final_destination"],
+                    "user_login": get_current_user_login(),
+                    "ref": farol_reference,
+                },
+            )
+            conn.execute(
             text(query_loading),
             {
                 "farol_status": "Booking Requested",
@@ -2593,6 +2711,21 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             raise Exception("Farol Reference not found in return carrier data.")
 
         # 5. Prepare and execute the UPDATE on F_CON_SALES_BOOKING_DATA
+        # Primeiro, buscar valores atuais para auditoria
+        current_values_query = text("""
+            SELECT S_SPLITTED_BOOKING_REFERENCE, S_PLACE_OF_RECEIPT, S_QUANTITY_OF_CONTAINERS,
+                   S_PORT_OF_LOADING_POL, S_PORT_OF_DELIVERY_POD, S_FINAL_DESTINATION,
+                   B_BOOKING_REFERENCE, B_TRANSHIPMENT_PORT, B_TERMINAL, B_VESSEL_NAME,
+                   B_VOYAGE_CODE, B_VOYAGE_CARRIER, B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE,
+                   S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE,
+                   B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE,
+                   B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
+                   S_REQUIRED_ARRIVAL_DATE_EXPECTED, B_BOOKING_CONFIRMATION_DATE, FAROL_STATUS
+            FROM LogTransp.F_CON_SALES_BOOKING_DATA
+            WHERE FAROL_REFERENCE = :farol_reference
+        """)
+        current_row = conn.execute(current_values_query, {"farol_reference": farol_reference}).fetchone()
+        
         main_update_fields = {"farol_reference": farol_reference, "FAROL_STATUS": "Booking Approved"}
         fields_to_propagate = [
             "S_SPLITTED_BOOKING_REFERENCE", "S_PLACE_OF_RECEIPT", "S_QUANTITY_OF_CONTAINERS",
@@ -2641,6 +2774,69 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         main_set_clause = ", ".join([f"{field} = :{field}" for field in main_update_fields.keys() if field != 'farol_reference'])
         main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
         conn.execute(main_update_query, main_update_fields)
+        
+        # Auditoria para campos alterados na aprovação
+        if current_row:
+            current_values = {
+                "S_SPLITTED_BOOKING_REFERENCE": current_row[0],
+                "S_PLACE_OF_RECEIPT": current_row[1],
+                "S_QUANTITY_OF_CONTAINERS": current_row[2],
+                "S_PORT_OF_LOADING_POL": current_row[3],
+                "S_PORT_OF_DELIVERY_POD": current_row[4],
+                "S_FINAL_DESTINATION": current_row[5],
+                "B_BOOKING_REFERENCE": current_row[6],
+                "B_TRANSHIPMENT_PORT": current_row[7],
+                "B_TERMINAL": current_row[8],
+                "B_VESSEL_NAME": current_row[9],
+                "B_VOYAGE_CODE": current_row[10],
+                "B_VOYAGE_CARRIER": current_row[11],
+                "B_DATA_DRAFT_DEADLINE": current_row[12],
+                "B_DATA_DEADLINE": current_row[13],
+                "S_REQUESTED_DEADLINE_START_DATE": current_row[14],
+                "S_REQUESTED_DEADLINE_END_DATE": current_row[15],
+                "B_DATA_ESTIMATIVA_SAIDA_ETD": current_row[16],
+                "B_DATA_ESTIMATIVA_CHEGADA_ETA": current_row[17],
+                "B_DATA_ABERTURA_GATE": current_row[18],
+                "B_DATA_PARTIDA_ATD": current_row[19],
+                "B_DATA_CHEGADA_ATA": current_row[20],
+                "B_DATA_ESTIMATIVA_ATRACACAO_ETB": current_row[21],
+                "B_DATA_ATRACACAO_ATB": current_row[22],
+                "S_REQUIRED_ARRIVAL_DATE_EXPECTED": current_row[23],
+                "B_BOOKING_CONFIRMATION_DATE": current_row[24],
+                "FAROL_STATUS": current_row[25],
+            }
+            
+            # Auditar mudança de status
+            audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'FAROL_STATUS', 
+                        current_values["FAROL_STATUS"], "Booking Approved", 'history', 'UPDATE', 
+                        adjustment_id=adjustment_id, related_ref=related_reference)
+            
+            # Auditar outros campos que mudaram
+            for field in fields_to_propagate:
+                if field in main_update_fields and field in current_values:
+                    old_val = current_values[field]
+                    new_val = main_update_fields[field]
+                    if old_val != new_val:
+                        audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', field, 
+                                   old_val, new_val, 'history', 'UPDATE', 
+                                   adjustment_id=adjustment_id, related_ref=related_reference)
+            
+            # Auditar campos especiais
+            if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in main_update_fields:
+                old_val = current_values["S_REQUIRED_ARRIVAL_DATE_EXPECTED"]
+                new_val = main_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"]
+                if old_val != new_val:
+                    audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'S_REQUIRED_ARRIVAL_DATE_EXPECTED', 
+                               old_val, new_val, 'history', 'UPDATE', 
+                               adjustment_id=adjustment_id, related_ref=related_reference)
+            
+            if "B_BOOKING_CONFIRMATION_DATE" in main_update_fields:
+                old_val = current_values["B_BOOKING_CONFIRMATION_DATE"]
+                new_val = main_update_fields["B_BOOKING_CONFIRMATION_DATE"]
+                if old_val != new_val:
+                    audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'B_BOOKING_CONFIRMATION_DATE', 
+                               old_val, new_val, 'history', 'UPDATE', 
+                               adjustment_id=adjustment_id, related_ref=related_reference)
 
         # 6. Buscar últimos valores de data e atualizar colunas de expectativa interna no registro existente da tabela carriers
         try:
@@ -2838,12 +3034,60 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                         })
 
                 if update_clauses:
+                    # Buscar valores atuais para auditoria
+                    current_values_query = text("""
+                        SELECT B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_DEADLINE,
+                               B_DATA_DRAFT_DEADLINE, B_DATA_ABERTURA_GATE, B_DATA_ATRACACAO_ATB,
+                               B_DATA_PARTIDA_ATD, B_DATA_CHEGADA_ATA, B_DATA_ESTIMATIVA_ATRACACAO_ETB,
+                               B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_ESTIMADA_TRANSBORDO_ETD, B_DATA_TRANSBORDO_ATD,
+                               B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA
+                        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                        WHERE UPPER(TRIM(FAROL_REFERENCE)) = UPPER(TRIM(:farol_reference))
+                    """)
+                    current_row = conn.execute(current_values_query, {"farol_reference": fr}).fetchone()
+                    
                     # Use robust WHERE clause and log changes after successful update
                     update_sql = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {', '.join(update_clauses)} WHERE UPPER(TRIM(FAROL_REFERENCE)) = UPPER(TRIM(:farol_reference))")
                     result = conn.execute(update_sql, update_params)
 
                     # Only log if the update was successful (affected rows > 0)
                     if result.rowcount > 0 and log_entries:
+                        # Auditoria para cada campo alterado
+                        if current_row:
+                            current_values = {
+                                "B_DATA_ESTIMATIVA_SAIDA_ETD": current_row[0],
+                                "B_DATA_ESTIMATIVA_CHEGADA_ETA": current_row[1],
+                                "B_DATA_DEADLINE": current_row[2],
+                                "B_DATA_DRAFT_DEADLINE": current_row[3],
+                                "B_DATA_ABERTURA_GATE": current_row[4],
+                                "B_DATA_ATRACACAO_ATB": current_row[5],
+                                "B_DATA_PARTIDA_ATD": current_row[6],
+                                "B_DATA_CHEGADA_ATA": current_row[7],
+                                "B_DATA_ESTIMATIVA_ATRACACAO_ETB": current_row[8],
+                                "B_DATA_CONFIRMACAO_EMBARQUE": current_row[9],
+                                "B_DATA_ESTIMADA_TRANSBORDO_ETD": current_row[10],
+                                "B_DATA_TRANSBORDO_ATD": current_row[11],
+                                "B_DATA_CHEGADA_DESTINO_ETA": current_row[12],
+                                "B_DATA_CHEGADA_DESTINO_ATA": current_row[13],
+                            }
+                            
+                            for field_name, values in changed_fields.items():
+                                main_table_col = COLUMN_MAPPING.get(field_name.upper())
+                                if main_table_col and main_table_col in current_values:
+                                    old_val = current_values[main_table_col]
+                                    new_val = values['new_value']
+                                    if isinstance(new_val, pd.Timestamp):
+                                        new_val = new_val.to_pydatetime()
+                                    
+                                    # Para colunas de destino (DATE), converter datetime para date
+                                    if main_table_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
+                                        if new_val is not None and hasattr(new_val, 'date'):
+                                            new_val = new_val.date()
+                                    
+                                    audit_change(conn, fr, 'F_CON_SALES_BOOKING_DATA', main_table_col, 
+                                               old_val, new_val, 'tracking', 'UPDATE')
+                        
+                        # Manter log antigo por compatibilidade (opcional)
                         log_sql = text("""INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY) VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)""")
                         conn.execute(log_sql, log_entries)
 

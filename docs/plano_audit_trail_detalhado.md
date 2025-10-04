@@ -385,7 +385,7 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY COLUMN_NAME ORDER BY CHANGE_AT DESC) = 1
 - [x] Adicionar USER_LOGIN_* em F_CON_SALES_BOOKING_DATA
 - [ ] Renomear RESPONSIBLE_NAME para USER_LOGIN em F_CON_ADJUSTMENTS_LOG
 - [ ] Criar tabela F_CON_CHANGE_LOG e índice
-- [ ] Implementar get_current_user_login e audit_change helper
+- [x] Implementar get_current_user_login e audit_change helper
 - [ ] Auditar updates do booking_new em update_booking_data_by_farol_reference
 - [ ] Auditar updates do tracking em update_booking_from_voyage
 - [ ] Auditar updates durante aprovações no history
