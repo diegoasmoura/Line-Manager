@@ -3275,6 +3275,30 @@ def display_audit_trail_tab(farol_reference):
         if 'Coluna' in df_display.columns:
             df_display['Coluna'] = df_display['Coluna'].apply(get_friendly_column_name)
         
+        # Aplicar nomes amigáveis na coluna 'Origem'
+        if 'Origem' in df_display.columns:
+            origin_mapping = {
+                'booking_new': 'Criação do Booking',
+                'shipments_new': 'Criação do Shipment',
+                'tracking': 'Atualização de Viagem',
+                'history': 'Aprovação de PDF',
+                'shipments_split': 'Ajustes',
+                'Booking Request - Company': 'Timeline Inicial'
+            }
+            df_display['Origem'] = df_display['Origem'].replace(origin_mapping)
+        
+        # Filtrar eventos iniciais (fallback caso a view não possa ser alterada)
+        df_display = df_display[
+            ~(
+                # Remover eventos de timeline inicial
+                ((df_display['Tipo'] == 'ADJUSTMENT') & (df_display['Origem'] == 'Timeline Inicial')) |
+                # Remover criações iniciais de Sales
+                ((df_display['Tabela'] == 'F_CON_SALES_BOOKING_DATA') & 
+                 (df_display['Coluna'].isin(['Farol Status', 'USER_LOGIN_SALES_CREATED'])) & 
+                 (df_display['Ação'] == 'CREATE'))
+            )
+        ]
+        
         # Filtros
         col1, col2, col3 = st.columns(3)
         
@@ -3305,13 +3329,7 @@ def display_audit_trail_tab(farol_reference):
         if selected_column != 'Todas':
             df_filtered = df_filtered[df_filtered['Coluna'] == selected_column]
         
-        # Opção para mostrar apenas última alteração por coluna
-        show_only_latest = st.checkbox("📌 Mostrar apenas última alteração por coluna", value=False)
-        
-        if show_only_latest:
-            # Manter apenas a última alteração de cada coluna
-            df_filtered = df_filtered.sort_values('Data/Hora', ascending=False)
-            df_filtered = df_filtered.groupby('Coluna').first().reset_index()
+        # Opção removida: Mostrar apenas última alteração por coluna
             df_filtered = df_filtered.sort_values('Data/Hora', ascending=False)
         
         # Exibir estatísticas

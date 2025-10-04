@@ -48,9 +48,20 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Suporte a múltiplos carriers**: HAPAG-LLOYD, MAERSK, MSC, CMA CGM, COSCO, EVERGREEN, OOCL, PIL
 - **Extração automática** de campos-chave (booking reference, vessel name, voyage, portos)
 
+### 🔍 Audit Trail Inteligente
+- **Filtros automáticos** que removem eventos de sistema desnecessários
+- **Nomes amigáveis** para colunas (ex: "Confirmação Embarque" em vez de "B_DATA_CONFIRMACAO_EMBARQUE")
+- **Mapeamento de origens** em português ("Criação do Booking", "Atualização de Viagem", etc.)
+- **Interface limpa** focada apenas em ações manuais do usuário
+- **Filtros dinâmicos** por origem, ação e coluna
+- **Export CSV** dos dados filtrados
+
 ### 🔐 Sistema de Autenticação e Auditoria
 - **Login seguro** com controle de acesso por usuário
-- **Trilha de auditoria completa** com registro de todas as alterações
+- **Trilha de auditoria inteligente** focada em mudanças reais do usuário
+- **Filtros automáticos** que removem eventos de sistema desnecessários
+- **Nomes amigáveis** para colunas e origens em português
+- **Interface otimizada** com foco nas informações relevantes
 - **Rastreabilidade total** de quem alterou o quê e quando
 - **Histórico de mudanças** campo-a-campo com timestamps
 - **Aba Audit Trail** no History com filtros avançados
@@ -3178,6 +3189,61 @@ Todos os PRs passam por revisão técnica focando em:
 - **Manutenibilidade**: O código é fácil de manter?
 
 ## 📋 Changelog
+
+### 🎯 **v4.1.0 - Janeiro 2025 - Otimização da Auditoria e Interface do Audit Trail**
+
+**🎯 Funcionalidades Implementadas:**
+
+#### **Otimização da Auditoria**
+- ✅ **Remoção de auditoria de eventos iniciais** - Parou de auditar criações automáticas de Sales e Booking
+- ✅ **Auditoria focada em mudanças reais** - Só registra quando usuário edita campos editáveis
+- ✅ **Filtros inteligentes** - Eventos de timeline inicial e criações automáticas são filtrados
+- ✅ **Nomes amigáveis de origens** - Interface mais profissional e legível
+
+#### **Melhorias na Interface do Audit Trail**
+- ✅ **Nomes amigáveis das colunas** - Exibe "Confirmação Embarque" em vez de "B_DATA_CONFIRMACAO_EMBARQUE"
+- ✅ **Mapeamento de origens** - "Criação do Booking", "Criação do Shipment", "Atualização de Viagem", etc.
+- ✅ **Filtros aprimorados** - Remove eventos automáticos de sistema
+- ✅ **Interface simplificada** - Removida opção desnecessária "Mostrar apenas última alteração por coluna"
+
+#### **Correções Técnicas**
+- ✅ **Filtro de eventos de timeline** - Corrigido mapeamento para "Timeline Inicial"
+- ✅ **Auditoria condicional** - Só audita campos que realmente mudaram
+- ✅ **View Oracle atualizada** - `V_FAROL_AUDIT_TRAIL` com filtros de eventos iniciais
+- ✅ **Fallback no UI** - Filtro adicional no `history.py` caso view não possa ser alterada
+
+**🔧 Implementação Técnica:**
+
+1. **`database.py`** → Auditoria otimizada:
+   - Removida auditoria de `FAROL_STATUS` e `USER_LOGIN_SALES_CREATED` na criação
+   - Auditoria condicional em `update_booking_data_by_farol_reference`
+   - Origem alterada de `'booking_new'` para `'Criação do Booking'`
+
+2. **`history.py`** → Interface melhorada:
+   - Mapeamento de nomes amigáveis para colunas (68 campos mapeados)
+   - Mapeamento de origens amigáveis (6 origens mapeadas)
+   - Filtro de eventos iniciais automáticos
+   - Remoção de funcionalidade desnecessária
+
+3. **`V_FAROL_AUDIT_TRAIL.sql`** → View otimizada:
+   - Filtro `WHERE P_STATUS <> 'Booking Request - Company'`
+   - Filtro de criações iniciais de Sales
+   - Melhor performance na consulta
+
+**📊 Resultado:**
+- **Audit Trail limpo** - Apenas ações manuais do usuário são exibidas
+- **Interface profissional** - Nomes amigáveis em português
+- **Performance melhorada** - Menos registros desnecessários
+- **Experiência otimizada** - Foco nas informações relevantes
+
+**🎯 Comportamento Esperado:**
+1. **Criar Sales** (`shipments_new.py`): ❌ Não aparece no Audit Trail
+2. **Criar Booking** (`booking_new.py`) sem editar: ❌ Não aparece no Audit Trail
+3. **Editar campos editáveis**: ✅ Aparece como "Criação do Booking"
+4. **Alterar datas** (`tracking.py`): ✅ Aparece como "Atualização de Viagem"
+5. **Aprovar PDF** (`history.py`): ✅ Aparece como "Aprovação de PDF"
+
+---
 
 ### 🔐 **v4.0.0 - Janeiro 2025 - Sistema Completo de Auditoria e Login**
 

@@ -1153,14 +1153,9 @@ def add_sales_record(form_values):
         """)
         conn.execute(insert_query, unified_values)
         
-        # Auditoria para criação de registro Sales
-        farol_reference = unified_values.get("FAROL_REFERENCE")
-        if farol_reference:
-            # Auditar criação do registro (campos principais)
-            audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'FAROL_STATUS', 
-                        None, "New Request", 'shipments_new', 'CREATE')
-            audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'USER_LOGIN_SALES_CREATED', 
-                        None, unified_values.get("USER_LOGIN_SALES_CREATED"), 'shipments_new', 'CREATE')
+        # Auditoria para criação de registro Sales - REMOVIDA
+        # Não auditar eventos de criação inicial (FAROL_STATUS, USER_LOGIN_SALES_CREATED)
+        # A auditoria será ativada apenas quando o usuário editar campos editáveis
  
         # Removido: criação automática de booking e container release
         # Commit final
@@ -1585,7 +1580,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                 "s_final_destination": values.get("s_final_destination") if values.get("s_final_destination") else None,
             }
             
-            # Auditoria para campos editáveis
+            # Auditoria para campos editáveis - apenas quando há mudanças reais
             if current_row:
                 audit_fields = [
                     ("S_PORT_OF_LOADING_POL", current_row[0], new_values["pol"]),
@@ -1596,9 +1591,11 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                     ("S_FINAL_DESTINATION", current_row[5], new_values["s_final_destination"]),
                 ]
                 
+                # Auditar apenas campos que realmente mudaram (não criação inicial)
                 for col_name, old_val, new_val in audit_fields:
-                    audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', col_name, 
-                               old_val, new_val, 'booking_new', 'UPDATE')
+                    if old_val != new_val:  # Só audita se houve mudança real
+                        audit_change(conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', col_name, 
+                                   old_val, new_val, 'Criação do Booking', 'UPDATE')
             
             query = """
             UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
