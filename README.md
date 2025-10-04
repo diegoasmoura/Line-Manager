@@ -3190,6 +3190,34 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.1.1 - Janeiro 2025 - Correção da Auditoria da Tabela Principal**
+
+**🎯 Problemas Corrigidos:**
+
+#### **Auditoria da Tabela Principal**
+- ✅ **Correção crítica**: Mudanças na tabela principal (`shipments.py`) agora aparecem no Audit Trail
+- ✅ **Função `insert_adjustments_basics` atualizada**: Agora chama `audit_change` para registrar na `F_CON_CHANGE_LOG`
+- ✅ **Mapeamento de colunas**: Adicionado mapeamento `S_TYPE_OF_SHIPMENT` → "Type of Shipment"
+- ✅ **Source tracking**: Mudanças da tabela principal aparecem com origem "shipments"
+
+#### **Melhorias na Interface**
+- ✅ **Nomes amigáveis**: Coluna "Type of Shipment" aparece corretamente no Audit Trail
+- ✅ **Consistência**: Todas as mudanças manuais agora são auditadas uniformemente
+- ✅ **Rastreabilidade completa**: Mudanças de qualquer módulo aparecem no Audit Trail
+
+**🔧 Detalhes Técnicos:**
+- **Arquivo modificado**: `database.py` - função `insert_adjustments_basics`
+- **Arquivo modificado**: `history.py` - mapeamento de colunas amigáveis
+- **Tabela afetada**: `F_CON_CHANGE_LOG` - agora recebe todas as mudanças da tabela principal
+- **Source**: `'shipments'` para identificar origem das mudanças da tabela principal
+
+**📊 Resultado:**
+- Mudanças em "Type of Shipment" e outros campos editáveis da tabela principal agora aparecem no Audit Trail
+- Interface consistente com nomes amigáveis
+- Rastreabilidade completa de todas as alterações manuais
+
+----
+
 ### 🎯 **v4.1.0 - Janeiro 2025 - Otimização da Auditoria e Interface do Audit Trail**
 
 **🎯 Funcionalidades Implementadas:**

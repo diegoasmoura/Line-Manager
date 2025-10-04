@@ -3192,6 +3192,7 @@ def display_audit_trail_tab(farol_reference):
                 'S_REQUESTED_SHIPMENT_WEEK': 'Requested Shipment Week',
                 'S_QUANTITY_OF_CONTAINERS': 'Quantity of Containers',
                 'S_PORT_OF_LOADING_POL': 'Port of Loading POL',
+                'S_TYPE_OF_SHIPMENT': 'Type of Shipment',
                 'S_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
                 'S_FINAL_DESTINATION': 'Final Destination',
                 'B_DATA_DRAFT_DEADLINE': 'Draft Deadline',
@@ -3280,20 +3281,38 @@ def display_audit_trail_tab(farol_reference):
             origin_mapping = {
                 'booking_new': 'Criação do Booking',
                 'shipments_new': 'Criação do Shipment',
-                'tracking': 'Atualização de Viagem',
+                'tracking': 'Atualização na tela de tracking',
                 'history': 'Aprovação de PDF',
-                'shipments_split': 'Ajustes',
+                'attachments': 'Upload/exclusão de anexos',
+                'shipments': 'Mudanças na tabela principal',
+                'shipments_split': 'Tela de Ajustes/Split',
                 'Booking Request - Company': 'Timeline Inicial',
-                'Other Request - Company': 'Timeline Inicial'
+                'Other Request - Company': 'Timeline Inicial',
+                'Adjusts Cargill': 'Timeline Inicial'
             }
             df_display['Origem'] = df_display['Origem'].replace(origin_mapping)
+        
+        # Substituir "NULL" por vazio nas colunas de valores
+        if 'Valor Anterior' in df_display.columns:
+            df_display['Valor Anterior'] = df_display['Valor Anterior'].replace('NULL', '')
+        if 'Novo Valor' in df_display.columns:
+            df_display['Novo Valor'] = df_display['Novo Valor'].replace('NULL', '')
+        
+        # Reordenar colunas para colocar "ID Ajuste" no final
+        column_order = [
+            'Referência', 'Tabela', 'Coluna', 'Valor Anterior', 'Novo Valor',
+            'Usuário', 'Origem', 'Ação', 'Data/Hora', 'ID Ajuste'
+        ]
+        
+        # Manter apenas as colunas que existem no DataFrame
+        available_columns = [col for col in column_order if col in df_display.columns]
+        df_display = df_display[available_columns]
         
         # Filtrar eventos iniciais (fallback caso a view não possa ser alterada)
         df_display = df_display[
             ~(
                 # Remover eventos de timeline inicial (todos os tipos)
-                ((df_display['Tipo'] == 'ADJUSTMENT') & 
-                 (df_display['Origem'].str.contains('Timeline Inicial|Request - Company', na=False))) |
+                (df_display['Origem'].str.contains('Timeline Inicial|Request - Company|Adjusts Cargill', na=False)) |
                 # Remover criações iniciais de Sales
                 ((df_display['Tabela'] == 'F_CON_SALES_BOOKING_DATA') & 
                  (df_display['Coluna'].isin(['Farol Status', 'USER_LOGIN_SALES_CREATED'])) & 
@@ -3343,17 +3362,16 @@ def display_audit_trail_tab(farol_reference):
                 'Data/Hora': st.column_config.DatetimeColumn(
                     'Data/Hora',
                     format='DD/MM/YYYY HH:mm:ss',
-                    width='medium'
+                    width=None
                 ),
-                'Usuário': st.column_config.TextColumn('Usuário', width='small'),
-                'Origem': st.column_config.TextColumn('Origem', width='small'),
-                'Ação': st.column_config.TextColumn('Ação', width='small'),
-                'Tabela': st.column_config.TextColumn('Tabela', width='medium'),
-                'Coluna': st.column_config.TextColumn('Coluna', width='medium'),
-                'Valor Anterior': st.column_config.TextColumn('Valor Anterior', width='large'),
-                'Novo Valor': st.column_config.TextColumn('Novo Valor', width='large'),
-                'ID Ajuste': st.column_config.TextColumn('ID Ajuste', width='small'),
-                'Referência Relacionada': st.column_config.TextColumn('Referência Relacionada', width='medium'),
+                'Usuário': st.column_config.TextColumn('Usuário', width=None),
+                'Origem': st.column_config.TextColumn('Origem', width=None),
+                'Ação': st.column_config.TextColumn('Ação', width=None),
+                'Tabela': st.column_config.TextColumn('Tabela', width=None),
+                'Coluna': st.column_config.TextColumn('Coluna', width=None),
+                'Valor Anterior': st.column_config.TextColumn('Valor Anterior', width=None),
+                'Novo Valor': st.column_config.TextColumn('Novo Valor', width=None),
+                'ID Ajuste': st.column_config.TextColumn('ID Ajuste', width=None),
             }
             
             # Exibir tabela

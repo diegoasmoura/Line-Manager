@@ -872,13 +872,18 @@ def insert_adjustments_basics(changes_df, comment, random_uuid):
     """
     if changes_df is None or changes_df.empty:
         return False
- 
+
     conn = None
     try:
         conn = get_database_connection()
         transaction = conn.begin()
- 
- 
+
+        # Auditoria: registrar cada mudança na F_CON_CHANGE_LOG
+        for _, row in changes_df.iterrows():
+            audit_change(conn, row["Farol Reference"], 'F_CON_SALES_BOOKING_DATA', 
+                        row["Column"], row["Previous Value"], row["New Value"], 
+                        'shipments', 'UPDATE', adjustment_id=random_uuid)
+
         # Preparar os dados para inserção
         data_to_insert = [
             {
