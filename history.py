@@ -3176,6 +3176,105 @@ def display_audit_trail_tab(farol_reference):
         
         df_display = df_audit.rename(columns=rename_map)
         
+        # Aplicar nomes amigáveis para as colunas (usando o mesmo mapeamento do shipments.py)
+        from shipments_mapping import get_display_names
+        display_names = get_display_names()
+        
+        # Mapear nomes técnicos das colunas para nomes amigáveis
+        def get_friendly_column_name(column_name):
+            """Converte nome técnico da coluna para nome amigável"""
+            if not column_name or pd.isna(column_name):
+                return column_name
+            
+            # Mapeamento direto para colunas conhecidas
+            friendly_mapping = {
+                'S_DTHC_PREPAID': 'DTHC',
+                'S_REQUESTED_SHIPMENT_WEEK': 'Requested Shipment Week',
+                'S_QUANTITY_OF_CONTAINERS': 'Quantity of Containers',
+                'S_PORT_OF_LOADING_POL': 'Port of Loading POL',
+                'S_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
+                'S_FINAL_DESTINATION': 'Final Destination',
+                'B_DATA_DRAFT_DEADLINE': 'Draft Deadline',
+                'B_DATA_DEADLINE': 'Deadline',
+                'B_DATA_ESTIMATIVA_SAIDA_ETD': 'ETD',
+                'B_DATA_ESTIMATIVA_CHEGADA_ETA': 'ETA',
+                'B_DATA_ABERTURA_GATE': 'Abertura Gate',
+                'B_DATA_CONFIRMACAO_EMBARQUE': 'Confirmação Embarque',
+                'B_DATA_PARTIDA_ATD': 'Partida (ATD)',
+                'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'Estimada Transbordo (ETD)',
+                'B_DATA_CHEGADA_ATA': 'Chegada (ATA)',
+                'B_DATA_TRANSBORDO_ATD': 'Transbordo (ATD)',
+                'B_DATA_CHEGADA_DESTINO_ETA': 'Estimativa Chegada Destino (ETA)',
+                'B_DATA_CHEGADA_DESTINO_ATA': 'Chegada no Destino (ATA)',
+                'B_DATA_ESTIMATIVA_ATRACACAO_ETB': 'Estimativa Atracação (ETB)',
+                'B_DATA_ATRACACAO_ATB': 'Atracação (ATB)',
+                'B_FREIGHT_RATE_USD': 'Freight Rate USD',
+                'B_BOGEY_SALE_PRICE_USD': 'Bogey Sale Price USD',
+                'B_FREIGHTPPNL': 'Freight PNL',
+                'B_VOYAGE_CARRIER': 'Voyage Carrier',
+                'B_VESSEL_NAME': 'Vessel Name',
+                'B_VOYAGE_CODE': 'Voyage Code',
+                'B_TERMINAL': 'Terminal',
+                'B_FREIGHT_FORWARDER': 'Freight Forwarder',
+                'B_TRANSHIPMENT_PORT': 'Transhipment Port',
+                'B_POD_COUNTRY': 'POD Country',
+                'B_POD_COUNTRY_ACRONYM': 'POD Country Acronym',
+                'B_DESTINATION_TRADE_REGION': 'Destination Trade Region',
+                'B_BOOKING_REFERENCE': 'Booking Reference',
+                'B_BOOKING_STATUS': 'Booking Status',
+                'B_BOOKING_OWNER': 'Booking Owner',
+                'S_SALES_ORDER_REFERENCE': 'Sales Order Reference',
+                'S_SALES_ORDER_DATE': 'Sales Order Date',
+                'S_BUSINESS': 'Business',
+                'S_CUSTOMER': 'Customer',
+                'S_MODE': 'Mode',
+                'S_INCOTERM': 'Incoterm',
+                'S_SKU': 'SKU',
+                'S_PLANT_OF_ORIGIN': 'Plant of Origin',
+                'S_TYPE_OF_SHIPMENT': 'Type of Shipment',
+                'S_CONTAINER_TYPE': 'Container Type',
+                'S_VOLUME_IN_TONS': 'Volume in Tons',
+                'S_PARTIAL_ALLOWED': 'Partial Allowed',
+                'S_VIP_PNL_RISK': 'VIP PNL Risk',
+                'S_PNL_DESTINATION': 'PNL Destination',
+                'S_LC_RECEIVED': 'LC Received',
+                'S_ALLOCATION_DATE': 'Allocation Date',
+                'S_PRODUCER_NOMINATION_DATE': 'Producer Nomination',
+                'S_SALES_OWNER': 'Sales Owner',
+                'S_COMMENTS': 'Comments Sales',
+                'S_PLACE_OF_RECEIPT': 'Place of Receipt',
+                'B_COMMENTS': 'Comments Booking',
+                'FAROL_STATUS': 'Farol Status',
+                'S_SHIPMENT_STATUS': 'Shipment Status',
+                'S_CREATION_OF_SHIPMENT': 'Shipment Requested Date',
+                'B_CREATION_OF_BOOKING': 'Booking Registered Date',
+                'B_BOOKING_REQUEST_DATE': 'Booking Requested Date',
+                'B_BOOKING_CONFIRMATION_DATE': 'Booking Confirmation Date',
+                'S_REQUESTED_DEADLINES_START_DATE': 'Requested Deadline Start',
+                'S_REQUESTED_DEADLINES_END_DATE': 'Requested Deadline End',
+                'S_SHIPMENT_PERIOD_START_DATE': 'Shipment Period Start',
+                'S_SHIPMENT_PERIOD_END_DATE': 'Shipment Period End',
+                'S_REQUIRED_ARRIVAL_DATE_EXPECTED': 'Required Arrival Expected',
+                'S_AFLOAT': 'Afloat',
+                'S_CUSTOMER_PO': 'Customer PO',
+                'S_SPLITTED_BOOKING_REFERENCE': 'Splitted Booking Reference',
+                'B_QUANTITY_OF_CONTAINERS': 'Booking Quantity of Containers',
+                'B_CONTAINER_TYPE': 'Booking Container Type',
+                'B_PORT_OF_LOADING_POL': 'Port of Loading POL',
+                'B_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
+                'B_FINAL_DESTINATION': 'Final Destination',
+                'B_PLACE_OF_RECEIPT': 'Place of Receipt',
+                'B_AWARD_STATUS': 'Award Status',
+                'ATTACHMENT': 'Anexo'
+            }
+            
+            # Retorna o nome amigável se encontrado, senão retorna o nome original
+            return friendly_mapping.get(column_name, column_name)
+        
+        # Aplicar nomes amigáveis na coluna 'Coluna'
+        if 'Coluna' in df_display.columns:
+            df_display['Coluna'] = df_display['Coluna'].apply(get_friendly_column_name)
+        
         # Filtros
         col1, col2, col3 = st.columns(3)
         
