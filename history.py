@@ -3279,13 +3279,13 @@ def display_audit_trail_tab(farol_reference):
         # Aplicar nomes amigáveis na coluna 'Origem'
         if 'Origem' in df_display.columns:
             origin_mapping = {
-                'booking_new': 'Criação do Booking',
+                'booking_new': 'Tela de Criação de Booking',
                 'shipments_new': 'Criação do Shipment',
-                'tracking': 'Atualização na tela de tracking',
-                'history': 'Aprovação de PDF',
-                'attachments': 'Upload/exclusão de anexos',
-                'shipments': 'Mudanças na tabela principal',
-                'shipments_split': 'Tela de Ajustes/Split',
+                'tracking': 'Tela de Tracking',
+                'history': 'Tela de Aprovação de PDF',
+                'attachments': 'Tela de Anexos (Upload/Exclusão)',
+                'shipments': 'Tela Principal de Shipments',
+                'shipments_split': 'Tela de Ajustes e Split',
                 'Booking Request - Company': 'Timeline Inicial',
                 'Other Request - Company': 'Timeline Inicial',
                 'Adjusts Cargill': 'Timeline Inicial'
