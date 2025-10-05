@@ -48,21 +48,6 @@ with st.sidebar:
     {svg_lighthouse} Farol
     </h2>
     """, unsafe_allow_html=True)
-    
-    # Informações do usuário logado
-    user_info = get_user_info()
-    if user_info:
-        st.markdown("---")
-        st.markdown(f"**👤 Usuário:** {user_info['username']}")
-        if user_info.get('login_time'):
-            duration = user_info['session_duration']
-            hours, remainder = divmod(duration.total_seconds(), 3600)
-            minutes, _ = divmod(remainder, 60)
-            st.markdown(f"**⏱️ Sessão:** {int(hours)}h {int(minutes)}m")
-        
-        # Botão de logout
-        if st.button("🚪 Logout", use_container_width=True):
-            logout()
  
     # Lista de opções (History removido - acessível via Shipments)
     options = ["Shipments", "Op. Control", "Performance", "Tracking", "Setup"]
@@ -85,6 +70,21 @@ with st.sidebar:
             "nav-link-selected": {"background-color": "#007681", "color": "white"},
         }
     )
+    
+    # Informações do usuário logado (movidas para baixo)
+    user_info = get_user_info()
+    if user_info:
+        st.markdown("---")
+        st.markdown(f"**👤 Usuário:** {user_info['username']}")
+        if user_info.get('login_time'):
+            duration = user_info['session_duration']
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, _ = divmod(remainder, 60)
+            st.markdown(f"**⏱️ Sessão:** {int(hours)}h {int(minutes)}m")
+        
+        # Botão de logout
+        if st.button("🚪 Logout", use_container_width=True):
+            logout()
     
     # Atualiza o estado do menu se houve mudança
     if choice != st.session_state.menu_choice:
