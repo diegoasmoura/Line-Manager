@@ -25,7 +25,8 @@ def authenticate_user(username: str, password: str) -> bool:
 
 def show_login_form():
     """Exibe formulário de login com layout aprimorado."""
-    st.markdown("<h1 style='text-align: center;'>🔐 Login - Sistema Farol</h1>", unsafe_allow_html=True)
+    svg_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 24 24"><path fill="currentColor" d="M12 16q-1.671 0-2.835-1.164Q8 13.67 8 12t1.165-2.835T12 8t2.836 1.165T16 12t-1.164 2.836T12 16m-7-3.5H1.5v-1H5zm17.5 0H19v-1h3.5zM11.5 5V1.5h1V5zm0 17.5V19h1v3.5zM6.746 7.404l-2.16-2.098l.695-.745l2.111 2.135zM18.72 19.439l-2.117-2.141l.652-.702l2.16 2.098zM16.596 6.745l2.098-2.16l.745.695l-2.135 2.111zM4.562 18.72l2.14-2.117l.664.652l-2.08 2.179z"/></svg>"""
+    st.markdown(f"<h1 style='text-align: center;'>{svg_icon} Login - Sistema Farol</h1>", unsafe_allow_html=True)
     st.markdown("---")
 
     # Centraliza o formulário
@@ -65,18 +66,18 @@ def show_login_form():
                     st.rerun()
                 else:
                     st.error("❌ Usuário ou senha incorretos")
-    
-    # Informações de desenvolvimento
-    with st.expander("ℹ️ Informações para Desenvolvimento"):
-        st.markdown("""
-        **Usuários de teste:**
-        - `admin` / `admin123`
-        - `user1` / `user123` 
-        - `diego` / `diego123`
         
-        **Nota:** Este é um sistema de login básico para desenvolvimento. 
-        Em produção, implementar autenticação segura com hash de senhas e banco de dados.
-        """)
+        # Informações de desenvolvimento
+        with st.expander("ℹ️ Informações para Desenvolvimento"):
+            st.markdown("""
+            **Usuários de teste:**
+            - `admin` / `admin123`
+            - `user1` / `user123` 
+            - `diego` / `diego123`
+            
+            **Nota:** Este é um sistema de login básico para desenvolvimento. 
+            Em produção, implementar autenticação segura com hash de senhas e banco de dados.
+            """)
 
 def logout():
     """Realiza logout do usuário"""
