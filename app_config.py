@@ -6,6 +6,14 @@ Centraliza todas as configurações e constantes
 import os
 from typing import Dict, List
 
+# Informações do sistema
+SYSTEM_INFO = {
+    "name": "Farol",
+    "version": "1.0.0",
+    "description": "Sistema de Gerenciamento de Embarques",
+    "build_date": "2025-10-05"
+}
+
 # Configurações da API Ellox
 ELLOX_API_CONFIG = {
     "base_url": "https://apidtz.comexia.digital",

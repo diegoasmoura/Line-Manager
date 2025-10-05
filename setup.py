@@ -147,11 +147,19 @@ def exibir_setup():
         with col_general_conn:
             st.subheader("Conexão Geral (Internet/Proxy)")
             general_result = st.session_state.general_connection_result
-            if general_result["success"]:
+            api_result = st.session_state.api_connection_result
+            
+            # Se a API Ellox está funcionando, considerar a conexão geral como OK também
+            if api_result.get("success", False):
+                st.success(f"Online ✅ (via API Ellox)")
+                st.caption(f"Último teste: {st.session_state.api_last_validated}")
+            elif general_result["success"]:
                 st.success(f"Online ✅ ({general_result.get('response_time', 0.0):.2f}s)")
+                st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
             else:
                 st.error(f"Offline ❌: {general_result.get('error', 'Erro desconhecido')}")
-            st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
+                st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
+            
             if st.button("Testar Conexão Geral", key="test_general_conn_card_btn"):
                 test_general_connection()
 
