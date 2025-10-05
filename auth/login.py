@@ -24,41 +24,47 @@ def authenticate_user(username: str, password: str) -> bool:
     return False
 
 def show_login_form():
-    """Exibe formulário de login"""
-    st.markdown("## 🔐 Login - Sistema Farol")
+    """Exibe formulário de login com layout aprimorado."""
+    st.markdown("<h1 style='text-align: center;'>🔐 Login - Sistema Farol</h1>", unsafe_allow_html=True)
     st.markdown("---")
-    
-    with st.form("login_form"):
-        st.markdown("### Acesso ao Sistema")
-        
-        username = st.text_input(
-            "👤 Usuário",
-            placeholder="Digite seu usuário",
-            help="Usuários disponíveis: admin, user1, diego"
-        )
-        
-        password = st.text_input(
-            "🔑 Senha",
-            type="password",
-            placeholder="Digite sua senha",
-            help="Senhas: admin123, user123, diego123"
-        )
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            login_button = st.form_submit_button("🚀 Entrar", use_container_width=True)
-        
-        if login_button:
-            if not username or not password:
-                st.error("❌ Por favor, preencha usuário e senha")
-            elif authenticate_user(username, password):
-                # Salvar usuário na sessão
-                st.session_state.current_user = username
-                st.session_state.login_time = datetime.now()
-                st.success(f"✅ Login realizado com sucesso! Bem-vindo, {username}")
-                st.rerun()
-            else:
-                st.error("❌ Usuário ou senha incorretos")
+
+    # Centraliza o formulário
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+
+    with col2:
+        with st.form("login_form"):
+            st.markdown("<h3 style='text-align: center;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
+
+            username = st.text_input(
+                "👤 **Usuário**",
+                placeholder="Digite seu usuário",
+                help="Usuários disponíveis: admin, user1, diego"
+            )
+
+            password = st.text_input(
+                "🔑 **Senha**",
+                type="password",
+                placeholder="Digite sua senha",
+                help="Senhas: admin123, user123, diego123"
+            )
+
+            st.markdown("<br>", unsafe_allow_html=True)  # Espaçador
+
+            login_button = st.form_submit_button(
+                "🚀 Entrar",
+                use_container_width=True
+            )
+
+            if login_button:
+                if not username or not password:
+                    st.error("❌ Por favor, preencha usuário e senha")
+                elif authenticate_user(username, password):
+                    st.session_state.current_user = username
+                    st.session_state.login_time = datetime.now()
+                    st.success(f"✅ Login bem-sucedido! Bem-vindo, {username}")
+                    st.rerun()
+                else:
+                    st.error("❌ Usuário ou senha incorretos")
     
     # Informações de desenvolvimento
     with st.expander("ℹ️ Informações para Desenvolvimento"):
