@@ -4,6 +4,13 @@ from app_config import ELLOX_API_CONFIG, PROXY_CONFIG # Import config for defaul
 from datetime import datetime # NEW
 import os # NEW
 import requests # NEW
+import pandas as pd # NEW
+from auth.login import has_access_level, get_current_user # NEW
+from auth.auth_db import ( # NEW
+    list_users, create_user, update_user, 
+    reset_user_password, get_business_units,
+    check_username_exists, check_email_exists
+)
 
 def exibir_setup():
     st.title("⚙️ Configurações do Sistema Farol")
@@ -126,10 +133,13 @@ def exibir_setup():
     if st.session_state.api_connection_result == {"success": False, "message": "Nunca testado"}:
         test_api_connection()
 
-    # Definir abas (preparado para futuras expansões)
-    tab1 = st.tabs(["Gerenciamento de Credenciais"])
+    # Definir abas (com administração de usuários para ADMIN)
+    if has_access_level('ADMIN'):
+        tabs = st.tabs(["Gerenciamento de Credenciais", "Administração de Usuários"])
+    else:
+        tabs = st.tabs(["Gerenciamento de Credenciais"])
 
-    with tab1[0]:
+    with tabs[0]:
         st.info("As credenciais salvas aqui são usadas para autenticar com a API Ellox e o Proxy corporativo. As alterações são temporárias para esta sessão.")
 
         col_general_conn, col_api_conn = st.columns(2)
@@ -218,4 +228,261 @@ def exibir_setup():
             else:
                 st.warning(st.session_state.proxy_save_message)
 
+    # Aba de Administração de Usuários (apenas para ADMIN)
+    if has_access_level('ADMIN') and len(tabs) > 1:
+        with tabs[1]:
+            show_user_administration()
+
     print("⚙️ Setup") # Keep the original print for now, can remove later if not needed
+
+def show_user_administration():
+    """Exibe interface de administração de usuários"""
+    st.header("👥 Administração de Usuários")
+    st.markdown("---")
+    
+    # Cards com métricas
+    users = list_users()
+    total_users = len(users)
+    active_users = len([u for u in users if u['is_active'] == 1])
+    inactive_users = total_users - active_users
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Total de Usuários", total_users)
+    with col2:
+        st.metric("Usuários Ativos", active_users, delta=f"{inactive_users} inativos")
+    with col3:
+        admin_count = len([u for u in users if u['access_level'] == 'ADMIN'])
+        st.metric("Administradores", admin_count)
+    with col4:
+        edit_count = len([u for u in users if u['access_level'] == 'EDIT'])
+        st.metric("Editores", edit_count)
+    
+    st.markdown("---")
+    
+    # Sub-abas para funcionalidades
+    sub_tabs = st.tabs(["📋 Listar Usuários", "➕ Novo Usuário", "✏️ Editar Usuário", "🔑 Reset de Senha"])
+    
+    with sub_tabs[0]:
+        show_user_list(users)
+    
+    with sub_tabs[1]:
+        show_create_user_form()
+    
+    with sub_tabs[2]:
+        show_edit_user_form(users)
+    
+    with sub_tabs[3]:
+        show_reset_password_form(users)
+
+def show_user_list(users):
+    """Lista todos os usuários em tabela formatada"""
+    st.subheader("Usuários Cadastrados")
+    
+    if not users:
+        st.info("Nenhum usuário cadastrado.")
+        return
+    
+    # Converter para DataFrame
+    df = pd.DataFrame(users)
+    
+    # Formatar colunas
+    df['is_active'] = df['is_active'].apply(lambda x: '✅ Ativo' if x == 1 else '❌ Inativo')
+    df['access_level'] = df['access_level'].replace({
+        'VIEW': '👁️ Visualização',
+        'EDIT': '✏️ Edição',
+        'ADMIN': '⚙️ Administrador'
+    })
+    df['business_unit'] = df['business_unit'].fillna('Todas')
+    
+    # Renomear colunas para exibição
+    df = df.rename(columns={
+        'username': 'Usuário',
+        'full_name': 'Nome Completo',
+        'email': 'Email',
+        'business_unit': 'Unidade de Negócio',
+        'access_level': 'Nível de Acesso',
+        'is_active': 'Status',
+        'last_login': 'Último Login'
+    })
+    
+    # Exibir tabela
+    st.dataframe(
+        df[['Usuário', 'Nome Completo', 'Email', 'Unidade de Negócio', 
+            'Nível de Acesso', 'Status', 'Último Login']],
+        use_container_width=True,
+        hide_index=True
+    )
+
+def show_create_user_form():
+    """Formulário de criação de usuário"""
+    st.subheader("Criar Novo Usuário")
+    
+    business_units = get_business_units()
+    unit_options = ['Todas'] + [u['UNIT_NAME'] for u in business_units]
+    
+    with st.form("create_user_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            username = st.text_input("Usuário*", placeholder="usuario.nome", 
+                                   help="Nome único para login", key="create_username")
+            email = st.text_input("Email*", placeholder="usuario@empresa.com", key="create_email")
+            full_name = st.text_input("Nome Completo*", placeholder="Nome Sobrenome", key="create_full_name")
+        
+        with col2:
+            password = st.text_input("Senha Inicial*", type="password",
+                                    help="Usuário será solicitado a trocar no primeiro login", key="create_password")
+            
+            business_unit = st.selectbox("Unidade de Negócio", options=unit_options)
+            
+            access_level = st.selectbox(
+                "Nível de Acesso*",
+                options=['VIEW', 'EDIT', 'ADMIN'],
+                format_func=lambda x: {'VIEW': '👁️ Visualização', 'EDIT': '✏️ Edição', 'ADMIN': '⚙️ Administrador'}[x]
+            )
+        
+        st.markdown("**Obs:** Usuário será forçado a trocar a senha no primeiro login.")
+        
+        if st.form_submit_button("➕ Criar Usuário", use_container_width=True):
+            if not all([username, email, password, full_name]):
+                st.error("❌ Preencha todos os campos obrigatórios (*)")
+            elif len(password) < 6:
+                st.error("❌ A senha deve ter no mínimo 6 caracteres")
+            elif check_username_exists(username):
+                st.error("❌ Username já existe. Escolha outro.")
+            elif check_email_exists(email):
+                st.error("❌ Email já existe. Escolha outro.")
+            else:
+                # Converter business_unit
+                bu_value = None if business_unit == 'Todas' else next(
+                    (u['UNIT_CODE'] for u in business_units if u['UNIT_NAME'] == business_unit), None
+                )
+                
+                if create_user(username, email, password, full_name, bu_value, 
+                             access_level, get_current_user()):
+                    st.success(f"✅ Usuário '{username}' criado com sucesso!")
+                    st.balloons()  # Efeito visual de sucesso
+                    st.info("🔄 Atualizando lista de usuários...")
+                    import time
+                    time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
+                    # Limpar campos do formulário
+                    keys_to_clear = ['create_username', 'create_email', 'create_full_name', 'create_password']
+                    for key in keys_to_clear:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.rerun()
+                else:
+                    st.error("❌ Erro ao criar usuário. Tente novamente.")
+
+def show_edit_user_form(users):
+    """Formulário de edição de usuário"""
+    st.subheader("Editar Usuário")
+    
+    if not users:
+        st.info("Nenhum usuário para editar.")
+        return
+    
+    business_units = get_business_units()
+    unit_options = ['Todas'] + [u['UNIT_NAME'] for u in business_units]
+    
+    # Seleção de usuário
+    user_to_edit = st.selectbox(
+        "Selecione o usuário",
+        options=[u['username'] for u in users],
+        format_func=lambda x: f"{x} - {next(u['full_name'] for u in users if u['username'] == x)}"
+    )
+    
+    if user_to_edit:
+        user_data = next(u for u in users if u['username'] == user_to_edit)
+        
+        with st.form("edit_user_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.text_input("Usuário (não editável)", value=user_data['username'], disabled=True)
+                email = st.text_input("Email", value=user_data['email'])
+                full_name = st.text_input("Nome Completo", value=user_data['full_name'])
+            
+            with col2:
+                business_unit_display = user_data.get('business_unit') or 'Todas'
+                business_unit_idx = unit_options.index(business_unit_display) if business_unit_display in unit_options else 0
+                
+                business_unit = st.selectbox(
+                    "Unidade de Negócio",
+                    options=unit_options,
+                    index=business_unit_idx
+                )
+                
+                access_level = st.selectbox(
+                    "Nível de Acesso",
+                    options=['VIEW', 'EDIT', 'ADMIN'],
+                    format_func=lambda x: {'VIEW': '👁️ Visualização', 'EDIT': '✏️ Edição', 'ADMIN': '⚙️ Administrador'}[x],
+                    index=['VIEW', 'EDIT', 'ADMIN'].index(user_data['access_level'])
+                )
+                
+                is_active = st.selectbox(
+                    "Status",
+                    options=[1, 0],
+                    format_func=lambda x: '✅ Ativo' if x == 1 else '❌ Inativo',
+                    index=0 if user_data['is_active'] == 1 else 1
+                )
+            
+            if st.form_submit_button("💾 Salvar Alterações", use_container_width=True):
+                # Converter business_unit
+                bu_value = None if business_unit == 'Todas' else next(
+                    (u['UNIT_CODE'] for u in business_units if u['UNIT_NAME'] == business_unit), None
+                )
+                
+                if update_user(
+                    user_data['user_id'], email, full_name, bu_value,
+                    access_level, is_active, get_current_user()
+                ):
+                    st.success("✅ Usuário atualizado com sucesso!")
+                    st.balloons()  # Efeito visual de sucesso
+                    st.info("🔄 Atualizando lista de usuários...")
+                    import time
+                    time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
+                    st.rerun()
+                else:
+                    st.error("❌ Erro ao atualizar usuário. Tente novamente.")
+
+def show_reset_password_form(users):
+    """Formulário de reset de senha"""
+    st.subheader("Reset de Senha")
+    
+    if not users:
+        st.info("Nenhum usuário para resetar senha.")
+        return
+    
+    with st.form("reset_password_form"):
+        user_to_reset = st.selectbox(
+            "Selecione o usuário",
+            options=[u['username'] for u in users],
+            format_func=lambda x: f"{x} - {next(u['full_name'] for u in users if u['username'] == x)}"
+        )
+        
+        new_password = st.text_input("Nova Senha", type="password")
+        confirm_password = st.text_input("Confirmar Nova Senha", type="password")
+        
+        st.markdown("**Obs:** Usuário será forçado a trocar a senha no próximo login.")
+        
+        if st.form_submit_button("🔑 Resetar Senha", use_container_width=True):
+            if not new_password or not confirm_password:
+                st.error("❌ Preencha todos os campos")
+            elif new_password != confirm_password:
+                st.error("❌ As senhas não coincidem")
+            elif len(new_password) < 6:
+                st.error("❌ A senha deve ter no mínimo 6 caracteres")
+            else:
+                user_data = next(u for u in users if u['username'] == user_to_reset)
+                
+                if reset_user_password(user_data['user_id'], new_password, get_current_user()):
+                    st.success(f"✅ Senha do usuário '{user_to_reset}' resetada com sucesso!")
+                    st.balloons()  # Efeito visual de sucesso
+                    st.info("🔄 Atualizando lista de usuários...")
+                    import time
+                    time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
+                    st.rerun()
+                else:
+                    st.error("❌ Erro ao resetar senha. Tente novamente.")

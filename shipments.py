@@ -6,6 +6,7 @@ import pandas as pd
 from sqlalchemy import text
 import time
 import uuid
+from auth.login import has_access_level  # NEW: Controle de acesso
  
 # Importa funções para interações com banco de dados e UDC
 from database import (
@@ -636,67 +637,70 @@ def exibir_shipments():
            
         col1, col2, col3, col4  = st.columns([1, 1, 2, 3])
         with col1:
-            if st.button("✅ Confirm Changes"):
-                comments = st.session_state.get("info_complementar", "").strip()
+            if has_access_level('EDIT'):
+                if st.button("✅ Confirm Changes"):
+                    comments = st.session_state.get("info_complementar", "").strip()
        
-                if comments:
-                    # Iniciar batch para agrupar todas as mudanças
-                    from database import begin_change_batch, end_change_batch
-                    begin_change_batch(random_uuid)
-                    
-                    try:
-                        # Loop de auditoria (substitui insert_adjustments_basics)
-                        conn = get_database_connection()
-                        transaction = conn.begin()
+                    if comments:
+                        # Iniciar batch para agrupar todas as mudanças
+                        from database import begin_change_batch, end_change_batch
+                        begin_change_batch(random_uuid)
                         
-                        for _, row in st.session_state["changes"].iterrows():
-                            from database import audit_change, update_field_in_sales_booking_data
-                            from shipments_mapping import process_farol_status_for_database, get_database_column_name
+                        try:
+                            # Loop de auditoria (substitui insert_adjustments_basics)
+                            conn = get_database_connection()
+                            transaction = conn.begin()
                             
-                            farol_ref = row["Farol Reference"]
-                            column = row["Column"]
-                            old_value = row["Previous Value"]
-                            new_value = row["New Value"]
+                            for _, row in st.session_state["changes"].iterrows():
+                                from database import audit_change, update_field_in_sales_booking_data
+                                from shipments_mapping import process_farol_status_for_database, get_database_column_name
+                                
+                                farol_ref = row["Farol Reference"]
+                                column = row["Column"]
+                                old_value = row["Previous Value"]
+                                new_value = row["New Value"]
+                                
+                                # Converter nome da coluna para nome técnico do banco de dados
+                                db_column_name = get_database_column_name(column)
+                                
+                                # Processar tipos de dados especiais
+                                if column == "Farol Status" or db_column_name == "FAROL_STATUS":
+                                    new_value = process_farol_status_for_database(new_value)
+                                
+                                # Converter pandas.Timestamp para datetime nativo
+                                if hasattr(new_value, 'to_pydatetime'):
+                                    new_value = new_value.to_pydatetime()
+                                
+                                # Converter para date se for coluna de data específica
+                                if db_column_name in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
+                                    if new_value is not None and hasattr(new_value, 'date'):
+                                        new_value = new_value.date()
+                                
+                                # 1. Auditar a mudança (usa nome técnico)
+                                audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', 
+                                            db_column_name, old_value, new_value, 
+                                            'shipments', 'UPDATE', adjustment_id=random_uuid)
+                                
+                                # 2. Persistir a mudança na tabela principal (usa nome técnico)
+                                update_field_in_sales_booking_data(conn, farol_ref, db_column_name, new_value)
                             
-                            # Converter nome da coluna para nome técnico do banco de dados
-                            db_column_name = get_database_column_name(column)
+                            transaction.commit()
+                            conn.close()
                             
-                            # Processar tipos de dados especiais
-                            if column == "Farol Status" or db_column_name == "FAROL_STATUS":
-                                new_value = process_farol_status_for_database(new_value)
-                            
-                            # Converter pandas.Timestamp para datetime nativo
-                            if hasattr(new_value, 'to_pydatetime'):
-                                new_value = new_value.to_pydatetime()
-                            
-                            # Converter para date se for coluna de data específica
-                            if db_column_name in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
-                                if new_value is not None and hasattr(new_value, 'date'):
-                                    new_value = new_value.date()
-                            
-                            # 1. Auditar a mudança (usa nome técnico)
-                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', 
-                                        db_column_name, old_value, new_value, 
-                                        'shipments', 'UPDATE', adjustment_id=random_uuid)
-                            
-                            # 2. Persistir a mudança na tabela principal (usa nome técnico)
-                            update_field_in_sales_booking_data(conn, farol_ref, db_column_name, new_value)
-                        
-                        transaction.commit()
-                        conn.close()
-                        
-                        st.success("✅ Changes successfully registered in the database!")
-                        st.session_state["changes"] = pd.DataFrame()
-                       
-                        #Liberando o cache salvo das consultas
-                        st.cache_data.clear()
-                        resetar_estado()
-                        st.rerun()
-                    finally:
-                        # Encerrar batch
-                        end_change_batch()
-                else:
-                    st.error("⚠️ The 'Additional Information' field is required.")
+                            st.success("✅ Changes successfully registered in the database!")
+                            st.session_state["changes"] = pd.DataFrame()
+                           
+                            #Liberando o cache salvo das consultas
+                            st.cache_data.clear()
+                            resetar_estado()
+                            st.rerun()
+                        finally:
+                            # Encerrar batch
+                            end_change_batch()
+                    else:
+                        st.error("⚠️ The 'Additional Information' field is required.")
+            else:
+                st.warning("⚠️ Você não tem permissão para editar dados. Nível de acesso: Visualização")
  
         with col2:
             if st.button("❌ Discard Changes"):

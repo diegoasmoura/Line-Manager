@@ -1,27 +1,9 @@
 """
-Sistema de login mínimo para o Farol
+Sistema de login com banco de dados Oracle e bcrypt
 """
 import streamlit as st
-import hashlib
-import os
-from datetime import datetime, timedelta
-
-# Usuários hardcoded para desenvolvimento (em produção, usar banco de dados)
-USERS = {
-    "admin": "admin123",  # senha: admin123
-    "user1": "user123",   # senha: user123
-    "diego": "diego123",  # senha: diego123
-}
-
-def hash_password(password: str) -> str:
-    """Hash simples da senha (em produção, usar bcrypt ou similar)"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def authenticate_user(username: str, password: str) -> bool:
-    """Autentica usuário com credenciais"""
-    if username in USERS and USERS[username] == password:
-        return True
-    return False
+from datetime import datetime
+from auth.auth_db import authenticate_user
 
 def show_login_form():
     """Exibe formulário de login com layout aprimorado."""
@@ -59,32 +41,41 @@ def show_login_form():
             if login_button:
                 if not username or not password:
                     st.error("❌ Por favor, preencha usuário e senha")
-                elif authenticate_user(username, password):
-                    st.session_state.current_user = username
-                    st.session_state.login_time = datetime.now()
-                    st.success(f"✅ Login bem-sucedido! Bem-vindo, {username}")
-                    st.rerun()
                 else:
-                    st.error("❌ Usuário ou senha incorretos")
+                    user_data = authenticate_user(username, password)
+                    
+                    if user_data:
+                        # Armazenar dados do usuário na sessão
+                        st.session_state.current_user = user_data['username']
+                        st.session_state.user_data = user_data
+                        st.session_state.login_time = datetime.now()
+                        
+                        # Verificar se precisa trocar senha
+                        if user_data.get('password_reset_required') == 1:
+                            st.session_state.force_password_change = True
+                        
+                        st.success(f"✅ Login bem-sucedido! Bem-vindo, {user_data['full_name']}")
+                        st.rerun()
+                    else:
+                        st.error("❌ Usuário ou senha incorretos, ou usuário inativo")
         
         # Informações de desenvolvimento
         with st.expander("ℹ️ Informações para Desenvolvimento"):
             st.markdown("""
-            **Usuários de teste:**
-            - `admin` / `admin123`
-            - `user1` / `user123` 
-            - `diego` / `diego123`
+            **Usuário administrador padrão:**
+            - `admin` / `Admin@2025`
             
-            **Nota:** Este é um sistema de login básico para desenvolvimento. 
-            Em produção, implementar autenticação segura com hash de senhas e banco de dados.
+            **Nota:** Sistema de autenticação seguro com banco de dados Oracle e hash bcrypt.
+            Acesse Setup > Administração de Usuários para gerenciar usuários.
             """)
 
 def logout():
     """Realiza logout do usuário"""
-    if 'current_user' in st.session_state:
-        del st.session_state.current_user
-    if 'login_time' in st.session_state:
-        del st.session_state.login_time
+    # Limpar sessão
+    keys_to_clear = ['current_user', 'user_data', 'login_time', 'force_password_change']
+    for key in keys_to_clear:
+        st.session_state.pop(key, None)
+    
     st.rerun()
 
 def get_current_user() -> str:
@@ -95,13 +86,34 @@ def is_logged_in() -> bool:
     """Verifica se há usuário logado"""
     return get_current_user() is not None
 
+def has_access_level(required_level: str) -> bool:
+    """
+    Verifica se usuário tem nível de acesso necessário.
+    Níveis: VIEW < EDIT < ADMIN
+    """
+    if not is_logged_in():
+        return False
+    
+    user_data = st.session_state.get('user_data', {})
+    current_level = user_data.get('access_level', 'VIEW')
+    
+    levels = {'VIEW': 1, 'EDIT': 2, 'ADMIN': 3}
+    
+    return levels.get(current_level, 0) >= levels.get(required_level, 0)
+
 def get_user_info() -> dict:
     """Retorna informações do usuário logado"""
     if not is_logged_in():
         return {}
     
+    user_data = st.session_state.get('user_data', {})
+    
     return {
         "username": get_current_user(),
+        "full_name": user_data.get('full_name', ''),
+        "email": user_data.get('email', ''),
+        "business_unit": user_data.get('business_unit', 'Todas'),
+        "access_level": user_data.get('access_level', 'VIEW'),
         "login_time": st.session_state.get("login_time"),
         "session_duration": datetime.now() - st.session_state.get("login_time", datetime.now())
     }

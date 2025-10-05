@@ -65,17 +65,17 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 - **Consistência de dados** garantindo que mudanças relacionadas compartilhem o mesmo ID
 - **Facilita análise** de padrões de uso e impacto de alterações
 
-### 🔐 Sistema de Autenticação e Auditoria
-- **Login seguro** com controle de acesso por usuário
-- **Trilha de auditoria inteligente** focada em mudanças reais do usuário
-- **Filtros automáticos** que removem eventos de sistema desnecessários
-- **Nomes amigáveis** para colunas e origens em português
-- **Interface otimizada** com foco nas informações relevantes
-- **Rastreabilidade total** de quem alterou o quê e quando
-- **Histórico de mudanças** campo-a-campo com timestamps
-- **Aba Audit Trail** no History com filtros avançados
-- **Export de dados** de auditoria em CSV
-- **Sistema de Batch ID** para agrupar mudanças relacionadas
+### 🔐 Sistema de Autenticação e Controle de Acesso
+- **Autenticação segura** com banco de dados Oracle e hash bcrypt
+- **Três níveis de acesso**: VIEW (Visualização), EDIT (Edição), ADMIN (Administrador)
+- **Gestão completa de usuários** com interface administrativa integrada
+- **Controle por unidade de negócio** (Cotton, Food, ou acesso a todas)
+- **Senhas seguras** com hash bcrypt e força de troca no primeiro login
+- **Interface de administração** para criar, editar e gerenciar usuários
+- **Controle de permissões** aplicado em todas as funcionalidades do sistema
+- **Auditoria de login** com registro de tentativas e último acesso
+- **Reset de senhas** por administradores
+- **Sistema escalável** para futuras expansões de níveis de acesso
 
 ### 🛡️ Sistema de Prevenção de Duplicidade Duplo
 
@@ -418,6 +418,172 @@ streamlit run app.py
 ```
 
 O sistema estará disponível em `http://localhost:8501`
+
+## 🔐 Sistema de Autenticação e Controle de Acesso
+
+### Visão Geral
+
+O Farol possui um sistema completo de autenticação integrado com banco de dados Oracle, oferecendo controle granular de acesso e gestão segura de usuários. O sistema utiliza hash bcrypt para segurança das senhas e oferece três níveis de acesso distintos.
+
+### Níveis de Acesso
+
+#### 👁️ **VIEW (Visualização)**
+- **Permissões**: Apenas leitura de dados
+- **Funcionalidades**: Visualizar embarques, relatórios, histórico
+- **Restrições**: Não pode editar, criar ou deletar registros
+- **Uso recomendado**: Usuários que precisam apenas consultar informações
+
+#### ✏️ **EDIT (Edição)**
+- **Permissões**: Leitura + Edição de dados
+- **Funcionalidades**: Todas as funcionalidades de VIEW + editar embarques, criar novos registros
+- **Restrições**: Não pode gerenciar usuários
+- **Uso recomendado**: Usuários operacionais que precisam modificar dados
+
+#### ⚙️ **ADMIN (Administrador)**
+- **Permissões**: Acesso total ao sistema
+- **Funcionalidades**: Todas as funcionalidades + gestão de usuários
+- **Especiais**: Criar, editar, desativar usuários; resetar senhas; configurar unidades de negócio
+- **Uso recomendado**: Administradores do sistema e supervisores
+
+### Primeiro Acesso
+
+#### Credenciais Padrão
+Após a instalação inicial, use as seguintes credenciais:
+
+- **Username**: `admin`
+- **Password**: `Admin@2025`
+- **Nível**: Administrador
+
+⚠️ **IMPORTANTE**: Troque a senha padrão imediatamente após o primeiro login!
+
+#### Passo a Passo
+1. Execute o sistema Farol
+2. Na tela de login, digite `admin` / `Admin@2025`
+3. Acesse **Setup > Administração de Usuários**
+4. Crie novos usuários conforme necessário
+5. Troque a senha do admin por uma senha segura
+
+### Administração de Usuários
+
+#### Como Acessar
+1. Faça login como usuário ADMIN
+2. No menu lateral, clique em **Setup**
+3. Selecione a aba **Administração de Usuários**
+
+#### Funcionalidades Disponíveis
+
+##### 📋 **Listar Usuários**
+- Visualizar todos os usuários cadastrados
+- Ver status (ativo/inativo), nível de acesso, último login
+- Métricas: total de usuários, ativos, administradores, editores
+
+##### ➕ **Criar Novo Usuário**
+- **Campos obrigatórios**:
+  - Username (único)
+  - Email (único)
+  - Nome completo
+  - Senha inicial (mínimo 6 caracteres)
+  - Nível de acesso
+- **Campos opcionais**:
+  - Unidade de negócio (Cotton, Food, ou Todas)
+- **Comportamento**: Usuário será forçado a trocar senha no primeiro login
+
+##### ✏️ **Editar Usuário**
+- Modificar dados pessoais (email, nome)
+- Alterar nível de acesso
+- Ativar/desativar usuário
+- Alterar unidade de negócio
+- **Username não pode ser alterado**
+
+##### 🔑 **Reset de Senha**
+- Selecionar usuário
+- Definir nova senha
+- Confirmar nova senha
+- **Comportamento**: Usuário será forçado a trocar senha no próximo login
+
+### Unidades de Negócio
+
+O sistema suporta controle de acesso por unidade de negócio:
+
+- **Cotton**: Acesso apenas a embarques da unidade Cotton
+- **Food**: Acesso apenas a embarques da unidade Food  
+- **Todas**: Acesso a todas as unidades (padrão para ADMIN)
+
+### Boas Práticas
+
+#### Política de Senhas
+- **Mínimo**: 6 caracteres
+- **Recomendado**: 8+ caracteres com maiúsculas, minúsculas, números e símbolos
+- **Troca obrigatória**: No primeiro login e quando resetada por admin
+- **Segurança**: Senhas são armazenadas com hash bcrypt (60 caracteres)
+
+#### Gestão de Usuários
+- **Desative usuários** em vez de deletar (preserva histórico)
+- **Use níveis apropriados**: VIEW para consultas, EDIT para operações, ADMIN para gestão
+- **Monitore último login**: Identifique usuários inativos
+- **Documente mudanças**: Use campos de auditoria (criado por, atualizado por)
+
+#### Controle de Acesso
+- **Princípio do menor privilégio**: Dê apenas o acesso necessário
+- **Revisão periódica**: Verifique permissões regularmente
+- **Separação de funções**: Diferentes usuários para diferentes responsabilidades
+
+### Estrutura do Banco de Dados
+
+#### Tabela `LogTransp.F_CON_USERS`
+```sql
+-- Principais colunas:
+USER_ID              -- Chave primária (auto-incremento)
+USERNAME             -- Nome de usuário único
+EMAIL                -- Email único
+PASSWORD_HASH        -- Hash bcrypt da senha (60 chars)
+FULL_NAME            -- Nome completo
+BUSINESS_UNIT        -- Unidade de negócio (NULL = todas)
+ACCESS_LEVEL         -- VIEW/EDIT/ADMIN
+IS_ACTIVE            -- 1=ativo, 0=inativo
+CREATED_AT           -- Data de criação
+LAST_LOGIN           -- Último login bem-sucedido
+PASSWORD_RESET_REQUIRED -- 1=deve trocar senha
+```
+
+### Troubleshooting
+
+#### Problemas Comuns
+
+**❌ "Usuário ou senha incorretos"**
+- Verifique se o username está correto
+- Confirme a senha (case-sensitive)
+- Verifique se o usuário está ativo
+
+**❌ "Acesso negado"**
+- Verifique seu nível de acesso
+- Confirme se tem permissão para a funcionalidade
+- Entre em contato com um administrador
+
+**❌ "Usuário inativo"**
+- Usuário foi desativado por um administrador
+- Solicite reativação ao administrador do sistema
+
+**❌ "Erro de conexão com banco"**
+- Verifique configuração do Oracle
+- Confirme se a tabela `F_CON_USERS` existe
+- Execute o script de inicialização se necessário
+
+#### Scripts de Manutenção
+
+**Inicializar Sistema de Autenticação:**
+```bash
+python scripts/init_auth_system.py
+```
+
+**Verificar Estrutura do Banco:**
+```sql
+-- Verificar se tabela existe
+SELECT COUNT(*) FROM user_tables WHERE table_name = 'F_CON_USERS';
+
+-- Listar usuários
+SELECT USERNAME, FULL_NAME, ACCESS_LEVEL, IS_ACTIVE FROM LogTransp.F_CON_USERS;
+```
 
 ## 📖 Guia de Uso
 
