@@ -3997,6 +3997,154 @@ Todos os PRs passam por revisão técnica focando em:
 - **Wiki**: Documentação interna completa
 - **Tickets**: Sistema interno de tickets
 
+## 🔧 Sistema de Audit Trail Inteligente
+
+### 📋 Visão Geral
+
+O sistema de audit trail foi completamente reformulado para garantir consistência e rastreabilidade adequada das mudanças. O sistema agora implementa validação inteligente que evita registros desconexos e garante que apenas mudanças relevantes sejam auditadas.
+
+### 🎯 Problemas Resolvidos
+
+**Problema Original:**
+- Erro `ORA-00942` ao tentar inserir em tabela obsoleta `F_CON_VOYAGE_MANUAL_UPDATES`
+- Audit trail criava registros para Farol References que já haviam sido rolados para outras viagens
+- Histórico inconsistente com "atualizações desconexas" de viagens antigas
+
+**Solução Implementada:**
+- Remoção completa da dependência da tabela obsoleta
+- Validação de vínculo atual antes de criar audit trail
+- Sistema inteligente que distingue entre mudanças atuais e históricas
+
+### 🏗️ Arquitetura da Solução
+
+#### Função de Validação (`is_currently_linked_to_voyage`)
+
+```python
+def is_currently_linked_to_voyage(conn, farol_ref, vessel, voyage, terminal):
+    """
+    Verifica se o Farol Reference está atualmente vinculado a esta viagem.
+    Retorna True apenas se for a relação mais recente.
+    """
+    query = text("""
+        SELECT 1 FROM (
+            SELECT FAROL_REFERENCE, B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY FAROL_REFERENCE 
+                       ORDER BY ROW_INSERTED_DATE DESC
+                   ) as rn
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE FAROL_REFERENCE = :fr
+        ) WHERE rn = 1 
+          AND UPPER(TRIM(B_VESSEL_NAME)) = UPPER(TRIM(:vessel))
+          AND UPPER(TRIM(B_VOYAGE_CODE)) = UPPER(TRIM(:voyage))
+          AND UPPER(TRIM(B_TERMINAL)) = UPPER(TRIM(:terminal))
+    """)
+    
+    result = conn.execute(query, {
+        'fr': farol_ref,
+        'vessel': vessel,
+        'voyage': voyage,
+        'terminal': terminal
+    }).fetchone()
+    
+    return result is not None
+```
+
+#### Fluxo de Validação
+
+1. **Mudança Detectada**: Usuário altera dados de viagem no Tracking
+2. **Busca de FRs**: Sistema identifica Farol References vinculados à viagem
+3. **Validação Atual**: Para cada FR, verifica se é o vínculo mais recente
+4. **Audit Condicional**:
+   - **Se atual**: Cria registro em `F_ELLOX_TERMINAL_MONITORINGS` + atualiza `F_CON_SALES_BOOKING_DATA` + **cria audit trail em `F_CON_CHANGE_LOG`**
+   - **Se histórico**: Cria registro em `F_ELLOX_TERMINAL_MONITORINGS` + atualiza `F_CON_SALES_BOOKING_DATA` + **SEM audit trail**
+
+### 🎯 Benefícios da Nova Arquitetura
+
+- ✅ **Erro ORA-00942 Eliminado**: Não tenta mais inserir em tabela obsoleta
+- ✅ **Audit Trail Coerente**: Apenas mudanças de FRs atualmente vinculados
+- ✅ **Histórico Limpo**: Evita registros desconexos de viagens antigas
+- ✅ **Rastreabilidade Mantida**: `F_ELLOX_TERMINAL_MONITORINGS` sempre atualizado
+- ✅ **Performance Otimizada**: Validação eficiente com ROW_NUMBER()
+
+### 📊 Tabelas Envolvidas
+
+| Tabela | Função | Status |
+|--------|--------|--------|
+| `F_ELLOX_TERMINAL_MONITORINGS` | Histórico completo de viagens | ✅ Sempre atualizada |
+| `F_CON_SALES_BOOKING_DATA` | Dados principais de booking | ✅ Sempre atualizada |
+| `F_CON_CHANGE_LOG` | Audit trail de mudanças | ✅ Apenas para FRs atuais |
+| `F_CON_RETURN_CARRIERS` | Validação de vínculos | ✅ Consultada para validação |
+| ~~`F_CON_VOYAGE_MANUAL_UPDATES`~~ | ~~Tabela obsoleta~~ | ❌ Removida |
+
+## 🎨 Melhorias de Experiência do Usuário (UX)
+
+### 📱 Mensagens de Confirmação Padronizadas
+
+**Problema Identificado:**
+- Mensagens de confirmação inconsistentes entre diferentes módulos
+- Falta de feedback visual adequado após operações críticas
+- Experiência fragmentada entre `tracking.py` e `booking_new.py`
+
+**Solução Implementada:**
+- Padronização de mensagens de sucesso: `"✅ Dados atualizados com sucesso!"`
+- Implementação de delay de 2 segundos para feedback visual
+- Limpeza automática de cache com `st.cache_data.clear()`
+- Comportamento uniforme em todo o sistema
+
+### 🔄 Sistema de Persistência de Sessão Robusto
+
+**Evolução da Solução:**
+1. **v1.0**: `st.session_state` básico (perdia sessão no F5)
+2. **v2.0**: `st.cache_data` com persistência (perdia na atualização de código)
+3. **v3.0**: **Sistema Híbrido** (atual) - `st.session_state` + `st.cache_data(persist="disk")` + arquivos JSON locais
+
+**Arquitetura Híbrida:**
+```python
+# Camada 1: Session State (rápida)
+st.session_state['session_token'] = token
+
+# Camada 2: Cache Persistente (sobrevive a reinicializações)
+@st.cache_data(ttl=SESSION_TIMEOUT, persist="disk")
+def _store_session_data(token, session_data):
+    return session_data
+
+# Camada 3: Arquivos JSON (backup e restauração)
+def _save_session_to_file(token, session_data):
+    with open(f".streamlit/sessions/{token}.json", "w") as f:
+        json.dump(session_data, f)
+```
+
+### ⏰ Gerenciamento de Timeout de Sessão
+
+**Configurações Atuais:**
+- **Timeout**: 4 horas (reduzido de 8 horas)
+- **Indicador Visual**: Cores dinâmicas baseadas no tempo restante
+  - 🟢 Verde: > 1 hora restante
+  - 🟠 Laranja: < 1 hora restante  
+  - 🔴 Vermelho: < 30 minutos restante
+- **Ícones Dinâmicos**: ✅ ⏰ ⚠️ baseados no tempo restante
+
+### 🎯 Interface de Sessão Unificada
+
+**Layout Atualizado:**
+```html
+<div style="text-align: left; margin: 20px 0; padding: 10px; 
+            background-color: #f8f9fa; border-radius: 5px;">
+    <small style="font-weight: bold;">👤 Usuário: admin</small><br>
+    <small style="color: {color}; font-weight: bold;">
+        {icon} Sessão: {time_str}
+    </small>
+</div>
+```
+
+### 📊 Status de Conexão Inteligente
+
+**Lógica de Exibição:**
+- **API Ellox Online**: "Online ✅ (via API Ellox)" para conexão geral
+- **API Ellox Offline**: Fallback para teste próprio de conectividade
+- **Eliminação de Confusão**: Remove mensagens contraditórias de status
+
 ### 📚 Documentação Adicional
 
 - [Guia de Instalação Detalhado](docs/INSTALLATION.md)
@@ -4031,23 +4179,219 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.9.10*
+*Sistema de Gerenciamento de Embarques - Versão 3.9.11*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~16.500+ linhas Python (atualizado v3.9.10)
+- **Linhas de Código**: ~17.000+ linhas Python (atualizado v3.9.11)
 - **Módulos**: 15+ módulos especializados  
 - **Arquivos Ellox**: 4 arquivos especializados para integração API
 - **Carriers Suportados**: 8 carriers principais
-- **Integrações**: Oracle DB + API Ellox
-- **Funcionalidades**: 50+ funcionalidades ativas
+- **Integrações**: Oracle DB + API Ellox + Sistema de Sincronização Automática
+- **Funcionalidades**: 55+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.10)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.10)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.10)
-- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.10)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.11)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.11)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.11)
+- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.11)
+- **Audit Trail**: ✅ Sistema inteligente implementado (v3.9.11)
+- **Sessão Persistente**: ✅ Sistema híbrido robusto (v3.9.11)
+- **UX Padronizada**: ✅ Mensagens e feedback uniformes (v3.9.11)
+- **Sincronização Automática**: ✅ Sistema de background ativo (v3.9.11)
 - **Permissões LogTransp**: ✅ Erro ORA-01031 resolvido (v3.9.10)
+- **Interface Audit Trail**: ✅ Colunas otimizadas e contagem de registros (v3.9.11)
+- **Correções de Bugs**: ✅ KeyError 'Tabela' e outros erros resolvidos (v3.9.11)
+
+## 🔧 Correções e Melhorias Recentes v3.9.11
+
+### 🎨 Melhorias na Interface Audit Trail
+
+#### Contagem de Registros
+**Implementação:**
+- Aba Audit Trail agora mostra número de registros: `🔍 Audit Trail (X records)`
+- Consistente com outras abas do sistema
+- Query otimizada para contagem rápida
+
+#### Otimização de Colunas
+**Colunas Ocultas:**
+- ❌ **"Tabela"** - Removida da exibição (informação técnica desnecessária)
+- ❌ **"ID Ajuste"** - Removida da exibição (identificador interno)
+
+**Larguras Ajustadas:**
+- ✅ **"Origem"** - Largura `medium` para melhor legibilidade
+- ✅ **"Coluna"** - Largura `medium` mantida
+
+#### Estrutura Atualizada
+```
+Antes: Referência | Ação | Coluna | Valor Anterior | Novo Valor | Usuário | Origem | Data/Hora | Tabela | ID Ajuste
+Agora:  Referência | Ação | Coluna | Valor Anterior | Novo Valor | Usuário | Origem | Data/Hora
+```
+
+### 🐛 Correções de Bugs
+
+#### KeyError 'Tabela' (Resolvido)
+**Problema:**
+- Erro `KeyError: 'Tabela'` ao acessar aba Audit Trail
+- Causado por referência à coluna removida no código de filtros
+
+**Solução:**
+- Removidas referências à coluna "Tabela" no código de filtros
+- Simplificado filtro de eventos iniciais
+- Mantida funcionalidade de remoção de eventos de timeline inicial
+
+#### Mensagens de Confirmação Padronizadas
+**Implementação:**
+- Mensagem uniforme: `"✅ Dados atualizados com sucesso!"`
+- Delay de 2 segundos para feedback visual
+- Limpeza automática de cache com `st.cache_data.clear()`
+- Comportamento consistente entre `tracking.py` e `booking_new.py`
+
+### 📊 Benefícios das Melhorias
+
+#### Para Usuários
+- ✅ **Interface mais limpa** - Colunas desnecessárias ocultas
+- ✅ **Informação útil** - Contagem de registros visível
+- ✅ **Feedback consistente** - Mensagens padronizadas
+- ✅ **Melhor legibilidade** - Larguras de coluna otimizadas
+
+#### Para Administradores
+- ✅ **Debugging facilitado** - Menos colunas técnicas na interface
+- ✅ **Performance melhorada** - Queries otimizadas para contagem
+- ✅ **Manutenção simplificada** - Código mais limpo e focado
+
+### 🔄 Fluxo de Desenvolvimento
+
+#### Processo de Otimização
+1. **Identificação** - Usuário reporta necessidade de melhorias
+2. **Análise** - Avaliação do impacto e benefícios
+3. **Implementação** - Código otimizado com testes
+4. **Validação** - Verificação de funcionamento correto
+5. **Documentação** - Atualização do README e guias
+
+#### Padrões Estabelecidos
+- **Contagem de registros** em todas as abas
+- **Larguras consistentes** para colunas similares
+- **Mensagens padronizadas** em todo o sistema
+- **Tratamento de erros** robusto e informativo
+
+## 🎓 Guia de Treinamento - Novas Funcionalidades v3.9.11
+
+### 🔧 Sistema de Audit Trail Inteligente
+
+#### Para Administradores
+
+**O que mudou:**
+- Sistema agora distingue entre mudanças atuais e históricas
+- Audit trail só é criado para Farol References atualmente vinculados à viagem
+- Eliminado erro ORA-00942 que impedia salvamento no Tracking
+
+**Como funciona:**
+1. Usuário faz mudança na viagem no Tracking
+2. Sistema valida se cada Farol Reference está atualmente vinculado
+3. Apenas mudanças de FRs atuais geram audit trail
+4. Histórico completo sempre é mantido em `F_ELLOX_TERMINAL_MONITORINGS`
+
+**Benefícios para o usuário:**
+- Salvamento no Tracking funciona sem erros
+- Histórico de mudanças mais limpo e coerente
+- Rastreabilidade mantida para mudanças relevantes
+
+### 🎨 Melhorias de Interface
+
+#### Mensagens de Confirmação Padronizadas
+
+**Antes:**
+- Mensagens diferentes em cada módulo
+- Feedback inconsistente após operações
+
+**Agora:**
+- Mensagem uniforme: "✅ Dados atualizados com sucesso!"
+- Delay de 2 segundos para visualização
+- Limpeza automática de cache
+
+#### Sistema de Sessão Robusto
+
+**Características:**
+- Sessão persiste após F5 (refresh da página)
+- Sessão persiste após atualizações de código
+- Timeout de 4 horas (reduzido de 8 horas)
+- Indicador visual com cores dinâmicas:
+  - 🟢 Verde: > 1 hora restante
+  - 🟠 Laranja: < 1 hora restante
+  - 🔴 Vermelho: < 30 minutos restante
+
+#### Status de Conexão Inteligente
+
+**Melhoria:**
+- Quando API Ellox está online, conexão geral mostra "Online ✅ (via API Ellox)"
+- Elimina mensagens contraditórias de status
+- Interface mais clara e confiável
+
+### 🔄 Sistema de Sincronização Automática
+
+#### Para Administradores
+
+**Configuração:**
+1. Acesse Setup → Sincronização Automática
+2. Configure intervalo (30min, 1h, 2h, 4h, 8h)
+3. Ative/desative conforme necessário
+
+**Monitoramento:**
+- Aba "Logs de Sincronização" mostra estatísticas detalhadas
+- Filtros por período, status, navio, terminal
+- Gráficos de performance e taxa de sucesso
+
+**Inicialização do Daemon:**
+```bash
+# Iniciar sincronização
+python ellox_sync_daemon.py start
+
+# Verificar status
+python ellox_sync_daemon.py status
+
+# Parar sincronização
+python ellox_sync_daemon.py stop
+```
+
+### 📊 Tabelas de Auditoria
+
+#### Estrutura Atualizada
+
+| Tabela | Função | Quando é Usada |
+|--------|--------|----------------|
+| `F_ELLOX_TERMINAL_MONITORINGS` | Histórico de viagens | Sempre (todas as mudanças) |
+| `F_CON_SALES_BOOKING_DATA` | Dados principais | Sempre (todas as mudanças) |
+| `F_CON_CHANGE_LOG` | Audit trail | Apenas FRs atualmente vinculados |
+| `F_ELLOX_SYNC_LOGS` | Logs de sincronização | Sistema automático |
+| `F_ELLOX_SYNC_CONFIG` | Configurações | Sistema automático |
+
+### 🚨 Resolução de Problemas
+
+#### Erro ORA-00942 (Resolvido)
+- **Causa**: Tentativa de inserir em tabela obsoleta
+- **Solução**: Sistema atualizado, erro eliminado
+- **Status**: ✅ Resolvido na v3.9.11
+
+#### Sessão Perdida (Resolvido)
+- **Causa**: Sistema de persistência inadequado
+- **Solução**: Sistema híbrido implementado
+- **Status**: ✅ Resolvido na v3.9.11
+
+#### Mensagens Inconsistentes (Resolvido)
+- **Causa**: Falta de padronização entre módulos
+- **Solução**: Mensagens uniformes implementadas
+- **Status**: ✅ Resolvido na v3.9.11
+
+#### KeyError 'Tabela' na Aba Audit Trail (Resolvido)
+- **Causa**: Referência à coluna "Tabela" removida da exibição
+- **Solução**: Removidas referências no código de filtros
+- **Status**: ✅ Resolvido na v3.9.11
+
+#### Interface Audit Trail Desatualizada (Resolvido)
+- **Causa**: Falta de contagem de registros e colunas desnecessárias
+- **Solução**: Contagem implementada e colunas otimizadas
+- **Status**: ✅ Resolvido na v3.9.11
 
 ### 🎯 Roadmap Técnico Detalhado
 

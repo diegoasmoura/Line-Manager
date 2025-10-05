@@ -1275,8 +1275,23 @@ def exibir_history():
         st.session_state[active_tab_key] = other_label
         st.session_state[last_active_tab_key] = other_label
 
+    # Contar registros de audit trail para exibir na aba
+    audit_count = 0
+    try:
+        conn = get_database_connection()
+        audit_query = text("""
+            SELECT COUNT(*) as total
+            FROM LogTransp.V_FAROL_AUDIT_TRAIL
+            WHERE FAROL_REFERENCE = :farol_ref
+        """)
+        result = conn.execute(audit_query, {"farol_ref": farol_reference}).fetchone()
+        audit_count = result[0] if result else 0
+        conn.close()
+    except Exception:
+        audit_count = 0
+
     # Adicionar aba Audit Trail
-    audit_label = "🔍 Audit Trail"
+    audit_label = f"🔍 Audit Trail ({audit_count} records)"
 
     active_tab = st.segmented_control(
         "",
@@ -3312,10 +3327,10 @@ def display_audit_trail_tab(farol_reference):
         if 'Novo Valor' in df_display.columns:
             df_display['Novo Valor'] = df_display['Novo Valor'].replace('NULL', '')
         
-        # Reordenar colunas para colocar "ID Ajuste" no final
+        # Reordenar colunas (ocultando "Tabela" e "ID Ajuste")
         column_order = [
             'Referência', 'Ação', 'Coluna', 'Valor Anterior', 'Novo Valor',
-            'Usuário', 'Origem', 'Data/Hora', 'Tabela', 'ID Ajuste'
+            'Usuário', 'Origem', 'Data/Hora'
         ]
         
         # Manter apenas as colunas que existem no DataFrame
@@ -3326,11 +3341,7 @@ def display_audit_trail_tab(farol_reference):
         df_display = df_display[
             ~(
                 # Remover eventos de timeline inicial (todos os tipos)
-                (df_display['Origem'].str.contains('Timeline Inicial|Request - Company|Adjusts Cargill', na=False)) |
-                # Remover criações iniciais de Sales
-                ((df_display['Tabela'] == 'F_CON_SALES_BOOKING_DATA') & 
-                 (df_display['Coluna'].isin(['Farol Status', 'USER_LOGIN_SALES_CREATED'])) & 
-                 (df_display['Ação'] == 'CREATE'))
+                (df_display['Origem'].str.contains('Timeline Inicial|Request - Company|Adjusts Cargill', na=False))
             )
         ]
         
@@ -3371,7 +3382,7 @@ def display_audit_trail_tab(farol_reference):
         st.markdown(f"**📊 Total de registros:** {len(df_filtered)} de {len(df_display)}")
         
         if not df_filtered.empty:
-            # Configuração das colunas - apenas "Coluna" com tamanho medium
+            # Configuração das colunas - "Coluna" e "Origem" com tamanho medium
             column_config = {
                 'Data/Hora': st.column_config.DatetimeColumn(
                     'Data/Hora',
@@ -3384,14 +3395,10 @@ def display_audit_trail_tab(farol_reference):
                 ),
                 'Origem': st.column_config.TextColumn(
                     'Origem', 
-                    width=None
+                    width='medium'
                 ),
                 'Ação': st.column_config.TextColumn(
                     'Ação', 
-                    width=None
-                ),
-                'Tabela': st.column_config.TextColumn(
-                    'Tabela', 
                     width=None
                 ),
                 'Coluna': st.column_config.TextColumn(
@@ -3405,10 +3412,6 @@ def display_audit_trail_tab(farol_reference):
                 ),
                 'Novo Valor': st.column_config.TextColumn(
                     'Novo Valor', 
-                    width=None
-                ),
-                'ID Ajuste': st.column_config.TextColumn(
-                    'ID Ajuste', 
                     width=None
                 ),
             }
