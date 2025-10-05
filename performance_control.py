@@ -483,10 +483,10 @@ def exibir_performance_control():
     
     with col2:
         avg_freight_rate = df['b_freight_rate_usd'].mean()
-        if pd.isna(avg_freight_rate) or avg_freight_rate == 0:
+        if pd.isna(avg_freight_rate):
             st.metric(
                 label="Freight Rate Médio (USD)",
-                value="N/A",
+                value="$0",
                 delta=None
             )
         else:
@@ -515,7 +515,7 @@ def exibir_performance_control():
         else:
             st.metric(
                 label="Receita Estimada (USD)",
-                value="N/A",
+                value="$0",
                 delta=None
             )
 
