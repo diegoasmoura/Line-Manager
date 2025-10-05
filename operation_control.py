@@ -86,27 +86,27 @@ def calculate_kpis(df):
     now = datetime.now()
     
     # Total de Bookings Ativos
-    total_active = len(df[df['FAROL_STATUS'].isin(['Shipment Requested', 'Booking Requested', 'Booking Approved'])])
+    total_active = len(df[df['farol_status'].isin(['Shipment Requested', 'Booking Requested', 'Booking Approved'])])
     
     # Bookings Pendentes (aguardando aprovação)
-    pending = len(df[df['FAROL_STATUS'].isin(['Shipment Requested', 'Booking Requested'])])
+    pending = len(df[df['farol_status'].isin(['Shipment Requested', 'Booking Requested'])])
     
     # Prazos Críticos (< 48h até deadline)
     critical_deadlines = 0
-    if 'B_DATA_DEADLINE' in df.columns:
+    if 'b_data_deadline' in df.columns:
         critical_deadlines = len(df[
-            (df['B_DATA_DEADLINE'].notna()) & 
-            (df['B_DATA_DEADLINE'] <= now + timedelta(hours=48)) &
-            (df['FAROL_STATUS'].isin(['Shipment Requested', 'Booking Requested']))
+            (df['b_data_deadline'].notna()) & 
+            (df['b_data_deadline'] <= now + timedelta(hours=48)) &
+            (df['farol_status'].isin(['Shipment Requested', 'Booking Requested']))
         ])
     
     # Taxa de Resposta Hoje (aprovações hoje / total pendente)
     today = now.date()
     approvals_today = 0
-    if 'B_BOOKING_CONFIRMATION_DATE' in df.columns:
+    if 'b_booking_confirmation_date' in df.columns:
         approvals_today = len(df[
-            (df['B_BOOKING_CONFIRMATION_DATE'].dt.date == today) &
-            (df['FAROL_STATUS'] == 'Booking Approved')
+            (df['b_booking_confirmation_date'].dt.date == today) &
+            (df['farol_status'] == 'Booking Approved')
         ])
     
     response_rate = (approvals_today / max(pending, 1)) * 100 if pending > 0 else 0
@@ -121,7 +121,7 @@ def calculate_kpis(df):
 
 def create_status_funnel_chart(df):
     """Cria gráfico de funil de status"""
-    status_counts = df['FAROL_STATUS'].value_counts()
+    status_counts = df['farol_status'].value_counts()
     
     # Mapear cores por status
     status_colors = {
@@ -159,9 +159,9 @@ def create_critical_deadlines_timeline(df):
     
     # Filtrar próximos 10 bookings com deadlines mais urgentes
     critical_df = df[
-        (df['B_DATA_DEADLINE'].notna()) & 
-        (df['FAROL_STATUS'].isin(['Shipment Requested', 'Booking Requested']))
-    ].nlargest(10, 'B_DATA_DEADLINE')
+        (df['b_data_deadline'].notna()) & 
+        (df['farol_status'].isin(['Shipment Requested', 'Booking Requested']))
+    ].nlargest(10, 'b_data_deadline')
     
     if critical_df.empty:
         return None
@@ -169,15 +169,15 @@ def create_critical_deadlines_timeline(df):
     # Preparar dados para timeline
     timeline_data = []
     for _, row in critical_df.iterrows():
-        hours_to_deadline = (row['B_DATA_DEADLINE'] - now).total_seconds() / 3600
+        hours_to_deadline = (row['b_data_deadline'] - now).total_seconds() / 3600
         
         timeline_data.append({
-            'Farol_Reference': row['FAROL_REFERENCE'][:15] + '...',
-            'Carrier': row['B_VOYAGE_CARRIER'] or 'N/A',
-            'Deadline': row['B_DATA_DEADLINE'].strftime('%d/%m %H:%M'),
+            'Farol_Reference': row['farol_reference'][:15] + '...',
+            'Carrier': row['b_voyage_carrier'] or 'N/A',
+            'Deadline': row['b_data_deadline'].strftime('%d/%m %H:%M'),
             'Hours_Left': hours_to_deadline,
             'Status': 'Critical' if hours_to_deadline < 48 else 'Warning',
-            'Containers': row['S_QUANTITY_OF_CONTAINERS'] or 0
+            'Containers': row['s_quantity_of_containers'] or 0
         })
     
     timeline_df = pd.DataFrame(timeline_data)
@@ -204,10 +204,10 @@ def create_workload_distribution_chart(df):
     # Combinar operadores de booking e sales
     operators = []
     for _, row in df.iterrows():
-        if pd.notna(row['USER_LOGIN_BOOKING_CREATED']):
-            operators.append(row['USER_LOGIN_BOOKING_CREATED'])
-        if pd.notna(row['USER_LOGIN_SALES_CREATED']):
-            operators.append(row['USER_LOGIN_SALES_CREATED'])
+        if pd.notna(row['user_login_booking_created']):
+            operators.append(row['user_login_booking_created'])
+        if pd.notna(row['user_login_sales_created']):
+            operators.append(row['user_login_sales_created'])
     
     operator_counts = pd.Series(operators).value_counts().head(10)
     
@@ -230,7 +230,7 @@ def create_workload_distribution_chart(df):
 
 def create_carrier_distribution_chart(df):
     """Cria gráfico de distribuição por carrier"""
-    carrier_counts = df['B_VOYAGE_CARRIER'].value_counts().head(10)
+    carrier_counts = df['b_voyage_carrier'].value_counts().head(10)
     
     chart_data = pd.DataFrame({
         'Carrier': carrier_counts.index,
@@ -254,10 +254,10 @@ def create_urgent_actions_table(df):
     now = datetime.now()
     
     urgent_df = df[
-        (df['FAROL_STATUS'].isin(['Shipment Requested', 'Booking Requested'])) &
+        (df['farol_status'].isin(['Shipment Requested', 'Booking Requested'])) &
         (
-            (df['B_DATA_DEADLINE'].notna() & (df['B_DATA_DEADLINE'] <= now + timedelta(days=3))) |
-            (df['B_DATA_DRAFT_DEADLINE'].notna() & (df['B_DATA_DRAFT_DEADLINE'] <= now + timedelta(days=3)))
+            (df['b_data_deadline'].notna() & (df['b_data_deadline'] <= now + timedelta(days=3))) |
+            (df['b_data_draft_deadline'].notna() & (df['b_data_draft_deadline'] <= now + timedelta(days=3)))
         )
     ].head(20)
     
@@ -266,12 +266,12 @@ def create_urgent_actions_table(df):
     
     # Preparar dados para tabela
     table_data = urgent_df[[
-        'FAROL_REFERENCE', 'S_CUSTOMER', 'B_VOYAGE_CARRIER', 
-        'B_DATA_DEADLINE', 'FAROL_STATUS', 'USER_LOGIN_BOOKING_CREATED'
+        'farol_reference', 's_customer', 'b_voyage_carrier', 
+        'b_data_deadline', 'farol_status', 'user_login_booking_created'
     ]].copy()
     
-    table_data['B_DATA_DEADLINE'] = table_data['B_DATA_DEADLINE'].dt.strftime('%d/%m/%Y %H:%M')
-    table_data['Hours_Left'] = (urgent_df['B_DATA_DEADLINE'] - now).dt.total_seconds() / 3600
+    table_data['b_data_deadline'] = table_data['b_data_deadline'].dt.strftime('%d/%m/%Y %H:%M')
+    table_data['Hours_Left'] = (urgent_df['b_data_deadline'] - now).dt.total_seconds() / 3600
     table_data['Hours_Left'] = table_data['Hours_Left'].round(1)
     
     return table_data
@@ -305,18 +305,18 @@ def exibir_operation_control():
     
     # Filtros dinâmicos com verificação de segurança
     business_units = ['Todas']
-    if 'S_BUSINESS' in df.columns and not df.empty:
-        business_units.extend(sorted(df['S_BUSINESS'].dropna().unique().tolist()))
+    if 's_business' in df.columns and not df.empty:
+        business_units.extend(sorted(df['s_business'].dropna().unique().tolist()))
     business_unit = st.sidebar.selectbox("Business Unit", business_units)
     
     statuses = ['Todos']
-    if 'FAROL_STATUS' in df.columns and not df.empty:
-        statuses.extend(sorted(df['FAROL_STATUS'].unique().tolist()))
+    if 'farol_status' in df.columns and not df.empty:
+        statuses.extend(sorted(df['farol_status'].unique().tolist()))
     status_filter = st.sidebar.selectbox("Status", statuses)
     
     carriers = ['Todos']
-    if 'B_VOYAGE_CARRIER' in df.columns and not df.empty:
-        carriers.extend(sorted(df['B_VOYAGE_CARRIER'].dropna().unique().tolist()))
+    if 'b_voyage_carrier' in df.columns and not df.empty:
+        carriers.extend(sorted(df['b_voyage_carrier'].dropna().unique().tolist()))
     carrier_filter = st.sidebar.selectbox("Carrier", carriers)
     
     # Aplicar filtros
@@ -396,12 +396,12 @@ def exibir_operation_control():
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "FAROL_REFERENCE": "Farol Ref",
-                    "S_CUSTOMER": "Cliente",
-                    "B_VOYAGE_CARRIER": "Carrier",
-                    "B_DATA_DEADLINE": "Deadline",
-                    "FAROL_STATUS": "Status",
-                    "USER_LOGIN_BOOKING_CREATED": "Operador",
+                    "farol_reference": "Farol Ref",
+                    "s_customer": "Cliente",
+                    "b_voyage_carrier": "Carrier",
+                    "b_data_deadline": "Deadline",
+                    "farol_status": "Status",
+                    "user_login_booking_created": "Operador",
                     "Hours_Left": "Horas Restantes"
                 }
             )
@@ -416,12 +416,12 @@ def exibir_operation_control():
     with col1:
         st.metric(
             label="Total de Containers",
-            value=f"{df['S_QUANTITY_OF_CONTAINERS'].sum():,.0f}",
+            value=f"{df['s_quantity_of_containers'].sum():,.0f}",
             delta=None
         )
     
     with col2:
-        avg_containers = df['S_QUANTITY_OF_CONTAINERS'].mean()
+        avg_containers = df['s_quantity_of_containers'].mean()
         st.metric(
             label="Média de Containers/Booking",
             value=f"{avg_containers:.1f}",
@@ -429,7 +429,7 @@ def exibir_operation_control():
         )
     
     with col3:
-        unique_customers = df['S_CUSTOMER'].nunique()
+        unique_customers = df['s_customer'].nunique()
         st.metric(
             label="Clientes Únicos",
             value=unique_customers,

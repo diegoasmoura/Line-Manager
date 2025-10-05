@@ -26,52 +26,52 @@ def load_performance_data(days_back=180, business_unit=None, trade_region=None, 
         # Query otimizada para Performance Control
         query = """
         SELECT 
-            FAROL_REFERENCE,
-            FAROL_STATUS,
-            S_BUSINESS,
-            S_QUANTITY_OF_CONTAINERS,
-            S_VOLUME_IN_TONS,
-            S_CREATION_OF_SHIPMENT,
-            B_CREATION_OF_BOOKING,
-            B_BOOKING_CONFIRMATION_DATE,
-            B_VOYAGE_CARRIER,
-            B_FREIGHT_RATE_USD,
-            B_FREIGHTPPNL,
-            S_PORT_OF_LOADING_POL,
-            S_PORT_OF_DELIVERY_POD,
-            B_DESTINATION_TRADE_REGION,
-            B_POD_COUNTRY,
-            B_DATA_ESTIMATIVA_SAIDA_ETD,
-            B_DATA_PARTIDA_ATD,
-            S_REQUESTED_SHIPMENT_WEEK,
-            S_CUSTOMER,
-            S_TYPE_OF_SHIPMENT
+            farol_reference,
+            farol_status,
+            s_business,
+            s_quantity_of_containers,
+            s_volume_in_tons,
+            s_creation_of_shipment,
+            b_creation_of_booking,
+            b_booking_confirmation_date,
+            b_voyage_carrier,
+            b_freight_rate_usd,
+            b_freightppnl,
+            s_port_of_loading_pol,
+            s_port_of_delivery_pod,
+            b_destination_trade_region,
+            b_pod_country,
+            b_data_estimativa_saida_etd,
+            b_data_partida_atd,
+            s_requested_shipment_week,
+            s_customer,
+            s_type_of_shipment
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
-        WHERE S_CREATION_OF_SHIPMENT >= SYSTIMESTAMP - :days_back
+        WHERE s_creation_of_shipment >= SYSTIMESTAMP - :days_back
         """
         
         params = {'days_back': days_back}
         
         # Aplicar filtros
         if business_unit and business_unit != 'Todas':
-            query += " AND S_BUSINESS = :business_unit"
+            query += " AND s_business = :business_unit"
             params['business_unit'] = business_unit
             
         if trade_region and trade_region != 'Todas':
-            query += " AND B_DESTINATION_TRADE_REGION = :trade_region"
+            query += " AND b_destination_trade_region = :trade_region"
             params['trade_region'] = trade_region
             
         if country and country != 'Todos':
-            query += " AND B_POD_COUNTRY = :country"
+            query += " AND b_pod_country = :country"
             params['country'] = country
             
-        query += " ORDER BY S_CREATION_OF_SHIPMENT DESC"
+        query += " ORDER BY s_creation_of_shipment DESC"
         
         df = pd.read_sql(query, conn, params=params)
         
         # Processar datas
-        date_columns = ['S_CREATION_OF_SHIPMENT', 'B_CREATION_OF_BOOKING', 'B_BOOKING_CONFIRMATION_DATE',
-                       'B_DATA_ESTIMATIVA_SAIDA_ETD', 'B_DATA_PARTIDA_ATD', 'S_REQUESTED_SHIPMENT_WEEK']
+        date_columns = ['s_creation_of_shipment', 'b_creation_of_booking', 'b_booking_confirmation_date',
+                       'b_data_estimativa_saida_etd', 'b_data_partida_atd', 's_requested_shipment_week']
         
         for col in date_columns:
             if col in df.columns:
@@ -91,34 +91,34 @@ def calculate_executive_kpis(df):
     last_month = (current_month - timedelta(days=1)).replace(day=1)
     
     # Filtrar dados do mês atual
-    current_month_data = df[df['S_CREATION_OF_SHIPMENT'].dt.to_period('M') == current_month.strftime('%Y-%m')]
+    current_month_data = df[df['s_creation_of_shipment'].dt.to_period('M') == current_month.strftime('%Y-%m')]
     
     # Total de Containers Embarcados (mês atual)
-    total_containers = current_month_data['S_QUANTITY_OF_CONTAINERS'].sum()
+    total_containers = current_month_data['s_quantity_of_containers'].sum()
     
     # Volume em Toneladas (mês atual)
-    total_volume_tons = current_month_data['S_VOLUME_IN_TONS'].sum()
+    total_volume_tons = current_month_data['s_volume_in_tons'].sum()
     
     # Taxa de Aprovação Geral
-    total_requests = len(df[df['FAROL_STATUS'].isin(['Shipment Requested', 'Booking Requested', 'Booking Approved'])])
-    approved_requests = len(df[df['FAROL_STATUS'] == 'Booking Approved'])
+    total_requests = len(df[df['farol_status'].isin(['Shipment Requested', 'Booking Requested', 'Booking Approved'])])
+    approved_requests = len(df[df['farol_status'] == 'Booking Approved'])
     approval_rate = (approved_requests / max(total_requests, 1)) * 100
     
     # Tempo Médio de Ciclo (Shipment Request → Booking Approved)
     cycle_times = []
     for _, row in df.iterrows():
-        if (pd.notna(row['S_CREATION_OF_SHIPMENT']) and 
-            pd.notna(row['B_BOOKING_CONFIRMATION_DATE']) and 
-            row['FAROL_STATUS'] == 'Booking Approved'):
-            cycle_time = (row['B_BOOKING_CONFIRMATION_DATE'] - row['S_CREATION_OF_SHIPMENT']).days
+        if (pd.notna(row['s_creation_of_shipment']) and 
+            pd.notna(row['b_booking_confirmation_date']) and 
+            row['farol_status'] == 'Booking Approved'):
+            cycle_time = (row['b_booking_confirmation_date'] - row['s_creation_of_shipment']).days
             if cycle_time >= 0:
                 cycle_times.append(cycle_time)
     
     avg_cycle_time = np.mean(cycle_times) if cycle_times else 0
     
     # Comparativo MoM
-    last_month_data = df[df['S_CREATION_OF_SHIPMENT'].dt.to_period('M') == last_month.strftime('%Y-%m')]
-    last_month_containers = last_month_data['S_QUANTITY_OF_CONTAINERS'].sum()
+    last_month_data = df[df['s_creation_of_shipment'].dt.to_period('M') == last_month.strftime('%Y-%m')]
+    last_month_containers = last_month_data['s_quantity_of_containers'].sum()
     containers_delta = total_containers - last_month_containers if last_month_containers > 0 else 0
     
     return {
@@ -134,11 +134,11 @@ def calculate_executive_kpis(df):
 def create_monthly_trend_chart(df):
     """Cria gráfico de tendência mensal de bookings"""
     # Agrupar por mês
-    df['month'] = df['S_CREATION_OF_SHIPMENT'].dt.to_period('M')
+    df['month'] = df['s_creation_of_shipment'].dt.to_period('M')
     monthly_data = df.groupby('month').agg({
-        'FAROL_REFERENCE': 'count',
-        'FAROL_STATUS': lambda x: (x == 'Booking Approved').sum(),
-        'S_QUANTITY_OF_CONTAINERS': 'sum'
+        'farol_reference': 'count',
+        'farol_status': lambda x: (x == 'Booking Approved').sum(),
+        's_quantity_of_containers': 'sum'
     }).reset_index()
     
     monthly_data.columns = ['Month', 'Total_Created', 'Approved', 'Containers']
@@ -171,10 +171,10 @@ def create_monthly_trend_chart(df):
 
 def create_business_unit_performance_chart(df):
     """Cria gráfico de performance por Business Unit"""
-    bu_data = df.groupby('S_BUSINESS').agg({
-        'S_QUANTITY_OF_CONTAINERS': 'sum',
-        'FAROL_STATUS': lambda x: (x == 'Booking Approved').sum() / len(x) * 100,
-        'FAROL_REFERENCE': 'count'
+    bu_data = df.groupby('s_business').agg({
+        's_quantity_of_containers': 'sum',
+        'farol_status': lambda x: (x == 'Booking Approved').sum() / len(x) * 100,
+        'farol_reference': 'count'
     }).reset_index()
     
     bu_data.columns = ['Business_Unit', 'Containers', 'Approval_Rate', 'Total_Bookings']
@@ -198,14 +198,14 @@ def create_lead_time_analysis(df):
     # Calcular lead times
     lead_times = []
     for _, row in df.iterrows():
-        if (pd.notna(row['S_CREATION_OF_SHIPMENT']) and 
-            pd.notna(row['B_CREATION_OF_BOOKING'])):
-            lead_time = (row['B_CREATION_OF_BOOKING'] - row['S_CREATION_OF_SHIPMENT']).days
+        if (pd.notna(row['s_creation_of_shipment']) and 
+            pd.notna(row['b_creation_of_booking'])):
+            lead_time = (row['b_creation_of_booking'] - row['s_creation_of_shipment']).days
             if 0 <= lead_time <= 30:  # Filtrar outliers
                 lead_times.append({
                     'Lead_Time_Days': lead_time,
-                    'Business_Unit': row['S_BUSINESS'],
-                    'Carrier': row['B_VOYAGE_CARRIER']
+                    'Business_Unit': row['s_business'],
+                    'Carrier': row['b_voyage_carrier']
                 })
     
     if not lead_times:
@@ -228,11 +228,11 @@ def create_lead_time_analysis(df):
 def create_top_routes_chart(df):
     """Cria gráfico de top rotas"""
     # Criar coluna de rota
-    df['Route'] = df['S_PORT_OF_LOADING_POL'].astype(str) + ' → ' + df['S_PORT_OF_DELIVERY_POD'].astype(str)
+    df['Route'] = df['s_port_of_loading_pol'].astype(str) + ' → ' + df['s_port_of_delivery_pod'].astype(str)
     
     route_data = df.groupby('Route').agg({
-        'S_QUANTITY_OF_CONTAINERS': 'sum',
-        'FAROL_REFERENCE': 'count'
+        's_quantity_of_containers': 'sum',
+        'farol_reference': 'count'
     }).reset_index()
     
     route_data.columns = ['Route', 'Containers', 'Bookings']
@@ -254,11 +254,11 @@ def create_freight_rate_analysis(df):
     """Cria análise de freight rate"""
     # Filtrar dados com freight rate válido
     freight_data = df[
-        (df['B_FREIGHT_RATE_USD'].notna()) & 
-        (df['B_FREIGHTPPNL'].notna()) & 
-        (df['S_QUANTITY_OF_CONTAINERS'].notna()) &
-        (df['B_FREIGHT_RATE_USD'] > 0) &
-        (df['B_FREIGHTPPNL'] > 0)
+        (df['b_freight_rate_usd'].notna()) & 
+        (df['b_freightppnl'].notna()) & 
+        (df['s_quantity_of_containers'].notna()) &
+        (df['b_freight_rate_usd'] > 0) &
+        (df['b_freightppnl'] > 0)
     ].copy()
     
     if freight_data.empty:
@@ -266,15 +266,15 @@ def create_freight_rate_analysis(df):
     
     # Criar scatter plot
     chart = alt.Chart(freight_data).mark_circle(size=100).encode(
-        x=alt.X('B_FREIGHT_RATE_USD:Q', title='Freight Rate (USD)'),
-        y=alt.Y('B_FREIGHTPPNL:Q', title='Freight PPNL (USD)'),
-        size=alt.Size('S_QUANTITY_OF_CONTAINERS:Q', 
+        x=alt.X('b_freight_rate_usd:Q', title='Freight Rate (USD)'),
+        y=alt.Y('b_freightppnl:Q', title='Freight PPNL (USD)'),
+        size=alt.Size('s_quantity_of_containers:Q', 
                      scale=alt.Scale(range=[50, 500]),
                      legend=alt.Legend(title="Containers")),
-        color=alt.Color('S_BUSINESS:N', 
+        color=alt.Color('s_business:N', 
                        scale=alt.Scale(scheme='category20'),
                        legend=alt.Legend(title="Business Unit")),
-        tooltip=['FAROL_REFERENCE', 'S_BUSINESS', 'B_FREIGHT_RATE_USD', 'B_FREIGHTPPNL', 'S_QUANTITY_OF_CONTAINERS']
+        tooltip=['farol_reference', 's_business', 'b_freight_rate_usd', 'b_freightppnl', 's_quantity_of_containers']
     ).properties(
         height=400,
         title='Análise de Freight Rate vs PPNL'
@@ -287,20 +287,20 @@ def create_carrier_efficiency_table(df):
     # Calcular métricas por carrier
     carrier_metrics = []
     
-    for carrier in df['B_VOYAGE_CARRIER'].dropna().unique():
-        carrier_data = df[df['B_VOYAGE_CARRIER'] == carrier]
+    for carrier in df['b_voyage_carrier'].dropna().unique():
+        carrier_data = df[df['b_voyage_carrier'] == carrier]
         
-        total_containers = carrier_data['S_QUANTITY_OF_CONTAINERS'].sum()
+        total_containers = carrier_data['s_quantity_of_containers'].sum()
         total_bookings = len(carrier_data)
         
         # Calcular on-time departure rate
         on_time_data = carrier_data[
-            (carrier_data['B_DATA_ESTIMATIVA_SAIDA_ETD'].notna()) & 
-            (carrier_data['B_DATA_PARTIDA_ATD'].notna())
+            (carrier_data['b_data_estimativa_saida_etd'].notna()) & 
+            (carrier_data['b_data_partida_atd'].notna())
         ]
         
         if not on_time_data.empty:
-            on_time_rate = (on_time_data['B_DATA_PARTIDA_ATD'] <= on_time_data['B_DATA_ESTIMATIVA_SAIDA_ETD']).mean() * 100
+            on_time_rate = (on_time_data['b_data_partida_atd'] <= on_time_data['b_data_estimativa_saida_etd']).mean() * 100
         else:
             on_time_rate = 0
         
@@ -327,9 +327,9 @@ def create_carrier_efficiency_table(df):
 def create_demand_forecast_chart(df):
     """Cria forecast de demanda"""
     # Agrupar por semana solicitada
-    df['requested_week'] = df['S_REQUESTED_SHIPMENT_WEEK'].dt.to_period('W')
-    forecast_data = df.groupby(['requested_week', 'S_BUSINESS']).agg({
-        'S_QUANTITY_OF_CONTAINERS': 'sum'
+    df['requested_week'] = df['s_requested_shipment_week'].dt.to_period('W')
+    forecast_data = df.groupby(['requested_week', 's_business']).agg({
+        's_quantity_of_containers': 'sum'
     }).reset_index()
     
     forecast_data.columns = ['Week', 'Business_Unit', 'Containers']
@@ -381,18 +381,18 @@ def exibir_performance_control():
     
     # Filtros dinâmicos com verificação de segurança
     business_units = ['Todas']
-    if 'S_BUSINESS' in df.columns and not df.empty:
-        business_units.extend(sorted(df['S_BUSINESS'].dropna().unique().tolist()))
+    if 's_business' in df.columns and not df.empty:
+        business_units.extend(sorted(df['s_business'].dropna().unique().tolist()))
     business_unit = st.sidebar.selectbox("Business Unit", business_units)
     
     trade_regions = ['Todas']
-    if 'B_DESTINATION_TRADE_REGION' in df.columns and not df.empty:
-        trade_regions.extend(sorted(df['B_DESTINATION_TRADE_REGION'].dropna().unique().tolist()))
+    if 'b_destination_trade_region' in df.columns and not df.empty:
+        trade_regions.extend(sorted(df['b_destination_trade_region'].dropna().unique().tolist()))
     trade_region = st.sidebar.selectbox("Trade Region", trade_regions)
     
     countries = ['Todos']
-    if 'B_POD_COUNTRY' in df.columns and not df.empty:
-        countries.extend(sorted(df['B_POD_COUNTRY'].dropna().unique().tolist()))
+    if 'b_pod_country' in df.columns and not df.empty:
+        countries.extend(sorted(df['b_pod_country'].dropna().unique().tolist()))
     country = st.sidebar.selectbox("País de Destino", countries)
     
     # Aplicar filtros
@@ -504,7 +504,7 @@ def exibir_performance_control():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        unique_customers = df['S_CUSTOMER'].nunique()
+        unique_customers = df['s_customer'].nunique()
         st.metric(
             label="Clientes Únicos",
             value=unique_customers,
@@ -512,7 +512,7 @@ def exibir_performance_control():
         )
     
     with col2:
-        avg_freight_rate = df['B_FREIGHT_RATE_USD'].mean()
+        avg_freight_rate = df['b_freight_rate_usd'].mean()
         st.metric(
             label="Freight Rate Médio (USD)",
             value=f"${avg_freight_rate:,.0f}",
@@ -520,7 +520,7 @@ def exibir_performance_control():
         )
     
     with col3:
-        total_revenue_estimate = (df['B_FREIGHT_RATE_USD'] * df['S_QUANTITY_OF_CONTAINERS']).sum()
+        total_revenue_estimate = (df['b_freight_rate_usd'] * df['s_quantity_of_containers']).sum()
         st.metric(
             label="Receita Estimada (USD)",
             value=f"${total_revenue_estimate:,.0f}",
