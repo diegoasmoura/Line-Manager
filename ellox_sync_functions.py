@@ -1,5 +1,5 @@
 """
-Funções de sincronização automática Ellox API
+Funções de sincronização automática Ellox API - VERSÃO CORRIGIDA
 Integração com database.py para gerenciar logs e configurações
 """
 
@@ -216,6 +216,10 @@ def get_sync_statistics(days=30):
     """
     conn = get_database_connection()
     try:
+        # Calcular data de início
+        from datetime import datetime, timedelta
+        start_date = datetime.now() - timedelta(days=days)
+        
         # Estatísticas gerais
         stats_query = text("""
             SELECT 
@@ -226,14 +230,14 @@ def get_sync_statistics(days=30):
                 AVG(EXECUTION_TIME_MS) as avg_execution_time_ms,
                 SUM(CHANGES_DETECTED) as total_changes_detected
             FROM LogTransp.F_ELLOX_SYNC_LOGS 
-            WHERE SYNC_TIMESTAMP >= SYSTIMESTAMP - INTERVAL :days DAY
+            WHERE SYNC_TIMESTAMP >= :start_date
         """)
         
-        stats_result = conn.execute(stats_query, {'days': days}).fetchone()
+        stats_result = conn.execute(stats_query, {'start_date': start_date}).fetchone()
         
         # Viagens ativas (sem B_DATA_CHEGADA_DESTINO_ATA)
         active_voyages_query = text("""
-            SELECT COUNT(DISTINCT CONCAT(NAVIO, '|', VIAGEM, '|', TERMINAL)) as active_voyages
+            SELECT COUNT(DISTINCT NAVIO || '|' || VIAGEM || '|' || TERMINAL) as active_voyages
             FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
             WHERE B_DATA_CHEGADA_DESTINO_ATA IS NULL
               AND NAVIO IS NOT NULL 

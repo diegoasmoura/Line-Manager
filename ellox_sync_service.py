@@ -49,7 +49,7 @@ def get_current_voyage_data(vessel: str, voyage: str, terminal: str) -> Optional
             WHERE NAVIO = :vessel 
               AND VIAGEM = :voyage 
               AND TERMINAL = :terminal
-            ORDER BY CREATED_AT DESC
+            ORDER BY ROW_INSERTED_DATE DESC
             FETCH FIRST 1 ROWS ONLY
         """)
         

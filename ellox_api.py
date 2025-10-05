@@ -1316,3 +1316,65 @@ DEFAULT_CARRIER_MAPPING = {
     "PIL": ["PIL", "PACIFIC INTERNATIONAL LINES"]
 }
 
+
+def get_voyage_monitoring_data(vessel: str, voyage: str, terminal: str) -> Dict[str, Any]:
+    """
+    Função de conveniência para obter dados de monitoramento de uma viagem específica.
+    Usada pelo sistema de sincronização automática.
+    
+    Args:
+        vessel (str): Nome do navio
+        voyage (str): Código da viagem
+        terminal (str): Terminal
+        
+    Returns:
+        dict: Dados de monitoramento da viagem ou erro
+    """
+    try:
+        # Criar instância da API
+        api = ElloxAPI()
+        
+        # Obter CNPJ do cliente (assumindo que existe uma função para isso)
+        # Por enquanto, vamos usar um CNPJ padrão ou buscar do banco
+        cnpj_client = "12345678000199"  # CNPJ padrão - deve ser configurado
+        
+        # Obter CNPJ do terminal (assumindo que existe uma função para isso)
+        cnpj_terminal = "98765432000188"  # CNPJ padrão - deve ser configurado
+        
+        # Chamar a função de visualização de monitoramento
+        result = api.view_vessel_monitoring(
+            cnpj_client=cnpj_client,
+            cnpj_terminal=cnpj_terminal,
+            nome_navio=vessel,
+            viagem_navio=voyage
+        )
+        
+        if result.get("success"):
+            return {
+                "success": True,
+                "data": result.get("data", {}),
+                "vessel": vessel,
+                "voyage": voyage,
+                "terminal": terminal,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Erro desconhecido"),
+                "vessel": vessel,
+                "voyage": voyage,
+                "terminal": terminal,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Erro na consulta da API: {str(e)}",
+            "vessel": vessel,
+            "voyage": voyage,
+            "terminal": terminal,
+            "timestamp": datetime.now().isoformat()
+        }
+
