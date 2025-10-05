@@ -362,42 +362,12 @@ def exibir_performance_control():
     st.title("📈 Performance Control")
     st.markdown("**Dashboard Executivo - Análise Estratégica de Bookings Marítimos**")
     
-    # Sidebar com filtros
-    st.sidebar.header("🔍 Filtros Executivos")
-    
-    days_back = st.sidebar.selectbox(
-        "Período de Análise",
-        [90, 180, 365],
-        index=1,
-        format_func=lambda x: f"Últimos {x} dias"
-    )
-    
-    # Carregar dados
-    df = load_performance_data(days_back)
+    # Carregar dados (últimos 180 dias por padrão)
+    df = load_performance_data(180)
     
     if df.empty:
         st.warning("Nenhum dado encontrado para o período selecionado.")
         return
-    
-    # Filtros dinâmicos com verificação de segurança
-    business_units = ['Todas']
-    if 's_business' in df.columns and not df.empty:
-        business_units.extend(sorted(df['s_business'].dropna().unique().tolist()))
-    business_unit = st.sidebar.selectbox("Business Unit", business_units)
-    
-    trade_regions = ['Todas']
-    if 'b_destination_trade_region' in df.columns and not df.empty:
-        trade_regions.extend(sorted(df['b_destination_trade_region'].dropna().unique().tolist()))
-    trade_region = st.sidebar.selectbox("Trade Region", trade_regions)
-    
-    countries = ['Todos']
-    if 'b_pod_country' in df.columns and not df.empty:
-        countries.extend(sorted(df['b_pod_country'].dropna().unique().tolist()))
-    country = st.sidebar.selectbox("País de Destino", countries)
-    
-    # Aplicar filtros
-    if business_unit != 'Todas' or trade_region != 'Todas' or country != 'Todos':
-        df = load_performance_data(days_back, business_unit, trade_region, country)
     
     # Calcular KPIs executivos
     kpis = calculate_executive_kpis(df)

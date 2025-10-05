@@ -281,47 +281,12 @@ def exibir_operation_control():
     st.title("📊 Operation Control")
     st.markdown("**Dashboard Operacional - Gestão de Bookings Marítimos**")
     
-    # Sidebar com filtros
-    st.sidebar.header("🔍 Filtros")
-    
-    days_back = st.sidebar.selectbox(
-        "Período",
-        [7, 15, 30, 60, 90],
-        index=2,
-        format_func=lambda x: f"Últimos {x} dias"
-    )
-    
-    # Carregar dados
-    df = load_operation_data(days_back)
+    # Carregar dados (últimos 30 dias por padrão)
+    df = load_operation_data(30)
     
     if df.empty:
         st.warning("Nenhum dado encontrado para o período selecionado.")
         return
-    
-    # Debug: mostrar colunas disponíveis se houver problema
-    if st.checkbox("🔍 Debug - Mostrar colunas disponíveis"):
-        st.write("Colunas disponíveis:", df.columns.tolist())
-        st.write("Primeiras linhas:", df.head())
-    
-    # Filtros dinâmicos com verificação de segurança
-    business_units = ['Todas']
-    if 's_business' in df.columns and not df.empty:
-        business_units.extend(sorted(df['s_business'].dropna().unique().tolist()))
-    business_unit = st.sidebar.selectbox("Business Unit", business_units)
-    
-    statuses = ['Todos']
-    if 'farol_status' in df.columns and not df.empty:
-        statuses.extend(sorted(df['farol_status'].unique().tolist()))
-    status_filter = st.sidebar.selectbox("Status", statuses)
-    
-    carriers = ['Todos']
-    if 'b_voyage_carrier' in df.columns and not df.empty:
-        carriers.extend(sorted(df['b_voyage_carrier'].dropna().unique().tolist()))
-    carrier_filter = st.sidebar.selectbox("Carrier", carriers)
-    
-    # Aplicar filtros
-    if business_unit != 'Todas' or status_filter != 'Todos' or carrier_filter != 'Todos':
-        df = load_operation_data(days_back, business_unit, status_filter, carrier_filter)
     
     # Calcular KPIs
     kpis = calculate_kpis(df)
