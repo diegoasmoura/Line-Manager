@@ -6,12 +6,7 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 import numpy as np
 
-# Configuração de página wide para dashboards
-st.set_page_config(
-    page_title="Performance Control - Farol",
-    page_icon="📈",
-    layout="wide"
-)
+# Configuração de página é feita no app.py principal
 
 # Paleta de cores Cargill
 COLORS = {
