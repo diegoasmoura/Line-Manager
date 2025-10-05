@@ -400,23 +400,106 @@ def exibir_operation_control():
             st.altair_chart(chart, use_container_width=True)
     
     with col2:
-        # Gráfico de Status por Business Unit
-        st.subheader("🏢 Status por Business Unit")
-        if 's_business' in df.columns and not df.empty:
-            bu_status_data = df.groupby(['s_business', 'farol_status']).size().reset_index(name='count')
+        # Gráfico de Bookings Requested sem Resposta do Carrier
+        st.subheader("⏳ Bookings sem Resposta do Carrier")
+        if not df.empty:
+            # Filtrar bookings que estão em "Booking Requested" há mais de 3 dias
+            now = datetime.now()
+            pending_bookings = df[
+                (df['farol_status'] == 'Booking Requested') &
+                (df['b_creation_of_booking'].notna())
+            ].copy()
             
-            chart = alt.Chart(bu_status_data).mark_bar().encode(
-                x=alt.X('count:Q', title='Quantidade'),
-                y=alt.Y('s_business:N', title='Business Unit'),
-                color=alt.Color('farol_status:N', 
-                               scale=alt.Scale(scheme='category20'),
-                               legend=alt.Legend(title="Status")),
-                tooltip=['s_business', 'farol_status', 'count']
-            ).properties(
-                height=300,
-                title='Distribuição de Status por BU'
-            )
-            st.altair_chart(chart, use_container_width=True)
+            if not pending_bookings.empty:
+                pending_bookings['days_waiting'] = (now - pending_bookings['b_creation_of_booking']).dt.days
+                pending_bookings = pending_bookings[pending_bookings['days_waiting'] >= 3]
+                
+                if not pending_bookings.empty:
+                    # Agrupar por carrier e mostrar tempo médio de espera
+                    carrier_waiting = pending_bookings.groupby('b_voyage_carrier').agg({
+                        'farol_reference': 'count',
+                        'days_waiting': 'mean'
+                    }).reset_index()
+                    carrier_waiting.columns = ['carrier', 'bookings', 'avg_days_waiting']
+                    carrier_waiting = carrier_waiting.sort_values('avg_days_waiting', ascending=False)
+                    
+                    chart = alt.Chart(carrier_waiting).mark_bar().encode(
+                        x=alt.X('avg_days_waiting:Q', title='Dias Médios de Espera'),
+                        y=alt.Y('carrier:N', title='Carrier', sort='-x'),
+                        color=alt.condition(
+                            alt.datum.avg_days_waiting > 7,
+                            alt.value(COLORS['danger']),
+                            alt.condition(
+                                alt.datum.avg_days_waiting > 5,
+                                alt.value(COLORS['warning']),
+                                alt.value(COLORS['primary'])
+                            )
+                        ),
+                        tooltip=['carrier', 'bookings', 'avg_days_waiting']
+                    ).properties(
+                        height=300,
+                        title='Carriers com Maior Tempo de Resposta'
+                    )
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.info("✅ Nenhum booking aguardando resposta há mais de 3 dias.")
+            else:
+                st.info("Nenhum booking em status 'Booking Requested' encontrado.")
+    
+    # Tabela de Bookings Aguardando Resposta
+    st.subheader("📋 Bookings Aguardando Resposta do Carrier")
+    if not df.empty:
+        now = datetime.now()
+        waiting_bookings = df[
+            (df['farol_status'] == 'Booking Requested') &
+            (df['b_creation_of_booking'].notna())
+        ].copy()
+        
+        if not waiting_bookings.empty:
+            waiting_bookings['days_waiting'] = (now - waiting_bookings['b_creation_of_booking']).dt.days
+            waiting_bookings = waiting_bookings[waiting_bookings['days_waiting'] >= 3]
+            waiting_bookings = waiting_bookings.sort_values('days_waiting', ascending=False)
+            
+            if not waiting_bookings.empty:
+                # Preparar dados para tabela
+                table_data = waiting_bookings[[
+                    'farol_reference', 's_customer', 'b_voyage_carrier', 
+                    'b_creation_of_booking', 'days_waiting', 's_quantity_of_containers'
+                ]].copy()
+                
+                table_data['b_creation_of_booking'] = table_data['b_creation_of_booking'].dt.strftime('%d/%m/%Y %H:%M')
+                
+                # Adicionar status visual baseado no tempo de espera
+                def get_waiting_status(days):
+                    if days >= 10:
+                        return "🔴 Crítico"
+                    elif days >= 7:
+                        return "🟠 Alto"
+                    elif days >= 5:
+                        return "🟡 Médio"
+                    else:
+                        return "🟢 Normal"
+                
+                table_data['status'] = table_data['days_waiting'].apply(get_waiting_status)
+                
+                st.dataframe(
+                    table_data,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "farol_reference": "Farol Ref",
+                        "s_customer": "Cliente",
+                        "b_voyage_carrier": "Carrier",
+                        "b_creation_of_booking": "Data do Booking",
+                        "days_waiting": st.column_config.NumberColumn("Dias Esperando", format="%d"),
+                        "s_quantity_of_containers": st.column_config.NumberColumn("Containers", format="%d"),
+                        "status": "Status"
+                    }
+                )
+            else:
+                st.info("✅ Nenhum booking aguardando resposta há mais de 3 dias.")
+        else:
+            st.info("Nenhum booking em status 'Booking Requested' encontrado.")
     
     # Gráfico de Heatmap de Horários
     st.subheader("⏰ Heatmap de Atividade por Horário")
