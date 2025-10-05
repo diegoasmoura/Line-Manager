@@ -3371,21 +3371,46 @@ def display_audit_trail_tab(farol_reference):
         st.markdown(f"**📊 Total de registros:** {len(df_filtered)} de {len(df_display)}")
         
         if not df_filtered.empty:
-            # Configuração das colunas para exibição
+            # Configuração das colunas - apenas "Coluna" com tamanho medium
             column_config = {
                 'Data/Hora': st.column_config.DatetimeColumn(
                     'Data/Hora',
                     format='DD/MM/YYYY HH:mm:ss',
                     width=None
                 ),
-                'Usuário': st.column_config.TextColumn('Usuário', width=None),
-                'Origem': st.column_config.TextColumn('Origem', width=None),
-                'Ação': st.column_config.TextColumn('Ação', width=None),
-                'Tabela': st.column_config.TextColumn('Tabela', width=None),
-                'Coluna': st.column_config.TextColumn('Coluna', width=None),
-                'Valor Anterior': st.column_config.TextColumn('Valor Anterior', width=None),
-                'Novo Valor': st.column_config.TextColumn('Novo Valor', width=None),
-                'ID Ajuste': st.column_config.TextColumn('ID Ajuste', width=None),
+                'Usuário': st.column_config.TextColumn(
+                    'Usuário', 
+                    width=None
+                ),
+                'Origem': st.column_config.TextColumn(
+                    'Origem', 
+                    width=None
+                ),
+                'Ação': st.column_config.TextColumn(
+                    'Ação', 
+                    width=None
+                ),
+                'Tabela': st.column_config.TextColumn(
+                    'Tabela', 
+                    width=None
+                ),
+                'Coluna': st.column_config.TextColumn(
+                    'Coluna', 
+                    width='medium',
+                    help="Nome da coluna alterada"
+                ),
+                'Valor Anterior': st.column_config.TextColumn(
+                    'Valor Anterior', 
+                    width=None
+                ),
+                'Novo Valor': st.column_config.TextColumn(
+                    'Novo Valor', 
+                    width=None
+                ),
+                'ID Ajuste': st.column_config.TextColumn(
+                    'ID Ajuste', 
+                    width=None
+                ),
             }
             
             # Exibir tabela
@@ -3393,7 +3418,8 @@ def display_audit_trail_tab(farol_reference):
                 df_filtered,
                 column_config=column_config,
                 use_container_width=True,
-                height=400
+                height=400,
+                hide_index=True
             )
             
             # Botão de export
