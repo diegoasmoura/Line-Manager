@@ -483,19 +483,41 @@ def exibir_performance_control():
     
     with col2:
         avg_freight_rate = df['b_freight_rate_usd'].mean()
-        st.metric(
-            label="Freight Rate Médio (USD)",
-            value=f"${avg_freight_rate:,.0f}",
-            delta=None
-        )
+        if pd.isna(avg_freight_rate) or avg_freight_rate == 0:
+            st.metric(
+                label="Freight Rate Médio (USD)",
+                value="N/A",
+                delta=None
+            )
+        else:
+            st.metric(
+                label="Freight Rate Médio (USD)",
+                value=f"${avg_freight_rate:,.0f}",
+                delta=None
+            )
     
     with col3:
-        total_revenue_estimate = (df['b_freight_rate_usd'] * df['s_quantity_of_containers']).sum()
-        st.metric(
-            label="Receita Estimada (USD)",
-            value=f"${total_revenue_estimate:,.0f}",
-            delta=None
-        )
+        # Filtrar apenas registros com freight rate válido
+        valid_freight = df[
+            (df['b_freight_rate_usd'].notna()) & 
+            (df['b_freight_rate_usd'] > 0) &
+            (df['s_quantity_of_containers'].notna()) &
+            (df['s_quantity_of_containers'] > 0)
+        ]
+        
+        if not valid_freight.empty:
+            total_revenue_estimate = (valid_freight['b_freight_rate_usd'] * valid_freight['s_quantity_of_containers']).sum()
+            st.metric(
+                label="Receita Estimada (USD)",
+                value=f"${total_revenue_estimate:,.0f}",
+                delta=None
+            )
+        else:
+            st.metric(
+                label="Receita Estimada (USD)",
+                value="N/A",
+                delta=None
+            )
 
 if __name__ == "__main__":
     exibir_performance_control()
