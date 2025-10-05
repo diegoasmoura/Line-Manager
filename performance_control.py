@@ -379,14 +379,20 @@ def exibir_performance_control():
         st.warning("Nenhum dado encontrado para o período selecionado.")
         return
     
-    # Filtros dinâmicos
-    business_units = ['Todas'] + sorted(df['S_BUSINESS'].dropna().unique().tolist())
+    # Filtros dinâmicos com verificação de segurança
+    business_units = ['Todas']
+    if 'S_BUSINESS' in df.columns and not df.empty:
+        business_units.extend(sorted(df['S_BUSINESS'].dropna().unique().tolist()))
     business_unit = st.sidebar.selectbox("Business Unit", business_units)
     
-    trade_regions = ['Todas'] + sorted(df['B_DESTINATION_TRADE_REGION'].dropna().unique().tolist())
+    trade_regions = ['Todas']
+    if 'B_DESTINATION_TRADE_REGION' in df.columns and not df.empty:
+        trade_regions.extend(sorted(df['B_DESTINATION_TRADE_REGION'].dropna().unique().tolist()))
     trade_region = st.sidebar.selectbox("Trade Region", trade_regions)
     
-    countries = ['Todos'] + sorted(df['B_POD_COUNTRY'].dropna().unique().tolist())
+    countries = ['Todos']
+    if 'B_POD_COUNTRY' in df.columns and not df.empty:
+        countries.extend(sorted(df['B_POD_COUNTRY'].dropna().unique().tolist()))
     country = st.sidebar.selectbox("País de Destino", countries)
     
     # Aplicar filtros

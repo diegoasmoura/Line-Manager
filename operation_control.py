@@ -298,14 +298,25 @@ def exibir_operation_control():
         st.warning("Nenhum dado encontrado para o período selecionado.")
         return
     
-    # Filtros dinâmicos
-    business_units = ['Todas'] + sorted(df['S_BUSINESS'].dropna().unique().tolist())
+    # Debug: mostrar colunas disponíveis se houver problema
+    if st.checkbox("🔍 Debug - Mostrar colunas disponíveis"):
+        st.write("Colunas disponíveis:", df.columns.tolist())
+        st.write("Primeiras linhas:", df.head())
+    
+    # Filtros dinâmicos com verificação de segurança
+    business_units = ['Todas']
+    if 'S_BUSINESS' in df.columns and not df.empty:
+        business_units.extend(sorted(df['S_BUSINESS'].dropna().unique().tolist()))
     business_unit = st.sidebar.selectbox("Business Unit", business_units)
     
-    statuses = ['Todos'] + sorted(df['FAROL_STATUS'].unique().tolist())
+    statuses = ['Todos']
+    if 'FAROL_STATUS' in df.columns and not df.empty:
+        statuses.extend(sorted(df['FAROL_STATUS'].unique().tolist()))
     status_filter = st.sidebar.selectbox("Status", statuses)
     
-    carriers = ['Todos'] + sorted(df['B_VOYAGE_CARRIER'].dropna().unique().tolist())
+    carriers = ['Todos']
+    if 'B_VOYAGE_CARRIER' in df.columns and not df.empty:
+        carriers.extend(sorted(df['B_VOYAGE_CARRIER'].dropna().unique().tolist()))
     carrier_filter = st.sidebar.selectbox("Carrier", carriers)
     
     # Aplicar filtros
