@@ -1,5 +1,29 @@
-Tabelas Oracle/
+# Arquivos de sessão
+.streamlit/sessions/
+.streamlit/sessions/*.json
+
+# Cache do Python
 __pycache__/
-*.pyc
-__pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Arquivos de ambiente
+.env
+.venv
+env/
+venv/
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db

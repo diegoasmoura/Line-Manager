@@ -4,7 +4,8 @@ import streamlit as st
 st.set_page_config(page_title="Farol", layout="wide")
 
 # Importar sistema de login
-from auth.login import show_login_form, is_logged_in, get_user_info, logout
+from auth.login import show_login_form, is_logged_in, get_user_info, logout, restore_session_if_exists
+from auth.session_manager import get_session, get_session_time_remaining, format_session_time
  
 from streamlit_option_menu import option_menu 
 import shipments
@@ -23,8 +24,10 @@ svg_lighthouse = """
 
 # Guard de login - verificar se usuário está logado
 if not is_logged_in():
-    show_login_form()
-    st.stop()  # Para a execução se não estiver logado
+    # Tentar restaurar sessão existente
+    if not restore_session_if_exists():
+        show_login_form()
+        st.stop()  # Para a execução se não estiver logado
 
 # Inicializa o estado do menu se não existir
 if "menu_choice" not in st.session_state:
@@ -48,6 +51,10 @@ with st.sidebar:
     {svg_lighthouse} Farol
     </h2>
     """, unsafe_allow_html=True)
+    
+    # Informações do usuário (ocultas)
+    if is_logged_in():
+        user_info = get_user_info()
  
     # Lista de opções (History removido - acessível via Shipments)
     options = ["Shipments", "Op. Control", "Performance", "Tracking", "Setup"]
@@ -71,16 +78,38 @@ with st.sidebar:
         }
     )
     
-    # Informações do usuário logado (movidas para baixo)
+    # Informações do usuário logado
     user_info = get_user_info()
     if user_info:
         st.markdown("---")
-        st.markdown(f"**👤 Usuário:** {user_info['username']}")
-        if user_info.get('login_time'):
-            duration = user_info['session_duration']
-            hours, remainder = divmod(duration.total_seconds(), 3600)
-            minutes, _ = divmod(remainder, 60)
-            st.markdown(f"**⏱️ Sessão:** {int(hours)}h {int(minutes)}m")
+        
+        # Informação de sessão
+        session_token = st.session_state.get('session_token')
+        if session_token:
+            session_data = get_session(session_token)
+            if session_data:
+                time_remaining = get_session_time_remaining(session_data)
+                if time_remaining:
+                    time_str = format_session_time(time_remaining)
+                    
+                    # Cores baseadas no tempo restante
+                    if time_remaining.total_seconds() < 1800:  # Menos de 30 min
+                        color = "#dc3545"  # Vermelho
+                        icon = "⚠️"
+                    elif time_remaining.total_seconds() < 3600:  # Menos de 1 hora
+                        color = "#fd7e14"  # Laranja
+                        icon = "⏰"
+                    else:
+                        color = "#28a745"  # Verde
+                        icon = "✅"
+                    
+                    # Exibe ambos os valores com background
+                    st.markdown(f"""
+                    <div style="text-align: left; margin: 20px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+                        <small style="font-weight: bold;">👤 Usuário: {user_info['username']}</small><br>
+                        <small style="color: {color}; font-weight: bold;">{icon} Sessão: {time_str}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
         
         # Botão de logout
         if st.button("🚪 Logout", use_container_width=True):
@@ -97,6 +126,7 @@ with st.sidebar:
                     del st.session_state[key]
             # Força reset para primeira página (main = tela principal do shipments)
             st.session_state["current_page"] = "main"
+
 
 # Usa o estado do menu para determinar qual página exibir
 if st.session_state.menu_choice == "Shipments":
