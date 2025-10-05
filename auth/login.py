@@ -52,7 +52,7 @@ def show_login_form():
             st.markdown("<br>", unsafe_allow_html=True)  # Espaçador
 
             login_button = st.form_submit_button(
-                "🚀 Entrar",
+                "Entrar",
                 use_container_width=True
             )
 
