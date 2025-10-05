@@ -377,11 +377,24 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY COLUMN_NAME ORDER BY CHANGE_AT DESC) = 1
 
 - [x] Adicionar USER_LOGIN_* em F_CON_SALES_BOOKING_DATA
 - [x] Migrar justificativas para F_CON_RETURN_CARRIERS
-- [ ] Criar tabela F_CON_CHANGE_LOG e índice
+- [x] Criar tabela F_CON_CHANGE_LOG e índice
 - [x] Implementar get_current_user_login e audit_change helper
-- [ ] Auditar updates do booking_new em update_booking_data_by_farol_reference
-- [ ] Auditar updates do tracking em update_booking_from_voyage
-- [ ] Auditar updates durante aprovações no history
+- [x] Auditar updates do booking_new em update_booking_data_by_farol_reference
+- [x] Auditar updates do tracking em update_booking_from_voyage
+- [x] Auditar updates durante aprovações no history
+- [x] Auditar updates do shipments.py (correção de persistência implementada)
 - [ ] Auditar inclusão/remoção de anexos
 - [ ] Implementar tela de login e session_state.current_user
 - [ ] Criar nova aba Audit Trail em history.py
+
+### ✅ Correção de Persistência Implementada (Janeiro 2025)
+
+**Problema Resolvido**: O sistema de auditoria estava funcionando corretamente, mas as alterações feitas no `shipments.py` não eram persistidas na tabela principal `F_CON_SALES_BOOKING_DATA`.
+
+**Solução Implementada**:
+- ✅ Função `update_field_in_sales_booking_data()` para persistência de alterações
+- ✅ Mapeamento correto de aliases SQL para colunas do banco de dados
+- ✅ Conversão inteligente de nomes amigáveis para nomes técnicos
+- ✅ Tratamento robusto de tipos de dados especiais
+
+**Resultado**: O sistema agora persiste corretamente todas as alterações feitas na interface, mantendo a auditoria completa em `F_CON_CHANGE_LOG` e aplicando as mudanças na tabela principal.

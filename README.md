@@ -36,10 +36,11 @@ O **Farol** é um sistema de gestão logística que permite o controle completo 
 
 ### 📦 Gestão de Embarques
 - **Criação de novos embarques** com validação automática
-- **Edição em tempo real** com controle de alterações
+- **Edição em tempo real** com controle de alterações e persistência garantida
 - **Sistema de splits** para divisão de cargas
 - **Gestão de status** com workflow automatizado
 - **Filtros avançados** e exportação de dados
+- **Persistência robusta** de alterações em todos os stages (Sales Data, Booking Management, General View)
 
 ### 📄 Processamento de Documentos
 - **Upload e gestão de anexos** com suporte a múltiplos formatos
@@ -2837,6 +2838,17 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🎯 Scripts de Configuração**: Melhorado `setup_ellox_database.py` com argumentos de linha de comando flexíveis
 - **📈 Estatísticas de Dados**: Documentadas métricas de terminais, navios, voyages e carriers
 - **🔗 Integração Aprimorada**: Clarificada integração dos dados Ellox com sistema principal (tracking, voyage monitoring, PDFs, histórico)
+
+### 📌 v3.9.9 - Correção de Persistência de Alterações no Shipments (Janeiro 2025)
+- **🔧 Problema Resolvido**: Alterações feitas na interface do shipments.py não eram persistidas na tabela `F_CON_SALES_BOOKING_DATA`
+- **❌ Erro Corrigido**: `ORA-00904: invalid identifier` devido a mapeamento incorreto de colunas
+- **🎯 Solução Implementada**:
+  - Função `update_field_in_sales_booking_data()` no `database.py` para persistência
+  - Mapeamento explícito de aliases SQL → colunas do banco em `shipments_mapping.py`
+  - Conversão inteligente de nomes amigáveis para nomes técnicos do banco
+  - Tratamento robusto de tipos de dados (datas, Farol Status, etc.)
+- **✅ Resultado**: Alterações agora são persistidas corretamente em todos os stages (Sales Data, Booking Management, General View)
+- **📊 Compatibilidade**: Funciona com todos os campos editáveis e mantém auditoria em `F_CON_CHANGE_LOG`
 
 ### 📌 v3.9.8 - Pré-preenchimento Automático de Datas em PDFs (Janeiro 2025)
 - **🔄 Pré-preenchimento Inteligente**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo

@@ -116,6 +116,28 @@ def audit_change(conn, farol_ref: str, table: str, column: str,
         "user": user_login, "src": source, "type": change_type,
         "adj": adjustment_id, "rel": related_ref,
     })
+
+def update_field_in_sales_booking_data(conn, farol_reference: str, column_name: str, new_value):
+    """
+    Atualiza um campo específico na tabela F_CON_SALES_BOOKING_DATA.
+    
+    Args:
+        conn: Conexão com o banco de dados
+        farol_reference: Referência Farol do registro
+        column_name: Nome técnico da coluna no banco (em UPPER CASE, ex: S_QUANTITY_OF_CONTAINERS)
+        new_value: Novo valor a ser atualizado
+    """
+    # Nome da coluna já deve vir no formato técnico (UPPER CASE)
+    # Não precisa de aspas duplas pois não tem espaços
+    update_sql = text(f"""
+        UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+        SET {column_name} = :new_value
+        WHERE FAROL_REFERENCE = :farol_reference
+    """)
+    conn.execute(update_sql, {
+        "new_value": new_value,
+        "farol_reference": farol_reference
+    })
  
 # Configurações do banco de dados (podem ser sobrescritas por variáveis de ambiente)
 DB_CONFIG = {

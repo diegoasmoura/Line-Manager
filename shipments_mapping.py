@@ -403,6 +403,144 @@ def get_reverse_mapping():
     column_mapping = get_column_mapping()
     return {v: k for k, v in column_mapping.items()}
 
+def get_alias_to_database_column_mapping():
+    """
+    Retorna o mapeamento de alias SQL para nome real da coluna no banco de dados.
+    
+    Resolve o problema de aliases com prefixos diferentes (s_, b_) que mapeiam 
+    para a mesma coluna física (S_*, B_*) em F_CON_SALES_BOOKING_DATA.
+    
+    Returns:
+        dict: {alias_sql: coluna_banco}
+    """
+    return {
+        # Aliases que apontam para colunas S_* (Sales)
+        "s_farol_reference": "FAROL_REFERENCE",
+        "s_farol_status": "FAROL_STATUS",
+        "s_shipment_status": "S_SHIPMENT_STATUS",
+        "s_type_of_shipment": "S_TYPE_OF_SHIPMENT",
+        "s_creation_of_shipment": "S_CREATION_OF_SHIPMENT",
+        "s_customer_po": "S_CUSTOMER_PO",
+        "s_sales_order_reference": "S_SALE_ORDER_REFERENCE",
+        "s_sales_order_date": "S_SALE_ORDER_DATE",
+        "s_business": "S_BUSINESS",
+        "s_customer": "S_CUSTOMER",
+        "s_mode": "S_MODE",
+        "s_incoterm": "S_INCOTERM",
+        "s_sku": "S_SKU",
+        "s_plant_of_origin": "S_PLANT_OF_ORIGIN",
+        "s_splitted_booking_reference": "S_SPLITTED_BOOKING_REFERENCE",
+        "s_volume_in_tons": "S_VOLUME_IN_TONS",
+        "s_quantity_of_containers": "S_QUANTITY_OF_CONTAINERS",
+        "s_container_type": "S_CONTAINER_TYPE",
+        "s_port_of_loading_pol": "S_PORT_OF_LOADING_POL",
+        "s_port_of_delivery_pod": "S_PORT_OF_DELIVERY_POD",
+        "s_place_of_receipt": "S_PLACE_OF_RECEIPT",
+        "s_final_destination": "S_FINAL_DESTINATION",
+        "s_requested_shipment_week": "S_REQUESTED_SHIPMENT_WEEK",
+        "s_requested_deadlines_start_date": "S_REQUESTED_DEADLINE_START_DATE",
+        "s_requested_deadlines_end_date": "S_REQUESTED_DEADLINE_END_DATE",
+        "s_dthc_prepaid": "S_DTHC_PREPAID",
+        "s_afloat": "S_AFLOAT",
+        "s_shipment_period_start_date": "S_SHIPMENT_PERIOD_START_DATE",
+        "s_shipment_period_end_date": "S_SHIPMENT_PERIOD_END_DATE",
+        "s_required_arrival_date_expected": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
+        "s_partial_allowed": "S_PARTIAL_ALLOWED",
+        "s_vip_pnl_risk": "S_VIP_PNL_RISK",
+        "s_pnl_destination": "S_PNL_DESTINATION",
+        "s_lc_received": "S_LC_RECEIVED",
+        "s_allocation_date": "S_ALLOCATION_DATE",
+        "s_producer_nomination_date": "S_PRODUCER_NOMINATION_DATE",
+        "s_sales_owner": "USER_LOGIN_SALES_CREATED",
+        "s_comments": "S_COMMENTS",
+        
+        # Aliases com prefixo b_ que apontam para colunas B_* (Booking)
+        "b_farol_reference": "FAROL_REFERENCE",
+        "b_farol_status": "FAROL_STATUS",
+        "b_creation_of_booking": "B_CREATION_OF_BOOKING",
+        "b_booking_reference": "B_BOOKING_REFERENCE",
+        "b_booking_status": "B_BOOKING_STATUS",
+        "b_booking_owner": "USER_LOGIN_BOOKING_CREATED",
+        "b_voyage_carrier": "B_VOYAGE_CARRIER",
+        "b_freight_forwarder": "B_FREIGHT_FORWARDER",
+        "b_booking_request_date": "B_BOOKING_REQUEST_DATE",
+        "b_booking_confirmation_date": "B_BOOKING_CONFIRMATION_DATE",
+        "b_vessel_name": "B_VESSEL_NAME",
+        "b_voyage_code": "B_VOYAGE_CODE",
+        "b_terminal": "B_TERMINAL",
+        "b_transhipment_port": "B_TRANSHIPMENT_PORT",
+        "b_pod_country": "B_POD_COUNTRY",
+        "b_pod_country_acronym": "B_POD_COUNTRY_ACRONYM",
+        "b_destination_trade_region": "B_DESTINATION_TRADE_REGION",
+        "b_data_draft_deadline": "B_DATA_DRAFT_DEADLINE",
+        "b_data_deadline": "B_DATA_DEADLINE",
+        "b_data_estimativa_saida_etd": "B_DATA_ESTIMATIVA_SAIDA_ETD",
+        "b_data_estimativa_chegada_eta": "B_DATA_ESTIMATIVA_CHEGADA_ETA",
+        "b_data_abertura_gate": "B_DATA_ABERTURA_GATE",
+        "b_data_confirmacao_embarque": "B_DATA_CONFIRMACAO_EMBARQUE",
+        "b_data_partida_atd": "B_DATA_PARTIDA_ATD",
+        "b_data_estimada_transbordo_etd": "B_DATA_ESTIMADA_TRANSBORDO_ETD",
+        "b_data_chegada_ata": "B_DATA_CHEGADA_ATA",
+        "b_data_transbordo_atd": "B_DATA_TRANSBORDO_ATD",
+        "b_data_chegada_destino_eta": "B_DATA_CHEGADA_DESTINO_ETA",
+        "b_data_chegada_destino_ata": "B_DATA_CHEGADA_DESTINO_ATA",
+        "b_data_estimativa_atracacao_etb": "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
+        "b_data_atracacao_atb": "B_DATA_ATRACACAO_ATB",
+        "b_freight_rate_usd": "B_FREIGHT_RATE_USD",
+        "b_bogey_sale_price_usd": "B_BOGEY_SALE_PRICE_USD",
+        "b_freightppnl": "B_FREIGHTPPNL",
+        "b_award_status": "B_AWARD_STATUS",
+        "b_comments": "B_COMMENTS",
+        
+        # ⚠️ IMPORTANTE: Aliases com b_ que na verdade apontam para colunas S_*
+        # (usado em Booking Management para exibir campos de Sales)
+        "b_port_of_loading_pol": "S_PORT_OF_LOADING_POL",  # ← Alias b_ mas coluna S_!
+        "b_port_of_delivery_pod": "S_PORT_OF_DELIVERY_POD",  # ← Alias b_ mas coluna S_!
+        "b_place_of_receipt": "S_PLACE_OF_RECEIPT",
+        "b_final_destination": "S_FINAL_DESTINATION",  # General View usa S_FINAL_DESTINATION
+    }
+
+def get_database_column_name(display_name_or_alias: str) -> str:
+    """
+    Converte nome amigável OU alias SQL para nome real da coluna do banco de dados.
+    
+    Args:
+        display_name_or_alias: Nome amigável ("Port of Loading POL") ou alias SQL ("b_port_of_loading_pol")
+    
+    Returns:
+        Nome real da coluna em UPPER CASE ("S_PORT_OF_LOADING_POL")
+    """
+    # Primeiro tenta como alias SQL (mais preciso)
+    alias_mapping = get_alias_to_database_column_mapping()
+    lower_input = display_name_or_alias.lower()
+    
+    if lower_input in alias_mapping:
+        return alias_mapping[lower_input]
+    
+    # Tenta mapeamento reverso completo (nome amigável → alias → coluna)
+    reverse_mapping = get_reverse_mapping()
+    
+    if display_name_or_alias in reverse_mapping:
+        alias = reverse_mapping[display_name_or_alias]
+        # Converte alias para nome de coluna do banco
+        if alias.lower() in alias_mapping:
+            return alias_mapping[alias.lower()]
+        # Fallback: converte para UPPER CASE
+        return alias.upper()
+    
+    # Casos especiais que não passam pelo mapeamento
+    special_cases = {
+        "Farol Status": "FAROL_STATUS",
+        "Farol Reference": "FAROL_REFERENCE",
+        "Select": "SELECT",  # Coluna UI, não existe no banco
+    }
+    
+    if display_name_or_alias in special_cases:
+        return special_cases[display_name_or_alias]
+    
+    # Fallback final: assume que o nome já é técnico e converte para UPPER
+    return display_name_or_alias.upper().replace(" ", "_")
+
 # --- Bloco de Funções para Ícones do Farol Status ---
 
 def get_farol_status_icons():
