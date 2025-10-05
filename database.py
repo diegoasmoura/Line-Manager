@@ -2729,6 +2729,35 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
     finally:
         conn.close()
 
+def is_currently_linked_to_voyage(conn, farol_ref, vessel, voyage, terminal):
+    """
+    Verifica se o Farol Reference está atualmente vinculado a esta viagem.
+    Retorna True apenas se for a relação mais recente.
+    """
+    query = text("""
+        SELECT 1 FROM (
+            SELECT FAROL_REFERENCE, B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY FAROL_REFERENCE 
+                       ORDER BY ROW_INSERTED_DATE DESC
+                   ) as rn
+            FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE FAROL_REFERENCE = :fr
+        ) WHERE rn = 1 
+          AND UPPER(TRIM(B_VESSEL_NAME)) = UPPER(TRIM(:vessel))
+          AND UPPER(TRIM(B_VOYAGE_CODE)) = UPPER(TRIM(:voyage))
+          AND UPPER(TRIM(B_TERMINAL)) = UPPER(TRIM(:terminal))
+    """)
+    
+    result = conn.execute(query, {
+        'fr': farol_ref,
+        'vessel': vessel,
+        'voyage': voyage,
+        'terminal': terminal
+    }).fetchone()
+    
+    return result is not None
+
 def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
     """
     Processes manual updates from the voyage update screen.
@@ -2891,12 +2920,13 @@ def update_booking_from_voyage(changes: list) -> tuple[bool, str]:
                                         if new_val is not None and hasattr(new_val, 'date'):
                                             new_val = new_val.date()
                                     
-                                    audit_change(conn, fr, 'F_CON_SALES_BOOKING_DATA', main_table_col, 
-                                               old_val, new_val, 'tracking', 'UPDATE')
-                        
-                        # Manter log antigo por compatibilidade (opcional)
-                        log_sql = text("""INSERT INTO LogTransp.F_CON_VOYAGE_MANUAL_UPDATES (FAROL_REFERENCE, FIELD_NAME, OLD_VALUE, NEW_VALUE, UPDATED_BY) VALUES (:farol_reference, :field_name, :old_value, :new_value, :updated_by)""")
-                        conn.execute(log_sql, log_entries)
+                                    # Verificar se FR está atualmente vinculado a esta viagem
+                                    if is_currently_linked_to_voyage(conn, fr, 
+                                                                      change['vessel_name'], 
+                                                                      change['voyage_code'], 
+                                                                      change['terminal']):
+                                        audit_change(conn, fr, 'F_CON_SALES_BOOKING_DATA', main_table_col, 
+                                                   old_val, new_val, 'tracking', 'UPDATE')
 
         transaction.commit()
         return True, "Changes saved successfully."

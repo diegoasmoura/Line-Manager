@@ -4,6 +4,7 @@ from sqlalchemy import text
 import traceback
 from datetime import datetime, timedelta
 import json
+import time
 
 from database import get_database_connection, update_booking_from_voyage
 from auth.login import has_access_level
@@ -443,7 +444,9 @@ def exibir_atualizacao_manual():
                         success, message = update_booking_from_voyage(changes)
                         
                         if success:
-                            st.session_state.page_flash_message = {"type": "success", "message": "✅ Changes saved successfully!"}
+                            st.success("✅ Dados atualizados com sucesso!")
+                            time.sleep(2)  # Aguarda 2 segundos
+                            st.cache_data.clear()
                             st.rerun()
                         else:
                             st.error(f"❌ Failed to save: {message}")

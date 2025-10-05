@@ -137,9 +137,11 @@ def exibir_setup():
 
     # Definir abas (com administração de usuários e sincronização para ADMIN)
     if has_access_level('ADMIN'):
-        tabs = st.tabs(["Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"])
+        tab_names = ["Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
+        tabs = st.tabs(tab_names)
     else:
-        tabs = st.tabs(["Gerenciamento de Credenciais"])
+        tab_names = ["Gerenciamento de Credenciais"]
+        tabs = st.tabs(tab_names)
 
     with tabs[0]:
         st.info("As credenciais salvas aqui são usadas para autenticar com a API Ellox e o Proxy corporativo. As alterações são temporárias para esta sessão.")
@@ -175,7 +177,7 @@ def exibir_setup():
             st.caption(f"Último teste: {st.session_state.api_last_validated}")
             if st.button("Testar Conexão API Ellox", key="test_api_conn_card_btn"):
                 test_api_connection()
-                st.rerun()
+                # Não precisa de rerun - a conexão já foi testada e atualizada
 
         st.markdown("---") # Separator
 
@@ -393,7 +395,8 @@ def show_create_user_form():
                     for key in keys_to_clear:
                         if key in st.session_state:
                             del st.session_state[key]
-                    st.rerun()
+                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
+                    # O formulário será limpo automaticamente na próxima interação
                 else:
                     st.error("❌ Erro ao criar usuário. Tente novamente.")
 
@@ -465,7 +468,7 @@ def show_edit_user_form(users):
                     st.info("🔄 Atualizando lista de usuários...")
                     import time
                     time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
-                    st.rerun()
+                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
                 else:
                     st.error("❌ Erro ao atualizar usuário. Tente novamente.")
 
@@ -505,7 +508,7 @@ def show_reset_password_form(users):
                     st.info("🔄 Atualizando lista de usuários...")
                     import time
                     time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
-                    st.rerun()
+                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
                 else:
                     st.error("❌ Erro ao resetar senha. Tente novamente.")
 
@@ -602,8 +605,8 @@ def show_sync_configuration():
                     st.success("✅ Configuração salva com sucesso!")
                     st.balloons()
                     
-                    # Atualizar página
-                    st.rerun()
+                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
+                    # A configuração já foi salva e será refletida na próxima interação
                     
                 except Exception as e:
                     st.error(f"❌ Erro ao salvar configuração: {str(e)}")
