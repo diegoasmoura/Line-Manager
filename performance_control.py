@@ -336,7 +336,7 @@ def create_demand_forecast_chart(df):
     forecast_data['Week_Str'] = forecast_data['Week'].astype(str)
     
     # Pegar próximas 12 semanas
-    current_week = datetime.now().to_period('W')
+    current_week = pd.Timestamp.now().to_period('W')
     future_weeks = [current_week + i for i in range(12)]
     forecast_data = forecast_data[forecast_data['Week'].isin(future_weeks)]
     
