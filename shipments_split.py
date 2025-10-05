@@ -309,21 +309,17 @@ def show_split_form():
                                     request_uuid = str(uuid4())
                                     try:
                                         with st.spinner("Processando ajustes, por favor aguarde..."):
-                                            # Processa os ajustes da linha principal
+                                            # Para ajustes/splits, o histórico é mantido apenas em F_CON_RETURN_CARRIERS
+                                            # (visível no Request Timeline em history.py)
+                                            
+                                            # Atualiza o Farol Status para "Adjustment Requested" na tabela unificada e na tabela de Loading
                                             if changes:
-                                                # Loop de auditoria (substitui insert_adjustments_critic)
-                                                from database import get_database_connection, audit_change
+                                                farol_reference = changes[0]["Farol Reference"]
+                                                from database import get_database_connection
+                                                from sqlalchemy import text
                                                 conn = get_database_connection()
                                                 transaction = conn.begin()
                                                 
-                                                for _, row in pd.DataFrame(changes).iterrows():
-                                                    audit_change(conn, row["Farol Reference"], 'F_CON_SALES_BOOKING_DATA', 
-                                                                row["Coluna"], row["Valor Anterior"], row["Novo Valor"], 
-                                                                'shipments_split', 'UPDATE', adjustment_id=request_uuid)
-                                                
-                                                # Atualiza o Farol Status para "Adjustment Requested" na tabela unificada e na tabela de Loading
-                                                farol_reference = changes[0]["Farol Reference"]
-                                                from sqlalchemy import text
                                                 update_unified_query = text("""
                                                     UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
                                                     SET FAROL_STATUS = :farol_status
@@ -346,7 +342,8 @@ def show_split_form():
                                                 
                                                 transaction.commit()
                                                 conn.close()
-                                                success = True
+                                            
+                                            success = True
          
                                             # Processa os splits apenas se houver splits
                                             new_split_refs = []
@@ -363,8 +360,8 @@ def show_split_form():
                                                 )
                                                 success = True if new_split_refs is not None else False
                                             else:
-                                                # Se não há splits, considera sucesso se os ajustes da linha principal foram processados
-                                                success = True if not changes else success
+                                                # Se não há splits, considera sucesso automático para ajustes simples
+                                                success = True
          
                                         if success:
                                             # Upsert de Return Carriers para a referência original e splits
