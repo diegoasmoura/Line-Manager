@@ -3361,22 +3361,21 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
         
         audit_query = text("""
             INSERT INTO LogTransp.F_CON_CHANGE_LOG 
-            (CHANGE_ID, FAROL_REFERENCE, TABLE_NAME, COLUMN_NAME, OLD_VALUE, NEW_VALUE, 
-             CHANGE_TYPE, USER_NAME, CHANGE_DATE, SOURCE, ADJUSTMENT_ID)
-            VALUES (:change_id, :farol_ref, :table_name, :column_name, :old_value, :new_value,
-                    :change_type, :user_name, SYSDATE, :source, :adjustment_id)
+            (FAROL_REFERENCE, TABLE_NAME, COLUMN_NAME, OLD_VALUE, NEW_VALUE, 
+             CHANGE_TYPE, USER_LOGIN, CHANGE_SOURCE, ADJUSTMENT_ID)
+            VALUES (:farol_ref, :table_name, :column_name, :old_value, :new_value,
+                    :change_type, :user_login, :change_source, :adjustment_id)
         """)
         
         conn.execute(audit_query, {
-            "change_id": audit_id,
             "farol_ref": farol_ref,
             "table_name": "F_CON_SALES_BOOKING_DATA",
             "column_name": "FAROL_STATUS",
             "old_value": old_status or "NULL",
             "new_value": new_status,
             "change_type": "UPDATE",
-            "user_name": current_user,
-            "source": "history",
+            "user_login": current_user,
+            "change_source": "history",
             "adjustment_id": adjustment_id
         })
 

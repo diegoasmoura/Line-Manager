@@ -2418,24 +2418,24 @@ def exibir_history():
                             key=f"status_booking_rejected_{farol_reference}",
                             type="secondary",
                             disabled=disable_rejected):
-                    # Aplicar mudança de status diretamente
-                    apply_status_change(farol_ref, adjustment_id, "Booking Rejected", selected_row_status)
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
+                    st.rerun()
 
             with subcol3:
                 if st.button("Booking Cancelled", 
                             key=f"status_booking_cancelled_{farol_reference}",
                             type="secondary",
                             disabled=disable_cancelled):
-                    # Aplicar mudança de status diretamente
-                    apply_status_change(farol_ref, adjustment_id, "Booking Cancelled", selected_row_status)
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
+                    st.rerun()
             
             with subcol4:
                 if st.button("Adjustment Requested", 
                             key=f"status_adjustment_requested_{farol_reference}",
                             type="secondary",
                             disabled=disable_adjustment):
-                    # Aplicar mudança de status diretamente
-                    apply_status_change(farol_ref, adjustment_id, "Adjustment Requested", selected_row_status)
+                    st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
+                    st.rerun()
         
             
         # Verificar se é necessário cadastro manual de voyage monitoring
@@ -3054,6 +3054,38 @@ def exibir_history():
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
+    # Confirmação para mudanças de status pendentes
+    pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
+    if pending_status and len(selected) == 1 and active_tab == received_label:
+        st.markdown("---")
+        st.warning(f"**Confirmar alteração para:** {pending_status}")
+        
+        col_confirm, col_cancel = st.columns([1, 3])
+        
+        with col_confirm:
+            if st.button("✅ Confirmar", 
+                        key=f"confirm_status_change_{farol_reference}",
+                        type="primary"):
+                # Executa a mudança de status
+                selected_row = selected.iloc[0]
+                farol_ref = selected_row.get("Farol Reference")
+                adjustment_id = selected_row["ADJUSTMENT_ID"]
+                selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
+                
+                apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status)
+                
+                # Limpa o status pendente
+                if f"pending_status_change_{farol_reference}" in st.session_state:
+                    del st.session_state[f"pending_status_change_{farol_reference}"]
+        
+        with col_cancel:
+            if st.button("❌ Cancelar", 
+                        key=f"cancel_status_change_{farol_reference}",
+                        type="secondary"):
+                # Limpa o status pendente
+                if f"pending_status_change_{farol_reference}" in st.session_state:
+                    del st.session_state[f"pending_status_change_{farol_reference}"]
+                st.rerun()
 
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
