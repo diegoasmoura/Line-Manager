@@ -373,6 +373,158 @@ def exibir_operation_control():
         else:
             st.info("Nenhuma ação urgente encontrada.")
     
+    # Novos gráficos bonitos
+    st.subheader("📈 Análises Avançadas")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Gráfico de Timeline de Criação de Bookings
+        st.subheader("📅 Timeline de Criação de Bookings")
+        timeline_data = df.copy()
+        timeline_data['date'] = timeline_data['s_creation_of_shipment'].dt.date
+        daily_counts = timeline_data.groupby('date').size().reset_index(name='bookings')
+        
+        if not daily_counts.empty:
+            chart = alt.Chart(daily_counts).mark_area(
+                interpolate='monotone',
+                color=COLORS['primary']
+            ).encode(
+                x=alt.X('date:T', title='Data'),
+                y=alt.Y('bookings:Q', title='Número de Bookings'),
+                tooltip=['date:T', 'bookings:Q']
+            ).properties(
+                height=300,
+                title='Bookings Criados por Dia'
+            )
+            st.altair_chart(chart, use_container_width=True)
+    
+    with col2:
+        # Gráfico de Status por Business Unit
+        st.subheader("🏢 Status por Business Unit")
+        if 's_business' in df.columns and not df.empty:
+            bu_status_data = df.groupby(['s_business', 'farol_status']).size().reset_index(name='count')
+            
+            chart = alt.Chart(bu_status_data).mark_bar().encode(
+                x=alt.X('count:Q', title='Quantidade'),
+                y=alt.Y('s_business:N', title='Business Unit'),
+                color=alt.Color('farol_status:N', 
+                               scale=alt.Scale(scheme='category20'),
+                               legend=alt.Legend(title="Status")),
+                tooltip=['s_business', 'farol_status', 'count']
+            ).properties(
+                height=300,
+                title='Distribuição de Status por BU'
+            )
+            st.altair_chart(chart, use_container_width=True)
+    
+    # Gráfico de Heatmap de Horários
+    st.subheader("⏰ Heatmap de Atividade por Horário")
+    if not df.empty:
+        df['hour'] = df['s_creation_of_shipment'].dt.hour
+        df['day_of_week'] = df['s_creation_of_shipment'].dt.day_name()
+        
+        heatmap_data = df.groupby(['day_of_week', 'hour']).size().reset_index(name='bookings')
+        
+        # Ordenar dias da semana
+        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        heatmap_data['day_of_week'] = pd.Categorical(heatmap_data['day_of_week'], categories=day_order, ordered=True)
+        
+        chart = alt.Chart(heatmap_data).mark_rect().encode(
+            x=alt.X('hour:O', title='Hora do Dia'),
+            y=alt.Y('day_of_week:N', title='Dia da Semana', sort=day_order),
+            color=alt.Color('bookings:Q', 
+                           scale=alt.Scale(scheme='blues'),
+                           legend=alt.Legend(title="Bookings")),
+            tooltip=['day_of_week', 'hour', 'bookings']
+        ).properties(
+            height=400,
+            title='Atividade de Criação de Bookings por Horário'
+        )
+        st.altair_chart(chart, use_container_width=True)
+    
+    # Gráfico de Performance de Operadores
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("👥 Performance de Operadores")
+        if not df.empty:
+            # Calcular métricas por operador
+            operator_metrics = []
+            for operator in df['user_login_booking_created'].dropna().unique():
+                op_data = df[df['user_login_booking_created'] == operator]
+                total_bookings = len(op_data)
+                approved_bookings = len(op_data[op_data['farol_status'] == 'Booking Approved'])
+                approval_rate = (approved_bookings / total_bookings * 100) if total_bookings > 0 else 0
+                
+                operator_metrics.append({
+                    'operator': operator,
+                    'total_bookings': total_bookings,
+                    'approval_rate': approval_rate
+                })
+            
+            if operator_metrics:
+                op_df = pd.DataFrame(operator_metrics)
+                op_df = op_df.nlargest(10, 'total_bookings')
+                
+                chart = alt.Chart(op_df).mark_circle(size=200).encode(
+                    x=alt.X('total_bookings:Q', title='Total de Bookings'),
+                    y=alt.Y('approval_rate:Q', title='Taxa de Aprovação (%)'),
+                    size=alt.Size('total_bookings:Q', scale=alt.Scale(range=[50, 500])),
+                    color=alt.value(COLORS['success']),
+                    tooltip=['operator', 'total_bookings', 'approval_rate']
+                ).properties(
+                    height=300,
+                    title='Performance: Volume vs Taxa de Aprovação'
+                )
+                st.altair_chart(chart, use_container_width=True)
+    
+    with col2:
+        st.subheader("📊 Distribuição de Containers por Status")
+        if not df.empty:
+            status_containers = df.groupby('farol_status')['s_quantity_of_containers'].sum().reset_index()
+            
+            chart = alt.Chart(status_containers).mark_arc(innerRadius=50).encode(
+                theta=alt.Theta('s_quantity_of_containers:Q'),
+                color=alt.Color('farol_status:N', 
+                               scale=alt.Scale(scheme='category20'),
+                               legend=alt.Legend(title="Status")),
+                tooltip=['farol_status', 's_quantity_of_containers']
+            ).properties(
+                width=400,
+                height=300,
+                title='Containers por Status'
+            )
+            st.altair_chart(chart, use_container_width=True)
+    
+    # Gráfico de Tendência de Aprovações
+    st.subheader("📈 Tendência de Aprovações")
+    if not df.empty and 'b_booking_confirmation_date' in df.columns:
+        # Filtrar apenas bookings aprovados com data de confirmação
+        approved_df = df[df['farol_status'] == 'Booking Approved'].copy()
+        if not approved_df.empty:
+            approved_df['date'] = approved_df['b_booking_confirmation_date'].dt.date
+            daily_approvals = approved_df.groupby('date').size().reset_index(name='approvals')
+            
+            # Calcular média móvel de 7 dias
+            daily_approvals['ma_7d'] = daily_approvals['approvals'].rolling(window=7, min_periods=1).mean()
+            
+            base = alt.Chart(daily_approvals).encode(x=alt.X('date:T', title='Data'))
+            
+            bars = base.mark_bar(opacity=0.7, color=COLORS['primary']).encode(
+                y=alt.Y('approvals:Q', title='Aprovações')
+            )
+            
+            line = base.mark_line(strokeWidth=3, color=COLORS['success']).encode(
+                y=alt.Y('ma_7d:Q', title='Média Móvel 7 dias')
+            )
+            
+            chart = (bars + line).resolve_scale(y='independent').properties(
+                height=400,
+                title='Aprovações Diárias e Tendência'
+            )
+            st.altair_chart(chart, use_container_width=True)
+    
     # Resumo estatístico
     st.subheader("📊 Resumo Estatístico")
     
