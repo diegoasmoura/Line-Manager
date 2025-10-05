@@ -14,7 +14,6 @@ from database import (
     get_data_generalView,         # Carrega os dados da visão geral
     get_data_loadingData,         # Carrega os dados dos embarques na tabela Container Loading
     load_df_udc,                  # Carrega as opções de UDC (dropdowns)
-    insert_adjustments_basics,    #Função para inserir ajustes básicos na tabela de log
     get_actions_count_by_farol_reference,  # Conta ações por Farol Reference
     get_database_connection       # Conexão direta para consultas auxiliares
 )
@@ -646,22 +645,26 @@ def exibir_shipments():
                     begin_change_batch(random_uuid)
                     
                     try:
-                        success = insert_adjustments_basics(
-                            st.session_state["changes"],
-                            comments,
-                            random_uuid
-                        )
-                        if success:
-                            st.success("✅ Changes successfully registered in the database!")
-                            st.session_state["changes"] = pd.DataFrame()
-                           
-                            #Liberando o cache salvo das consultas
-                            st.cache_data.clear()
-                            resetar_estado()
-                            st.rerun()
-                            
-                        else:
-                            st.error("❌ Error registering adjustments in the database.")
+                        # Loop de auditoria (substitui insert_adjustments_basics)
+                        conn = get_database_connection()
+                        transaction = conn.begin()
+                        
+                        for _, row in st.session_state["changes"].iterrows():
+                            from database import audit_change
+                            audit_change(conn, row["Farol Reference"], 'F_CON_SALES_BOOKING_DATA', 
+                                        row["Column"], row["Previous Value"], row["New Value"], 
+                                        'shipments', 'UPDATE', adjustment_id=random_uuid)
+                        
+                        transaction.commit()
+                        conn.close()
+                        
+                        st.success("✅ Changes successfully registered in the database!")
+                        st.session_state["changes"] = pd.DataFrame()
+                       
+                        #Liberando o cache salvo das consultas
+                        st.cache_data.clear()
+                        resetar_estado()
+                        st.rerun()
                     finally:
                         # Encerrar batch
                         end_change_batch()

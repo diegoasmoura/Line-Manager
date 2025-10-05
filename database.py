@@ -897,225 +897,6 @@ def load_df_udc():
         if conn:
             conn.close()
  
-def insert_adjustments_basics(changes_df, comment, random_uuid):
-    """
-    Insere os ajustes na tabela LogTransp.F_CON_Adjustments_Log.
-    :param changes_df: DataFrame com as mudanças feitas pelo usuário.
-    :param area: Valor do campo Adjustment Area.
-    :param reason: Valor do campo Adjustment Request Reason.
-    :param responsibility: Valor do campo Responsibility.
-    :param comment: Valor do campo Comment.
-    """
-    if changes_df is None or changes_df.empty:
-        return False
-
-    conn = None
-    try:
-        conn = get_database_connection()
-        transaction = conn.begin()
-
-        # Iniciar batch se não houver um ativo
-        if not get_current_change_batch_id():
-            begin_change_batch(random_uuid)
-
-        # Auditoria: registrar cada mudança na F_CON_CHANGE_LOG
-        for _, row in changes_df.iterrows():
-            audit_change(conn, row["Farol Reference"], 'F_CON_SALES_BOOKING_DATA', 
-                        row["Column"], row["Previous Value"], row["New Value"], 
-                        'shipments', 'UPDATE', adjustment_id=random_uuid)
-
-        # Preparar os dados para inserção
-        data_to_insert = [
-            {
-                "farol_reference": row["Farol Reference"],
-                "adjustment_id": random_uuid,
-                "responsible_name": None,
-                "area": None,
-                "request_type": "Basic",
-                "request_reason": None,
-                "adjustments_owner": None,
-                "column_name": row["Column"],
-                "previous_value": row["Previous Value"],
-                "new_value": row["New Value"],
-                "request_carrier_date": None,
-                "confirmation_date": None,
-                "process_stage": None,
-                "stage": row["Stage"],
-                "comments": comment,
-                "user_insert": None,
-                "status": "Approved"
-            }
-            for _, row in changes_df.iterrows()
-        ]
- 
-        # Query de inserção
-        query = text("""
-            INSERT INTO LogTransp.F_CON_Adjustments_Log (
-                farol_reference, adjustment_id, responsible_name, area, request_type, request_reason, adjustments_owner, column_name,
-                previous_value, new_value, request_carrier_date, confirmation_date, stage,
-                comments, user_insert
- 
-            ) VALUES (
-                :farol_reference, :adjustment_id, :responsible_name, :area, :request_type, :request_reason, :adjustments_owner, :column_name,
-                :previous_value, :new_value, :request_carrier_date, :confirmation_date, :stage,
-                :comments, :user_insert
-            )
-        """)
- 
-        # Executa inserção em lote
-        conn.execute(query, data_to_insert)
-        transaction.commit()
-        return True
-    except Exception as e:
-        if conn:
-            transaction.rollback()
-        print(f"Erro ao inserir ajustes no banco de dados: {e}")
-        return False
-    finally:
-        if conn:
-            conn.close()
-        # Encerrar batch
-        end_change_batch()
- 
-def insert_adjustments_critic(changes_df, comment, random_uuid, area, reason, responsibility, user_insert=None):
-    if changes_df is None or changes_df.empty:
-        return False
-
-    from datetime import datetime
-    conn = None
-    try:
-        conn = get_database_connection()
-        transaction = conn.begin()
-
-        now = datetime.now()
-        data_to_insert = [
-            {
-                "farol_reference": row["Farol Reference"],
-                "adjustment_id": random_uuid,
-                "responsible_name": None,
-                "area": area,
-                "request_type": "Critic",
-                "request_reason": reason,
-                "adjustments_owner": responsibility,
-                "column_name": row["Coluna"],
-                "previous_value": row["Valor Anterior"],
-                "new_value": row["Novo Valor"],
-                "request_carrier_date": None,
-                "confirmation_date": None,
-                "stage": row["Stage"],
-                "comments": comment,
-                "user_insert": user_insert,
-                "row_inserted_date": now
-            }
-            for _, row in changes_df.iterrows()
-        ]
-
-        insert_query = text("""
-            INSERT INTO LogTransp.F_CON_Adjustments_Log (
-                farol_reference, adjustment_id, responsible_name, area, request_type, request_reason, adjustments_owner, column_name,
-                previous_value, new_value, request_carrier_date, confirmation_date, stage,
-                comments, user_insert, row_inserted_date
-            ) VALUES (
-                :farol_reference, :adjustment_id, :responsible_name, :area, :request_type, :request_reason, :adjustments_owner, :column_name,
-                :previous_value, :new_value, :request_carrier_date, :confirmation_date, :stage,
-                :comments, :user_insert, :row_inserted_date
-            )
-        """)
-        conn.execute(insert_query, data_to_insert)
-
-        farol_reference = changes_df.iloc[0]["Farol Reference"]
-
-        # Atualiza o Farol Status para "Adjustment Requested" na tabela unificada e na tabela de Loading
-        update_unified_query = text("""
-            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
-            SET FAROL_STATUS = :farol_status
-            WHERE FAROL_REFERENCE = :ref
-        """)
-        update_loading_query = text("""
-            UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
-            SET l_farol_status = :farol_status
-            WHERE l_farol_reference = :ref
-        """)
-
-        conn.execute(update_unified_query, {
-            "farol_status": "Adjustment Requested",
-            "ref": farol_reference
-        })
-        conn.execute(update_loading_query, {
-            "farol_status": "Adjustment Requested",
-            "ref": farol_reference
-        })
-
-        transaction.commit()
-        return True
-    except Exception as e:
-        if conn:
-            transaction.rollback()
-        st.error(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
-        return False
-
-    finally:
-        if conn:
-            conn.close()
- 
-def insert_adjustments_critic_splits(changes_df, comment, random_uuid, area, reason, responsibility, user_insert=None):
-    if changes_df is None or changes_df.empty:
-        return False
-
-    from datetime import datetime
-    conn = None
-    try:
-        conn = get_database_connection()
-        transaction = conn.begin()
-
-        now = datetime.now()
-        data_to_insert = [
-            {
-                "farol_reference": row["Farol Reference"],
-                "adjustment_id": random_uuid,
-                "responsible_name": None,
-                "area": area,
-                "request_type": "Critic",
-                "request_reason": reason,
-                "adjustments_owner": responsibility,
-                "column_name": row["Coluna"],
-                "previous_value": row["Valor Anterior"],
-                "new_value": row["Novo Valor"],
-                "request_carrier_date": None,
-                "confirmation_date": None,
-                "stage": row["Stage"],
-                "comments": comment,
-                "user_insert": user_insert,
-                "row_inserted_date": now
-            }
-            for _, row in changes_df.iterrows()
-        ]
-
-        insert_query = text("""
-            INSERT INTO LogTransp.F_CON_Adjustments_Log (
-                farol_reference, adjustment_id, responsible_name, area, request_type, request_reason, adjustments_owner, column_name,
-                previous_value, new_value, request_carrier_date, confirmation_date, stage,
-                comments, user_insert, row_inserted_date
-            ) VALUES (
-                :farol_reference, :adjustment_id, :responsible_name, :area, :request_type, :request_reason, :adjustments_owner, :column_name,
-                :previous_value, :new_value, :request_carrier_date, :confirmation_date, :stage,
-                :comments, :user_insert, :row_inserted_date
-            )
-        """)
-        conn.execute(insert_query, data_to_insert)
-
-        transaction.commit()
-        return True
-    except Exception as e:
-        if conn:
-            transaction.rollback()
-        st.error(f"Erro ao inserir ajustes críticos no banco de dados: {e}")
-        return False
- 
-    finally:
-        if conn:
-            conn.close()
- 
  
  
  
@@ -1382,8 +1163,8 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         insert_table("LogTransp.F_CON_SALES_BOOKING_DATA", data, conn)
     for data in insert_loading:
         insert_table("LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE", data, conn)
-    for df, data in zip(insert_logs, insert_sales):
-        insert_adjustments_critic_splits(df, comment, request_uuid if request_uuid else data.get("adjustment_id"), area, reason, responsibility, user_insert)
+    # Auditoria já é feita via insert_return_carrier_from_ui em shipments_split.py
+    # Não precisa mais gravar em F_CON_ADJUSTMENTS_LOG
  
     # Atualiza o Farol Status da linha original para "Adjustment Requested"
     update_unified_original = text("""
@@ -1468,35 +1249,6 @@ def insert_table(full_table_name, row_dict, conn):
  
  
  
-# --- CONSULTA UNIFICADA ---
-def get_merged_data():
-    query = """
-    SELECT 
-        farol_reference,
-        adjustment_id,
-        responsible_name,
-        area,
-        request_type,
-        request_reason,
-        adjustments_owner,
-        column_name,
-        previous_value,
-        new_value,
-        status,
-        request_carrier_date,
-        confirmation_date,
-        row_inserted_date,
-        comments,
-        stage
-    FROM LogTransp.F_CON_Adjustments_Log
-    WHERE request_type = 'Critic'
-    ORDER BY row_inserted_date DESC
-    """
-
-    with get_database_connection() as conn:
-        df = pd.read_sql_query(text(query), conn)
-        return df
-   
  
 #Função utilizada para obter dados de split baseados no farol reference
 def get_split_data_by_farol_reference(farol_reference):
@@ -2722,24 +2474,13 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             update_params.update(justification)
             set_clauses.extend(["Linked_Reference = 'New Adjustment'", "AREA = :area", "REQUEST_REASON = :request_reason", "ADJUSTMENTS_OWNER = :adjustments_owner", "COMMENTS = :comments"])
         else:
-            # Para aprovação de PDF/retorno do carrier, limpar campos de justificativa
-            # Persistir a chave completa enviada pela UI (sem ícones). Caso ultrapasse 60, truncar com segurança
+            # Para aprovação de PDF/retorno do carrier, apenas atualizar Linked_Reference
+            # Mantém as justificativas originais (se o registro veio de ajuste/split, elas permanecem)
             ref_str = str(related_reference) if related_reference is not None else ''
             if len(ref_str) > 60:
                 ref_str = ref_str[:60]
             update_params["linked_ref"] = ref_str
-            # Limpar campos de justificativa para aprovações de PDF
-            update_params["area_clear"] = None
-            update_params["request_reason_clear"] = None  
-            update_params["adjustments_owner_clear"] = None
-            update_params["comments_clear"] = None
-            set_clauses.extend([
-                "Linked_Reference = :linked_ref",
-                "AREA = :area_clear", 
-                "REQUEST_REASON = :request_reason_clear",
-                "ADJUSTMENTS_OWNER = :adjustments_owner_clear", 
-                "COMMENTS = :comments_clear"
-            ])
+            set_clauses.append("Linked_Reference = :linked_ref")
 
         update_query_str = f"UPDATE LogTransp.F_CON_RETURN_CARRIERS SET {', '.join(set_clauses)} WHERE ADJUSTMENT_ID = :adjustment_id"
         conn.execute(text(update_query_str), update_params)

@@ -14,8 +14,8 @@
 - Não usaremos `USER_LOGIN_LAST_UPDATE` neste momento. O "último a alterar" será consultado na trilha.
 - Separação de responsabilidades:
   - `F_CON_CHANGE_LOG`: trilha técnica, campo‑a‑campo, imutável.
-  - `F_CON_ADJUSTMENTS_LOG`: eventos de negócio (basic/critic, split, etc). Vamos padronizar autoria para `USER_LOGIN`.
-- `F_CON_VOYAGE_MANUAL_UPDATES`: será descontinuada (substituída por registros na `F_CON_CHANGE_LOG`).
+  - `F_CON_RETURN_CARRIERS`: eventos de negócio (ajustes, splits, aprovações) com justificativas.
+  - `F_CON_VOYAGE_MANUAL_UPDATES`: será descontinuada (substituída por registros na `F_CON_CHANGE_LOG`).
 
 ---
 
@@ -89,19 +89,12 @@ Regra futura: `USER_LOGIN_BOOKING_CREATED` deve ser populado apenas se ainda est
 
 ---
 
-### 1.3 Padronizar autoria de ajustes (negócio)
+### 1.3 Justificativas de Ajustes/Splits
 
-Se já existir `RESPONSIBLE_NAME` na `F_CON_ADJUSTMENTS_LOG`, renomeie para `USER_LOGIN`:
-
-```sql
-ALTER TABLE LogTransp.F_CON_ADJUSTMENTS_LOG 
-  RENAME COLUMN RESPONSIBLE_NAME TO USER_LOGIN;
-
-COMMENT ON COLUMN LogTransp.F_CON_ADJUSTMENTS_LOG.USER_LOGIN 
-  IS 'Login do usuário do app responsável pelo evento de negócio (basic/critic/split).';
-```
-
-Se o ambiente for totalmente novo e você optar por descartar esta tabela no futuro, este passo é opcional. Mantê-la é recomendado para diferenciar "evento de negócio" da trilha técnica.
+Campos de justificativa (AREA, REQUEST_REASON, ADJUSTMENTS_OWNER, COMMENTS) são armazenados em `F_CON_RETURN_CARRIERS`:
+- Para cada ajuste/split criado, as justificativas são gravadas e preservadas mesmo após aprovações subsequentes
+- Histórico campo-a-campo em `F_CON_CHANGE_LOG` (via `audit_change`)
+- Visualização unificada em `V_FAROL_AUDIT_TRAIL` e aba "Audit Trail"
 
 ---
 
@@ -383,7 +376,7 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY COLUMN_NAME ORDER BY CHANGE_AT DESC) = 1
 ### To-dos
 
 - [x] Adicionar USER_LOGIN_* em F_CON_SALES_BOOKING_DATA
-- [ ] Renomear RESPONSIBLE_NAME para USER_LOGIN em F_CON_ADJUSTMENTS_LOG
+- [x] Migrar justificativas para F_CON_RETURN_CARRIERS
 - [ ] Criar tabela F_CON_CHANGE_LOG e índice
 - [x] Implementar get_current_user_login e audit_change helper
 - [ ] Auditar updates do booking_new em update_booking_data_by_farol_reference

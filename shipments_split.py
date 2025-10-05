@@ -2,7 +2,7 @@
  
 import streamlit as st
 import pandas as pd
-from database import load_df_udc, insert_adjustments_critic, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales, upsert_return_carrier_from_unified, insert_return_carrier_snapshot, insert_return_carrier_from_ui
+from database import load_df_udc, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales, upsert_return_carrier_from_unified, insert_return_carrier_snapshot, insert_return_carrier_from_ui
 import re
 from uuid import uuid4
 import time
@@ -311,14 +311,42 @@ def show_split_form():
                                         with st.spinner("Processando ajustes, por favor aguarde..."):
                                             # Processa os ajustes da linha principal
                                             if changes:
-                                                success = insert_adjustments_critic(
-                                                    changes_df=pd.DataFrame(changes),
-                                                    random_uuid=request_uuid,  # Usa o mesmo UUID
-                                                    area=area,
-                                                    reason=reason,
-                                                    responsibility=responsibility,
-                                                    comment=comment,
-                                                )
+                                                # Loop de auditoria (substitui insert_adjustments_critic)
+                                                from database import get_database_connection, audit_change
+                                                conn = get_database_connection()
+                                                transaction = conn.begin()
+                                                
+                                                for _, row in pd.DataFrame(changes).iterrows():
+                                                    audit_change(conn, row["Farol Reference"], 'F_CON_SALES_BOOKING_DATA', 
+                                                                row["Coluna"], row["Valor Anterior"], row["Novo Valor"], 
+                                                                'shipments_split', 'UPDATE', adjustment_id=request_uuid)
+                                                
+                                                # Atualiza o Farol Status para "Adjustment Requested" na tabela unificada e na tabela de Loading
+                                                farol_reference = changes[0]["Farol Reference"]
+                                                from sqlalchemy import text
+                                                update_unified_query = text("""
+                                                    UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                                                    SET FAROL_STATUS = :farol_status
+                                                    WHERE FAROL_REFERENCE = :ref
+                                                """)
+                                                update_loading_query = text("""
+                                                    UPDATE LogTransp.F_CON_CARGO_LOADING_CONTAINER_RELEASE
+                                                    SET l_farol_status = :farol_status
+                                                    WHERE l_farol_reference = :ref
+                                                """)
+                                                
+                                                conn.execute(update_unified_query, {
+                                                    "farol_status": "Adjustment Requested",
+                                                    "ref": farol_reference
+                                                })
+                                                conn.execute(update_loading_query, {
+                                                    "farol_status": "Adjustment Requested",
+                                                    "ref": farol_reference
+                                                })
+                                                
+                                                transaction.commit()
+                                                conn.close()
+                                                success = True
          
                                             # Processa os splits apenas se houver splits
                                             new_split_refs = []

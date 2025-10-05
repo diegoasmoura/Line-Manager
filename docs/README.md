@@ -152,7 +152,7 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - `F_CON_BOOKING_MANAGEMENT` (Booking): dados de solicitação/gestão de booking.
 - `F_CON_CARGO_LOADING_CONTAINER_RELEASE` (Loading): controle de carregamento/entrega em porto.
 - `F_CON_RETURN_CARRIERS` (Return Carriers): histórico de alterações e dados retornados pelos carriers, com campo `ADJUSTMENT_ID` para rastreabilidade.
-- `F_CON_ADJUSTMENTS_LOG` (Log): trilha de ajustes básicos e críticos (inclui splits).
+- `F_CON_CHANGE_LOG` (Log): trilha técnica campo-a-campo de todas as alterações.
 - `F_CON_GLOBAL_VARIABLES` (UDC): listas de opções para dropdowns.
 - `F_CON_ANEXOS` (Attachments): armazenamento de arquivos por `farol_reference`.
 
@@ -171,7 +171,7 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - O usuário pode:
   - Ajustar campos não editáveis na grade principal (sem split), ou
   - Criar splits (novas referências derivadas `FR_... .N`), definindo quantidades e destinos.
-- Ao confirmar, os ajustes são gravados em `F_CON_ADJUSTMENTS_LOG` com `request_type = 'Critic'` e status normalizado para "Adjustment Requested" nas três tabelas (Sales, Booking, Loading). Splits são inseridos como novas linhas com status "Adjustment Requested" e ficam ocultos da listagem até aprovação.
+- Ao confirmar, as justificativas são gravadas em `F_CON_RETURN_CARRIERS` e o histórico campo-a-campo em `F_CON_CHANGE_LOG`, com status normalizado para "Adjustment Requested" nas três tabelas (Sales, Booking, Loading). Splits são inseridos como novas linhas com status "Adjustment Requested" e ficam ocultos da listagem até aprovação.
 
 4) Aprovação de Ajustes
 - `booking_adjustments.py` exibe uma visão ajustada (simulada) da `F_CON_SALES_DATA` aplicando as mudanças pendentes e exibindo os splits como linhas separadas.
@@ -317,8 +317,8 @@ Na tela de Shipments, a exibição dos botões de ação depende do status origi
 * Gatilhos:
     * Se alterações forem feitas, a grade Changes Made é exibida
     * Ao confirmar:
-        * Registro salvo na tabela F_CON_ADJUSTMENTS_LOG
-        * Request Type = Basic, Status = Approved
+        * Histórico campo-a-campo registrado na tabela F_CON_CHANGE_LOG
+        * Status = Approved
         * Trigger é ativada, chamando a procedure que atualiza F_CON_SALES_DATA e F_CON_BOOKING_MANAGEMENT
     * Ao descartar:
         * Alterações são desfeitas e a grade some
@@ -382,21 +382,19 @@ Campos ajustáveis incluem:
 * POL, POD, Carrier, Datas e demais campos não disponíveis para edição direta na tela
 
 Após preenchimento da justificativa e confirmação:
-* Registro é salvo na tabela F_CON_ADJUSTMENTS_LOG
-* Request Type = Critic, Status = Pending
+* Justificativas são gravadas na tabela F_CON_RETURN_CARRIERS
+* Histórico campo-a-campo é registrado na tabela F_CON_CHANGE_LOG
 * O campo Farol Status é atualizado para Adjustment Requested nas tabelas:
-    * F_CON_SALES_DATA
-    * F_CON_BOOKING_MANAGEMENT
+    * F_CON_SALES_BOOKING_DATA
+    * F_CON_CARGO_LOADING_CONTAINER_RELEASE
 * Splits ficam ocultos na tela até aprovação
-* Triggers e procedures não são acionadas neste momento
-
 
 ---
 
 #### 📝 Ajustes normais (sem split)
 
 - As alterações permanecem pendentes até revisão
-- Apenas após aprovação na tela `Review Adjustments` é que as mudanças são aplicadas nas tabelas principais F_CON_SALES_DATA
+- Apenas após aprovação na tela `History` é que as mudanças são aplicadas nas tabelas principais
 - Toda alteração é rastreada via:
 
   - Coluna alterada
@@ -405,7 +403,7 @@ Após preenchimento da justificativa e confirmação:
 
 #### 🔀 Ajustes com Split
 
-- Splits são criados como **novas linhas** nas tabelas `F_CON_SALES_DATA` e `F_CON_BOOKING_MANAGEMENT`
+- Splits são criados como **novas linhas** nas tabelas `F_CON_SALES_BOOKING_DATA` e `F_CON_CARGO_LOADING_CONTAINER_RELEASE`
 - Estas novas linhas já possuem os dados ajustados informados pelo usuário
 - Porém, **só ficam visíveis na interface** (`Shipments.py`) **após aprovação**
 
@@ -866,6 +864,15 @@ A **Adjusted Data View** substitui completamente a antiga **List View**, oferece
 | **Contexto** | Sem informação de mudanças | Resumo completo das alterações |
 | **Splits** | Não mostrava divisões | Exibe splits como linhas separadas |
 | **Aprovação** | Processo separado | Integrado na visualização |
+
+---
+
+## 📊 Justificativas de Ajustes/Splits
+
+Campos de justificativa (AREA, REQUEST_REASON, ADJUSTMENTS_OWNER, COMMENTS) são armazenados em:
+- **F_CON_RETURN_CARRIERS**: Para cada ajuste/split criado, as justificativas são gravadas e preservadas mesmo após aprovações subsequentes
+- Histórico campo-a-campo em **F_CON_CHANGE_LOG** (via `audit_change`)
+- Visualização unificada em **V_FAROL_AUDIT_TRAIL** e aba "Audit Trail"
 
 ---
 
