@@ -475,10 +475,37 @@ def exibir_performance_control():
     
     with col1:
         unique_customers = df['s_customer'].nunique()
+        
+        # Calcular período anterior para comparação
+        current_period_end = datetime.now()
+        current_period_start = current_period_end - timedelta(days=180)
+        previous_period_end = current_period_start
+        previous_period_start = previous_period_end - timedelta(days=180)
+        
+        # Buscar dados do período anterior
+        try:
+            conn = get_database_connection()
+            previous_query = text("""
+                SELECT COUNT(DISTINCT S_CUSTOMER) as unique_customers_prev
+                FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                WHERE S_CREATION_OF_SHIPMENT >= :start_date 
+                AND S_CREATION_OF_SHIPMENT < :end_date
+            """)
+            result = conn.execute(previous_query, {
+                'start_date': previous_period_start,
+                'end_date': previous_period_end
+            }).fetchone()
+            conn.close()
+            
+            previous_customers = result[0] if result else 0
+            delta_customers = unique_customers - previous_customers
+        except:
+            delta_customers = None
+        
         st.metric(
-            label="Clientes Únicos",
+            label="Customer",
             value=unique_customers,
-            delta=None
+            delta=delta_customers
         )
     
     with col2:
