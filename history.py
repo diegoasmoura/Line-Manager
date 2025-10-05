@@ -715,9 +715,16 @@ def display_attachments_section(farol_reference):
     # Seção de Upload Unificada
     with st.expander("📤 Add New Attachment", expanded=st.session_state[expander_key]):
         # Checkbox para ativar processamento de PDF de Booking
+        checkbox_key = f"process_booking_checkbox_{farol_reference}"
+        
+        # Inicializa o estado do checkbox se não existir
+        if checkbox_key not in st.session_state:
+            st.session_state[checkbox_key] = False
+            
         process_booking_pdf = st.checkbox(
             "📄 Processar PDF de Booking recebido por e-mail", 
-            key=f"process_booking_checkbox_{farol_reference}",
+            key=checkbox_key,
+            value=st.session_state[checkbox_key],
             help="Marque esta opção se o arquivo é um PDF de booking que precisa ser processado e validado"
         )
         
@@ -745,7 +752,7 @@ def display_attachments_section(farol_reference):
             )
         
         # Processamento baseado no tipo de upload
-        if process_booking_pdf and uploaded_file:
+        if process_booking_pdf and uploaded_file is not None:
             if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
                 with st.spinner("🔄 Processando PDF e extraindo dados..."):
                     try:
@@ -2411,33 +2418,24 @@ def exibir_history():
                             key=f"status_booking_rejected_{farol_reference}",
                             type="secondary",
                             disabled=disable_rejected):
-                    progress_bar = st.progress(0, text="🔄 Processando rejeição...")
-                    progress_bar.progress(50, text="📝 Atualizando status...")
-                    progress_bar.progress(100, text="✅ Rejeição processada!")
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
-                    st.rerun()
+                    # Aplicar mudança de status diretamente
+                    apply_status_change(farol_ref, adjustment_id, "Booking Rejected", selected_row_status)
 
             with subcol3:
                 if st.button("Booking Cancelled", 
                             key=f"status_booking_cancelled_{farol_reference}",
                             type="secondary",
                             disabled=disable_cancelled):
-                    progress_bar = st.progress(0, text="🔄 Processando cancelamento...")
-                    progress_bar.progress(50, text="📝 Atualizando status...")
-                    progress_bar.progress(100, text="✅ Cancelamento processado!")
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
-                    st.rerun()
+                    # Aplicar mudança de status diretamente
+                    apply_status_change(farol_ref, adjustment_id, "Booking Cancelled", selected_row_status)
             
             with subcol4:
                 if st.button("Adjustment Requested", 
                             key=f"status_adjustment_requested_{farol_reference}",
                             type="secondary",
                             disabled=disable_adjustment):
-                    progress_bar = st.progress(0, text="🔄 Processando solicitação de ajuste...")
-                    progress_bar.progress(50, text="📝 Atualizando status...")
-                    progress_bar.progress(100, text="✅ Solicitação processada!")
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
-                    st.rerun()
+                    # Aplicar mudança de status diretamente
+                    apply_status_change(farol_ref, adjustment_id, "Adjustment Requested", selected_row_status)
         
             
         # Verificar se é necessário cadastro manual de voyage monitoring

@@ -3340,7 +3340,11 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
         """)
         conn.execute(update_return_query, {"new_status": new_status, "adj_id": adjustment_id})
 
-        # 3. Update the status in F_CON_SALES_BOOKING_DATA
+        # 3. Get the old status before updating F_CON_SALES_BOOKING_DATA
+        old_status_query = text("SELECT FAROL_STATUS FROM LogTransp.F_CON_SALES_BOOKING_DATA WHERE FAROL_REFERENCE = :farol_ref")
+        old_status = conn.execute(old_status_query, {"farol_ref": farol_ref}).scalar()
+
+        # 4. Update the status in F_CON_SALES_BOOKING_DATA
         update_main_query = text("""
             UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
             SET FAROL_STATUS = :new_status
@@ -3348,7 +3352,35 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
         """)
         conn.execute(update_main_query, {"new_status": new_status, "farol_ref": farol_ref})
 
-        # 4. Commit
+        # 5. Audit the change in F_CON_CHANGE_LOG
+        from uuid import uuid4
+        audit_id = str(uuid4())
+        
+        # Get current user from session state or use 'System'
+        current_user = st.session_state.get('username', 'System')
+        
+        audit_query = text("""
+            INSERT INTO LogTransp.F_CON_CHANGE_LOG 
+            (CHANGE_ID, FAROL_REFERENCE, TABLE_NAME, COLUMN_NAME, OLD_VALUE, NEW_VALUE, 
+             CHANGE_TYPE, USER_NAME, CHANGE_DATE, SOURCE, ADJUSTMENT_ID)
+            VALUES (:change_id, :farol_ref, :table_name, :column_name, :old_value, :new_value,
+                    :change_type, :user_name, SYSDATE, :source, :adjustment_id)
+        """)
+        
+        conn.execute(audit_query, {
+            "change_id": audit_id,
+            "farol_ref": farol_ref,
+            "table_name": "F_CON_SALES_BOOKING_DATA",
+            "column_name": "FAROL_STATUS",
+            "old_value": old_status or "NULL",
+            "new_value": new_status,
+            "change_type": "UPDATE",
+            "user_name": current_user,
+            "source": "history",
+            "adjustment_id": adjustment_id
+        })
+
+        # 6. Commit
         tx.commit()
         st.success(f"✅ Status for {farol_ref} successfully updated to '{new_status}'.")
         return True
