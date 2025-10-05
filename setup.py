@@ -11,6 +11,7 @@ from auth.auth_db import ( # NEW
     reset_user_password, get_business_units,
     check_username_exists, check_email_exists
 )
+from ellox_sync_functions import get_sync_config, update_sync_config, get_sync_statistics
 
 def exibir_setup():
     st.title("⚙️ Configurações do Sistema Farol")
@@ -133,9 +134,9 @@ def exibir_setup():
     if st.session_state.api_connection_result == {"success": False, "message": "Nunca testado"}:
         test_api_connection()
 
-    # Definir abas (com administração de usuários para ADMIN)
+    # Definir abas (com administração de usuários e sincronização para ADMIN)
     if has_access_level('ADMIN'):
-        tabs = st.tabs(["Gerenciamento de Credenciais", "Administração de Usuários"])
+        tabs = st.tabs(["Gerenciamento de Credenciais", "Administração de Usuários", "🔄 Sincronização Automática"])
     else:
         tabs = st.tabs(["Gerenciamento de Credenciais"])
 
@@ -240,6 +241,11 @@ def exibir_setup():
     if has_access_level('ADMIN') and len(tabs) > 1:
         with tabs[1]:
             show_user_administration()
+    
+    # Aba de Sincronização Automática (apenas para ADMIN)
+    if has_access_level('ADMIN') and len(tabs) > 2:
+        with tabs[2]:
+            show_sync_configuration()
 
     print("⚙️ Setup") # Keep the original print for now, can remove later if not needed
 
@@ -494,3 +500,190 @@ def show_reset_password_form(users):
                     st.rerun()
                 else:
                     st.error("❌ Erro ao resetar senha. Tente novamente.")
+
+
+def show_sync_configuration():
+    """Exibe interface de configuração da sincronização automática Ellox"""
+    st.header("🔄 Sincronização Automática Ellox API")
+    st.markdown("Configure a sincronização automática de dados de viagens com a API Ellox.")
+    st.markdown("---")
+    
+    try:
+        # Carregar configuração atual
+        config = get_sync_config()
+        
+        # Cards de status
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            status_icon = "✅" if config['enabled'] else "❌"
+            status_text = "Ativa" if config['enabled'] else "Inativa"
+            st.metric("Status", f"{status_icon} {status_text}")
+        
+        with col2:
+            interval_text = f"{config['interval_minutes']} min"
+            if config['interval_minutes'] >= 60:
+                hours = config['interval_minutes'] // 60
+                minutes = config['interval_minutes'] % 60
+                if minutes == 0:
+                    interval_text = f"{hours}h"
+                else:
+                    interval_text = f"{hours}h {minutes}min"
+            st.metric("Intervalo", interval_text)
+        
+        with col3:
+            last_exec = config.get('last_execution')
+            if last_exec:
+                st.metric("Última Execução", last_exec.strftime("%d/%m %H:%M"))
+            else:
+                st.metric("Última Execução", "Nunca")
+        
+        st.markdown("---")
+        
+        # Formulário de configuração
+        st.subheader("⚙️ Configurações")
+        
+        with st.form("sync_config_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                enabled = st.checkbox(
+                    "Ativar sincronização automática",
+                    value=config['enabled'],
+                    help="Quando ativado, o sistema sincronizará automaticamente os dados de viagens com a API Ellox"
+                )
+            
+            with col2:
+                interval_options = [
+                    (30, "30 minutos"),
+                    (60, "1 hora"),
+                    (120, "2 horas"),
+                    (240, "4 horas"),
+                    (480, "8 horas")
+                ]
+                
+                current_interval = config['interval_minutes']
+                interval_index = next((i for i, (val, _) in enumerate(interval_options) if val == current_interval), 1)
+                
+                interval_minutes = st.selectbox(
+                    "Intervalo de sincronização",
+                    options=[val for val, _ in interval_options],
+                    format_func=lambda x: next(label for val, label in interval_options if val == x),
+                    index=interval_index,
+                    help="Frequência com que o sistema verificará por atualizações na API Ellox"
+                )
+            
+            # Informações adicionais
+            st.info("""
+            **Como funciona:**
+            - O sistema consulta a API Ellox no intervalo configurado
+            - Apenas viagens sem data de chegada ao destino final são monitoradas
+            - Mudanças detectadas são salvas automaticamente no histórico
+            - Logs detalhados estão disponíveis na aba Tracking
+            """)
+            
+            if st.form_submit_button("💾 Salvar Configuração", type="primary"):
+                try:
+                    # Atualizar configuração
+                    update_sync_config(
+                        enabled=enabled,
+                        interval_minutes=interval_minutes,
+                        updated_by=get_current_user()
+                    )
+                    
+                    st.success("✅ Configuração salva com sucesso!")
+                    st.balloons()
+                    
+                    # Atualizar página
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erro ao salvar configuração: {str(e)}")
+        
+        st.markdown("---")
+        
+        # Estatísticas
+        st.subheader("📊 Estatísticas (Últimos 30 dias)")
+        
+        try:
+            stats = get_sync_statistics(days=30)
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric(
+                    "Total de Execuções",
+                    f"{stats['total_executions']:,}",
+                    help="Número total de sincronizações executadas"
+                )
+            
+            with col2:
+                st.metric(
+                    "Taxa de Sucesso",
+                    f"{stats['success_rate']:.1f}%",
+                    help="Percentual de execuções bem-sucedidas"
+                )
+            
+            with col3:
+                st.metric(
+                    "Viagens Ativas",
+                    f"{stats['active_voyages']:,}",
+                    help="Viagens sendo monitoradas atualmente"
+                )
+            
+            with col4:
+                avg_time = stats['avg_execution_time_ms']
+                st.metric(
+                    "Tempo Médio",
+                    f"{avg_time:.0f}ms",
+                    help="Tempo médio de execução por sincronização"
+                )
+            
+            # Resumo detalhado
+            st.subheader("📋 Resumo Detalhado")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Execuções por Status:**")
+                st.write(f"✅ Sucessos: {stats['successful_executions']}")
+                st.write(f"ℹ️ Sem mudanças: {stats['no_changes_executions']}")
+                st.write(f"❌ Erros: {stats['error_executions']}")
+            
+            with col2:
+                st.write("**Mudanças Detectadas:**")
+                st.write(f"📊 Total: {stats['total_changes_detected']}")
+                if stats['total_executions'] > 0:
+                    avg_changes = stats['total_changes_detected'] / stats['total_executions']
+                    st.write(f"📈 Média por execução: {avg_changes:.1f}")
+        
+        except Exception as e:
+            st.warning(f"⚠️ Não foi possível carregar estatísticas: {str(e)}")
+        
+        st.markdown("---")
+        
+        # Ações manuais
+        st.subheader("🔧 Ações Manuais")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔄 Executar Sincronização Agora", help="Força uma sincronização imediata"):
+                with st.spinner("Executando sincronização..."):
+                    try:
+                        from ellox_sync_service import sync_all_active_voyages
+                        result = sync_all_active_voyages()
+                        
+                        st.success("✅ Sincronização executada com sucesso!")
+                        st.json(result)
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erro na sincronização: {str(e)}")
+        
+        with col2:
+            if st.button("📊 Ver Logs Detalhados", help="Abre a aba de logs no Tracking"):
+                st.info("💡 Acesse a aba 'Tracking' → 'Sync Logs' para ver os logs detalhados")
+    
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar configuração de sincronização: {str(e)}")
+        st.error("Verifique se as tabelas de sincronização foram criadas corretamente.")

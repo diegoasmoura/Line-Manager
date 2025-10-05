@@ -15,6 +15,7 @@ Sistema completo de gerenciamento de embarques marítimos com interface web intu
 - [Estrutura do Banco de Dados](#-estrutura-do-banco-de-dados)
 - [Fluxos de Trabalho](#-fluxos-de-trabalho)
 - [API e Integrações](#-api-e-integrações)
+- [Sistema de Sincronização Automática Ellox](#-sistema-de-sincronização-automática-ellox)
 - [Boas Práticas](#-boas-práticas---identificação-de-carriers)
 - [Boas Práticas - Coleta de Hora Atual](#-boas-práticas---coleta-de-hora-atual)
 - [Contribuição](#-contribuição)
@@ -1840,6 +1841,315 @@ Retorna viagens disponíveis para um navio e terminal. Útil para sugerir voyage
 - Solicitar (ShipOwner): `POST /api/monitor/shipowner`
 - Visualizar (ShipOwner): `POST /api/shipownermonitorings`
 Observação: alguns CNPJs de clientes só são aceitos se estiverem na base interna de `companies` da Ellox. Utilize a verificação prévia via `check_company_exists`.
+
+## 🔄 Sistema de Sincronização Automática Ellox
+
+### 📋 Visão Geral
+
+O sistema de sincronização automática Ellox é uma funcionalidade avançada que mantém os dados de viagens sempre atualizados consultando periodicamente a API Ellox e detectando mudanças automaticamente. Este sistema opera em background, garantindo que as informações de monitoramento de viagens sejam sempre as mais recentes disponíveis.
+
+### 🎯 Benefícios da Sincronização Automática
+
+- **Dados Sempre Atualizados**: Consulta automática da API Ellox a intervalos configuráveis
+- **Detecção Inteligente de Mudanças**: Identifica apenas campos que realmente foram alterados
+- **Histórico Completo**: Mantém registro de todas as atualizações e mudanças detectadas
+- **Operação em Background**: Não interfere na experiência do usuário
+- **Retry Automático**: Sistema robusto de tentativas em caso de falhas temporárias
+- **Logs Detalhados**: Rastreabilidade completa de todas as operações
+
+### 🏗️ Arquitetura da Solução
+
+#### Decisões de Arquitetura
+
+**Infraestrutura de Execução:**
+Após avaliar três alternativas principais, optamos por um **Script Python separado com APScheduler** como solução ideal. Esta abordagem oferece o melhor equilíbrio entre robustez e simplicidade:
+
+- **Background Thread no Streamlit**: Simples de implementar, mas reinicia junto com o aplicativo, perdendo continuidade
+- **Script Python separado com APScheduler**: Escolhido por oferecer independência total do Streamlit, facilidade de manutenção e robustez operacional
+- **Celery/APScheduler com Redis**: Mais profissional, mas adiciona complexidade desnecessária para este caso de uso
+
+**Armazenamento de Logs:**
+Implementamos uma abordagem híbrida que combina o melhor dos dois mundos:
+
+- **Tabela Oracle F_ELLOX_SYNC_LOGS**: Para persistência, consultas SQL e integração com o sistema existente
+- **Arquivo .log local**: Para debug rápido, troubleshooting e análise de logs em tempo real
+- **Benefícios**: Dados estruturados no banco + facilidade de debug local
+
+#### Componentes Principais
+
+1. **Daemon de Sincronização** (`ellox_sync_daemon.py`)
+   - Script independente que roda 24/7
+   - APScheduler para agendamento (IntervalTrigger configurável)
+   - Retry automático com backoff exponencial (3 tentativas: 5min, 10min, 15min)
+   - Leitura de configurações do banco Oracle
+   - Logs em arquivo + banco de dados
+
+2. **Serviço de Sincronização** (`ellox_sync_service.py`)
+   - Lógica core de sincronização
+   - Integração com `ellox_api.py` existente
+   - Detecção inteligente de mudanças (diff de valores)
+   - Gravação em `F_ELLOX_TERMINAL_MONITORINGS` com `DATA_SOURCE='API'`
+   - Logging detalhado de execuções
+
+3. **Funções de Banco** (`ellox_sync_functions.py`)
+   - `get_sync_config()`: Configuração atual
+   - `update_sync_config()`: Atualização de configurações
+   - `log_sync_execution()`: Registro de execuções
+   - `get_sync_logs()`: Consulta de logs com filtros
+   - `get_sync_statistics()`: Estatísticas e métricas
+
+4. **Interface de Administração**
+   - **Setup.py**: Nova aba "🔄 Sincronização Automática" para configuração
+   - **Tracking.py**: Nova aba "📊 Sync Logs" para visualização de logs (apenas ADMIN)
+
+### 🔄 Como Funciona (Step-by-Step)
+
+#### Fluxo de Execução
+
+1. **Inicialização do Daemon**
+   - Lê configuração do banco Oracle (`F_ELLOX_SYNC_CONFIG`)
+   - Verifica se sincronização está habilitada
+   - Configura APScheduler com intervalo especificado
+
+2. **Execução Periódica**
+   - Timer dispara (ex: a cada 1 hora)
+   - Busca viagens ativas: `SELECT DISTINCT NAVIO, VIAGEM, TERMINAL FROM F_ELLOX_TERMINAL_MONITORINGS WHERE B_DATA_CHEGADA_DESTINO_ATA IS NULL`
+
+3. **Processamento por Viagem**
+   - Para cada viagem ativa:
+     - Consulta API Ellox (`ellox_api.py`)
+     - Busca dados atuais no banco
+     - Compara valores (detecta mudanças)
+     - Se houver mudanças → INSERT em `F_ELLOX_TERMINAL_MONITORINGS` com `DATA_SOURCE='API'`
+     - Registra log de execução
+
+4. **Estratégia de Retry**
+   - Falha 1 → Retry em 5 minutos
+   - Falha 2 → Retry em 10 minutos  
+   - Falha 3 → Retry em 15 minutos
+   - Após 3 falhas → Log ERROR, aguarda próximo ciclo
+
+5. **Critérios de Parada**
+   - Viagem para de ser sincronizada quando `B_DATA_CHEGADA_DESTINO_ATA` é preenchido
+   - Registro removido de `F_ELLOX_TERMINAL_MONITORINGS`
+
+#### Detecção de Mudanças
+
+O sistema compara os seguintes campos entre dados atuais e novos:
+- `B_ETA`, `B_ETD`, `B_ATA`, `B_ATD`
+- `B_DATA_CHEGADA_DESTINO_ATA`, `B_DATA_SAIDA_DESTINO_ATD`
+- `B_STATUS`, `B_VESSEL_NAME`, `B_VOYAGE_CODE`, `B_TERMINAL`
+- `B_CARRIER`, `B_ORIGIN`, `B_DESTINATION`
+- `B_CARGO_TYPE`, `B_QUANTITY`, `B_UNIT`, `B_DEADLINE`, `B_COMMENTS`
+
+### ⚙️ Configuração e Ativação
+
+#### Pré-requisitos
+
+1. **Criar Tabelas Oracle**
+   ```bash
+   # Executar script SQL
+   sqlplus user/password@database @scripts/create_sync_tables.sql
+   ```
+
+2. **Instalar Dependências**
+   ```bash
+   pip install APScheduler>=3.10.0
+   ```
+
+3. **Configurar Logs**
+   ```bash
+   mkdir -p logs
+   ```
+
+#### Ativação via Interface
+
+1. **Acesse Setup** (apenas usuários ADMIN)
+2. **Aba "🔄 Sincronização Automática"**
+3. **Configure**:
+   - ☑️ Ativar sincronização automática
+   - ⏱️ Intervalo (30min, 1h, 2h, 4h, 8h)
+4. **Salve configuração**
+
+#### Iniciar Daemon
+
+```bash
+# Iniciar daemon
+python ellox_sync_daemon.py
+
+# Verificar status
+python ellox_sync_daemon.py status
+
+# Testar conexões
+python ellox_sync_daemon.py test
+
+# Executar sincronização manual
+python ellox_sync_daemon.py sync-now
+```
+
+### 📊 Monitoramento e Logs
+
+#### Interface de Logs (Tracking → Sync Logs)
+
+**Métricas Disponíveis:**
+- 📊 Total de execuções (período)
+- ✅ Taxa de sucesso (%)
+- 🚢 Viagens ativas monitoradas
+- ⏱️ Tempo médio de execução
+
+**Filtros:**
+- Período: 7 dias, 30 dias, 90 dias
+- Status: SUCCESS, NO_CHANGES, API_ERROR, AUTH_ERROR, SAVE_ERROR, ERROR
+- Navio, Viagem, Terminal (busca parcial)
+
+**Funcionalidades:**
+- Tabela de logs com colunas: Data/Hora, Navio, Viagem, Terminal, Status, Mudanças, Tempo, Tentativa, Erro
+- Export CSV
+- Gráficos de resumo por status
+- Badge visual no menu quando há mudanças recentes
+
+#### Interpretação de Status
+
+- **✅ SUCCESS**: Sincronização bem-sucedida com mudanças detectadas
+- **ℹ️ NO_CHANGES**: Sincronização bem-sucedida sem mudanças
+- **🔴 API_ERROR**: Erro na comunicação com API Ellox
+- **🔐 AUTH_ERROR**: Erro de autenticação com API Ellox
+- **💾 SAVE_ERROR**: Erro ao salvar dados no banco
+- **❌ ERROR**: Erro inesperado no sistema
+- **🔄 RETRY**: Tentativa de retry em andamento
+
+### 🗄️ Estrutura das Tabelas
+
+#### F_ELLOX_SYNC_LOGS
+```sql
+CREATE TABLE LogTransp.F_ELLOX_SYNC_LOGS (
+    ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    SYNC_TIMESTAMP TIMESTAMP DEFAULT SYSTIMESTAMP,
+    VESSEL_NAME VARCHAR2(200),
+    VOYAGE_CODE VARCHAR2(100),
+    TERMINAL VARCHAR2(200),
+    STATUS VARCHAR2(50) NOT NULL,
+    CHANGES_DETECTED NUMBER DEFAULT 0,
+    ERROR_MESSAGE CLOB,
+    RETRY_ATTEMPT NUMBER DEFAULT 0,
+    EXECUTION_TIME_MS NUMBER,
+    USER_ID VARCHAR2(50) DEFAULT 'SYSTEM',
+    FIELDS_CHANGED CLOB
+);
+```
+
+#### F_ELLOX_SYNC_CONFIG
+```sql
+CREATE TABLE LogTransp.F_ELLOX_SYNC_CONFIG (
+    ID NUMBER DEFAULT 1 PRIMARY KEY,
+    SYNC_ENABLED NUMBER(1) DEFAULT 1,
+    SYNC_INTERVAL_MINUTES NUMBER DEFAULT 60,
+    MAX_RETRIES NUMBER DEFAULT 3,
+    LAST_EXECUTION TIMESTAMP,
+    NEXT_EXECUTION TIMESTAMP,
+    UPDATED_BY VARCHAR2(50),
+    UPDATED_AT TIMESTAMP DEFAULT SYSTIMESTAMP
+);
+```
+
+### 🔧 Troubleshooting
+
+#### Problemas Comuns
+
+**1. Daemon não inicia**
+- Verificar se tabelas foram criadas
+- Verificar credenciais do banco
+- Verificar logs em `logs/ellox_sync_daemon.log`
+
+**2. API Ellox não responde**
+- Verificar conectividade de rede
+- Verificar credenciais da API
+- Verificar se proxy está configurado corretamente
+
+**3. Nenhuma viagem sendo sincronizada**
+- Verificar se existem viagens sem `B_DATA_CHEGADA_DESTINO_ATA`
+- Verificar logs de erro específicos
+- Executar teste manual: `python ellox_sync_daemon.py sync-now`
+
+**4. Muitos erros de API**
+- Verificar limite de rate da API Ellox
+- Aumentar intervalo de sincronização
+- Verificar estabilidade da conexão
+
+#### Comandos de Diagnóstico
+
+```bash
+# Verificar status do daemon
+python ellox_sync_daemon.py status
+
+# Testar conexões
+python ellox_sync_daemon.py test
+
+# Executar sincronização manual
+python ellox_sync_daemon.py sync-now
+
+# Ver logs em tempo real
+tail -f logs/ellox_sync_daemon.log
+```
+
+### ❓ FAQ
+
+**Q: O que acontece se a API Ellox cair?**
+A: O sistema tenta 3 vezes com intervalos crescentes (5min, 10min, 15min). Após isso, aguarda o próximo ciclo programado.
+
+**Q: Como desativar temporariamente?**
+A: Acesse Setup → Sincronização Automática → Desmarque "Ativar sincronização automática" → Salvar.
+
+**Q: Quantas viagens são monitoradas simultaneamente?**
+A: Todas as viagens ativas (sem `B_DATA_CHEGADA_DESTINO_ATA`). O sistema processa uma por vez com pausa de 0.5s entre elas.
+
+**Q: Qual o impacto no desempenho?**
+A: Mínimo. O daemon roda independente do Streamlit e as consultas são otimizadas com índices.
+
+**Q: Como forçar sincronização de uma viagem específica?**
+A: Use a interface Setup → "Executar Sincronização Agora" ou implemente função específica.
+
+### 📈 Casos de Uso
+
+#### Exemplo 1: Mudança de Deadline Detectada
+1. API Ellox atualiza deadline de viagem
+2. Sistema detecta mudança no campo `B_DEADLINE`
+3. Novo registro inserido em `F_ELLOX_TERMINAL_MONITORINGS`
+4. Log registrado: `SUCCESS` com 1 mudança detectada
+5. Usuário vê atualização na próxima consulta
+
+#### Exemplo 2: Atualização de ETA
+1. Navio atrasa, ETA é atualizado na API
+2. Sistema detecta mudança em `B_ETA`
+3. Dados salvos com `DATA_SOURCE='API'`
+4. Histórico mantido para auditoria
+5. Interface reflete nova data automaticamente
+
+#### Exemplo 3: Tratamento de Erro de API
+1. API Ellox retorna erro 500
+2. Sistema registra `API_ERROR`
+3. Retry agendado para 5 minutos
+4. Após 3 tentativas, registra `ERROR`
+5. Próxima execução programada em 1 hora
+
+### 🚀 Arquivos do Sistema
+
+| Arquivo | Função | Dependências |
+|---------|--------|--------------|
+| `ellox_sync_daemon.py` | Daemon principal | APScheduler, ellox_sync_service |
+| `ellox_sync_service.py` | Lógica de sincronização | ellox_api, ellox_sync_functions |
+| `ellox_sync_functions.py` | Funções de banco | database.py |
+| `scripts/create_sync_tables.sql` | Criação de tabelas | Oracle Database |
+| `tracking.py` | Interface de logs | ellox_sync_functions |
+| `setup.py` | Configuração | ellox_sync_functions |
+
+### 🔒 Considerações de Segurança
+
+- **Credenciais**: Lidas do banco de dados existente (tabela de credenciais Ellox)
+- **Logs**: Não expõem dados sensíveis, apenas metadados
+- **Acesso**: Apenas usuários ADMIN podem ver logs completos
+- **Daemon**: Roda com usuário de sistema, sem privilégios especiais
+- **Rede**: Utiliza mesma infraestrutura de proxy/certificados do sistema principal
 
 #### 🔄 Integração com Voyage Timeline durante Aprovação
 

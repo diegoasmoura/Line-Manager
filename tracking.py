@@ -2,8 +2,12 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import text
 import traceback
+from datetime import datetime, timedelta
+import json
 
 from database import get_database_connection, update_booking_from_voyage
+from ellox_sync_functions import get_sync_logs, get_sync_statistics
+from auth.login import has_access_level
 
 def get_voyage_data_for_update():
     """
@@ -132,6 +136,29 @@ def get_voyage_history(vessel_name, voyage_code, terminal):
 
 def exibir_tracking():
     """
+    Exibe a página de tracking com abas para atualização manual e logs de sincronização.
+    """
+    st.title("🚢 Tracking de Viagens")
+    
+    # Verifica se usuário tem acesso de admin para ver logs de sincronização
+    show_sync_logs = has_access_level('ADMIN')
+    
+    if show_sync_logs:
+        # Abas para admin
+        tab1, tab2 = st.tabs(["📊 Atualização Manual", "🔄 Sync Logs"])
+        
+        with tab1:
+            exibir_atualizacao_manual()
+        
+        with tab2:
+            exibir_sync_logs()
+    else:
+        # Apenas atualização manual para usuários não-admin
+        exibir_atualizacao_manual()
+
+
+def exibir_atualizacao_manual():
+    """
     Exibe a página para atualização manual de datas de viagem.
     """
     # Inicializa a chave do editor se não existir
@@ -148,7 +175,7 @@ def exibir_tracking():
         flash = st.session_state.pop("page_flash_message")
         st.success(flash["message"])
 
-    st.title("🚢 Atualização Manual de Datas de Viagem")
+    st.subheader("📊 Atualização Manual de Datas de Viagem")
 
     with st.spinner("Carregando dados de viagens..."):
         df_original = get_voyage_data_for_update()
@@ -445,6 +472,175 @@ def exibir_tracking():
             if st.button("❌ Cancel"):
                 st.session_state['tracking_discard_changes'] = True
                 st.rerun()
+
+
+def exibir_sync_logs():
+    """
+    Exibe a aba de logs de sincronização automática Ellox.
+    """
+    st.subheader("🔄 Logs de Sincronização Automática Ellox")
+    
+    try:
+        # Estatísticas gerais
+        with st.spinner("Carregando estatísticas..."):
+            stats = get_sync_statistics(days=30)
+        
+        # Cards de métricas
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                label="📊 Total de Execuções (30d)",
+                value=f"{stats['total_executions']:,}",
+                delta=None
+            )
+        
+        with col2:
+            st.metric(
+                label="✅ Taxa de Sucesso",
+                value=f"{stats['success_rate']:.1f}%",
+                delta=None
+            )
+        
+        with col3:
+            st.metric(
+                label="🚢 Viagens Ativas",
+                value=f"{stats['active_voyages']:,}",
+                delta=None
+            )
+        
+        with col4:
+            avg_time = stats['avg_execution_time_ms']
+            st.metric(
+                label="⏱️ Tempo Médio",
+                value=f"{avg_time:.0f}ms",
+                delta=None
+            )
+        
+        st.divider()
+        
+        # Filtros
+        st.subheader("🔍 Filtros")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            period = st.selectbox(
+                "Período",
+                options=["7 dias", "30 dias", "90 dias"],
+                index=1
+            )
+            days = int(period.split()[0])
+        
+        with col2:
+            status_filter = st.selectbox(
+                "Status",
+                options=["Todos", "SUCCESS", "NO_CHANGES", "API_ERROR", "AUTH_ERROR", "SAVE_ERROR", "ERROR"],
+                index=0
+            )
+        
+        with col3:
+            vessel_filter = st.text_input("Navio (opcional)", placeholder="Digite parte do nome...")
+        
+        with col4:
+            terminal_filter = st.text_input("Terminal (opcional)", placeholder="Digite parte do nome...")
+        
+        # Aplicar filtros
+        filters = {}
+        if days:
+            filters['start_date'] = datetime.now() - timedelta(days=days)
+        if status_filter != "Todos":
+            filters['status'] = status_filter
+        if vessel_filter:
+            filters['vessel'] = vessel_filter
+        if terminal_filter:
+            filters['terminal'] = terminal_filter
+        
+        # Buscar logs
+        with st.spinner("Carregando logs..."):
+            logs = get_sync_logs(filters=filters, limit=1000)
+        
+        if not logs:
+            st.info("Nenhum log encontrado para os filtros selecionados.")
+            return
+        
+        # Converter para DataFrame
+        df_logs = pd.DataFrame(logs)
+        
+        # Formatar colunas
+        if not df_logs.empty:
+            df_logs['sync_timestamp'] = pd.to_datetime(df_logs['sync_timestamp'])
+            df_logs['execution_time_ms'] = df_logs['execution_time_ms'].round(2)
+            
+            # Mapear status para ícones
+            status_icons = {
+                'SUCCESS': '✅',
+                'NO_CHANGES': 'ℹ️',
+                'API_ERROR': '🔴',
+                'AUTH_ERROR': '🔐',
+                'SAVE_ERROR': '💾',
+                'ERROR': '❌',
+                'RETRY': '🔄'
+            }
+            
+            df_logs['status_icon'] = df_logs['status'].map(status_icons).fillna('❓')
+            df_logs['status_display'] = df_logs['status_icon'] + ' ' + df_logs['status']
+        
+        # Exibir tabela
+        st.subheader(f"📋 Logs de Sincronização ({len(df_logs)} registros)")
+        
+        # Configurar colunas para exibição
+        display_columns = {
+            'sync_timestamp': 'Data/Hora',
+            'vessel_name': 'Navio',
+            'voyage_code': 'Viagem',
+            'terminal': 'Terminal',
+            'status_display': 'Status',
+            'changes_detected': 'Mudanças',
+            'execution_time_ms': 'Tempo (ms)',
+            'retry_attempt': 'Tentativa',
+            'error_message': 'Erro'
+        }
+        
+        # Filtrar colunas que existem no DataFrame
+        available_columns = {k: v for k, v in display_columns.items() if k in df_logs.columns}
+        
+        # Exibir tabela
+        st.dataframe(
+            df_logs[list(available_columns.keys())].rename(columns=available_columns),
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Botão de export
+        if st.button("📥 Exportar CSV"):
+            csv = df_logs.to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"sync_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+        
+        # Resumo por status
+        if not df_logs.empty:
+            st.subheader("📊 Resumo por Status")
+            status_summary = df_logs['status'].value_counts()
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.bar_chart(status_summary)
+            
+            with col2:
+                for status, count in status_summary.items():
+                    icon = status_icons.get(status, '❓')
+                    percentage = (count / len(df_logs)) * 100
+                    st.write(f"{icon} **{status}**: {count} ({percentage:.1f}%)")
+    
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar logs de sincronização: {str(e)}")
+        st.error(f"Detalhes: {traceback.format_exc()}")
+
 
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
