@@ -1477,7 +1477,7 @@ def exibir_history():
                         if split_val is not None:
                             split_str = str(split_val).strip()
                             if split_str and split_str.upper() != "NULL":
-                                return "📄 Split Info"
+                                return "📄 Split"
                     fr_val = row.get("Farol Reference")
                     if fr_val is not None:
                         fr_str = str(fr_val).strip()
@@ -1506,6 +1506,8 @@ def exibir_history():
                     # Novos nomes mais claros
                     if low == "booking request - company":
                         return "📋 Booking Request"
+                    if low == "booking requested":
+                        return "📋 Booking Requested"
                     if low == "pdf document - carrier":
                         return "📄 PDF Document"
                     if low == "adjustment request - company":
@@ -1724,8 +1726,8 @@ def exibir_history():
                 st.info("ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "📋 Booking Request":
                 st.info("ℹ️ **Booking Request:** Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "📄 Split Info":
-                st.info("ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
+            elif status == "📄 Split":
+                st.info("ℹ️ **Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "🛠️ Cargill (Adjusts)":
                 st.info("ℹ️ **Ajuste da Cargill:** Esta linha representa ajuste interno. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "🛠️ Adjustment Request":
