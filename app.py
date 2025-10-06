@@ -86,33 +86,40 @@ with st.sidebar:
     if user_info:
         st.markdown("---")
         
-        # Informação de sessão
-        session_token = st.session_state.get('session_token')
-        if session_token:
-            session_data = get_session(session_token)
-            if session_data:
-                time_remaining = get_session_time_remaining(session_data)
-                if time_remaining:
-                    time_str = format_session_time(time_remaining)
-                    
-                    # Cores baseadas no tempo restante
-                    if time_remaining.total_seconds() < 1800:  # Menos de 30 min
-                        color = "#dc3545"  # Vermelho
-                        icon = "⚠️"
-                    elif time_remaining.total_seconds() < 3600:  # Menos de 1 hora
-                        color = "#fd7e14"  # Laranja
-                        icon = "⏰"
-                    else:
-                        color = "#28a745"  # Verde
-                        icon = "✅"
-                    
-                    # Exibe ambos os valores com background
-                    st.markdown(f"""
-                    <div style="text-align: left; margin: 20px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-                        <small style="font-weight: bold;">👤 Usuário: {user_info['username']}</small><br>
-                        <small style="color: {color}; font-weight: bold;">{icon} Sessão: {time_str}</small>
-                    </div>
-                    """, unsafe_allow_html=True)
+        # Informação de sessão simplificada
+        username = st.session_state.get('current_user', 'N/A')
+        login_time = st.session_state.get('login_time')
+        
+        if login_time:
+            from datetime import datetime
+            session_duration = datetime.now() - login_time
+            hours = int(session_duration.total_seconds() // 3600)
+            minutes = int((session_duration.total_seconds() % 3600) // 60)
+            
+            # Cores baseadas no tempo de sessão
+            if session_duration.total_seconds() > 25200:  # Mais de 7 horas
+                color = "#dc3545"  # Vermelho
+                icon = "⚠️"
+            elif session_duration.total_seconds() > 21600:  # Mais de 6 horas
+                color = "#fd7e14"  # Laranja
+                icon = "⏰"
+            else:
+                color = "#28a745"  # Verde
+                icon = "✅"
+            
+            time_str = f"{hours}h {minutes}m"
+        else:
+            color = "#6c757d"
+            icon = "❓"
+            time_str = "N/A"
+        
+        # Exibe ambos os valores com background
+        st.markdown(f"""
+        <div style="text-align: left; margin: 20px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <small style="font-weight: bold;">👤 Usuário: {username}</small><br>
+            <small style="color: {color}; font-weight: bold;">{icon} Sessão: {time_str}</small>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Botão de logout
         if st.button("🚪 Logout", use_container_width=True):

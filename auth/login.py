@@ -13,32 +13,41 @@ def show_login_form():
     st.markdown(f"<h1 style='text-align: center;'>{svg_icon} Login - Sistema Farol</h1>", unsafe_allow_html=True)
     
     # Exibir versão do sistema
-    st.markdown(f"<div style='text-align: center; margin-bottom: 1rem;'>{SYSTEM_INFO}</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style='text-align: center; margin: 10px 0; padding: 8px; background-color: #f0f2f6; border-radius: 5px;'>
+        <small style='color: #666; font-weight: bold;'>
+            {SYSTEM_INFO['name']} v{SYSTEM_INFO['version']} | Build: {SYSTEM_INFO['build_date']}
+        </small>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Aviso sobre F5
-    st.warning("⚠️ **Importante**: Evite pressionar F5 (atualizar página) - use os botões da aplicação para navegar. O F5 causará logout automático.")
-    
-    with st.container():
-        st.markdown("### Acesso ao Sistema")
-        
+    st.markdown("---")
+
+    # Centraliza o formulário
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+
+    with col2:
         with st.form("login_form"):
+            st.markdown("<h3 style='text-align: center;'>Acesso ao Sistema</h3>", unsafe_allow_html=True)
+
             username = st.text_input(
-                "👤 Usuário", 
+                "👤 **Usuário**",
                 placeholder="Digite seu usuário",
-                key="login_username",
-                help="Usuário padrão: admin"
+                help="Usuários disponíveis: admin, user1, diego"
             )
+
             password = st.text_input(
-                "🔑 Senha", 
-                type="password", 
+                "🔑 **Senha**",
+                type="password",
                 placeholder="Digite sua senha",
-                key="login_password"
+                help="Senhas: admin123, user123, diego123"
             )
-            
+
+            st.markdown("<br>", unsafe_allow_html=True)  # Espaçador
+
             login_button = st.form_submit_button(
-                "🔓 Entrar", 
-                use_container_width=True,
-                type="primary"
+                "Entrar",
+                use_container_width=True
             )
 
             if login_button:
@@ -70,18 +79,19 @@ def show_login_form():
             Acesse Setup > Administração de Usuários para gerenciar usuários.
             """)
 
+
 def logout():
     """Realiza logout do usuário"""
     destroy_session()
     st.rerun()
 
+def get_current_user() -> str:
+    """Retorna o usuário logado atual"""
+    return st.session_state.get("current_user", None)
+
 def is_logged_in() -> bool:
     """Verifica se há usuário logado"""
-    return st.session_state.get("current_user") is not None
-
-def get_current_user() -> str:
-    """Retorna o usuário atual"""
-    return st.session_state.get("current_user", None)
+    return get_current_user() is not None
 
 def has_access_level(required_level: str) -> bool:
     """
@@ -94,11 +104,7 @@ def has_access_level(required_level: str) -> bool:
     user_data = st.session_state.get('user_data', {})
     current_level = user_data.get('access_level', 'VIEW')
     
-    levels = {
-        'VIEW': 1,
-        'EDIT': 2,
-        'ADMIN': 3
-    }
+    levels = {'VIEW': 1, 'EDIT': 2, 'ADMIN': 3}
     
     return levels.get(current_level, 0) >= levels.get(required_level, 0)
 

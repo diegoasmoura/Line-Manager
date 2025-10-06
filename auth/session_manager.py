@@ -43,7 +43,8 @@ def initialize_session_from_cookie() -> bool:
     # Restaurar session_state
     st.session_state.current_user = user_data['username']
     st.session_state.user_data = user_data
-    st.session_state.login_time = datetime.now()
+    # Usar o tempo de criação do JWT (tempo real do login)
+    st.session_state.login_time = datetime.fromtimestamp(payload['iat'])
     
     return True
 
