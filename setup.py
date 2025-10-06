@@ -6,6 +6,7 @@ import os # NEW
 import requests # NEW
 import pandas as pd # NEW
 import traceback # NEW
+import time # NEW
 from auth.login import has_access_level, get_current_user # NEW
 from auth.auth_db import ( # NEW
     list_users, create_user, update_user, 
@@ -135,15 +136,23 @@ def exibir_setup():
     if st.session_state.api_connection_result == {"success": False, "message": "Nunca testado"}:
         test_api_connection()
 
-    # Definir abas (com administração de usuários e sincronização para ADMIN)
+    # Define as abas disponíveis com base no nível de acesso
     if has_access_level('ADMIN'):
         tab_names = ["Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
-        tabs = st.tabs(tab_names)
     else:
         tab_names = ["Gerenciamento de Credenciais"]
-        tabs = st.tabs(tab_names)
 
-    with tabs[0]:
+    # Usa st.radio para criar uma navegação que persiste o estado entre recarregamentos
+    selected_tab = st.radio(
+        "Navegação",
+        tab_names,
+        key='setup_tab_selection', # Chave para manter o estado
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+
+    # Renderiza o conteúdo da aba selecionada
+    if selected_tab == "Gerenciamento de Credenciais":
         st.info("As credenciais salvas aqui são usadas para autenticar com a API Ellox e o Proxy corporativo. As alterações são temporárias para esta sessão.")
 
         col_general_conn, col_api_conn = st.columns(2)
@@ -240,28 +249,35 @@ def exibir_setup():
             else:
                 st.warning(st.session_state.proxy_save_message)
 
-    # Aba de Administração de Usuários (apenas para ADMIN)
-    if has_access_level('ADMIN') and len(tabs) > 1:
-        with tabs[1]:
-            show_user_administration()
+    elif selected_tab == "Administração de Usuários" and has_access_level('ADMIN'):
+        show_user_administration()
     
-    # Aba de Sincronização Automática (apenas para ADMIN)
-    if has_access_level('ADMIN') and len(tabs) > 2:
-        with tabs[2]:
-            # Sub-abas para Sincronização
-            sync_sub_tabs = st.tabs(["⚙️ Configuração", "📊 Logs de Sincronização"])
-            
-            with sync_sub_tabs[0]:
-                show_sync_configuration()
-            
-            with sync_sub_tabs[1]:
-                show_sync_logs()
+    elif selected_tab == "Sincronização Automática" and has_access_level('ADMIN'):
+        # Sub-abas para Sincronização
+        sync_sub_tabs = st.tabs(["⚙️ Configuração", "📊 Logs de Sincronização"])
+        
+        with sync_sub_tabs[0]:
+            show_sync_configuration()
+        
+        with sync_sub_tabs[1]:
+            show_sync_logs()
 
     print("⚙️ Setup") # Keep the original print for now, can remove later if not needed
 
 def show_user_administration():
     """Exibe interface de administração de usuários"""
     st.header("👥 Administração de Usuários")
+
+    # Exibir mensagem de sucesso de ações (create, update, reset)
+    if st.session_state.get('user_admin_message'):
+        st.success(st.session_state.pop('user_admin_message')) # Exibe e remove a mensagem
+        st.balloons()
+    
+    # Verificar se houve atualização e limpar cache se necessário
+    if st.session_state.get('user_list_updated', False):
+        st.cache_data.clear()
+        st.session_state['user_list_updated'] = False
+    
     st.markdown("---")
     
     # Cards com métricas
@@ -345,18 +361,22 @@ def show_create_user_form():
     business_units = get_business_units()
     unit_options = ['Todas'] + [u['UNIT_NAME'] for u in business_units]
     
-    with st.form("create_user_form"):
+    # Usar key dinâmico para forçar recriação do formulário quando necessário
+    form_counter = st.session_state.get('form_counter', 0)
+    form_key = f"create_user_form_{form_counter}"
+    
+    with st.form(form_key):
         col1, col2 = st.columns(2)
         
         with col1:
             username = st.text_input("Usuário*", placeholder="usuario.nome", 
-                                   help="Nome único para login", key="create_username")
-            email = st.text_input("Email*", placeholder="usuario@empresa.com", key="create_email")
-            full_name = st.text_input("Nome Completo*", placeholder="Nome Sobrenome", key="create_full_name")
+                                   help="Nome único para login", key=f"create_username_{form_counter}")
+            email = st.text_input("Email*", placeholder="usuario@empresa.com", key=f"create_email_{form_counter}")
+            full_name = st.text_input("Nome Completo*", placeholder="Nome Sobrenome", key=f"create_full_name_{form_counter}")
         
         with col2:
             password = st.text_input("Senha Inicial*", type="password",
-                                    help="Usuário será solicitado a trocar no primeiro login", key="create_password")
+                                   help="Usuário será solicitado a trocar no primeiro login", key=f"create_password_{form_counter}")
             
             business_unit = st.selectbox("Unidade de Negócio", options=unit_options)
             
@@ -385,19 +405,13 @@ def show_create_user_form():
                 
                 if create_user(username, email, password, full_name, bu_value, 
                              access_level, get_current_user()):
-                    st.success(f"✅ Usuário '{username}' criado com sucesso!")
-                    st.balloons()  # Efeito visual de sucesso
-                    st.info("🔄 Atualizando lista de usuários...")
-                    import time
-                    time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
-                    # Limpar campos do formulário
-                    keys_to_clear = ['create_username', 'create_email', 'create_full_name', 'create_password']
-                    for key in keys_to_clear:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
-                    # O formulário será limpo automaticamente na próxima interação
+                    # SUCESSO: Incrementar contador para limpar o formulário e definir flags.
+                    st.session_state['form_counter'] = st.session_state.get('form_counter', 0) + 1
+                    st.session_state['user_list_updated'] = True
+                    st.session_state['user_admin_message'] = f"✅ Usuário '{username}' criado com sucesso!"
+                    st.rerun() # Força o recarregamento para exibir o feedback e atualizar a UI
                 else:
+                    # ERRO: NÃO incrementa contador, para manter os dados do formulário para correção.
                     st.error("❌ Erro ao criar usuário. Tente novamente.")
 
 def show_edit_user_form(users):
@@ -463,12 +477,9 @@ def show_edit_user_form(users):
                     user_data['user_id'], email, full_name, bu_value,
                     access_level, is_active, get_current_user()
                 ):
-                    st.success("✅ Usuário atualizado com sucesso!")
-                    st.balloons()  # Efeito visual de sucesso
-                    st.info("🔄 Atualizando lista de usuários...")
-                    import time
-                    time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
-                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
+                    st.session_state['user_list_updated'] = True
+                    st.session_state['user_admin_message'] = "✅ Usuário atualizado com sucesso!"
+                    st.rerun() # Força o recarregamento para exibir o feedback e atualizar a UI
                 else:
                     st.error("❌ Erro ao atualizar usuário. Tente novamente.")
 
@@ -503,12 +514,9 @@ def show_reset_password_form(users):
                 user_data = next(u for u in users if u['username'] == user_to_reset)
                 
                 if reset_user_password(user_data['user_id'], new_password, get_current_user()):
-                    st.success(f"✅ Senha do usuário '{user_to_reset}' resetada com sucesso!")
-                    st.balloons()  # Efeito visual de sucesso
-                    st.info("🔄 Atualizando lista de usuários...")
-                    import time
-                    time.sleep(1)  # Pequeno delay para garantir que a mensagem seja vista
-                    # Não usar rerun - deixar o usuário ver a mensagem de sucesso
+                    st.session_state['user_list_updated'] = True
+                    st.session_state['user_admin_message'] = f"✅ Senha do usuário '{user_to_reset}' resetada com sucesso!"
+                    st.rerun() # Força o recarregamento para exibir o feedback e atualizar a UI
                 else:
                     st.error("❌ Erro ao resetar senha. Tente novamente.")
 
