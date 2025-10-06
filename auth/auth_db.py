@@ -147,6 +147,13 @@ def create_user(username: str, email: str, password: str, full_name: str,
             "created_by": created_by
         })
         conn.commit()
+        
+        # Limpar cache para atualizar lista de usuários
+        try:
+            st.cache_data.clear()
+        except:
+            pass  # Ignorar erro se não estiver em contexto Streamlit
+        
         return True
         
     except Exception as e:
