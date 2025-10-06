@@ -352,32 +352,20 @@ def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
             )
         """)
         
-        with conn.begin():  # Transação para auditoria
-            # Iniciar batch para agrupar mudanças
-            from database import begin_change_batch, end_change_batch, audit_change
-            batch_id = begin_change_batch()
-            
-            try:
-                conn.execute(insert_query, {
-                    "id": None,
-                    "farol_reference": farol_reference,
-                    "adjustment_id": batch_id,  # Usar o mesmo batch_id
-                    "process_stage": "Attachment Management",
-                    "type_": file_type,
-                    "file_name": file_name_without_ext,
-                    "file_extension": file_extension,
-                    "upload_timestamp": datetime.now(),
-                    "attachment": file_content,
-                    "user_insert": user_id
-                })
-                
-                # Auditoria para upload de anexo
-                audit_change(conn, farol_reference, 'F_CON_ANEXOS', 'ATTACHMENT', 
-                            'NULL', file_name, 'attachments', 'CREATE')
-            finally:
-                # Encerrar batch
-                end_change_batch()
+        conn.execute(insert_query, {
+            "id": None,
+            "farol_reference": farol_reference,
+            "adjustment_id": str(uuid.uuid4()),  # Gera UUID para adjustment_id
+            "process_stage": "Attachment Management",
+            "type_": file_type,
+            "file_name": file_name_without_ext,
+            "file_extension": file_extension,
+            "upload_timestamp": datetime.now(),
+            "attachment": file_content,
+            "user_insert": user_id
+        })
         
+        conn.commit()
         conn.close()
         return True
         
@@ -452,40 +440,16 @@ def delete_attachment(attachment_id, deleted_by="system"):
     try:
         conn = get_database_connection()
         
-        # Buscar informações do anexo antes de deletar para auditoria
-        info_query = text("""
-            SELECT farol_reference, file_name, file_extension
-            FROM LogTransp.F_CON_ANEXOS
-            WHERE id = :attachment_id
+        # Atualiza metadados e marca o estágio como deletado
+        query = text("""
+            UPDATE LogTransp.F_CON_ANEXOS
+               SET process_stage = 'Attachment Deleted',
+                   user_update = :user_update,
+                   date_update = SYSDATE
+             WHERE id = :attachment_id
         """)
-        attachment_info = conn.execute(info_query, {"attachment_id": attachment_id}).fetchone()
-        
-        with conn.begin():  # Transação para auditoria
-            # Iniciar batch para agrupar mudanças
-            from database import begin_change_batch, end_change_batch, audit_change
-            batch_id = begin_change_batch()
-            
-            try:
-                # Atualiza metadados e marca o estágio como deletado
-                query = text("""
-                    UPDATE LogTransp.F_CON_ANEXOS
-                       SET process_stage = 'Attachment Deleted',
-                           user_update = :user_update,
-                           date_update = SYSDATE
-                     WHERE id = :attachment_id
-                """)
-                result = conn.execute(query, {"attachment_id": attachment_id, "user_update": deleted_by})
-                
-                # Auditoria para exclusão de anexo
-                if attachment_info and result.rowcount > 0:
-                    farol_ref = attachment_info[0]
-                    file_name = f"{attachment_info[1]}.{attachment_info[2]}" if attachment_info[2] else attachment_info[1]
-                    audit_change(conn, farol_ref, 'F_CON_ANEXOS', 'ATTACHMENT', 
-                                file_name, 'NULL', 'attachments', 'DELETE')
-            finally:
-                # Encerrar batch
-                end_change_batch()
-        
+        result = conn.execute(query, {"attachment_id": attachment_id, "user_update": deleted_by})
+        conn.commit()
         conn.close()
         return result.rowcount > 0
     except Exception as e:
@@ -715,16 +679,9 @@ def display_attachments_section(farol_reference):
     # Seção de Upload Unificada
     with st.expander("📤 Add New Attachment", expanded=st.session_state[expander_key]):
         # Checkbox para ativar processamento de PDF de Booking
-        checkbox_key = f"process_booking_checkbox_{farol_reference}"
-        
-        # Inicializa o estado do checkbox se não existir
-        if checkbox_key not in st.session_state:
-            st.session_state[checkbox_key] = False
-            
         process_booking_pdf = st.checkbox(
             "📄 Processar PDF de Booking recebido por e-mail", 
-            key=checkbox_key,
-            value=st.session_state[checkbox_key],
+            key=f"process_booking_checkbox_{farol_reference}",
             help="Marque esta opção se o arquivo é um PDF de booking que precisa ser processado e validado"
         )
         
@@ -752,7 +709,7 @@ def display_attachments_section(farol_reference):
             )
         
         # Processamento baseado no tipo de upload
-        if process_booking_pdf and uploaded_file is not None:
+        if process_booking_pdf and uploaded_file:
             if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
                 with st.spinner("🔄 Processando PDF e extraindo dados..."):
                     try:
@@ -1190,8 +1147,6 @@ def exibir_history():
         "B_DATA_CONFIRMACAO_EMBARQUE",
         "B_DATA_ESTIMADA_TRANSBORDO_ETD",
         "B_DATA_TRANSBORDO_ATD",
-        "B_DATA_CHEGADA_DESTINO_ETA",
-        "B_DATA_CHEGADA_DESTINO_ATA",
         "P_PDF_NAME",
         "PDF_BOOKING_EMISSION_DATE",
         "S_SPLITTED_BOOKING_REFERENCE",
@@ -1282,27 +1237,9 @@ def exibir_history():
         st.session_state[active_tab_key] = other_label
         st.session_state[last_active_tab_key] = other_label
 
-    # Contar registros de audit trail para exibir na aba
-    audit_count = 0
-    try:
-        conn = get_database_connection()
-        audit_query = text("""
-            SELECT COUNT(*) as total
-            FROM LogTransp.V_FAROL_AUDIT_TRAIL
-            WHERE FAROL_REFERENCE = :farol_ref
-        """)
-        result = conn.execute(audit_query, {"farol_ref": farol_reference}).fetchone()
-        audit_count = result[0] if result else 0
-        conn.close()
-    except Exception:
-        audit_count = 0
-
-    # Adicionar aba Audit Trail
-    audit_label = f"🔍 Audit Trail ({audit_count} records)"
-
     active_tab = st.segmented_control(
         "",
-        options=[other_label, received_label, voyages_label, audit_label],
+        options=[other_label, received_label, voyages_label],
         key=active_tab_key
     )
 
@@ -1317,14 +1254,8 @@ def exibir_history():
             # Limpamos seleção da aba "Request Timeline"
             if f"history_other_status_editor_{farol_reference}" in st.session_state:
                 del st.session_state[f"history_other_status_editor_{farol_reference}"]
-        elif active_tab == voyages_label:
+        else:  # voyages_label
             # Limpamos seleções de ambas as abas
-            if f"history_other_status_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_other_status_editor_{farol_reference}"]
-            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
-        elif active_tab == audit_label:
-            # Limpamos seleções das outras abas quando entrar na Audit Trail
             if f"history_other_status_editor_{farol_reference}" in st.session_state:
                 del st.session_state[f"history_other_status_editor_{farol_reference}"]
             if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
@@ -1469,8 +1400,6 @@ def exibir_history():
             "data_confirmacao_embarque": "Confirmação Embarque",
             "data_estimada_transbordo": "Estimada Transbordo (ETD)",
             "data_transbordo": "Transbordo (ATD)",
-            "data_chegada_destino_eta": "Estimativa Chegada Destino (ETA)",
-            "data_chegada_destino_ata": "Chegada no Destino (ATA)",
             "data_estimativa_atracacao": "Estimativa Atracação (ETB)",
             "data_atracacao": "Atracação (ATB)",
             "data_partida": "Partida (ATD)",
@@ -1481,8 +1410,6 @@ def exibir_history():
             "B_DATA_CONFIRMACAO_EMBARQUE": "Confirmação Embarque",
             "B_DATA_ESTIMADA_TRANSBORDO_ETD": "Estimada Transbordo (ETD)",
             "B_DATA_TRANSBORDO_ATD": "Transbordo (ATD)",
-            "B_DATA_CHEGADA_DESTINO_ETA": "Estimativa Chegada Destino (ETA)",
-            "B_DATA_CHEGADA_DESTINO_ATA": "Chegada no Destino (ATA)",
             "B_DATA_DRAFT_DEADLINE": "Draft Deadline",
             "B_DATA_DEADLINE": "Deadline",
             "S_REQUESTED_DEADLINE_START_DATE": "Requested Deadline Start",
@@ -1578,7 +1505,7 @@ def exibir_history():
                     low = txt.lower()
                     # Novos nomes mais claros
                     if low == "booking request - company":
-                        return "📋 Booking Requested"
+                        return "📋 Booking Request"
                     if low == "pdf document - carrier":
                         return "📄 PDF Document"
                     if low == "adjustment request - company":
@@ -1616,7 +1543,7 @@ def exibir_history():
             "Requested Deadline Start", "Requested Deadline End", "Required Arrival Expected",
             "ETD", "ETA", "Abertura Gate",
             "Confirmação Embarque", "Partida (ATD)", "Estimada Transbordo (ETD)",
-            "Chegada (ATA)", "Transbordo (ATD)", "Estimativa Chegada Destino (ETA)", "Chegada no Destino (ATA)", "Estimativa Atracação (ETB)", "Atracação (ATB)",
+            "Chegada (ATA)", "Transbordo (ATD)", "Estimativa Atracação (ETB)", "Atracação (ATB)",
             "PDF Booking Emission Date"
         ]
         
@@ -1658,7 +1585,7 @@ def exibir_history():
                             current_p_status_str = str(current_p_status).strip().lower()
                             # Se não for um dos novos P_STATUS, manter comportamento legado
                             if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                                df_processed.loc[first_idx_sel, "Status"] = "📦 Shipment Requested"
+                                df_processed.loc[first_idx_sel, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
 
@@ -1682,7 +1609,7 @@ def exibir_history():
                                 # Se não for um dos novos P_STATUS, manter comportamento legado
                                 if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
                                     # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                                    df_processed.loc[i, "Status"] = "📦 Shipment Requested"
+                                    df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
                     else:
                         # Verificar P_STATUS antes de sobrescrever para cada linha
                         for i in idx_first:
@@ -1691,7 +1618,7 @@ def exibir_history():
                             # Se não for um dos novos P_STATUS, manter comportamento legado
                             if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
                                 # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                                df_processed.loc[i, "Status"] = "📦 Shipment Requested"
+                                df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
 
@@ -1707,7 +1634,7 @@ def exibir_history():
                     current_p_status_str = str(current_p_status).strip().lower()
                     # Se não for um dos novos P_STATUS, manter comportamento legado
                     if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                        df_processed.loc[first_idx_any, "Status"] = "📦 Shipment Requested"
+                        df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
         except Exception:
             pass
 
@@ -1745,8 +1672,6 @@ def exibir_history():
                 "Estimada Transbordo (ETD)",
                 "Chegada (ATA)",
                 "Transbordo (ATD)",
-                "Estimativa Chegada Destino (ETA)",
-                "Chegada no Destino (ATA)",
                 "PDF Name",
                 "PDF Booking Emission Date",
                 "Splitted Farol Reference",
@@ -1795,9 +1720,9 @@ def exibir_history():
             selected_row = edited_df_other[edited_df_other["Selecionar"] == True].iloc[0]
             status = selected_row.get("Status")
             
-            if status == "📦 Shipment Requested":
+            if status == "📦 Cargill Booking Request":
                 st.info("ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "📋 Booking Requested":
+            elif status == "📋 Booking Request":
                 st.info("ℹ️ **Booking Request:** Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "📄 Split Info":
                 st.info("ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
@@ -1840,10 +1765,6 @@ def exibir_history():
         # Aviso imediato para seleção múltipla
         if "Selecionar" in edited_df_received.columns and (edited_df_received["Selecionar"] == True).sum() > 1:
             st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
-
-    # Conteúdo da aba "Audit Trail"
-    if active_tab == audit_label:
-        display_audit_trail_tab(farol_reference)
 
     # Conteúdo da aba "Histórico de Viagens" 
     if active_tab == voyages_label:
@@ -2014,22 +1935,7 @@ def exibir_history():
                                         'data_estimativa_atracacao': 'Estimativa Atracação ETB',
                                         'data_atracacao': 'Atracação ATB',
                                         'data_chegada': 'Data de Chegada',
-                                        'data_partida': 'Data de Partida',
-                                        'b_data_confirmacao_embarque': 'Confirmação Embarque',
-                                        'b_data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
-                                        'b_data_transbordo_atd': 'Transbordo (ATD)',
-                                        'b_data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
-                                        'b_data_chegada_destino_ata': 'Chegada no Destino (ATA)',
-                                        'data_confirmacao_embarque': 'Confirmação Embarque',
-                                        'data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
-                                        'data_transbordo_atd': 'Transbordo (ATD)',
-                                        'data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
-                                        'data_chegada_destino_ata': 'Chegada no Destino (ATA)',
-                                        'B_DATA_CONFIRMACAO_EMBARQUE': 'Confirmação Embarque',
-                                        'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'Estimativa Transbordo (ETD)',
-                                        'B_DATA_TRANSBORDO_ATD': 'Transbordo (ATD)',
-                                        'B_DATA_CHEGADA_DESTINO_ETA': 'Estimativa Chegada Destino (ETA)',
-                                        'B_DATA_CHEGADA_DESTINO_ATA': 'Chegada no Destino (ATA)'
+                                        'data_partida': 'Data de Partida'
                                     }
                                     
                                     # Comparar registros consecutivos (do mais novo para o mais antigo)
@@ -2156,11 +2062,6 @@ def exibir_history():
                                     'data_atracacao': 'Atracação (ATB)',
                                     'data_partida': 'Partida (ATD)',
                                     'data_chegada': 'Chegada (ATA)',
-                                    'b_data_confirmacao_embarque': 'Confirmação Embarque',
-                                    'b_data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
-                                    'b_data_transbordo_atd': 'Transbordo (ATD)',
-                                    'b_data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
-                                    'b_data_chegada_destino_ata': 'Chegada no Destino (ATA)',
                                     'data_atualizacao': 'Data Atualização',
                                     'row_inserted_date': 'Inserted Date',
                                 }
@@ -2170,33 +2071,22 @@ def exibir_history():
                                 if 'Source' in voyage_display.columns:
                                     voyage_display['Source'] = voyage_display['Source'].apply(format_source_display)
                                 
-                                # Hide ID columns (qualquer coluna que termine com 'id' ou seja exatamente 'id')
-                                id_cols_to_drop = [col for col in voyage_display.columns 
-                                                 if col.strip().lower() == 'id' or col.strip().lower().endswith('_id')]
+                                # Hide ID column
+                                id_cols_to_drop = [col for col in voyage_display.columns if col.strip().lower() == 'id']
                                 if id_cols_to_drop:
                                     voyage_display = voyage_display.drop(columns=id_cols_to_drop)
 
-                                # Define desired column order, hiding Agência and other technical columns
+                                # Define desired column order, hiding Agência and moving Terminal
                                 desired_cols = [
                                     'Source', 'Vessel Name', 'Voyage Code', 'Terminal', 'Deadline', 
-                                    'Draft Deadline', 'Abertura Gate', 'Abertura Gate Reefer',
+                                    'Draft Deadline', 'Abertura Gate', 
                                     'ETD', 'ETA', 
                                     'Estimativa Atracação (ETB)', 'Atracação (ATB)', 'Partida (ATD)', 
-                                    'Chegada (ATA)', 'Confirmação Embarque', 'Estimativa Transbordo (ETD)', 'Transbordo (ATD)',
-                                    'Estimativa Chegada Destino (ETA)', 'Chegada no Destino (ATA)', 
-                                    'Data Atualização', 'Inserted Date'
+                                    'Chegada (ATA)', 'Data Atualização', 'Inserted Date'
                                 ]
-                                # Remove colunas técnicas que não devem ser exibidas
-                                technical_cols_to_hide = ['Terminal CNPJ', 'Agência']
-                                for col in technical_cols_to_hide:
-                                    if col in voyage_display.columns:
-                                        voyage_display = voyage_display.drop(columns=[col])
-                                
                                 existing_cols = [col for col in desired_cols if col in voyage_display.columns]
                                 voyage_display = voyage_display[existing_cols]
 
-                                # Força limpeza de cache para garantir que as mudanças sejam aplicadas
-                                st.cache_data.clear()
                                 st.dataframe(voyage_display, use_container_width=True, hide_index=True)
                         
                         # Separador visual entre viagens
@@ -2418,6 +2308,9 @@ def exibir_history():
                             key=f"status_booking_rejected_{farol_reference}",
                             type="secondary",
                             disabled=disable_rejected):
+                    progress_bar = st.progress(0, text="🔄 Processando rejeição...")
+                    progress_bar.progress(50, text="📝 Atualizando status...")
+                    progress_bar.progress(100, text="✅ Rejeição processada!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
                     st.rerun()
 
@@ -2426,6 +2319,9 @@ def exibir_history():
                             key=f"status_booking_cancelled_{farol_reference}",
                             type="secondary",
                             disabled=disable_cancelled):
+                    progress_bar = st.progress(0, text="🔄 Processando cancelamento...")
+                    progress_bar.progress(50, text="📝 Atualizando status...")
+                    progress_bar.progress(100, text="✅ Cancelamento processado!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
                     st.rerun()
             
@@ -2434,6 +2330,9 @@ def exibir_history():
                             key=f"status_adjustment_requested_{farol_reference}",
                             type="secondary",
                             disabled=disable_adjustment):
+                    progress_bar = st.progress(0, text="🔄 Processando solicitação de ajuste...")
+                    progress_bar.progress(50, text="📝 Atualizando status...")
+                    progress_bar.progress(100, text="✅ Solicitação processada!")
                     st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
                     st.rerun()
         
@@ -2818,11 +2717,10 @@ def exibir_history():
             # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
 
         # Exibe aviso de sucesso (mesma posição) quando a API encontrou dados, mas antes de confirmar aprovação
-        if voyage_success_notice:
+        if voyage_success_notice and voyage_success_notice.get("adjustment_id") == adjustment_id:
             st.markdown("---")
             st.success(voyage_success_notice.get("message", ""))
-            # Limpa o aviso depois de exibi-lo para não aparecer novamente
-            del st.session_state["voyage_success_notice"]
+            # Mensagem persiste até aprovação ou cancelamento para manter visibilidade durante seleção de referência
 
         # --- Seleção de Referência (SEMPRE após as mensagens, antes da confirmação) ---
         related_reference = None  # Inicializa a variável
@@ -2916,7 +2814,7 @@ def exibir_history():
                     if p_status.lower() == 'adjusts cargill':
                         status_display = 'Cargill (Adjusts)'
                     elif b_status == 'Booking Requested' and _is_empty_local(linked):
-                        status_display = 'Shipment Requested'
+                        status_display = 'Cargill Booking Request'
                     else:
                         status_display = b_status or p_status or 'Status'
 
@@ -2969,6 +2867,9 @@ def exibir_history():
                 else:
                     st.info(f"📋 **Referência selecionada:** {selected_value}")
             
+            st.markdown("---")
+            st.warning("**Confirmar alteração para: Booking Approved**")
+
             # A validação para habilitar o botão agora usa o valor lido diretamente do estado da sessão
             can_confirm = selected_value and selected_value != "Selecione uma referência..."
             
@@ -3051,51 +2952,6 @@ def exibir_history():
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
-    # Confirmação para mudanças de status pendentes (apenas se não houver seleção de referência ativa)
-    pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
-    
-    # Definir selected_row_status se houver uma linha selecionada
-    selected_row_status = ""
-    if len(selected) == 1:
-        selected_row = selected.iloc[0]
-        adjustment_id = selected_row["ADJUSTMENT_ID"]
-        selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
-    
-    show_reference_selection = (
-        selected_row_status == "Received from Carrier" and 
-        pending_status == "Booking Approved"
-    )
-    
-    if pending_status and len(selected) == 1 and active_tab == received_label and not show_reference_selection:
-        st.markdown("---")
-        st.warning(f"**Confirmar alteração para:** {pending_status}")
-        
-        col_confirm, col_cancel = st.columns([1, 3])
-        
-        with col_confirm:
-            if st.button("✅ Confirmar", 
-                        key=f"confirm_status_change_{farol_reference}",
-                        type="primary"):
-                # Executa a mudança de status
-                selected_row = selected.iloc[0]
-                farol_ref = selected_row.get("Farol Reference")
-                adjustment_id = selected_row["ADJUSTMENT_ID"]
-                selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
-                
-                apply_status_change(farol_ref, adjustment_id, pending_status, selected_row_status)
-                
-                # Limpa o status pendente
-                if f"pending_status_change_{farol_reference}" in st.session_state:
-                    del st.session_state[f"pending_status_change_{farol_reference}"]
-        
-        with col_cancel:
-            if st.button("❌ Cancelar", 
-                        key=f"cancel_status_change_{farol_reference}",
-                        type="secondary"):
-                # Limpa o status pendente
-                if f"pending_status_change_{farol_reference}" in st.session_state:
-                    del st.session_state[f"pending_status_change_{farol_reference}"]
-                st.rerun()
 
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
@@ -3126,346 +2982,9 @@ def exibir_history():
             st.session_state["current_page"] = "main"
             st.rerun()
 
-    # Seção de anexos (toggle) - sempre visível no final
+    # Seção de anexos (toggle)
+    
     if st.session_state.get("history_show_attachments", False):
         st.markdown("---")
         st.subheader("📎 Attachment Management")
         display_attachments_section(farol_reference)
-
-
-def display_audit_trail_tab(farol_reference):
-    """Exibe a aba Audit Trail com histórico de mudanças"""
-    import pandas as pd
-    import pytz
-    from datetime import datetime
-    from database import get_database_connection
-    from sqlalchemy import text
-    
-    st.markdown("### 🔍 Audit Trail - Histórico de Mudanças")
-    st.markdown(f"**Referência:** `{farol_reference}`")
-    st.markdown("---")
-    
-    try:
-        conn = get_database_connection()
-        
-        # Query para buscar dados da view V_FAROL_AUDIT_TRAIL
-        query = text("""
-            SELECT 
-                EVENT_KIND,
-                FAROL_REFERENCE,
-                TABLE_NAME,
-                COLUMN_NAME,
-                OLD_VALUE,
-                NEW_VALUE,
-                USER_LOGIN,
-                CHANGE_SOURCE,
-                CHANGE_TYPE,
-                ADJUSTMENT_ID,
-                RELATED_REFERENCE,
-                CHANGE_AT
-            FROM LogTransp.V_FAROL_AUDIT_TRAIL
-            WHERE FAROL_REFERENCE = :farol_ref
-            ORDER BY CHANGE_AT DESC
-        """)
-        
-        df_audit = pd.read_sql(query, conn, params={"farol_ref": farol_reference})
-        conn.close()
-        
-        if df_audit.empty:
-            st.info("📋 Nenhum registro de auditoria encontrado para esta referência.")
-            return
-        
-        
-        # Converter timestamps para fuso do Brasil
-        def convert_utc_to_brazil_time(utc_timestamp):
-            if utc_timestamp is None:
-                return None
-            try:
-                if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
-                    utc_dt = utc_timestamp
-                else:
-                    utc_dt = pytz.UTC.localize(utc_timestamp)
-                
-                brazil_tz = pytz.timezone('America/Sao_Paulo')
-                brazil_dt = utc_dt.astimezone(brazil_tz)
-                return brazil_dt
-            except Exception:
-                return utc_timestamp
-        
-        # Verificar se a coluna existe (pode estar em minúsculas)
-        change_at_col = None
-        for col in df_audit.columns:
-            if col.upper() == 'CHANGE_AT':
-                change_at_col = col
-                break
-        
-        if change_at_col:
-            df_audit[change_at_col] = df_audit[change_at_col].apply(convert_utc_to_brazil_time)
-        else:
-            st.error("❌ Coluna CHANGE_AT não encontrada no resultado da query")
-            return
-        
-        # Renomear colunas para exibição (usar nomes reais das colunas)
-        rename_map = {}
-        for col in df_audit.columns:
-            if col.upper() == 'EVENT_KIND':
-                rename_map[col] = 'Tipo'
-            elif col.upper() == 'FAROL_REFERENCE':
-                rename_map[col] = 'Referência'
-            elif col.upper() == 'TABLE_NAME':
-                rename_map[col] = 'Tabela'
-            elif col.upper() == 'COLUMN_NAME':
-                rename_map[col] = 'Coluna'
-            elif col.upper() == 'OLD_VALUE':
-                rename_map[col] = 'Valor Anterior'
-            elif col.upper() == 'NEW_VALUE':
-                rename_map[col] = 'Novo Valor'
-            elif col.upper() == 'USER_LOGIN':
-                rename_map[col] = 'Usuário'
-            elif col.upper() == 'CHANGE_SOURCE':
-                rename_map[col] = 'Origem'
-            elif col.upper() == 'CHANGE_TYPE':
-                rename_map[col] = 'Ação'
-            elif col.upper() == 'ADJUSTMENT_ID':
-                rename_map[col] = 'ID Ajuste'
-            elif col.upper() == 'RELATED_REFERENCE':
-                rename_map[col] = 'Referência Relacionada'
-            elif col.upper() == 'CHANGE_AT':
-                rename_map[col] = 'Data/Hora'
-        
-        df_display = df_audit.rename(columns=rename_map)
-        
-        # Aplicar nomes amigáveis para as colunas (usando o mesmo mapeamento do shipments.py)
-        from shipments_mapping import get_display_names
-        display_names = get_display_names()
-        
-        # Mapear nomes técnicos das colunas para nomes amigáveis
-        def get_friendly_column_name(column_name):
-            """Converte nome técnico da coluna para nome amigável"""
-            if not column_name or pd.isna(column_name):
-                return column_name
-            
-            # Mapeamento direto para colunas conhecidas
-            friendly_mapping = {
-                'S_DTHC_PREPAID': 'DTHC',
-                'S_REQUESTED_SHIPMENT_WEEK': 'Requested Shipment Week',
-                'S_QUANTITY_OF_CONTAINERS': 'Quantity of Containers',
-                'S_PORT_OF_LOADING_POL': 'Port of Loading POL',
-                'S_TYPE_OF_SHIPMENT': 'Type of Shipment',
-                'S_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
-                'S_FINAL_DESTINATION': 'Final Destination',
-                'B_DATA_DRAFT_DEADLINE': 'Draft Deadline',
-                'B_DATA_DEADLINE': 'Deadline',
-                'B_DATA_ESTIMATIVA_SAIDA_ETD': 'ETD',
-                'B_DATA_ESTIMATIVA_CHEGADA_ETA': 'ETA',
-                'B_DATA_ABERTURA_GATE': 'Abertura Gate',
-                'B_DATA_CONFIRMACAO_EMBARQUE': 'Confirmação Embarque',
-                'B_DATA_PARTIDA_ATD': 'Partida (ATD)',
-                'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'Estimada Transbordo (ETD)',
-                'B_DATA_CHEGADA_ATA': 'Chegada (ATA)',
-                'B_DATA_TRANSBORDO_ATD': 'Transbordo (ATD)',
-                'B_DATA_CHEGADA_DESTINO_ETA': 'Estimativa Chegada Destino (ETA)',
-                'B_DATA_CHEGADA_DESTINO_ATA': 'Chegada no Destino (ATA)',
-                'B_DATA_ESTIMATIVA_ATRACACAO_ETB': 'Estimativa Atracação (ETB)',
-                'B_DATA_ATRACACAO_ATB': 'Atracação (ATB)',
-                'B_FREIGHT_RATE_USD': 'Freight Rate USD',
-                'B_BOGEY_SALE_PRICE_USD': 'Bogey Sale Price USD',
-                'B_FREIGHTPPNL': 'Freight PNL',
-                'B_VOYAGE_CARRIER': 'Voyage Carrier',
-                'B_VESSEL_NAME': 'Vessel Name',
-                'B_VOYAGE_CODE': 'Voyage Code',
-                'B_TERMINAL': 'Terminal',
-                'B_FREIGHT_FORWARDER': 'Freight Forwarder',
-                'B_TRANSHIPMENT_PORT': 'Transhipment Port',
-                'B_POD_COUNTRY': 'POD Country',
-                'B_POD_COUNTRY_ACRONYM': 'POD Country Acronym',
-                'B_DESTINATION_TRADE_REGION': 'Destination Trade Region',
-                'B_BOOKING_REFERENCE': 'Booking Reference',
-                'B_BOOKING_STATUS': 'Booking Status',
-                'B_BOOKING_OWNER': 'Booking Owner',
-                'S_SALES_ORDER_REFERENCE': 'Sales Order Reference',
-                'S_SALES_ORDER_DATE': 'Sales Order Date',
-                'S_BUSINESS': 'Business',
-                'S_CUSTOMER': 'Customer',
-                'S_MODE': 'Mode',
-                'S_INCOTERM': 'Incoterm',
-                'S_SKU': 'SKU',
-                'S_PLANT_OF_ORIGIN': 'Plant of Origin',
-                'S_TYPE_OF_SHIPMENT': 'Type of Shipment',
-                'S_CONTAINER_TYPE': 'Container Type',
-                'S_VOLUME_IN_TONS': 'Volume in Tons',
-                'S_PARTIAL_ALLOWED': 'Partial Allowed',
-                'S_VIP_PNL_RISK': 'VIP PNL Risk',
-                'S_PNL_DESTINATION': 'PNL Destination',
-                'S_LC_RECEIVED': 'LC Received',
-                'S_ALLOCATION_DATE': 'Allocation Date',
-                'S_PRODUCER_NOMINATION_DATE': 'Producer Nomination',
-                'S_SALES_OWNER': 'Sales Owner',
-                'S_COMMENTS': 'Comments Sales',
-                'S_PLACE_OF_RECEIPT': 'Place of Receipt',
-                'B_COMMENTS': 'Comments Booking',
-                'FAROL_STATUS': 'Farol Status',
-                'S_SHIPMENT_STATUS': 'Shipment Status',
-                'S_CREATION_OF_SHIPMENT': 'Shipment Requested Date',
-                'B_CREATION_OF_BOOKING': 'Booking Registered Date',
-                'B_BOOKING_REQUEST_DATE': 'Booking Requested Date',
-                'B_BOOKING_CONFIRMATION_DATE': 'Booking Confirmation Date',
-                'S_REQUESTED_DEADLINES_START_DATE': 'Requested Deadline Start',
-                'S_REQUESTED_DEADLINES_END_DATE': 'Requested Deadline End',
-                'S_SHIPMENT_PERIOD_START_DATE': 'Shipment Period Start',
-                'S_SHIPMENT_PERIOD_END_DATE': 'Shipment Period End',
-                'S_REQUIRED_ARRIVAL_DATE_EXPECTED': 'Required Arrival Expected',
-                'S_AFLOAT': 'Afloat',
-                'S_CUSTOMER_PO': 'Customer PO',
-                'S_SPLITTED_BOOKING_REFERENCE': 'Splitted Booking Reference',
-                'B_QUANTITY_OF_CONTAINERS': 'Booking Quantity of Containers',
-                'B_CONTAINER_TYPE': 'Booking Container Type',
-                'B_PORT_OF_LOADING_POL': 'Port of Loading POL',
-                'B_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
-                'B_FINAL_DESTINATION': 'Final Destination',
-                'B_PLACE_OF_RECEIPT': 'Place of Receipt',
-                'B_AWARD_STATUS': 'Award Status',
-                'ATTACHMENT': 'Anexo'
-            }
-            
-            # Retorna o nome amigável se encontrado, senão retorna o nome original
-            return friendly_mapping.get(column_name, column_name)
-        
-        # Aplicar nomes amigáveis na coluna 'Coluna'
-        if 'Coluna' in df_display.columns:
-            df_display['Coluna'] = df_display['Coluna'].apply(get_friendly_column_name)
-        
-        # Aplicar nomes amigáveis na coluna 'Origem'
-        if 'Origem' in df_display.columns:
-            origin_mapping = {
-                'booking_new': 'Tela de Criação de Booking',
-                'shipments_new': 'Criação do Shipment',
-                'tracking': 'Tela de Tracking',
-                'history': 'Tela de Aprovação de PDF',
-                'attachments': 'Tela de Anexos (Upload/Exclusão)',
-                'shipments': 'Tela Principal de Shipments',
-                'shipments_split': 'Tela de Ajustes e Split',
-                'Booking Requested': 'Timeline Inicial',
-                'Other Request - Company': 'Timeline Inicial',
-                'Adjusts Cargill': 'Timeline Inicial'
-            }
-            df_display['Origem'] = df_display['Origem'].replace(origin_mapping)
-        
-        # Substituir "NULL" por vazio nas colunas de valores
-        if 'Valor Anterior' in df_display.columns:
-            df_display['Valor Anterior'] = df_display['Valor Anterior'].replace('NULL', '')
-        if 'Novo Valor' in df_display.columns:
-            df_display['Novo Valor'] = df_display['Novo Valor'].replace('NULL', '')
-        
-        # Reordenar colunas (ocultando "Tabela" e "ID Ajuste")
-        column_order = [
-            'Referência', 'Ação', 'Coluna', 'Valor Anterior', 'Novo Valor',
-            'Usuário', 'Origem', 'Data/Hora'
-        ]
-        
-        # Manter apenas as colunas que existem no DataFrame
-        available_columns = [col for col in column_order if col in df_display.columns]
-        df_display = df_display[available_columns]
-        
-        # Filtrar eventos iniciais (fallback caso a view não possa ser alterada)
-        df_display = df_display[
-            ~(
-                # Remover eventos de timeline inicial (todos os tipos)
-                (df_display['Origem'].str.contains('Timeline Inicial|Request - Company|Adjusts Cargill', na=False))
-            )
-        ]
-        
-        # Filtros
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # Filtro por origem
-            origins = ['Todos'] + sorted(df_display['Origem'].dropna().unique().tolist())
-            selected_origin = st.selectbox("🔍 Filtrar por Origem", origins)
-            
-        with col2:
-            # Filtro por ação
-            actions = ['Todos'] + sorted(df_display['Ação'].dropna().unique().tolist())
-            selected_action = st.selectbox("🔍 Filtrar por Ação", actions)
-            
-        with col3:
-            # Filtro por coluna
-            columns = ['Todas'] + sorted(df_display['Coluna'].dropna().unique().tolist())
-            selected_column = st.selectbox("🔍 Filtrar por Coluna", columns)
-        
-        # Aplicar filtros
-        df_filtered = df_display.copy()
-        
-        if selected_origin != 'Todos':
-            df_filtered = df_filtered[df_filtered['Origem'] == selected_origin]
-        
-        if selected_action != 'Todos':
-            df_filtered = df_filtered[df_filtered['Ação'] == selected_action]
-            
-        if selected_column != 'Todas':
-            df_filtered = df_filtered[df_filtered['Coluna'] == selected_column]
-        
-        # Opção removida: Mostrar apenas última alteração por coluna
-            df_filtered = df_filtered.sort_values('Data/Hora', ascending=False)
-        
-        # Exibir estatísticas
-        st.markdown(f"**📊 Total de registros:** {len(df_filtered)} de {len(df_display)}")
-        
-        if not df_filtered.empty:
-            # Configuração das colunas - "Coluna" e "Origem" com tamanho medium
-            column_config = {
-                'Data/Hora': st.column_config.DatetimeColumn(
-                    'Data/Hora',
-                    format='DD/MM/YYYY HH:mm:ss',
-                    width=None
-                ),
-                'Usuário': st.column_config.TextColumn(
-                    'Usuário', 
-                    width=None
-                ),
-                'Origem': st.column_config.TextColumn(
-                    'Origem', 
-                    width='medium'
-                ),
-                'Ação': st.column_config.TextColumn(
-                    'Ação', 
-                    width=None
-                ),
-                'Coluna': st.column_config.TextColumn(
-                    'Coluna', 
-                    width='medium',
-                    help="Nome da coluna alterada"
-                ),
-                'Valor Anterior': st.column_config.TextColumn(
-                    'Valor Anterior', 
-                    width=None
-                ),
-                'Novo Valor': st.column_config.TextColumn(
-                    'Novo Valor', 
-                    width=None
-                ),
-            }
-            
-            # Exibir tabela
-            st.dataframe(
-                df_filtered,
-                column_config=column_config,
-                use_container_width=True,
-                height=400,
-                hide_index=True
-            )
-            
-            # Botão de export
-            csv_data = df_filtered.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                "⬇️ Exportar CSV",
-                data=csv_data,
-                file_name=f"audit_trail_{farol_reference}.csv",
-                mime="text/csv"
-            )
-        else:
-            st.info("📋 Nenhum registro encontrado com os filtros aplicados.")
-            
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar audit trail: {str(e)}")
-        st.exception(e)
