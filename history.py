@@ -2508,53 +2508,6 @@ def exibir_history():
                     with col_ata_time:
                         manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
                 
-                # --- Início da Seção de Referência Relacionada (Movido para dentro do Form) ---
-                # A seleção de referência é necessária para todos os cenários de entrada manual.
-                if True:
-                    st.markdown("---")
-                    st.markdown("#### 🔗 Referência Relacionada")
-                    st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
-
-                    # Lógica para buscar e exibir opções de referência
-                    try:
-                        available_refs = get_available_references_for_relation(farol_ref)
-                    except Exception:
-                        available_refs = []
-
-                    ref_options = ["Selecione uma referência..."]
-                    if available_refs:
-                        # ... (lógica de filtragem e formatação das opções)
-                        filtered = []
-                        for ref in available_refs:
-                            p_status = str(ref.get('P_STATUS', '') or '').strip()
-                            b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                            linked = ref.get('LINKED_REFERENCE')
-                            if (b_status == 'Booking Requested' and (linked is None or str(linked).strip() == '')) or \
-                               (b_status == 'Adjustment Requested' and (linked is None or str(linked).strip() == '')):
-                                filtered.append(ref)
-                        
-                        # Ordenar e formatar opções
-                        # ... (código de ordenação e formatação)
-
-                        for ref in filtered:
-                            # ... (código de formatação da opção)
-                            inserted_date = ref.get('ROW_INSERTED_DATE')
-                            brazil_time = convert_utc_to_brazil_time(inserted_date) if inserted_date else None
-                            date_str = brazil_time.strftime('%d/%m/%Y %H:%M') if brazil_time else 'N/A'
-                            status_display = ref.get('B_BOOKING_STATUS', 'Status')
-                            option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
-                            ref_options.append(option_text)
-
-                    ref_options.append("🆕 New Adjustment")
-
-                    # Chave do selectbox atualizada para ser única dentro do form
-                    manual_ref_key = f"manual_voyage_ref_{adjustment_id}"
-                    selected_ref_manual = st.selectbox(
-                        "Selecione uma referência...",
-                        options=ref_options,
-                        key=manual_ref_key
-                    )
-                # --- Fim da Seção de Referência Relacionada ---
 
                 # Botões do formulário
                 st.markdown("---")
@@ -2568,17 +2521,6 @@ def exibir_history():
                     cancel_manual_clicked = st.form_submit_button("❌ Cancelar")
                 
                 if confirm_manual_clicked:
-                    # Validação: verificar se uma referência foi selecionada
-                    if True:
-                        selected_ref = st.session_state.get(manual_ref_key) # Usa a chave do form
-                        if (
-                            not selected_ref or 
-                            selected_ref.strip() == "" or 
-                            selected_ref == "Selecione uma referência..."
-                        ):
-                            st.error("❌ **Erro:** Você deve selecionar uma referência relacionada antes de confirmar.")
-                            st.stop()
-                    
                     # Preparar dados para inserção
                     from datetime import datetime
                     
@@ -2633,65 +2575,13 @@ def exibir_history():
                             if "manual_save_error" in st.session_state:
                                 del st.session_state["manual_save_error"]
                             
-                            # Se há aprovação pendente, completar a aprovação
-                            if voyage_manual_required.get("pending_approval", False):
-                                st.info("🔄 Completando aprovação...")
-                                
-                                # Obter dados da justificativa (valores padrão)
-                                justification = {
-                                    "area": "Booking",
-                                    "request_reason": "Voyage Monitoring",
-                                    "adjustments_owner": "System",
-                                    "comments": "Dados de monitoramento inseridos manualmente"
-                                }
-                                
-                                # Usar referência selecionada no formulário manual se disponível
-                                if error_type == "voyage_not_found":
-                                    selected_ref = st.session_state.get(f"manual_voyage_ref_{adjustment_id}")
-                                    if selected_ref and selected_ref != "Selecione uma referência...":
-                                        if selected_ref == "🆕 New Adjustment":
-                                            related_reference = "New Adjustment"
-                                        else:
-                                            # Extrair a referência da opção selecionada
-                                            related_reference = selected_ref.split(" | ")[0] if " | " in selected_ref else selected_ref
-                                    else:
-                                        related_reference = "New Adjustment"
-                                else:
-                                    related_reference = "New Adjustment"
-                                
-                                # Preparar dados manuais para aprovação
-                                manual_data = {
-                                    'manual_deadline': monitoring_data.get("DATA_DEADLINE"),
-                                    'manual_draft_deadline': monitoring_data.get("DATA_DRAFT_DEADLINE"),
-                                    'manual_gate_opening': monitoring_data.get("DATA_ABERTURA_GATE"),
-                                    'manual_etd': monitoring_data.get("DATA_ESTIMATIVA_SAIDA"),
-                                    'manual_eta': monitoring_data.get("DATA_ESTIMATIVA_CHEGADA"),
-                                    'manual_etb': monitoring_data.get("DATA_ESTIMATIVA_ATRACACAO"),
-                                    'manual_atb': monitoring_data.get("DATA_ATRACACAO"),
-                                    'manual_atd': monitoring_data.get("DATA_PARTIDA"),
-                                    'manual_ata': monitoring_data.get("DATA_CHEGADA"),
-                                }
-                                
-                                # Completar aprovação
-                                try:
-                                    result = approve_carrier_return(adjustment_id, related_reference, justification, manual_data)
-                                except Exception as e:
-                                    st.session_state["approval_error"] = f"❌ Erro crítico durante a aprovação: {str(e)}"
-                                    st.error(st.session_state["approval_error"])
-                                    result = False
-                                
-                                if result:
-                                    st.success("✅ Aprovação concluída com sucesso!")
-                                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful with manual voyage data!"}
-                                else:
-                                    st.error("❌ Erro ao completar aprovação")
-                            
-                            # Limpar o flag de entrada manual
+                            # Limpar apenas o flag de entrada manual
+                            # MANTER pending_status_change para exibir seção de referência
                             if "voyage_manual_entry_required" in st.session_state:
                                 del st.session_state["voyage_manual_entry_required"]
                             
                             st.cache_data.clear()
-                            st.rerun()  # Atualizar interface após aprovação bem-sucedida
+                            st.rerun()  # Recarregar para mostrar seção de referência fora do form
                         else:
                             st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": "❌ Erro ao salvar dados de monitoramento"}
                             st.error("❌ Erro ao salvar dados de monitoramento")
