@@ -83,6 +83,39 @@ def authenticate_user(username: str, password: str) -> Optional[Dict]:
     finally:
         conn.close()
 
+def get_user_by_id(user_id: int) -> Optional[Dict]:
+    """
+    Busca usuário por ID.
+    
+    Args:
+        user_id: ID do usuário
+    
+    Returns:
+        Dict com dados do usuário ou None se não encontrado
+    """
+    conn = get_db_connection()
+    
+    try:
+        query = text("""
+            SELECT USER_ID, USERNAME, EMAIL, FULL_NAME, 
+                   BUSINESS_UNIT, ACCESS_LEVEL, IS_ACTIVE, 
+                   PASSWORD_RESET_REQUIRED
+            FROM LogTransp.F_CON_USERS
+            WHERE USER_ID = :user_id AND IS_ACTIVE = 1
+        """)
+        result = conn.execute(query, {"user_id": user_id}).fetchone()
+        
+        if not result:
+            return None
+        
+        return dict(result._mapping)
+        
+    except Exception as e:
+        print(f"Erro ao buscar usuário: {str(e)}")
+        return None
+    finally:
+        conn.close()
+
 # ========================================
 # GESTÃO DE USUÁRIOS (ADMIN)
 # ========================================

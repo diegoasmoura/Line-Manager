@@ -4,8 +4,8 @@ import streamlit as st
 st.set_page_config(page_title="Farol", layout="wide")
 
 # Importar sistema de login
-from auth.login import show_login_form, is_logged_in, get_user_info, logout, restore_session_if_exists
-from auth.session_manager import get_session, get_session_time_remaining, format_session_time
+from auth.login import show_login_form, is_logged_in, get_user_info, logout
+from auth.session_manager import get_session_time_remaining, format_session_time, initialize_session_from_cookie, get_session
  
 from streamlit_option_menu import option_menu 
 import shipments
@@ -22,12 +22,13 @@ svg_lighthouse = """
 </svg>
 """
 
-# Guard de login - verificar se usuário está logado
+# Tentar restaurar sessão do cookie (se existir)
+initialize_session_from_cookie()
+
+# Verificar se está logado
 if not is_logged_in():
-    # Tentar restaurar sessão existente
-    if not restore_session_if_exists():
-        show_login_form()
-        st.stop()  # Para a execução se não estiver logado
+    show_login_form()
+    st.stop()
 
 # Inicializa o estado do menu se não existir
 if "menu_choice" not in st.session_state:
@@ -52,9 +53,8 @@ with st.sidebar:
     </h2>
     """, unsafe_allow_html=True)
     
-    # Informações do usuário (ocultas)
-    if is_logged_in():
-        user_info = get_user_info()
+    # Informações do usuário
+    user_info = get_user_info()
  
     # Lista de opções (History removido - acessível via Shipments)
     options = ["Shipments", "Op. Control", "Performance", "Tracking", "Setup"]
