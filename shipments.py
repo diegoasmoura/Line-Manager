@@ -312,6 +312,11 @@ def exibir_shipments():
         disabled_columns.append("Carrier Returns")
     if "Carrier Returns Status" not in disabled_columns:
         disabled_columns.append("Carrier Returns Status")
+    
+    # Oculta "Booking Registered Date" nas visualizações "Booking Management" e "General View"
+    if choose in ["Booking Management", "General View"]:
+        if "Booking Registered Date" in df.columns:
+            df = df.drop(columns=["Booking Registered Date"])
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
     # Configuração explícita para exibir como texto somente leitura
