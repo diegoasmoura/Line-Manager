@@ -18,6 +18,25 @@ dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolis
 vip_pnl_risk_options = df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist()
  
 # ---------- 3. Constantes ----------
+# Mapeamento de valores POD do Excel para valores da tabela UDC
+# Permite que os valores do Excel Bulk Upload sejam exibidos corretamente nos dropdowns
+POD_MAPPING = {
+    "ANQING": "Anqing",
+    "CARTAGENA": "Cartagen",
+    "CHATTOGRAM": "Chattog",
+    "HAIPHONG": "Haiphong",
+    "HO CHI MINH CITY": "Hochimin",
+    "ISKENDERUN": "Iskender",
+    "IZMIR": "Izmir",
+    "JAKARTA": "Jakarta",
+    "KWANGYANG": "Kwangyan",
+    "MUNDRA": "Mundra",
+    "NHAVA SHEVA (JNP)": "Nhavashe",
+    "PORT QASIM/KARACHI": "Karachi",
+    "QINGDAO": "Qingdao",
+    "ZHANGJIAGANG": "Zhangjia",
+}
+
 # Campos do formulário e seus nomes internos
 form_fields = {
     "Shipment Status": "s_shipment_status",
@@ -270,6 +289,10 @@ def show_add_form():
                             # Se não conseguir converter, ignora o valor
                             s_required_arrival_date_expected = None
                     
+                    # Aplicar mapeamento POD para compatibilidade com UDC
+                    pod_value = row.get("POD", "")
+                    pod_mapped = POD_MAPPING.get(pod_value, pod_value)
+                    
                     values = {
                         "s_farol_status": "New request",
                         "s_type_of_shipment": "Forecast",
@@ -285,7 +308,7 @@ def show_add_form():
                         "s_port_of_loading_pol": "",
                         "s_vip_pnl_risk": s_vip_pnl_risk,
                         "s_pnl_destination": s_pnl_destination,
-                        "s_port_of_delivery_pod": row.get("POD", ""),
+                        "s_port_of_delivery_pod": pod_mapped,
                         "s_final_destination": s_final_destination,
                         "s_comments": sales_comments,
                         "adjustment_id": str(uuid.uuid4()),
