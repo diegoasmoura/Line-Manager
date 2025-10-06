@@ -1578,7 +1578,7 @@ def exibir_history():
                     low = txt.lower()
                     # Novos nomes mais claros
                     if low == "booking request - company":
-                        return "📋 Booking Request"
+                        return "📋 Booking Requested"
                     if low == "pdf document - carrier":
                         return "📄 PDF Document"
                     if low == "adjustment request - company":
@@ -1658,7 +1658,7 @@ def exibir_history():
                             current_p_status_str = str(current_p_status).strip().lower()
                             # Se não for um dos novos P_STATUS, manter comportamento legado
                             if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                                df_processed.loc[first_idx_sel, "Status"] = "📦 Cargill Booking Request"
+                                df_processed.loc[first_idx_sel, "Status"] = "📦 Shipment Requested"
         except Exception:
             pass
 
@@ -1682,7 +1682,7 @@ def exibir_history():
                                 # Se não for um dos novos P_STATUS, manter comportamento legado
                                 if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
                                     # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                                    df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
+                                    df_processed.loc[i, "Status"] = "📦 Shipment Requested"
                     else:
                         # Verificar P_STATUS antes de sobrescrever para cada linha
                         for i in idx_first:
@@ -1691,7 +1691,7 @@ def exibir_history():
                             # Se não for um dos novos P_STATUS, manter comportamento legado
                             if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
                                 # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                                df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
+                                df_processed.loc[i, "Status"] = "📦 Shipment Requested"
         except Exception:
             pass
 
@@ -1707,7 +1707,7 @@ def exibir_history():
                     current_p_status_str = str(current_p_status).strip().lower()
                     # Se não for um dos novos P_STATUS, manter comportamento legado
                     if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                        df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
+                        df_processed.loc[first_idx_any, "Status"] = "📦 Shipment Requested"
         except Exception:
             pass
 
@@ -1795,9 +1795,9 @@ def exibir_history():
             selected_row = edited_df_other[edited_df_other["Selecionar"] == True].iloc[0]
             status = selected_row.get("Status")
             
-            if status == "📦 Cargill Booking Request":
+            if status == "📦 Shipment Requested":
                 st.info("ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "📋 Booking Request":
+            elif status == "📋 Booking Requested":
                 st.info("ℹ️ **Booking Request:** Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
             elif status == "📄 Split Info":
                 st.info("ℹ️ **Informação de Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
@@ -2916,7 +2916,7 @@ def exibir_history():
                     if p_status.lower() == 'adjusts cargill':
                         status_display = 'Cargill (Adjusts)'
                     elif b_status == 'Booking Requested' and _is_empty_local(linked):
-                        status_display = 'Cargill Booking Request'
+                        status_display = 'Shipment Requested'
                     else:
                         status_display = b_status or p_status or 'Status'
 
@@ -2969,9 +2969,6 @@ def exibir_history():
                 else:
                     st.info(f"📋 **Referência selecionada:** {selected_value}")
             
-            st.markdown("---")
-            st.warning("**Confirmar alteração para: Booking Approved**")
-
             # A validação para habilitar o botão agora usa o valor lido diretamente do estado da sessão
             can_confirm = selected_value and selected_value != "Selecione uma referência..."
             
@@ -3054,9 +3051,22 @@ def exibir_history():
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
 
-    # Confirmação para mudanças de status pendentes
+    # Confirmação para mudanças de status pendentes (apenas se não houver seleção de referência ativa)
     pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
-    if pending_status and len(selected) == 1 and active_tab == received_label:
+    
+    # Definir selected_row_status se houver uma linha selecionada
+    selected_row_status = ""
+    if len(selected) == 1:
+        selected_row = selected.iloc[0]
+        adjustment_id = selected_row["ADJUSTMENT_ID"]
+        selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
+    
+    show_reference_selection = (
+        selected_row_status == "Received from Carrier" and 
+        pending_status == "Booking Approved"
+    )
+    
+    if pending_status and len(selected) == 1 and active_tab == received_label and not show_reference_selection:
         st.markdown("---")
         st.warning(f"**Confirmar alteração para:** {pending_status}")
         
@@ -3335,7 +3345,7 @@ def display_audit_trail_tab(farol_reference):
                 'attachments': 'Tela de Anexos (Upload/Exclusão)',
                 'shipments': 'Tela Principal de Shipments',
                 'shipments_split': 'Tela de Ajustes e Split',
-                'Booking Request - Company': 'Timeline Inicial',
+                'Booking Requested': 'Timeline Inicial',
                 'Other Request - Company': 'Timeline Inicial',
                 'Adjusts Cargill': 'Timeline Inicial'
             }

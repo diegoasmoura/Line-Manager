@@ -546,7 +546,7 @@ def get_database_column_name(display_name_or_alias: str) -> str:
 def get_farol_status_icons():
     """Retorna o dicionário que mapeia o status do Farol para um ícone."""
     return {
-        "New Request": "🆕",
+        "New Request": "📦",
         "Booking Requested": "📋",
         "Received from Carrier": "📨",
         "Booking Under Review": "🔍",

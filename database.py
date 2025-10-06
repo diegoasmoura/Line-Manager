@@ -1486,8 +1486,11 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             """
             SELECT 
                 FAROL_REFERENCE,
-                'Booking Requested' AS B_BOOKING_STATUS,
-                'Booking Request - Company' AS P_STATUS,
+                FAROL_STATUS AS B_BOOKING_STATUS,
+                CASE 
+                    WHEN FAROL_STATUS = 'New Request' THEN 'Shipment Requested'
+                    ELSE 'Booking Requested'
+                END AS P_STATUS,
                 NULL AS P_PDF_NAME,
                 S_SPLITTED_BOOKING_REFERENCE,
                 S_PLACE_OF_RECEIPT,
@@ -1552,44 +1555,46 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         # Adiciona ROW_INSERTED_DATE com horário local do Brasil
         data["ROW_INSERTED_DATE"] = get_brazil_time()
 
-        if exists and int(exists[0]) > 0:
-            # Atualiza
-            update_sql = text(
-                """
-                UPDATE LogTransp.F_CON_RETURN_CARRIERS
-                SET 
-                    B_BOOKING_STATUS = :B_BOOKING_STATUS,
-                    P_STATUS = :P_STATUS,
-                    P_PDF_NAME = :P_PDF_NAME,
-                    S_SPLITTED_BOOKING_REFERENCE = :S_SPLITTED_BOOKING_REFERENCE,
-                    S_PLACE_OF_RECEIPT = :S_PLACE_OF_RECEIPT,
-                    S_QUANTITY_OF_CONTAINERS = :S_QUANTITY_OF_CONTAINERS,
-                    S_PORT_OF_LOADING_POL = :S_PORT_OF_LOADING_POL,
-                    S_PORT_OF_DELIVERY_POD = :S_PORT_OF_DELIVERY_POD,
-                    S_FINAL_DESTINATION = :S_FINAL_DESTINATION,
-                    B_TRANSHIPMENT_PORT = :B_TRANSHIPMENT_PORT,
-                    B_TERMINAL = :B_TERMINAL,
-                    B_VESSEL_NAME = :B_VESSEL_NAME,
-                    B_VOYAGE_CARRIER = :B_VOYAGE_CARRIER,
-                    B_DATA_DRAFT_DEADLINE = :B_DATA_DRAFT_DEADLINE,
-                    B_DATA_DEADLINE = :B_DATA_DEADLINE,
-                    S_REQUESTED_DEADLINE_START_DATE = :S_REQUESTED_DEADLINE_START_DATE,
-                    S_REQUESTED_DEADLINE_END_DATE = :S_REQUESTED_DEADLINE_END_DATE,
-                    S_REQUIRED_ARRIVAL_DATE_EXPECTED = :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
-                    B_DATA_ESTIMATIVA_SAIDA_ETD = :B_DATA_ESTIMATIVA_SAIDA_ETD,
-                    B_DATA_ESTIMATIVA_CHEGADA_ETA = :B_DATA_ESTIMATIVA_CHEGADA_ETA,
-                    B_DATA_ABERTURA_GATE = :B_DATA_ABERTURA_GATE,
-                    ELLOX_MONITORING_ID = :ELLOX_MONITORING_ID, -- Adicionado
-                    USER_UPDATE = :USER_INSERT,
-                    DATE_UPDATE = SYSDATE
-                WHERE FAROL_REFERENCE = :FAROL_REFERENCE
-                """
-            )
-            # Nada a corrigir aqui além de garantir chaves MAIÚSCULAS
-            conn.execute(update_sql, data)
-        else:
-            # Insere
-            insert_sql = text(
+        # SEMPRE insere um novo registro para manter o histórico completo
+        # (comportamento alterado para suportar Request Timeline)
+        # Comentado: UPDATE removido para sempre inserir novo registro (Request Timeline)
+        # if exists and int(exists[0]) > 0:
+        #     # Atualiza
+        #     update_sql = text(
+        #         """
+        #         UPDATE LogTransp.F_CON_RETURN_CARRIERS
+        #         SET 
+        #             B_BOOKING_STATUS = :B_BOOKING_STATUS,
+        #             P_STATUS = :P_STATUS,
+        #             P_PDF_NAME = :P_PDF_NAME,
+        #             S_SPLITTED_BOOKING_REFERENCE = :S_SPLITTED_BOOKING_REFERENCE,
+        #             S_PLACE_OF_RECEIPT = :S_PLACE_OF_RECEIPT,
+        #             S_QUANTITY_OF_CONTAINERS = :S_QUANTITY_OF_CONTAINERS,
+        #             S_PORT_OF_LOADING_POL = :S_PORT_OF_LOADING_POL,
+        #             S_PORT_OF_DELIVERY_POD = :S_PORT_OF_DELIVERY_POD,
+        #             S_FINAL_DESTINATION = :S_FINAL_DESTINATION,
+        #             B_TRANSHIPMENT_PORT = :B_TRANSHIPMENT_PORT,
+        #             B_TERMINAL = :B_TERMINAL,
+        #             B_VESSEL_NAME = :B_VESSEL_NAME,
+        #             B_VOYAGE_CARRIER = :B_VOYAGE_CARRIER,
+        #             B_DATA_DRAFT_DEADLINE = :B_DATA_DRAFT_DEADLINE,
+        #             B_DATA_DEADLINE = :B_DATA_DEADLINE,
+        #             S_REQUESTED_DEADLINE_START_DATE = :S_REQUESTED_DEADLINE_START_DATE,
+        #             S_REQUESTED_DEADLINE_END_DATE = :S_REQUESTED_DEADLINE_END_DATE,
+        #             S_REQUIRED_ARRIVAL_DATE_EXPECTED = :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+        #             B_DATA_ESTIMATIVA_SAIDA_ETD = :B_DATA_ESTIMATIVA_SAIDA_ETD,
+        #             B_DATA_ESTIMATIVA_CHEGADA_ETA = :B_DATA_ESTIMATIVA_CHEGADA_ETA,
+        #             B_DATA_ABERTURA_GATE = :B_DATA_ABERTURA_GATE,
+        #             ELLOX_MONITORING_ID = :ELLOX_MONITORING_ID,
+        #             USER_UPDATE = :USER_INSERT,
+        #             DATE_UPDATE = SYSDATE
+        #         WHERE FAROL_REFERENCE = :FAROL_REFERENCE
+        #         """
+        #     )
+        #     conn.execute(update_sql, data)
+        # else:
+        #     # Insere
+        insert_sql = text(
                             """
                             INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
                                 FAROL_REFERENCE,
@@ -1648,8 +1653,9 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                             )
                             """
                         )
-            data["ADJUSTMENT_ID"] = str(uuid.uuid4())
-            conn.execute(insert_sql, data)
+        
+        data["ADJUSTMENT_ID"] = str(uuid.uuid4())
+        conn.execute(insert_sql, data)
         conn.commit()
     finally:
         conn.close()
@@ -1761,8 +1767,8 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
         params = {
             "FAROL_REFERENCE": rd.get("FAROL_REFERENCE"),
             "B_BOOKING_STATUS": b_status,
-            # Snapshot oriundo do carrier
-            "P_STATUS": "Booking Request - Company",
+            # Snapshot oriundo do carrier - P_STATUS baseado no status real
+            "P_STATUS": "Shipment Requested" if b_status == "New Request" else "Booking Requested",
             "P_PDF_NAME": None,
             "S_SPLITTED_BOOKING_REFERENCE": rd.get("S_SPLITTED_BOOKING_REFERENCE"),
             "S_PLACE_OF_RECEIPT": rd.get("S_PLACE_OF_RECEIPT"),
