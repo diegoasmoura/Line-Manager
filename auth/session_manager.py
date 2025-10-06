@@ -4,6 +4,9 @@ Gerenciador de sessões usando cookies HTTP seguros com JWT
 import streamlit as st
 from datetime import datetime
 from typing import Optional, Dict, Any
+from pathlib import Path
+import json
+import os
 from auth.jwt_manager import create_jwt_token, verify_jwt_token
 from auth.cookie_manager import set_auth_cookie, get_auth_cookie, clear_auth_cookie
 from auth.auth_db import get_user_by_id
@@ -62,15 +65,62 @@ def create_session(user_data: dict):
     st.session_state.user_data = user_data
     st.session_state.login_time = datetime.now()
 
+def cleanup_expired_sessions():
+    """
+    Remove arquivos de sessão expirados (> 8 horas).
+    Deve ser chamada no startup da aplicação.
+    """
+    sessions_dir = Path(".streamlit/sessions")
+    if not sessions_dir.exists():
+        return
+    
+    now = datetime.now()
+    expired_count = 0
+    
+    for session_file in sessions_dir.glob("session_*.json"):
+        try:
+            with open(session_file, 'r') as f:
+                session_data = json.load(f)
+            
+            # Verificar se sessão está expirada
+            expires_at = datetime.fromisoformat(session_data.get('expires_at', ''))
+            if now > expires_at:
+                session_file.unlink()
+                expired_count += 1
+        except Exception as e:
+            # Se não conseguir ler, deletar arquivo corrompido
+            try:
+                session_file.unlink()
+                expired_count += 1
+                print(f"[SESSION_CLEANUP] Arquivo corrompido removido: {session_file}")
+            except Exception as e2:
+                print(f"[SESSION_CLEANUP] Erro ao remover arquivo corrompido {session_file}: {e2}")
+    
+    if expired_count > 0:
+        print(f"[SESSION_CLEANUP] Removidas {expired_count} sessões expiradas")
+
 def destroy_session():
     """
-    Destroi a sessão: limpa cookie e session_state.
+    Destroi a sessão: limpa arquivo, cookie e session_state.
     """
+    # Obter token da sessão atual
+    session_token = st.session_state.get('session_token')
+    
+    # Deletar arquivo da sessão
+    if session_token:
+        session_file = Path(f".streamlit/sessions/session_{session_token}.json")
+        if session_file.exists():
+            try:
+                session_file.unlink()
+                print(f"[SESSION_CLEANUP] Arquivo de sessão removido: {session_file}")
+            except Exception as e:
+                print(f"[SESSION_CLEANUP] Erro ao remover arquivo de sessão: {e}")
+    
     # Limpar cookie
     clear_auth_cookie()
     
     # Limpar session_state
-    keys_to_clear = ['current_user', 'user_data', 'login_time', 'force_password_change']
+    keys_to_clear = ['current_user', 'user_data', 'login_time', 'force_password_change', 'session_token']
     for key in keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
