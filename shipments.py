@@ -821,6 +821,11 @@ def exibir_shipments():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"download_xlsx_{int(datetime.now().timestamp())}"
         )
+        
+        # Botão para limpar cache
+        if st.button("🔄 Refresh Data", help="Clear cache and reload data"):
+            st.cache_data.clear()
+            st.rerun()
     # Seção de anexos
     if st.session_state.get("show_shipments_attachments", False):
         # Sincroniza referência se seleção mudar

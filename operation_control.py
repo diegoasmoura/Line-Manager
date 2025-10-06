@@ -6,6 +6,15 @@ from sqlalchemy import text
 from datetime import datetime, timedelta
 import numpy as np
 
+def ensure_datetime_columns(df, datetime_columns):
+    """Garante que as colunas especificadas sejam do tipo datetime"""
+    df_copy = df.copy()
+    for col in datetime_columns:
+        if col in df_copy.columns:
+            if not pd.api.types.is_datetime64_any_dtype(df_copy[col]):
+                df_copy[col] = pd.to_datetime(df_copy[col], errors='coerce')
+    return df_copy
+
 # Configuração de página é feita no app.py principal
 
 # Paleta de cores Cargill
@@ -84,6 +93,10 @@ def load_operation_data(days_back=30, business_unit=None, status_filter=None, ca
 def calculate_kpis(df):
     """Calcula KPIs principais para o dashboard"""
     now = datetime.now()
+    
+    # Garantir que as colunas de data sejam do tipo datetime
+    datetime_columns = ['b_data_deadline', 'b_booking_confirmation_date']
+    df = ensure_datetime_columns(df, datetime_columns)
     
     # Total de Bookings Ativos
     total_active = len(df[df['farol_status'].isin(['Shipment Requested', 'Booking Requested', 'Booking Approved'])])
@@ -253,6 +266,10 @@ def create_urgent_actions_table(df):
     """Cria tabela de ações urgentes"""
     now = datetime.now()
     
+    # Garantir que as colunas de data sejam do tipo datetime
+    datetime_columns = ['b_data_deadline', 'b_data_draft_deadline']
+    df = ensure_datetime_columns(df, datetime_columns)
+    
     urgent_df = df[
         (df['farol_status'].isin(['Shipment Requested', 'Booking Requested'])) &
         (
@@ -382,6 +399,7 @@ def exibir_operation_control():
         # Gráfico de Timeline de Criação de Bookings
         st.subheader("📅 Timeline de Criação de Bookings")
         timeline_data = df.copy()
+        timeline_data = ensure_datetime_columns(timeline_data, ['s_creation_of_shipment'])
         timeline_data['date'] = timeline_data['s_creation_of_shipment'].dt.date
         daily_counts = timeline_data.groupby('date').size().reset_index(name='bookings')
         
@@ -411,6 +429,7 @@ def exibir_operation_control():
             ].copy()
             
             if not pending_bookings.empty:
+                pending_bookings = ensure_datetime_columns(pending_bookings, ['b_creation_of_booking'])
                 pending_bookings['days_waiting'] = (now - pending_bookings['b_creation_of_booking']).dt.days
                 pending_bookings = pending_bookings[pending_bookings['days_waiting'] >= 3]
                 
@@ -456,6 +475,7 @@ def exibir_operation_control():
         ].copy()
         
         if not waiting_bookings.empty:
+            waiting_bookings = ensure_datetime_columns(waiting_bookings, ['b_creation_of_booking'])
             waiting_bookings['days_waiting'] = (now - waiting_bookings['b_creation_of_booking']).dt.days
             waiting_bookings = waiting_bookings[waiting_bookings['days_waiting'] >= 3]
             waiting_bookings = waiting_bookings.sort_values('days_waiting', ascending=False)
@@ -467,6 +487,7 @@ def exibir_operation_control():
                     'b_creation_of_booking', 'days_waiting', 's_quantity_of_containers'
                 ]].copy()
                 
+                table_data = ensure_datetime_columns(table_data, ['b_creation_of_booking'])
                 table_data['b_creation_of_booking'] = table_data['b_creation_of_booking'].dt.strftime('%d/%m/%Y %H:%M')
                 
                 # Adicionar status visual baseado no tempo de espera
@@ -504,6 +525,7 @@ def exibir_operation_control():
     # Gráfico de Heatmap de Horários
     st.subheader("⏰ Heatmap de Atividade por Horário")
     if not df.empty:
+        df = ensure_datetime_columns(df, ['s_creation_of_shipment'])
         df['hour'] = df['s_creation_of_shipment'].dt.hour
         df['day_of_week'] = df['s_creation_of_shipment'].dt.day_name()
         
@@ -586,6 +608,7 @@ def exibir_operation_control():
         # Filtrar apenas bookings aprovados com data de confirmação
         approved_df = df[df['farol_status'] == 'Booking Approved'].copy()
         if not approved_df.empty:
+            approved_df = ensure_datetime_columns(approved_df, ['b_booking_confirmation_date'])
             approved_df['date'] = approved_df['b_booking_confirmation_date'].dt.date
             daily_approvals = approved_df.groupby('date').size().reset_index(name='approvals')
             
