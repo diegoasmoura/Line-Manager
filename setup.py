@@ -300,25 +300,49 @@ def show_user_administration():
     
     st.markdown("---")
     
-    # Cria as abas usando desempacotamento para garantir o contexto correto
-    list_tab, create_tab, edit_tab, reset_tab = st.tabs([
-        "📋 Listar DSID",
-        "➕ Novo DSID", 
-        "✏️ Editar DSID",
+    # Inicializa o estado da aba se não existir
+    if 'user_admin_tab_index' not in st.session_state:
+        st.session_state.user_admin_tab_index = 0
+    
+    # Define as opções de navegação
+    tab_options = [
+        "📋 Listar Usuário",
+        "➕ Novo Usuário", 
+        "✏️ Editar Usuário",
         "🔑 Reset de Senha"
-    ])
-
-    # Conteúdo de cada aba em seu próprio contexto
-    with list_tab:
+    ]
+    
+    # Cria o radio horizontal com configurações otimizadas
+    selected_tab = st.radio(
+        "Navegação",
+        options=tab_options,
+        index=st.session_state.user_admin_tab_index,
+        key='user_admin_tab_radio',
+        label_visibility='collapsed',
+        horizontal=True,
+        # Configurações para evitar cliques duplos
+        help=None,
+        disabled=False,
+        # Força a atualização do estado
+        on_change=lambda: None
+    )
+    
+    # Atualiza o índice da aba selecionada
+    new_index = tab_options.index(selected_tab)
+    if new_index != st.session_state.user_admin_tab_index:
+        st.session_state.user_admin_tab_index = new_index
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # Renderiza o conteúdo baseado na aba selecionada
+    if st.session_state.user_admin_tab_index == 0:
         show_user_list(users)
-
-    with create_tab:
+    elif st.session_state.user_admin_tab_index == 1:
         show_create_user_form()
-
-    with edit_tab:
+    elif st.session_state.user_admin_tab_index == 2:
         show_edit_user_form(users)
-
-    with reset_tab:
+    else:
         show_reset_password_form(users)
 
 def show_user_list(users):
@@ -377,7 +401,7 @@ def show_create_user_form():
         with col1:
             username = st.text_input("DSID*", placeholder="D510098", 
                                    help="Identificador corporativo (DSID)", key=f"create_username_{form_counter}")
-            email = st.text_input("Email*", placeholder="d510098@empresa.com", key=f"create_email_{form_counter}")
+            email = st.text_input("Email*", placeholder="name_sobrenome@cargil.com", key=f"create_email_{form_counter}")
             full_name = st.text_input("Nome Completo*", placeholder="Nome Sobrenome", key=f"create_full_name_{form_counter}")
         
         with col2:
@@ -433,7 +457,7 @@ def show_edit_user_form(users):
     
     # Seleção de usuário
     user_to_edit = st.selectbox(
-        "Selecione o DSID",
+        "Selecione o Usuário",
         options=[u['username'] for u in users],
         format_func=lambda x: f"{x} - {next(u['full_name'] for u in users if u['username'] == x)}"
     )
@@ -491,7 +515,7 @@ def show_edit_user_form(users):
 
 def show_reset_password_form(users):
     """Formulário de reset de senha"""
-    st.subheader("Reset de Senha (DSID)")
+    st.subheader("Reset de Senha (Usuário)")
     
     if not users:
         st.info("Nenhum DSID para resetar senha.")
@@ -499,7 +523,7 @@ def show_reset_password_form(users):
     
     with st.form("reset_password_form"):
         user_to_reset = st.selectbox(
-            "Selecione o DSID",
+            "Selecione o Usuário",
             options=[u['username'] for u in users],
             format_func=lambda x: f"{x} - {next(u['full_name'] for u in users if u['username'] == x)}"
         )
