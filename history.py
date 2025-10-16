@@ -1230,6 +1230,23 @@ def exibir_history():
 
     voyages_label = f"📅 Voyage Timeline ({distinct_count} distinct)"
 
+    # Contagem para aba Audit Trail
+    try:
+        from sqlalchemy import text as _text_audit
+        conn_cnt = get_database_connection()
+        cnt_query = _text_audit("""
+            SELECT COUNT(*)
+            FROM LogTransp.V_FAROL_AUDIT_TRAIL
+            WHERE FAROL_REFERENCE = :farol_ref
+        """)
+        audit_count = conn_cnt.execute(cnt_query, {"farol_ref": farol_reference}).scalar() or 0
+        conn_cnt.close()
+    except Exception:
+        audit_count = 0
+
+    # Label da aba Audit Trail
+    audit_label = f"🔍 Audit Trail ({audit_count} records)"
+
     # Controle de "aba" ativa (segmented control) para detectar troca e limpar seleções da outra
     active_tab_key = f"history_active_tab_{farol_reference}"
     last_active_tab_key = f"history_last_active_tab_{farol_reference}"
@@ -1239,7 +1256,7 @@ def exibir_history():
 
     active_tab = st.segmented_control(
         "",
-        options=[other_label, received_label, voyages_label],
+        options=[other_label, received_label, voyages_label, audit_label],
         key=active_tab_key
     )
 
@@ -1254,6 +1271,12 @@ def exibir_history():
             # Limpamos seleção da aba "Request Timeline"
             if f"history_other_status_editor_{farol_reference}" in st.session_state:
                 del st.session_state[f"history_other_status_editor_{farol_reference}"]
+        elif active_tab == audit_label:
+            # Limpamos seleções de ambas as abas quando entrar na Audit Trail
+            if f"history_other_status_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_other_status_editor_{farol_reference}"]
+            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
+                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
         else:  # voyages_label
             # Limpamos seleções de ambas as abas
             if f"history_other_status_editor_{farol_reference}" in st.session_state:
@@ -2096,6 +2119,10 @@ def exibir_history():
                             st.markdown("---")
 
 
+    # Conteúdo da aba "Audit Trail"
+    if active_tab == audit_label:
+        display_audit_trail_tab(farol_reference)
+
     # Determina qual DataFrame usar baseado na aba ativa
     if edited_df_other is not None and not edited_df_other.empty:
         selected = edited_df_other[edited_df_other["Selecionar"] == True]
@@ -2843,8 +2870,6 @@ def exibir_history():
                 st.markdown("💡 **Dica:** Esta aba é para visualização do histórico de pedidos. Para aprovar retornos de armadores, use a aba '📨 Returns Awaiting Review'. Use 'View Attachments' para gerenciar arquivos.")
     
     # Função para aplicar mudanças de status (versão antiga removida; definida acima)
-
-
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -2880,3 +2905,256 @@ def exibir_history():
         st.markdown("---")
         st.subheader("📎 Attachment Management")
         display_attachments_section(farol_reference)
+
+
+def display_audit_trail_tab(farol_reference):
+    """Exibe a aba Audit Trail com histórico de mudanças"""
+    import pandas as pd
+    import pytz
+    from sqlalchemy import text as _text_audit_tab
+    st.markdown("### 🔍 Audit Trail - Histórico de Mudanças")
+    st.markdown(f"**Referência:** `{farol_reference}`")
+    st.markdown("---")
+
+    try:
+        conn_a = get_database_connection()
+        query = _text_audit_tab(
+            """
+            SELECT 
+                EVENT_KIND,
+                FAROL_REFERENCE,
+                TABLE_NAME,
+                COLUMN_NAME,
+                OLD_VALUE,
+                NEW_VALUE,
+                USER_LOGIN,
+                CHANGE_SOURCE,
+                CHANGE_TYPE,
+                ADJUSTMENT_ID,
+                RELATED_REFERENCE,
+                CHANGE_AT
+            FROM LogTransp.V_FAROL_AUDIT_TRAIL
+            WHERE FAROL_REFERENCE = :farol_ref
+            ORDER BY CHANGE_AT DESC
+            """
+        )
+        df_audit = pd.read_sql(query, conn_a, params={"farol_ref": farol_reference})
+        conn_a.close()
+
+        if df_audit.empty:
+            st.info("📋 Nenhum registro de auditoria encontrado para esta referência.")
+            return
+
+        def _convert_utc_to_brazil_time(ts):
+            if ts is None:
+                return None
+            try:
+                if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
+                    utc_dt = ts
+                else:
+                    utc_dt = pytz.UTC.localize(ts)
+                brazil_tz = pytz.timezone('America/Sao_Paulo')
+                return utc_dt.astimezone(brazil_tz)
+            except Exception:
+                return ts
+
+        change_at_col = None
+        for c in df_audit.columns:
+            if c.upper() == 'CHANGE_AT':
+                change_at_col = c
+                break
+        if change_at_col:
+            df_audit[change_at_col] = df_audit[change_at_col].apply(_convert_utc_to_brazil_time)
+        else:
+            st.error("❌ Coluna CHANGE_AT não encontrada no resultado da query")
+            return
+
+        rename_map = {}
+        for c in df_audit.columns:
+            cu = c.upper()
+            if cu == 'EVENT_KIND': rename_map[c] = 'Tipo'
+            elif cu == 'FAROL_REFERENCE': rename_map[c] = 'Referência'
+            elif cu == 'TABLE_NAME': rename_map[c] = 'Tabela'
+            elif cu == 'COLUMN_NAME': rename_map[c] = 'Coluna'
+            elif cu == 'OLD_VALUE': rename_map[c] = 'Valor Anterior'
+            elif cu == 'NEW_VALUE': rename_map[c] = 'Novo Valor'
+            elif cu == 'USER_LOGIN': rename_map[c] = 'Usuário'
+            elif cu == 'CHANGE_SOURCE': rename_map[c] = 'Origem'
+            elif cu == 'CHANGE_TYPE': rename_map[c] = 'Ação'
+            elif cu == 'ADJUSTMENT_ID': rename_map[c] = 'ID Ajuste'
+            elif cu == 'RELATED_REFERENCE': rename_map[c] = 'Referência Relacionada'
+            elif cu == 'CHANGE_AT': rename_map[c] = 'Data/Hora'
+
+        df_display = df_audit.rename(columns=rename_map)
+
+        def get_friendly_column_name(column_name):
+            if not column_name or pd.isna(column_name):
+                return column_name
+            friendly_mapping = {
+                'S_DTHC_PREPAID': 'DTHC',
+                'S_REQUESTED_SHIPMENT_WEEK': 'Requested Shipment Week',
+                'S_QUANTITY_OF_CONTAINERS': 'Quantity of Containers',
+                'S_PORT_OF_LOADING_POL': 'Port of Loading POL',
+                'S_TYPE_OF_SHIPMENT': 'Type of Shipment',
+                'S_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
+                'S_FINAL_DESTINATION': 'Final Destination',
+                'B_DATA_DRAFT_DEADLINE': 'Draft Deadline',
+                'B_DATA_DEADLINE': 'Deadline',
+                'B_DATA_ESTIMATIVA_SAIDA_ETD': 'ETD',
+                'B_DATA_ESTIMATIVA_CHEGADA_ETA': 'ETA',
+                'B_DATA_ABERTURA_GATE': 'Abertura Gate',
+                'B_DATA_CONFIRMACAO_EMBARQUE': 'Confirmação Embarque',
+                'B_DATA_PARTIDA_ATD': 'Partida (ATD)',
+                'B_DATA_ESTIMADA_TRANSBORDO_ETD': 'Estimada Transbordo (ETD)',
+                'B_DATA_CHEGADA_ATA': 'Chegada (ATA)',
+                'B_DATA_TRANSBORDO_ATD': 'Transbordo (ATD)',
+                'B_DATA_CHEGADA_DESTINO_ETA': 'Estimativa Chegada Destino (ETA)',
+                'B_DATA_CHEGADA_DESTINO_ATA': 'Chegada no Destino (ATA)',
+                'B_DATA_ESTIMATIVA_ATRACACAO_ETB': 'Estimativa Atracação (ETB)',
+                'B_DATA_ATRACACAO_ATB': 'Atracação (ATB)',
+                'B_FREIGHT_RATE_USD': 'Freight Rate USD',
+                'B_BOGEY_SALE_PRICE_USD': 'Bogey Sale Price USD',
+                'B_FREIGHTPPNL': 'Freight PNL',
+                'B_VOYAGE_CARRIER': 'Voyage Carrier',
+                'B_VESSEL_NAME': 'Vessel Name',
+                'B_VOYAGE_CODE': 'Voyage Code',
+                'B_TERMINAL': 'Terminal',
+                'B_FREIGHT_FORWARDER': 'Freight Forwarder',
+                'B_TRANSHIPMENT_PORT': 'Transhipment Port',
+                'B_POD_COUNTRY': 'POD Country',
+                'B_POD_COUNTRY_ACRONYM': 'POD Country Acronym',
+                'B_DESTINATION_TRADE_REGION': 'Destination Trade Region',
+                'B_BOOKING_REFERENCE': 'Booking Reference',
+                'B_BOOKING_STATUS': 'Booking Status',
+                'B_BOOKING_OWNER': 'Booking Owner',
+                'S_SALES_ORDER_REFERENCE': 'Sales Order Reference',
+                'S_SALES_ORDER_DATE': 'Sales Order Date',
+                'S_BUSINESS': 'Business',
+                'S_CUSTOMER': 'Customer',
+                'S_MODE': 'Mode',
+                'S_INCOTERM': 'Incoterm',
+                'S_SKU': 'SKU',
+                'S_PLANT_OF_ORIGIN': 'Plant of Origin',
+                'S_CONTAINER_TYPE': 'Container Type',
+                'S_VOLUME_IN_TONS': 'Volume in Tons',
+                'S_PARTIAL_ALLOWED': 'Partial Allowed',
+                'S_VIP_PNL_RISK': 'VIP PNL Risk',
+                'S_PNL_DESTINATION': 'PNL Destination',
+                'S_LC_RECEIVED': 'LC Received',
+                'S_ALLOCATION_DATE': 'Allocation Date',
+                'S_PRODUCER_NOMINATION_DATE': 'Producer Nomination',
+                'S_SALES_OWNER': 'Sales Owner',
+                'S_COMMENTS': 'Comments Sales',
+                'S_PLACE_OF_RECEIPT': 'Place of Receipt',
+                'B_COMMENTS': 'Comments Booking',
+                'FAROL_STATUS': 'Farol Status',
+                'S_SHIPMENT_STATUS': 'Shipment Status',
+                'S_CREATION_OF_SHIPMENT': 'Shipment Requested Date',
+                'B_CREATION_OF_BOOKING': 'Booking Registered Date',
+                'B_BOOKING_REQUEST_DATE': 'Booking Requested Date',
+                'B_BOOKING_CONFIRMATION_DATE': 'Booking Confirmation Date',
+                'S_REQUESTED_DEADLINES_START_DATE': 'Requested Deadline Start',
+                'S_REQUESTED_DEADLINES_END_DATE': 'Requested Deadline End',
+                'S_SHIPMENT_PERIOD_START_DATE': 'Shipment Period Start',
+                'S_SHIPMENT_PERIOD_END_DATE': 'Shipment Period End',
+                'S_REQUIRED_ARRIVAL_DATE_EXPECTED': 'Required Arrival Expected',
+                'S_AFLOAT': 'Afloat',
+                'S_CUSTOMER_PO': 'Customer PO',
+                'S_SPLITTED_BOOKING_REFERENCE': 'Splitted Booking Reference',
+                'B_QUANTITY_OF_CONTAINERS': 'Booking Quantity of Containers',
+                'B_CONTAINER_TYPE': 'Booking Container Type',
+                'B_PORT_OF_LOADING_POL': 'Port of Loading POL',
+                'B_PORT_OF_DELIVERY_POD': 'Port of Delivery POD',
+                'B_FINAL_DESTINATION': 'Final Destination',
+                'B_PLACE_OF_RECEIPT': 'Place of Receipt',
+                'B_AWARD_STATUS': 'Award Status',
+                'ATTACHMENT': 'Anexo'
+            }
+            return friendly_mapping.get(column_name, column_name)
+
+        if 'Coluna' in df_display.columns:
+            df_display['Coluna'] = df_display['Coluna'].apply(get_friendly_column_name)
+
+        if 'Origem' in df_display.columns:
+            origin_mapping = {
+                'booking_new': 'Tela de Criação de Booking',
+                'shipments_new': 'Criação do Shipment',
+                'tracking': 'Tela de Tracking',
+                'history': 'Tela de Aprovação de PDF',
+                'attachments': 'Tela de Anexos (Upload/Exclusão)',
+                'shipments': 'Tela Principal de Shipments',
+                'shipments_split': 'Tela de Ajustes e Split',
+                'Booking Requested': 'Timeline Inicial',
+                'Other Request - Company': 'Timeline Inicial',
+                'Adjusts Cargill': 'Timeline Inicial'
+            }
+            df_display['Origem'] = df_display['Origem'].replace(origin_mapping)
+
+        if 'Valor Anterior' in df_display.columns:
+            df_display['Valor Anterior'] = df_display['Valor Anterior'].replace('NULL', '')
+        if 'Novo Valor' in df_display.columns:
+            df_display['Novo Valor'] = df_display['Novo Valor'].replace('NULL', '')
+
+        column_order = [
+            'Referência', 'Ação', 'Coluna', 'Valor Anterior', 'Novo Valor',
+            'Usuário', 'Origem', 'Data/Hora'
+        ]
+        available_columns = [c for c in column_order if c in df_display.columns]
+        df_display = df_display[available_columns]
+
+        df_display = df_display[
+            ~(
+                df_display['Origem'].str.contains('Timeline Inicial|Request - Company|Adjusts Cargill', na=False)
+            )
+        ]
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            origins = ['Todos'] + sorted(df_display['Origem'].dropna().unique().tolist())
+            selected_origin = st.selectbox("🔍 Filtrar por Origem", origins)
+        with c2:
+            actions = ['Todos'] + sorted(df_display['Ação'].dropna().unique().tolist())
+            selected_action = st.selectbox("🔍 Filtrar por Ação", actions)
+        with c3:
+            columns = ['Todas'] + sorted(df_display['Coluna'].dropna().unique().tolist())
+            selected_column = st.selectbox("🔍 Filtrar por Coluna", columns)
+
+        df_filtered = df_display.copy()
+        if selected_origin != 'Todos':
+            df_filtered = df_filtered[df_filtered['Origem'] == selected_origin]
+        if selected_action != 'Todos':
+            df_filtered = df_filtered[df_filtered['Ação'] == selected_action]
+        if selected_column != 'Todas':
+            df_filtered = df_filtered[df_filtered['Coluna'] == selected_column]
+
+        df_filtered = df_filtered.sort_values('Data/Hora', ascending=False)
+
+        st.markdown(f"**📊 Total de registros:** {len(df_filtered)} de {len(df_display)}")
+        if not df_filtered.empty:
+            column_config = {
+                'Data/Hora': st.column_config.DatetimeColumn('Data/Hora', format='DD/MM/YYYY HH:mm:ss', width=None),
+                'Usuário': st.column_config.TextColumn('Usuário', width=None),
+                'Origem': st.column_config.TextColumn('Origem', width='medium'),
+                'Ação': st.column_config.TextColumn('Ação', width=None),
+                'Coluna': st.column_config.TextColumn('Coluna', width='medium', help='Nome da coluna alterada'),
+                'Valor Anterior': st.column_config.TextColumn('Valor Anterior', width=None),
+                'Novo Valor': st.column_config.TextColumn('Novo Valor', width=None),
+            }
+            st.dataframe(
+                df_filtered,
+                column_config=column_config,
+                use_container_width=True,
+                height=400,
+                hide_index=True
+            )
+            csv_data = df_filtered.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "⬇️ Exportar CSV",
+                data=csv_data,
+                file_name=f"audit_trail_{farol_reference}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("📋 Nenhum registro encontrado com os filtros aplicados.")
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar audit trail: {str(e)}")

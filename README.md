@@ -705,7 +705,7 @@ New Request → Booking Requested → Received from Carrier → Booking Approved
 3. **Aba Audit Trail**: Selecione a aba "🔍 Audit Trail"
 4. **Funcionalidades**:
    - **Filtros**: Por origem, ação e coluna
-   - **Última alteração**: Opção para mostrar apenas a última alteração por coluna
+   - **Contagem no rótulo**: Exibe número de registros no rótulo da aba
    - **Export**: Download dos dados filtrados em CSV
    - **Timestamps**: Conversão automática para fuso do Brasil
 
