@@ -34,9 +34,20 @@ def aplicar_filtros_interativos(df, colunas_ordenadas):
         st.session_state["expander_filtros_aberto"] = False
  
     with st.expander(" Advanced Filters (optional)", expanded=st.session_state["expander_filtros_aberto"]):
- 
-        # Remove "Select" das opções de filtro
-        colunas_disponiveis = [col for col in colunas_ordenadas if col != "Select"]
+
+        # Remove "Select" e filtros rápidos (já exibidos fora) das opções de filtro
+        quick_filter_columns_upper = {
+            "FAROL REFERENCE",
+            "FAROL STATUS",
+            # Booking Status pode ter nomes diferentes por origem
+            "BOOKING STATUS", "B_BOOKING_STATUS",
+            # Booking Reference pode ter nomes diferentes por origem
+            "BOOKING REFERENCE", "B_BOOKING_REFERENCE", "_BOOKING_REFERENCE",
+        }
+        colunas_disponiveis = [
+            col for col in colunas_ordenadas
+            if col != "Select" and col.upper() not in quick_filter_columns_upper
+        ]
         
         # Importa o mapeamento de nomes de exibição
         from shipments_mapping import get_display_names
@@ -163,6 +174,9 @@ def exibir_shipments():
     
     # Salva o stage atual na sessão
     st.session_state["current_stage"] = choose
+    
+    # Linha separadora após a navegação
+    st.markdown("---")
 
     # --- LÓGICA DE PAGINAÇÃO ---
     if 'shipments_current_page' not in st.session_state:
@@ -331,12 +345,13 @@ def exibir_shipments():
         else:
             qf_farol_status = None
 
-    # 3) Booking Status (coluna pode variar por origem)
+    # 3) Booking Status (sempre visível; desabilita se coluna não existir; detecção case-insensitive)
     with qf_col3:
         booking_status_col = None
-        for candidate in ["Booking Status", "B_BOOKING_STATUS", "b_booking_status"]:
-            if candidate in df.columns:
-                booking_status_col = candidate
+        df_cols_upper = {c.upper(): c for c in df.columns}
+        for candidate in ["BOOKING STATUS", "B_BOOKING_STATUS"]:
+            if candidate in df_cols_upper:
+                booking_status_col = df_cols_upper[candidate]
                 break
         if booking_status_col:
             booking_status_unique = (
@@ -350,21 +365,28 @@ def exibir_shipments():
                 key="qf_booking_status"
             )
         else:
-            qf_booking_status = None
+            # Mantém o componente visível e habilitado; sem efeito quando coluna não existe
+            qf_booking_status = st.selectbox(
+                "Booking Status",
+                options=["Todos"],
+                index=0,
+                key="qf_booking_status"
+            )
 
-    # 4) Booking Reference (texto - nome da coluna pode variar)
+    # 4) Booking (sempre visível; desabilita se coluna não existir; detecção case-insensitive)
     with qf_col4:
         booking_ref_col = None
-        for candidate in ["Booking Reference", "b_booking_reference", "B_BOOKING_REFERENCE"]:
-            if candidate in df.columns:
-                booking_ref_col = candidate
+        df_cols_upper = {c.upper(): c for c in df.columns}
+        for candidate in ["BOOKING REFERENCE", "B_BOOKING_REFERENCE", "_BOOKING_REFERENCE"]:
+            if candidate in df_cols_upper:
+                booking_ref_col = df_cols_upper[candidate]
                 break
         qf_booking_ref = st.text_input(
             "Booking",
             value="",
             placeholder="Digite parte do booking",
             key="qf_booking_reference"
-        ) if booking_ref_col else None
+        )
 
     # Aplicar filtros rápidos
     if qf_farol_ref:
