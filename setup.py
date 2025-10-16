@@ -11,7 +11,7 @@ from auth.login import has_access_level, get_current_user # NEW
 from auth.auth_db import ( # NEW
     list_users, create_user, update_user, 
     reset_user_password, get_business_units,
-    check_username_exists, check_email_exists
+    check_username_exists, check_email_exists, change_own_password
 )
 from ellox_sync_functions import get_sync_config, update_sync_config, get_sync_statistics, get_sync_logs
 
@@ -138,9 +138,10 @@ def exibir_setup():
 
     # Define as abas disponíveis com base no nível de acesso
     if has_access_level('ADMIN'):
-        tab_names = ["Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
+        tab_names = ["Alterar Senha", "Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
     else:
-        tab_names = ["Gerenciamento de Credenciais"]
+        # Usuários não-admin podem alterar sua própria senha
+        tab_names = ["Alterar Senha"]
 
     # Usa st.radio para criar uma navegação que persiste o estado entre recarregamentos
     selected_tab = st.radio(
@@ -152,7 +153,14 @@ def exibir_setup():
     )
 
     # Renderiza o conteúdo da aba selecionada
-    if selected_tab == "Gerenciamento de Credenciais":
+    if selected_tab == "Alterar Senha":
+        show_change_password_form()
+    
+    elif selected_tab == "Gerenciamento de Credenciais":
+        if not has_access_level('ADMIN'):
+            st.error("❌ Acesso negado. Esta funcionalidade é restrita a administradores.")
+            return
+        
         st.info("As credenciais salvas aqui são usadas para autenticar com a API Ellox e o Proxy corporativo. As alterações são temporárias para esta sessão.")
 
         col_general_conn, col_api_conn = st.columns(2)
@@ -899,3 +907,84 @@ def show_sync_logs():
     except Exception as e:
         st.error(f"❌ Erro ao carregar logs de sincronização: {str(e)}")
         st.error(f"Detalhes: {traceback.format_exc()}")
+
+
+def show_change_password_form():
+    """Formulário para o usuário alterar sua própria senha"""
+    st.header("🔑 Alterar Minha Senha")
+    
+    # Obter informações do usuário atual
+    current_user = get_current_user()
+    if not current_user:
+        st.error("❌ Usuário não autenticado.")
+        return
+    
+    st.info(f"**Usuário:** {current_user}")
+    st.markdown("---")
+    
+    with st.form("change_password_form"):
+        st.subheader("Alterar Senha")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            current_password = st.text_input(
+                "Senha Atual*", 
+                type="password",
+                help="Digite sua senha atual para confirmar a identidade"
+            )
+        
+        with col2:
+            new_password = st.text_input(
+                "Nova Senha*", 
+                type="password",
+                help="Mínimo de 6 caracteres"
+            )
+        
+        confirm_password = st.text_input(
+            "Confirmar Nova Senha*", 
+            type="password",
+            help="Digite a nova senha novamente"
+        )
+        
+        st.markdown("**Obs:** Após alterar a senha, você precisará fazer login novamente.")
+        
+        if st.form_submit_button("🔑 Alterar Senha", use_container_width=True, type="primary"):
+            # Validações
+            if not all([current_password, new_password, confirm_password]):
+                st.error("❌ Preencha todos os campos obrigatórios (*)")
+            elif len(new_password) < 6:
+                st.error("❌ A nova senha deve ter no mínimo 6 caracteres")
+            elif new_password != confirm_password:
+                st.error("❌ As senhas não coincidem")
+            elif current_password == new_password:
+                st.error("❌ A nova senha deve ser diferente da senha atual")
+            else:
+                # Tentar alterar a senha
+                if change_own_password(current_user, current_password, new_password):
+                    st.success("✅ Senha alterada com sucesso!")
+                    st.balloons()
+                    st.info("🔄 Você será redirecionado para o login em 3 segundos...")
+                    
+                    # Aguardar 3 segundos e redirecionar para login
+                    import time
+                    time.sleep(3)
+                    
+                    # Definir navegação desejada pós-login para a tela principal
+                    st.session_state["navigate_to"] = "Shipments"
+                    st.session_state["menu_choice"] = "Shipments"
+                    st.session_state["current_page"] = "main"
+                    
+                    # Limpar sessão e redirecionar para login
+                    from auth.login import destroy_session
+                    destroy_session()
+                    
+                    # Limpar apenas estados do setup (preservar navigate_to)
+                    for key in list(st.session_state.keys()):
+                        if key.startswith("setup_"):
+                            del st.session_state[key]
+                    
+                    # Forçar redirecionamento para login (o app.py detectará que não está logado)
+                    st.rerun()
+                else:
+                    st.error("❌ Senha atual incorreta ou erro ao alterar senha. Tente novamente.")

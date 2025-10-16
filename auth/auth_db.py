@@ -229,6 +229,41 @@ def reset_user_password(user_id: int, new_password: str, updated_by: str) -> boo
     finally:
         conn.close()
 
+def change_own_password(username: str, current_password: str, new_password: str) -> bool:
+    """Altera a senha do próprio usuário (verifica senha atual)"""
+    conn = get_db_connection()
+    
+    try:
+        # Primeiro, verificar se a senha atual está correta
+        auth_result = authenticate_user(username, current_password)
+        if not auth_result:
+            return False
+        
+        # Se a senha atual está correta, alterar para a nova senha
+        password_hash = hash_password(new_password)
+        
+        query = text("""
+            UPDATE LogTransp.F_CON_USERS
+            SET PASSWORD_HASH = :password_hash,
+                PASSWORD_RESET_REQUIRED = 0,
+                UPDATED_AT = SYSTIMESTAMP,
+                UPDATED_BY = :username
+            WHERE USERNAME = :username
+        """)
+        
+        conn.execute(query, {
+            "username": username,
+            "password_hash": password_hash
+        })
+        conn.commit()
+        return True
+        
+    except Exception as e:
+        st.error(f"Erro ao alterar senha: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
 def list_users() -> List[Dict]:
     """Lista todos os usuários (apenas admin)"""
     conn = get_db_connection()
