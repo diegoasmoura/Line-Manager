@@ -666,10 +666,16 @@ SELECT USERNAME, FULL_NAME, ACCESS_LEVEL, IS_ACTIVE FROM LogTransp.F_CON_USERS;
 
 A tela principal oferece uma visão completa de todos os embarques:
 
-1. **Filtros Avançados**: Use os filtros para localizar embarques específicos
-2. **Edição em Linha**: Clique nas células para editar informações diretamente
-3. **Seleção de Embarques**: Use os checkboxes para selecionar embarques
-4. **Ações Rápidas**: Botões para criar, editar e gerenciar embarques
+1. **Filtros Rápidos (sempre visíveis)**: Logo abaixo dos KPIs, os filtros:
+   - Farol Reference (texto)
+   - Farol Status (lista)
+   - Booking Status (lista)
+   - Booking (texto)
+   Esses filtros são aplicados antes da paginação, garantindo que resultados em páginas seguintes também sejam encontrados. Suporte a variações de colunas: `B_BOOKING_STATUS`, `B_BOOKING_REFERENCE`, `_BOOKING_REFERENCE`.
+2. **Filtros Avançados (expander)**: Filtros adicionais por múltiplas colunas. Quando ativos, o sistema busca todos os registros, aplica os filtros e só então pagina no cliente (não limita à página atual).
+3. **Edição em Linha**: Clique nas células para editar informações diretamente
+4. **Seleção de Embarques**: Use os checkboxes para selecionar embarques
+5. **Ações Rápidas**: Botões para criar, editar e gerenciar embarques
 
 ### 📋 Stages (Etapas)
 

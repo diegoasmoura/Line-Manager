@@ -407,13 +407,13 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
  
 #Obter os dados das tabelas principais Sales
 #@st.cache_data(ttl=300)
-def get_data_salesData(page_number: int = 1, page_size: int = 25):
+def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool = False):
     """Executa a consulta SQL com paginação, aplica o mapeamento de colunas e retorna um DataFrame formatado e o total de registros."""
     conn = None
     offset = (page_number - 1) * page_size
 
-    # Consulta SQL paginada e ordenada pelos mais recentes
-    query = f'''
+    # Consulta SQL (com ou sem paginação), ordenada pelos mais recentes
+    base_query = '''
     SELECT 
         FAROL_REFERENCE                    AS s_farol_reference,
         FAROL_STATUS                       AS s_farol_status,
@@ -454,8 +454,12 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
         USER_LOGIN_SALES_CREATED           AS s_sales_owner,
         S_COMMENTS                         AS s_comments
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY FAROL_REFERENCE DESC
-    OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
+    ORDER BY FAROL_REFERENCE DESC'''
+
+    if all_rows:
+        query = base_query
+    else:
+        query = base_query + f"\nOFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
 
     count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
 
@@ -499,13 +503,13 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
  
  #Obter os dados das tabelas principais Booking
 #@st.cache_data(ttl=300)
-def get_data_bookingData(page_number: int = 1, page_size: int = 25):
+def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bool = False):
     """Executa a consulta SQL com paginação, aplica o mapeamento de colunas e retorna um DataFrame formatado e o total de registros."""
     conn = None
     offset = (page_number - 1) * page_size
 
-    # Consulta SQL paginada e ordenada pelos mais recentes
-    query = f'''
+    # Consulta SQL (com ou sem paginação), ordenada pelos mais recentes
+    base_query = '''
     SELECT 
         ID                                  AS b_id,
         FAROL_REFERENCE                      AS b_farol_reference,
@@ -557,8 +561,12 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
         S_PORT_OF_LOADING_POL                AS b_port_of_loading_pol,
         S_PORT_OF_DELIVERY_POD               AS b_port_of_delivery_pod
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY FAROL_REFERENCE DESC
-    OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
+    ORDER BY FAROL_REFERENCE DESC'''
+
+    if all_rows:
+        query = base_query
+    else:
+        query = base_query + f"\nOFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
 
     count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
 
@@ -619,13 +627,13 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25):
 
 # Obter os dados da visão geral (todos os campos)
 #@st.cache_data(ttl=300)
-def get_data_generalView(page_number: int = 1, page_size: int = 25):
+def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bool = False):
     """Executa a consulta SQL com paginação para a visão geral, retornando todas as colunas das visões de Sales e Booking."""
     conn = None
     offset = (page_number - 1) * page_size
 
-    # Consulta explícita combinando todos os campos necessários para ambas as visões
-    query = f'''
+    # Consulta explícita combinando todos os campos necessários para ambas as visões (com ou sem paginação)
+    base_query = '''
     SELECT 
         ID                                 AS s_id,
         FAROL_REFERENCE                    AS s_farol_reference,
@@ -702,8 +710,12 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25):
         B_COMMENTS                           AS b_comments,
         ADJUSTMENT_ID                        AS adjustment_id
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
-    ORDER BY FAROL_REFERENCE DESC
-    OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY'''
+    ORDER BY FAROL_REFERENCE DESC'''
+
+    if all_rows:
+        query = base_query
+    else:
+        query = base_query + f"\nOFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
 
     count_query = 'SELECT COUNT(*) FROM LogTransp.F_CON_SALES_BOOKING_DATA'
 

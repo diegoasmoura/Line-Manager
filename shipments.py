@@ -71,6 +71,8 @@ def aplicar_filtros_interativos(df, colunas_ordenadas):
         # Converte nomes amigáveis de volta para nomes internos
         nome_para_interno = {opcao[0]: opcao[1] for opcao in opcoes_filtro}
         colunas_filtradas_internas = [nome_para_interno[nome] for nome in colunas_filtradas]
+        # Salva seleção interna no estado para uso na paginação baseada em filtros
+        st.session_state["colunas_filtradas_internas"] = colunas_filtradas_internas
         filtros = {}
  
  
@@ -111,7 +113,7 @@ def aplicar_filtros_interativos(df, colunas_ordenadas):
                 else:
                     filtros[col] = ("range", pd.Timestamp(srange[0]), pd.Timestamp(srange[1]))
  
-        # Aplica os filtros no DataFrame
+        # Aplica os filtros no DataFrame (nota: também aplicaremos em df_full no nível superior quando ativo)
         for col, val in filtros.items():
             if val is None:
                 continue
@@ -184,7 +186,7 @@ def exibir_shipments():
 
     page_size = 25  # Tamanho fixo de página
 
-    # Carrega os dados paginados
+    # Carrega dados (paginados por padrão)
     if choose == "Sales Data":
         df, total_records = get_data_salesData(page_number=st.session_state.shipments_current_page, page_size=page_size)
     elif choose == "Booking Management":
@@ -388,21 +390,90 @@ def exibir_shipments():
             key="qf_booking_reference"
         )
 
-    # Aplicar filtros rápidos
-    if qf_farol_ref:
-        df = df[df[farol_ref_col].astype(str).str.contains(qf_farol_ref, case=False, na=False)]
+    # Se qualquer filtro rápido foi utilizado, recarrega todos os registros e aplica filtro antes de paginar
+    quick_filters_active = bool(
+        (qf_farol_ref and len(qf_farol_ref) > 0) or
+        (qf_farol_status and qf_farol_status != "Todos") or
+        (qf_booking_status and qf_booking_status != "Todos") or
+        (qf_booking_ref and len(qf_booking_ref) > 0)
+    )
 
-    if qf_farol_status and qf_farol_status != "Todos" and "Farol Status" in df.columns:
-        # Normaliza ambos antes de comparar
-        _norm_target = clean_farol_status_value(qf_farol_status).strip().lower()
-        _norm_series = df["Farol Status"].astype(str).apply(clean_farol_status_value).str.strip().str.lower()
-        df = df[_norm_series == _norm_target]
+    # Checa filtros avançados ativos
+    advanced_cols = st.session_state.get("colunas_filtradas_internas", [])
+    advanced_filters_active = bool(advanced_cols)
 
-    if qf_booking_status and qf_booking_status != "Todos" and booking_status_col:
-        df = df[df[booking_status_col].astype(str).str.strip().str.lower() == qf_booking_status.strip().lower()]
+    if quick_filters_active or advanced_filters_active:
+        # Recarrega todos os registros para filtrar no cliente (antes da paginação)
+        if choose == "Sales Data":
+            df_full, total_records_full = get_data_salesData(page_number=1, page_size=page_size, all_rows=True)
+        elif choose == "Booking Management":
+            df_full, total_records_full = get_data_bookingData(page_number=1, page_size=page_size, all_rows=True)
+        else:
+            df_full, total_records_full = get_data_generalView(page_number=1, page_size=page_size, all_rows=True)
 
-    if qf_booking_ref and booking_ref_col:
-        df = df[df[booking_ref_col].astype(str).str.contains(qf_booking_ref, case=False, na=False)]
+        # Aplica os mesmos renomes de Farol Reference para consistência
+        if rename_map:
+            df_full.rename(columns=rename_map, inplace=True)
+
+        # Aplica filtros rápidos sobre o df_full
+        if qf_farol_ref:
+            df_full = df_full[df_full[farol_ref_col].astype(str).str.contains(qf_farol_ref, case=False, na=False)]
+
+        if qf_farol_status and qf_farol_status != "Todos" and "Farol Status" in df_full.columns:
+            _norm_target = clean_farol_status_value(qf_farol_status).strip().lower()
+            _norm_series = df_full["Farol Status"].astype(str).apply(clean_farol_status_value).str.strip().str.lower()
+            df_full = df_full[_norm_series == _norm_target]
+
+        if qf_booking_status and qf_booking_status != "Todos" and booking_status_col:
+            df_full = df_full[df_full[booking_status_col].astype(str).str.strip().str.lower() == qf_booking_status.strip().lower()]
+
+        if qf_booking_ref and booking_ref_col:
+            df_full = df_full[df_full[booking_ref_col].astype(str).str.contains(qf_booking_ref, case=False, na=False)]
+
+        # Aplica filtros avançados no df_full (igual à lógica da função)
+        if advanced_filters_active:
+            from shipments_mapping import get_display_names
+            display_names = get_display_names()
+            # Reconstrói mapping amigável->interno para colunas disponíveis no df_full
+            nome_para_interno_full = {display_names.get(col, col): col for col in df_full.columns if col != "Select"}
+            # Percorre colunas internas selecionadas
+            for col in advanced_cols:
+                if col not in df_full.columns:
+                    continue
+                col_data = df_full[col]
+                # Recupera o controle pelo mesmo padrão de keys usados acima
+                if col_data.dtype == "object":
+                    selected_vals = st.session_state.get(f"{col}_multiselect")
+                    if selected_vals:
+                        df_full = df_full[df_full[col].isin(selected_vals)]
+                elif pd.api.types.is_numeric_dtype(col_data):
+                    slider_val = st.session_state.get(f"{col}_slider")
+                    if slider_val:
+                        min_val, max_val = slider_val
+                        df_full = df_full[(df_full[col] >= min_val) & (df_full[col] <= max_val)]
+                elif pd.api.types.is_bool_dtype(col_data):
+                    radio_val = st.session_state.get(f"{col}_radio")
+                    if radio_val in [True, False]:
+                        df_full = df_full[df_full[col] == radio_val]
+                elif pd.api.types.is_datetime64_any_dtype(col_data):
+                    date_val = st.session_state.get(f"{col}_date")
+                    if date_val:
+                        if isinstance(date_val, (tuple, list, pd.DatetimeIndex)):
+                            srange = list(date_val)
+                        else:
+                            srange = [date_val]
+                        if len(srange) == 1:
+                            df_full = df_full[df_full[col] >= pd.Timestamp(srange[0])]
+                        elif len(srange) >= 2:
+                            end_of_day = pd.Timestamp(srange[1]) + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+                            df_full = df_full[(df_full[col] >= pd.Timestamp(srange[0])) & (df_full[col] <= end_of_day)]
+
+        # Atualiza total_records e aplica paginação no cliente
+        total_records = len(df_full)
+        total_pages = (total_records // page_size) + (1 if total_records % page_size > 0 else 0)
+        start_idx = (st.session_state.shipments_current_page - 1) * page_size
+        end_idx = start_idx + page_size
+        df = df_full.iloc[start_idx:end_idx].copy()
 
     # Define colunas não editáveis e configurações de dropdowns
     disabled_columns = non_editable_columns(choose)
