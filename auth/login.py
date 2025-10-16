@@ -69,14 +69,13 @@ def show_login_form():
                     else:
                         st.error("❌ Usuário ou senha incorretos, ou usuário inativo")
         
-        # Informações de desenvolvimento
-        with st.expander("ℹ️ Informações para Desenvolvimento"):
+        # Informações de acesso
+        with st.expander("ℹ️ Informações de Acesso"):
             st.markdown("""
-            **Usuário administrador padrão:**
-            - `admin` / `Admin@2025`
+            **Não possui acesso ao sistema?**
             
-            **Nota:** Sistema de autenticação seguro com banco de dados Oracle e hash bcrypt.
-            Acesse Setup > Administração de Usuários para gerenciar usuários.
+            Caso não tenha credenciais de acesso, solicite a criação de usuário ao administrador 
+            responsável pelo processo de gestão de booking.
             """)
 
 
