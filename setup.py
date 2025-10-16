@@ -140,8 +140,8 @@ def exibir_setup():
     if has_access_level('ADMIN'):
         tab_names = ["Alterar Senha", "Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
     else:
-        # Usuários não-admin podem alterar sua própria senha
-        tab_names = ["Alterar Senha"]
+        # Usuários não-admin: permitir visualizar conectividade (sem formulários de credenciais)
+        tab_names = ["Alterar Senha", "Conectividade"]
 
     # Usa st.radio para criar uma navegação que persiste o estado entre recarregamentos
     selected_tab = st.radio(
@@ -256,6 +256,41 @@ def exibir_setup():
                 st.success(st.session_state.proxy_save_message)
             else:
                 st.warning(st.session_state.proxy_save_message)
+
+    elif selected_tab == "Conectividade":
+        # Exibe apenas os cards de status e botões de teste (sem formulários)
+        st.info("As credenciais salvas aqui são usadas para autenticar com a API Ellox e o Proxy corporativo. As alterações são temporárias para esta sessão.")
+
+        col_general_conn, col_api_conn = st.columns(2)
+
+        with col_general_conn:
+            st.subheader("Conexão Geral (Internet/Proxy)")
+            general_result = st.session_state.general_connection_result
+            api_result = st.session_state.api_connection_result
+            
+            if api_result.get("success", False):
+                st.success(f"Online ✅ (via API Ellox)")
+                st.caption(f"Último teste: {st.session_state.api_last_validated}")
+            elif general_result["success"]:
+                st.success(f"Online ✅ ({general_result.get('response_time', 0.0):.2f}s)")
+                st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
+            else:
+                st.error(f"Offline ❌: {general_result.get('error', 'Erro desconhecido')}")
+                st.caption(f"Último teste: {st.session_state.general_connection_last_validated}")
+            
+            if st.button("Testar Conexão Geral", key="test_general_conn_card_btn_viewer"):
+                test_general_connection()
+
+        with col_api_conn:
+            st.subheader("Conexão API Ellox")
+            api_result = st.session_state.api_connection_result
+            if api_result["success"]:
+                st.success(f"Online ✅ ({api_result.get('response_time', 0.0):.2f}s)")
+            else:
+                st.error(f"Offline ❌: {api_result.get('error', 'Erro desconhecido')}")
+            st.caption(f"Último teste: {st.session_state.api_last_validated}")
+            if st.button("Testar Conexão API Ellox", key="test_api_conn_card_btn_viewer"):
+                test_api_connection()
 
     elif selected_tab == "Administração de Usuários" and has_access_level('ADMIN'):
         show_user_administration()
