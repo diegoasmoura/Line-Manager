@@ -198,6 +198,8 @@ def exibir_shipments():
         df.rename(columns=rename_map, inplace=True)
     farol_ref_col = "Farol Reference"
 
+    # Quick Filters serão exibidos após os KPIs — movidos mais abaixo
+
       # Filtro removido - agora todos os splits são visíveis na grade
     # Os splits podem ser gerenciados através do histórico
 
@@ -299,6 +301,87 @@ def exibir_shipments():
     with k4:
         st.metric("⚠️ Pending Adjustments", pending_adjustments)
  
+    # ------------------------
+    # Quick Filters (acima do Advanced Filters)
+    # ------------------------
+    qf_col1, qf_col2, qf_col3, qf_col4 = st.columns(4)
+
+    # 1) Farol Reference (texto)
+    with qf_col1:
+        qf_farol_ref = st.text_input(
+            "Farol Reference",
+            value="",
+            placeholder="Digite parte da referência",
+            key="qf_farol_reference"
+        )
+
+    # 2) Farol Status (lista)
+    with qf_col2:
+        if "Farol Status" in df.columns:
+            status_unique = (
+                df["Farol Status"].dropna().astype(str).apply(clean_farol_status_value).str.strip().str.title().unique().tolist()
+            )
+            status_unique = sorted(list({s for s in status_unique if s}))
+            qf_farol_status = st.selectbox(
+                "Farol Status",
+                options=["Todos"] + status_unique,
+                index=0,
+                key="qf_farol_status"
+            )
+        else:
+            qf_farol_status = None
+
+    # 3) Booking Status (coluna pode variar por origem)
+    with qf_col3:
+        booking_status_col = None
+        for candidate in ["Booking Status", "B_BOOKING_STATUS", "b_booking_status"]:
+            if candidate in df.columns:
+                booking_status_col = candidate
+                break
+        if booking_status_col:
+            booking_status_unique = (
+                df[booking_status_col].dropna().astype(str).str.strip().unique().tolist()
+            )
+            booking_status_unique = sorted(list({s for s in booking_status_unique if s}))
+            qf_booking_status = st.selectbox(
+                "Booking Status",
+                options=["Todos"] + booking_status_unique,
+                index=0,
+                key="qf_booking_status"
+            )
+        else:
+            qf_booking_status = None
+
+    # 4) Booking Reference (texto - nome da coluna pode variar)
+    with qf_col4:
+        booking_ref_col = None
+        for candidate in ["Booking Reference", "b_booking_reference", "B_BOOKING_REFERENCE"]:
+            if candidate in df.columns:
+                booking_ref_col = candidate
+                break
+        qf_booking_ref = st.text_input(
+            "Booking",
+            value="",
+            placeholder="Digite parte do booking",
+            key="qf_booking_reference"
+        ) if booking_ref_col else None
+
+    # Aplicar filtros rápidos
+    if qf_farol_ref:
+        df = df[df[farol_ref_col].astype(str).str.contains(qf_farol_ref, case=False, na=False)]
+
+    if qf_farol_status and qf_farol_status != "Todos" and "Farol Status" in df.columns:
+        # Normaliza ambos antes de comparar
+        _norm_target = clean_farol_status_value(qf_farol_status).strip().lower()
+        _norm_series = df["Farol Status"].astype(str).apply(clean_farol_status_value).str.strip().str.lower()
+        df = df[_norm_series == _norm_target]
+
+    if qf_booking_status and qf_booking_status != "Todos" and booking_status_col:
+        df = df[df[booking_status_col].astype(str).str.strip().str.lower() == qf_booking_status.strip().lower()]
+
+    if qf_booking_ref and booking_ref_col:
+        df = df[df[booking_ref_col].astype(str).str.contains(qf_booking_ref, case=False, na=False)]
+
     # Define colunas não editáveis e configurações de dropdowns
     disabled_columns = non_editable_columns(choose)
     # Ajusta nomes das colunas desabilitadas considerando renomeações para "Farol Reference"
