@@ -288,9 +288,9 @@ def show_user_administration():
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total de Usuários", total_users)
+        st.metric("Total de DSID", total_users)
     with col2:
-        st.metric("Usuários Ativos", active_users, delta=f"{inactive_users} inativos")
+        st.metric("DSID Ativos", active_users, delta=f"{inactive_users} inativos")
     with col3:
         admin_count = len([u for u in users if u['access_level'] == 'ADMIN'])
         st.metric("Administradores", admin_count)
@@ -300,27 +300,33 @@ def show_user_administration():
     
     st.markdown("---")
     
-    # Sub-abas para funcionalidades
-    sub_tabs = st.tabs(["📋 Listar Usuários", "➕ Novo Usuário", "✏️ Editar Usuário", "🔑 Reset de Senha"])
-    
-    with sub_tabs[0]:
+    # Cria as abas usando desempacotamento para garantir o contexto correto
+    list_tab, create_tab, edit_tab, reset_tab = st.tabs([
+        "📋 Listar DSID",
+        "➕ Novo DSID", 
+        "✏️ Editar DSID",
+        "🔑 Reset de Senha"
+    ])
+
+    # Conteúdo de cada aba em seu próprio contexto
+    with list_tab:
         show_user_list(users)
-    
-    with sub_tabs[1]:
+
+    with create_tab:
         show_create_user_form()
-    
-    with sub_tabs[2]:
+
+    with edit_tab:
         show_edit_user_form(users)
-    
-    with sub_tabs[3]:
+
+    with reset_tab:
         show_reset_password_form(users)
 
 def show_user_list(users):
     """Lista todos os usuários em tabela formatada"""
-    st.subheader("Usuários Cadastrados")
+    st.subheader("DSID Cadastrados")
     
     if not users:
-        st.info("Nenhum usuário cadastrado.")
+        st.info("Nenhum DSID cadastrado.")
         return
     
     # Converter para DataFrame
@@ -337,7 +343,7 @@ def show_user_list(users):
     
     # Renomear colunas para exibição
     df = df.rename(columns={
-        'username': 'Usuário',
+        'username': 'DSID',
         'full_name': 'Nome Completo',
         'email': 'Email',
         'business_unit': 'Unidade de Negócio',
@@ -348,7 +354,7 @@ def show_user_list(users):
     
     # Exibir tabela
     st.dataframe(
-        df[['Usuário', 'Nome Completo', 'Email', 'Unidade de Negócio', 
+        df[['DSID', 'Nome Completo', 'Email', 'Unidade de Negócio', 
             'Nível de Acesso', 'Status', 'Último Login']],
         use_container_width=True,
         hide_index=True
@@ -356,7 +362,7 @@ def show_user_list(users):
 
 def show_create_user_form():
     """Formulário de criação de usuário"""
-    st.subheader("Criar Novo Usuário")
+    st.subheader("Criar Novo DSID")
     
     business_units = get_business_units()
     unit_options = ['Todas'] + [u['UNIT_NAME'] for u in business_units]
@@ -369,14 +375,14 @@ def show_create_user_form():
         col1, col2 = st.columns(2)
         
         with col1:
-            username = st.text_input("Usuário*", placeholder="usuario.nome", 
-                                   help="Nome único para login", key=f"create_username_{form_counter}")
-            email = st.text_input("Email*", placeholder="usuario@empresa.com", key=f"create_email_{form_counter}")
+            username = st.text_input("DSID*", placeholder="D510098", 
+                                   help="Identificador corporativo (DSID)", key=f"create_username_{form_counter}")
+            email = st.text_input("Email*", placeholder="d510098@empresa.com", key=f"create_email_{form_counter}")
             full_name = st.text_input("Nome Completo*", placeholder="Nome Sobrenome", key=f"create_full_name_{form_counter}")
         
         with col2:
             password = st.text_input("Senha Inicial*", type="password",
-                                   help="Usuário será solicitado a trocar no primeiro login", key=f"create_password_{form_counter}")
+                                   help="O usuário DSID será solicitado a trocar no primeiro login", key=f"create_password_{form_counter}")
             
             business_unit = st.selectbox("Unidade de Negócio", options=unit_options)
             
@@ -386,15 +392,15 @@ def show_create_user_form():
                 format_func=lambda x: {'VIEW': '👁️ Visualização', 'EDIT': '✏️ Edição', 'ADMIN': '⚙️ Administrador'}[x]
             )
         
-        st.markdown("**Obs:** Usuário será forçado a trocar a senha no primeiro login.")
+        st.markdown("**Obs:** O DSID será forçado a trocar a senha no primeiro login.")
         
-        if st.form_submit_button("➕ Criar Usuário", use_container_width=True):
+        if st.form_submit_button("➕ Criar DSID", use_container_width=True):
             if not all([username, email, password, full_name]):
                 st.error("❌ Preencha todos os campos obrigatórios (*)")
             elif len(password) < 6:
                 st.error("❌ A senha deve ter no mínimo 6 caracteres")
             elif check_username_exists(username):
-                st.error("❌ Username já existe. Escolha outro.")
+                st.error("❌ DSID já existe. Escolha outro.")
             elif check_email_exists(email):
                 st.error("❌ Email já existe. Escolha outro.")
             else:
@@ -408,18 +414,18 @@ def show_create_user_form():
                     # SUCESSO: Incrementar contador para limpar o formulário e definir flags.
                     st.session_state['form_counter'] = st.session_state.get('form_counter', 0) + 1
                     st.session_state['user_list_updated'] = True
-                    st.session_state['user_admin_message'] = f"✅ Usuário '{username}' criado com sucesso!"
+                    st.session_state['user_admin_message'] = f"✅ DSID '{username}' criado com sucesso!"
                     st.rerun() # Força o recarregamento para exibir o feedback e atualizar a UI
                 else:
                     # ERRO: NÃO incrementa contador, para manter os dados do formulário para correção.
-                    st.error("❌ Erro ao criar usuário. Tente novamente.")
+                    st.error("❌ Erro ao criar DSID. Tente novamente.")
 
 def show_edit_user_form(users):
     """Formulário de edição de usuário"""
-    st.subheader("Editar Usuário")
+    st.subheader("Editar DSID")
     
     if not users:
-        st.info("Nenhum usuário para editar.")
+        st.info("Nenhum DSID para editar.")
         return
     
     business_units = get_business_units()
@@ -427,7 +433,7 @@ def show_edit_user_form(users):
     
     # Seleção de usuário
     user_to_edit = st.selectbox(
-        "Selecione o usuário",
+        "Selecione o DSID",
         options=[u['username'] for u in users],
         format_func=lambda x: f"{x} - {next(u['full_name'] for u in users if u['username'] == x)}"
     )
@@ -439,7 +445,7 @@ def show_edit_user_form(users):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.text_input("Usuário (não editável)", value=user_data['username'], disabled=True)
+                st.text_input("DSID (não editável)", value=user_data['username'], disabled=True)
                 email = st.text_input("Email", value=user_data['email'])
                 full_name = st.text_input("Nome Completo", value=user_data['full_name'])
             
@@ -478,22 +484,22 @@ def show_edit_user_form(users):
                     access_level, is_active, get_current_user()
                 ):
                     st.session_state['user_list_updated'] = True
-                    st.session_state['user_admin_message'] = "✅ Usuário atualizado com sucesso!"
+                    st.session_state['user_admin_message'] = "✅ DSID atualizado com sucesso!"
                     st.rerun() # Força o recarregamento para exibir o feedback e atualizar a UI
                 else:
-                    st.error("❌ Erro ao atualizar usuário. Tente novamente.")
+                    st.error("❌ Erro ao atualizar DSID. Tente novamente.")
 
 def show_reset_password_form(users):
     """Formulário de reset de senha"""
-    st.subheader("Reset de Senha")
+    st.subheader("Reset de Senha (DSID)")
     
     if not users:
-        st.info("Nenhum usuário para resetar senha.")
+        st.info("Nenhum DSID para resetar senha.")
         return
     
     with st.form("reset_password_form"):
         user_to_reset = st.selectbox(
-            "Selecione o usuário",
+            "Selecione o DSID",
             options=[u['username'] for u in users],
             format_func=lambda x: f"{x} - {next(u['full_name'] for u in users if u['username'] == x)}"
         )
@@ -501,7 +507,7 @@ def show_reset_password_form(users):
         new_password = st.text_input("Nova Senha", type="password")
         confirm_password = st.text_input("Confirmar Nova Senha", type="password")
         
-        st.markdown("**Obs:** Usuário será forçado a trocar a senha no próximo login.")
+        st.markdown("**Obs:** O DSID será forçado a trocar a senha no próximo login.")
         
         if st.form_submit_button("🔑 Resetar Senha", use_container_width=True):
             if not new_password or not confirm_password:
@@ -515,10 +521,10 @@ def show_reset_password_form(users):
                 
                 if reset_user_password(user_data['user_id'], new_password, get_current_user()):
                     st.session_state['user_list_updated'] = True
-                    st.session_state['user_admin_message'] = f"✅ Senha do usuário '{user_to_reset}' resetada com sucesso!"
+                    st.session_state['user_admin_message'] = f"✅ Senha do DSID '{user_to_reset}' resetada com sucesso!"
                     st.rerun() # Força o recarregamento para exibir o feedback e atualizar a UI
                 else:
-                    st.error("❌ Erro ao resetar senha. Tente novamente.")
+                    st.error("❌ Erro ao resetar senha do DSID. Tente novamente.")
 
 
 def show_sync_configuration():
