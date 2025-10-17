@@ -131,17 +131,17 @@ def get_column_mapping():
 def non_editable_columns(stage):
  
     if stage == "Sales Data":
-        non_editable = ["Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic", "Farol Status"]
+        non_editable = ["Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic"]
     elif stage == "Booking Management":
-        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Farol Status"]
+        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD"]
     elif stage == "General View":
         non_editable = list(dict.fromkeys([
             "Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic",
             "Booking Registered Date", "Type of Shipment", "Sales Quantity of Containers", "Container Type", 
-            "Port of Loading POL", "Port of Delivery POD", "Farol Status"
+            "Port of Loading POL", "Port of Delivery POD"
         ]))
     elif stage == "Container Delivery at Port":
-        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Farol Status"]
+        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD"]
     else:
         non_editable = []
  
@@ -180,6 +180,7 @@ def drop_downs(data_show, df_udc):
     # Tipo de editor para colunas específicas
     column_editors = {
         # Sales Data (mantido como está)
+        "Farol Status": "select",
         "Business": "select",
         "Port of Loading POL": "select",
         "Port of Delivery POD": "select",
@@ -206,7 +207,7 @@ def drop_downs(data_show, df_udc):
         "Volume in Tons": "numeric",
         "Sales Quantity of Containers": "numeric",
         "Requested Shipment Week": "numeric",
-        "Farol Status": "select",
+        
 
         # Booking Management
         "Booking Status": "select",
@@ -329,11 +330,19 @@ def drop_downs(data_show, df_udc):
                     or "Carrier" in data_show.columns
                 )
                 required_field = bool(is_booking_view)
-            column_config[col] = st.column_config.SelectboxColumn(
-                label=display_name,
-                options=dropdown_options[col],
-                required=required_field
-            )
+            if col == "Farol Status":
+                column_config[col] = st.column_config.SelectboxColumn(
+                    label=display_name,
+                    options=dropdown_options[col],
+                    required=required_field,
+                    width="medium"
+                )
+            else:
+                column_config[col] = st.column_config.SelectboxColumn(
+                    label=display_name,
+                    options=dropdown_options[col],
+                    required=required_field
+                )
         elif editor_type == "date":
             column_config[col] = st.column_config.DateColumn(
                 label=display_name,

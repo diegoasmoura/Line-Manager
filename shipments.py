@@ -694,6 +694,8 @@ def exibir_shipments():
         )
         st.markdown(f"<style>{returns_css}</style>", unsafe_allow_html=True)
 
+    # Remove qualquer CSS forçado para Farol Status; usa width nativa do componente
+
     # Destaque visual: colore colunas editáveis (inclui também colunas iniciadas com B_/b_/Booking)
     editable_cols = []
     for c in colunas_ordenadas:
