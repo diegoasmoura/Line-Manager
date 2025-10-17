@@ -645,6 +645,39 @@ def exibir_shipments():
         # apenas nas visões específicas
         colunas_ordenadas = _move_before(df, colunas_ordenadas, "Shipment Requested Date", "Booking Registered Date", choose)
 
+    # Aplica preferência de colunas fixas no início para todos os stages
+    # Ordem desejada (usando nomes internos; alguns possuem exibição amigável depois)
+    # Select, Farol Reference, Farol Status, Booking Status, Booking, Sales Order Reference, Sales Order Date
+    # Detecta Booking Status e Booking Reference com tolerância a nomes alternativos
+    df_cols_upper = {c.upper(): c for c in df.columns}
+    booking_status_col = None
+    for candidate in ["BOOKING STATUS", "B_BOOKING_STATUS"]:
+        if candidate in df_cols_upper:
+            booking_status_col = df_cols_upper[candidate]
+            break
+    booking_ref_col = None
+    for candidate in ["BOOKING REFERENCE", "B_BOOKING_REFERENCE", "_BOOKING_REFERENCE"]:
+        if candidate in df_cols_upper:
+            booking_ref_col = df_cols_upper[candidate]
+            break
+
+    preferred_prefix = [
+        "Select",
+        farol_ref_col,
+        "Farol Status",
+        booking_status_col if booking_status_col else None,
+        booking_ref_col if booking_ref_col else None,
+        "Sales Order Reference",
+        "data_sales_order",  # será exibida como "Sales Order Date"
+    ]
+    preferred_prefix = [c for c in preferred_prefix if c and c in df.columns]
+
+    # Remove preferidas da lista atual e reinsere no início na ordem solicitada
+    for c in preferred_prefix:
+        if c in colunas_ordenadas:
+            colunas_ordenadas.remove(c)
+    colunas_ordenadas = preferred_prefix + colunas_ordenadas
+
     # Aplica filtros avançados APÓS a reordenação das colunas
     df = aplicar_filtros_interativos(df, colunas_ordenadas)
 
