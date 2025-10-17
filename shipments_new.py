@@ -39,7 +39,6 @@ POD_MAPPING = {
 
 # Campos do formulário e seus nomes internos
 form_fields = {
-    "Shipment Status": "s_shipment_status",
     "Type of Shipment": "s_type_of_shipment",
     "Quantity of Containers": "s_quantity_of_containers",
     "Port of Loading POL": "s_port_of_loading_pol",

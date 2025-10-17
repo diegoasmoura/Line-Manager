@@ -3048,7 +3048,6 @@ def display_audit_trail_tab(farol_reference):
                 'S_PLACE_OF_RECEIPT': 'Place of Receipt',
                 'B_COMMENTS': 'Comments Booking',
                 'FAROL_STATUS': 'Farol Status',
-                'S_SHIPMENT_STATUS': 'Shipment Status',
                 'S_CREATION_OF_SHIPMENT': 'Shipment Requested Date',
                 'B_CREATION_OF_BOOKING': 'Booking Registered Date',
                 'B_BOOKING_REQUEST_DATE': 'Booking Requested Date',

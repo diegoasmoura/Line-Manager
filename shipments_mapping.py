@@ -9,7 +9,6 @@ def get_column_mapping():
         "s_id": "ID Sales",
         "adjusts_basic" : "Adjusts Basic",
         "adjusts_critic" : "Adjusts Critic",
-        "s_shipment_status": "Shipment Status",
         "s_farol_status" : "Farol Status",
 
         "s_farol_reference": "Sales Farol Reference",
@@ -156,7 +155,6 @@ def drop_downs(data_show, df_udc):
         "PNL Destination": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
         "DTHC": df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist(),
         "Afloat": df_udc[df_udc["grupo"] == "Yes No"]["dado"].dropna().unique().tolist(),
-        "Shipment Status": df_udc[df_udc["grupo"] == "Origin Status"]["dado"].dropna().unique().tolist(),
         "Type of Shipment": df_udc[df_udc["grupo"] == "Type of Shipment"]["dado"].dropna().unique().tolist(),
         "Container Type": df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().unique().tolist(),
         "Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist(),
@@ -182,7 +180,6 @@ def drop_downs(data_show, df_udc):
     # Tipo de editor para colunas específicas
     column_editors = {
         # Sales Data (mantido como está)
-        "Shipment Status": "select",
         "Business": "select",
         "Port of Loading POL": "select",
         "Port of Delivery POD": "select",

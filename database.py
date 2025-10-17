@@ -475,7 +475,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
             # Identificação
-            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Shipment Status",
+            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -750,7 +750,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         # Lista de colunas seguindo ordem específica solicitada pelo usuário
         combined_cols = [
             # 1. IDENTIFICAÇÃO BÁSICA
-            "Sales Farol Reference", "Farol Status", "Carrier Returns Status", "Type of Shipment", "Shipment Status",
+            "Sales Farol Reference", "Farol Status", "Carrier Returns Status", "Type of Shipment", "Booking Status",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             
             # 2. DATAS INICIAIS
