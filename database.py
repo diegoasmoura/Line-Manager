@@ -420,6 +420,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         S_SHIPMENT_STATUS                  AS s_shipment_status,
         S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
         S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
+        B_BOOKING_REFERENCE                AS b_booking_reference,
         S_CUSTOMER_PO                      AS s_customer_po,
         S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
         S_SALE_ORDER_DATE                  AS s_sales_order_date,
@@ -479,7 +480,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
             # Identificação
-            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status",
+            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -562,6 +563,8 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         S_TYPE_OF_SHIPMENT                   AS s_type_of_shipment,
         S_QUANTITY_OF_CONTAINERS             AS s_quantity_of_containers,
         S_CONTAINER_TYPE                     AS s_container_type,
+        S_SALE_ORDER_REFERENCE               AS s_sales_order_reference,
+        S_SALE_ORDER_DATE                    AS s_sales_order_date,
         S_PORT_OF_LOADING_POL                AS b_port_of_loading_pol,
         S_PORT_OF_DELIVERY_POD               AS b_port_of_delivery_pod
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
@@ -606,7 +609,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
-            "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
+            "Shipment Requested Date", "Sales Order Reference", "data_sales_order", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
             "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
             "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada", 
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",

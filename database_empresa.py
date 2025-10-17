@@ -422,6 +422,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
         S_SHIPMENT_STATUS                  AS s_shipment_status,
         S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
         S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
+        B_BOOKING_REFERENCE                AS b_booking_reference,
         S_CUSTOMER_PO                      AS s_customer_po,
         S_SALE_ORDER_REFERENCE             AS s_sales_order_reference,
         S_SALE_ORDER_DATE                  AS s_sales_order_date,
@@ -477,7 +478,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
             # Identificação
-            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status",
+            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
