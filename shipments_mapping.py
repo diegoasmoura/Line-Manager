@@ -62,7 +62,7 @@ def get_column_mapping():
         "b_farol_status" : "Farol Status",
 
         "b_booking_owner": "Booking Owner",
-        "b_voyage_carrier": "Voyage Carrier",
+        "b_voyage_carrier": "Carrier",
         "b_freight_forwarder": "Freight Forwarder",
         "b_booking_request_date": "Booking Requested Date",
         "b_booking_confirmation_date": "data_booking_confirmation",
@@ -70,7 +70,7 @@ def get_column_mapping():
         "b_voyage_code": "Voyage Code",
         "b_container_type": "Booking Container Type",
         "b_quantity_of_containers": "Booking Quantity of Containers",
-        "b_terminal": "Terminal",
+        "b_terminal": "Port Terminal",
         "b_port_of_loading_pol": "Port of Loading POL",
         "b_port_of_delivery_pod": "Port of Delivery POD",
         "b_final_destination": "Final Destination",
@@ -172,7 +172,7 @@ def drop_downs(data_show, df_udc):
         "Booking Container Type": df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().unique().tolist(),
         "Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
         "Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
-        "Voyage Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
+        "Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
         
         # Container Delivery at Port
         "Truck Loading Status": df_udc[df_udc["grupo"] == "Truck Loading Status"]["dado"].dropna().unique().tolist(),
@@ -216,7 +216,7 @@ def drop_downs(data_show, df_udc):
         "Booking Container Type": "select",
         "Port of Loading POL": "select",
         "Port of Delivery POD": "select",
-        "Voyage Carrier": "select",
+        "Carrier": "select",
         "data_booking_request": "date",
         "data_booking_confirmation": "date",
         "Booking Registered Date": "datetime",  # Adiciona coluna de criação como datetime
@@ -284,7 +284,7 @@ def drop_downs(data_show, df_udc):
         "data_requested_deadline_end": "Requested Deadline End",
         "data_shipment_period_start": "Shipment Period Start",
         "data_shipment_period_end": "Shipment Period End",
-        "data_required_arrival_expected": "Required Arrival Expected",
+        "data_required_arrival_expected": "Required Arrival Date",
         "data_lc_received": "LC Received",
         "data_allocation": "Allocation Date",
         "data_producer_nomination": "Producer Nomination",
@@ -329,7 +329,7 @@ def drop_downs(data_show, df_udc):
                 is_booking_view = (
                     "Booking Status" in data_show.columns
                     or "Booking Reference" in data_show.columns
-                    or "Voyage Carrier" in data_show.columns
+                    or "Carrier" in data_show.columns
                 )
                 required_field = bool(is_booking_view)
             column_config[col] = st.column_config.SelectboxColumn(
@@ -364,7 +364,7 @@ def get_display_names():
         "data_requested_deadline_end": "Requested Deadline End",
         "data_shipment_period_start": "Shipment Period Start",
         "data_shipment_period_end": "Shipment Period End",
-        "data_required_arrival_expected": "Required Arrival Expected",
+        "data_required_arrival_expected": "Required Arrival Date",
         "data_lc_received": "LC Received",
         "data_allocation": "Allocation Date",
         "data_producer_nomination": "Producer Nomination",

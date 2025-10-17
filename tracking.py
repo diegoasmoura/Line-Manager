@@ -203,7 +203,7 @@ def exibir_atualizacao_manual():
         "id": None, "rn": None, "farol_references_list": None,
         "navio": st.column_config.TextColumn("Vessel Name", disabled=True),
         "viagem": st.column_config.TextColumn("Voyage Code", disabled=True),
-        "terminal": st.column_config.TextColumn("Port Terminal City", disabled=True),
+        "terminal": st.column_config.TextColumn("Port Terminal", disabled=True),
         "farol_references_count": st.column_config.NumberColumn("Refs", help="Número de Farol References associadas", disabled=True),
         "data_estimativa_saida": st.column_config.DatetimeColumn("ETD", format="DD/MM/YYYY HH:mm"),
         "data_estimativa_chegada": st.column_config.DatetimeColumn("ETA", format="DD/MM/YYYY HH:mm"),
@@ -338,7 +338,7 @@ def exibir_atualizacao_manual():
                     rename_map = {
                         'navio': 'Vessel Name',
                         'viagem': 'Voyage Code',
-                        'terminal': 'Port Terminal City',
+                        'terminal': 'Port Terminal', 
                         'data_source': 'Source',
                         'data_estimativa_saida': 'ETD',
                         'data_estimativa_chegada': 'ETA',

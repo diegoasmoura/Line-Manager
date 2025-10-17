@@ -808,7 +808,7 @@ if col == "Farol Status":
 
 #### ⚠️ **Tratamento Especial de Colunas de Data (CRÍTICO)**
 
-**Problema Identificado**: As colunas de data específicas (`Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date`) não estavam sendo salvas corretamente na tabela `F_CON_RETURN_CARRIERS` durante operações de split.
+**Problema Identificado**: As colunas de data específicas (`Required Arrival Date`, `Requested Deadline Start Date`, `Requested Deadline End Date`) não estavam sendo salvas corretamente na tabela `F_CON_RETURN_CARRIERS` durante operações de split.
 
 **Causa Raiz**: 
 1. **Mapeamento incorreto** na função `perform_split_operation` - tentativa de aplicar prefixo "Sales" a colunas que não o possuem
@@ -821,7 +821,7 @@ if col == "Farol Status":
 
 ```python
 # 1. Mapeamento direto para colunas de data específicas
-if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected"]:
+if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date"]:
     col = reverse_map.get(ui_label)
     if col:
         # Mapeia diretamente sem prefixo
@@ -859,7 +859,7 @@ if "S_REQUIRED_ARRIVAL_DATE" in data:
 ```python
 # Script de teste para verificar funcionamento
 test_ui_data = {
-    "Required Arrival Date Expected": "2025-01-15",
+    "Required Arrival Date": "2025-01-15",
     "Requested Deadline Start Date": "2025-01-10", 
     "Requested Deadline End Date": "2025-01-20"
 }
@@ -873,7 +873,7 @@ test_ui_data = {
 **Funcionalidade**: Sistema preenche automaticamente campos de data quando um PDF é validado e salvo, baseado nos últimos valores da mesma Farol Reference.
 
 **Campos Pré-preenchidos**:
-- `Required Arrival Date Expected` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
+- `Required Arrival Date` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
 - `Requested Deadline Start Date` (S_REQUESTED_DEADLINE_START_DATE)  
 - `Requested Deadline End Date` (S_REQUESTED_DEADLINE_END_DATE)
 
@@ -948,7 +948,7 @@ test_ui_data = {
 **Funcionalidade Implementada**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo, baseado nos últimos valores da mesma Farol Reference.
 
 **Campos Pré-preenchidos**:
-- `Required Arrival Date Expected` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
+- `Required Arrival Date` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
 - `Requested Deadline Start Date` (S_REQUESTED_DEADLINE_START_DATE)  
 - `Requested Deadline End Date` (S_REQUESTED_DEADLINE_END_DATE)
 
@@ -1088,19 +1088,19 @@ values["s_required_arrival_date_expected"] = st.date_input(...)
 ```python
 # 4. Correção de mapeamentos em shipments_mapping.py
 # ANTES (INCORRETO):
-"s_required_arrival_date": "Required Arrival Date Expected"
+"s_required_arrival_date": "Required Arrival Date"
 
 # DEPOIS (CORRETO):
-"s_required_arrival_date_expected": "Required Arrival Date Expected"
+"s_required_arrival_date_expected": "Required Arrival Date"
 ```
 
 ```python
 # 5. Correção de referências em shipments_split.py
 # ANTES (INCORRETO):
-"Required Arrival Date Expected": split_data["s_required_arrival_date"]
+"Required Arrival Date": split_data["s_required_arrival_date"]
 
 # DEPOIS (CORRETO):
-"Required Arrival Date Expected": split_data["s_required_arrival_date_expected"]
+"Required Arrival Date": split_data["s_required_arrival_date_expected"]
 ```
 
 **Arquivos Corrigidos**:
@@ -1111,7 +1111,7 @@ values["s_required_arrival_date_expected"] = st.date_input(...)
 - ✅ `database.py` - Todas as funções atualizadas para usar coluna padronizada
 
 **Resultado**:
-- ✅ Campo "Required Arrival Date Expected" salva corretamente em todas as telas
+- ✅ Campo "Required Arrival Date" salva corretamente em todas as telas
 - ✅ Dados exibidos corretamente em booking_new.py
 - ✅ Operações de split funcionam sem erros
 - ✅ Consistência total entre todas as tabelas e interfaces
@@ -1220,7 +1220,7 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
    - Tamanho máximo por arquivo: 200 MB
 
 2. **Extração Automática**
-   - O sistema tenta extrair: Booking Reference, Quantity, Vessel Name, Voyage Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal City, PDF Print Date
+   - O sistema tenta extrair: Booking Reference, Quantity, Vessel Name, Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal, PDF Print Date
    - Nomes de terminais são normalizados para padrão Ellox
    - **Datas ETD/ETA**: Não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual
 
@@ -1291,8 +1291,8 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - **Filtro de Relevância**: Por padrão, a grade exibe apenas viagens que possuem pelo menos uma `Farol Reference` associada (`INNER JOIN`), ocultando monitoramentos antigos ou não relacionados.
 - **Interface Intuitiva**: Tela dedicada para visualização do último status de cada viagem, com filtros por navio e terminal.
 - **Edição em Grade**: Permite a edição de datas (ETD, ETA, Deadline, etc.) diretamente na grade, de forma ágil como em uma planilha.
-- **Nomenclatura Padronizada**: Colunas com nomes em inglês (Vessel Name, Voyage Code, Port Terminal City, Select) para consistência com o sistema.
-- **Controle de Edição**: Apenas campos de data são editáveis; campos de identificação (Vessel Name, Voyage Code, Port Terminal City, Refs) são somente leitura.
+- **Nomenclatura Padronizada**: Colunas com nomes em inglês (Vessel Name, Voyage Code, Port Terminal, Select) para consistência com o sistema.
+- **Controle de Edição**: Apenas campos de data são editáveis; campos de identificação (Vessel Name, Voyage Code, Port Terminal, Refs) são somente leitura.
 - **Ordem de Colunas Consistente**: Sequência de datas alinhada com o padrão do Voyage Timeline (Deadline → Draft Deadline → Abertura Gate → ETD/ETA → Atracação/Partida/Chegada).
 - **Interface Inteligente**: Dados dos botões "Associated Farol References" e "Voyage Records" são automaticamente ocultados quando há alterações na grade principal.
 - **Descarte Automático**: Ao clicar nos botões, alterações pendentes são automaticamente descartadas para exibir dados limpos.
@@ -1863,7 +1863,7 @@ graph TD
 
 - Coleta automática de “PDF Print Date” (ex.: "Print Date:\n2024-09-06 18:23 UTC").
 - Salvamento do campo como string no formato "YYYY-MM-DD HH:MM".
-- Validação de duplicidade: bloqueia processamento se já existir registro com mesma combinação (Farol Reference, Booking Reference, Voyage Carrier, Voyage Code, Vessel Name, PDF Print Date).
+- Validação de duplicidade: bloqueia processamento se já existir registro com mesma combinação (Farol Reference, Booking Reference, Carrier, Voyage Code, Vessel Name, PDF Print Date).
 
 ## 🔌 API e Integrações
 
@@ -3141,7 +3141,7 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
      - Fallback para schema do usuário se necessário
    - **Prevenção**: Sistema agora verifica existência antes de tentar criar objetos
 
-5. **❌ Campo "Required Arrival Date Expected" Não Salva (CRÍTICO - RESOLVIDO v3.9.7)**
+5. **❌ Campo "Required Arrival Date" Não Salva (CRÍTICO - RESOLVIDO v3.9.7)**
    - **Sintoma**: Campo aparece vazio mesmo após preenchimento em formulários
    - **Causa Raiz**: Inconsistência entre colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED`
    - **Erros Específicos**:
@@ -3216,12 +3216,12 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - Observação: listas usam `@st.cache_data(ttl=300)`; o refresh ocorre automaticamente em até 5 minutos
 
 10. **❌ Colunas de Data Não Salvam no Split (CRÍTICO - RESOLVIDO v3.9.6)**
-   - **Sintoma**: Campos `Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date` aparecem editáveis no `shipments_split.py` mas não são salvos na tabela `F_CON_RETURN_CARRIERS`
+   - **Sintoma**: Campos `Required Arrival Date`, `Requested Deadline Start Date`, `Requested Deadline End Date` aparecem editáveis no `shipments_split.py` mas não são salvos na tabela `F_CON_RETURN_CARRIERS`
    - **Causa**: Mapeamento incorreto na função `perform_split_operation` tentando aplicar prefixo "Sales" a colunas que não o possuem
    - **Solução**: 
      ```python
      # Mapeamento direto para colunas de data específicas
-     if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date Expected"]:
+     if ui_label in ["Requested Deadline Start Date", "Requested Deadline End Date", "Required Arrival Date"]:
          col = reverse_map.get(ui_label)
          if col:
              actual_col = find_column_case_insensitive(df, col)
@@ -3409,7 +3409,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 ### 📌 v3.9.8 - Pré-preenchimento Automático de Datas em PDFs (Janeiro 2025)
 - **🔄 Pré-preenchimento Inteligente**: Sistema agora preenche automaticamente os campos de data quando um PDF é validado e salvo
 - **📅 Campos Preenchidos**: Sistema copia automaticamente os últimos valores de:
-  - `Required Arrival Date Expected` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
+  - `Required Arrival Date` (S_REQUIRED_ARRIVAL_DATE_EXPECTED)
   - `Requested Deadline Start Date` (S_REQUESTED_DEADLINE_START_DATE)  
   - `Requested Deadline End Date` (S_REQUESTED_DEADLINE_END_DATE)
 - **⚡ Ativação Automática**: Funcionalidade ativa para PDFs processados com status "Received from Carrier" ou "Adjustment Requested"
@@ -3435,7 +3435,7 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - **database.py**: Lógica melhorada para tratar tanto `None` quanto strings vazias como valores nulos
 - **🔄 Funcionamento Corrigido**: 
   - Sistema agora busca automaticamente os últimos valores de data da mesma `Farol Reference`
-  - Aplica pré-preenchimento nos campos: `Required Arrival Date Expected`, `Requested Deadline Start Date`, `Requested Deadline End Date`
+  - Aplica pré-preenchimento nos campos: `Required Arrival Date`, `Requested Deadline Start Date`, `Requested Deadline End Date`
 - **📚 Documentação Atualizada**: Seção específica no README para evitar regressão futura
 - **⚠️ Impacto**: Correção crítica que restaura funcionalidade essencial de automação no processamento de PDFs
 
@@ -3718,14 +3718,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **Suporte expandido** para carriers: OOCL e PIL adicionados
 - **Extração automática** de campos específicos por carrier:
   - **OOCL**: PDF Print Date, Booking Reference, Vessel Name, Voyage, POL/POD, Transhipment Port, ETD/ETA
-  - **PIL**: PDF Print Date, Quantidade de Containers, ETD/ETA específicos, Port Terminal City
+- **PIL**: PDF Print Date, Quantidade de Containers, ETD/ETA específicos, Port Terminal
 - **Validação aprimorada** com correção manual de dados
 - **Interface de confirmação** com preview dos dados extraídos
 
 ### 🔄 Melhorias Gerais (v2.4)
 - Captura automática de "PDF Print Date" em PDFs (Maersk e genéricos) e exibição nas abas do histórico
 - Persistência do campo `PDF_BOOKING_EMISSION_DATE` como string "YYYY-MM-DD HH:MM"
-- Bloqueio de processamento de PDFs duplicados com base em (Farol Reference, Booking Reference, Voyage Carrier, Voyage Code, Vessel Name, PDF Print Date)
+- Bloqueio de processamento de PDFs duplicados com base em (Farol Reference, Booking Reference, Carrier, Voyage Code, Vessel Name, PDF Print Date)
 - Justificativas obrigatórias no "New Adjustment" (Area, Reason, Responsibility, Comentários) na aprovação de "Retornos do Armador"
 - Replicação de Booking Reference e Vessel Name no fluxo de ajustes/split para `F_CON_RETURN_CARRIERS`
 - Limpeza de cache após aprovações no histórico para refletir imediatamente na grade de `shipments.py`

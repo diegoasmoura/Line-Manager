@@ -548,10 +548,10 @@ def exibir_shipments():
             idx_comments = colunas_ordenadas.index("Comments Sales")
             colunas_ordenadas.insert(idx_comments, "Splitted Booking Reference")
         
-        # Posiciona "Voyage Code" após "Voyage Carrier" (Booking Management)
-        if "Voyage Code" in colunas_ordenadas and "Voyage Carrier" in colunas_ordenadas:
+        # Posiciona "Voyage Code" após "Carrier" (Booking Management)
+        if "Voyage Code" in colunas_ordenadas and "Carrier" in colunas_ordenadas:
             colunas_ordenadas.remove("Voyage Code")
-            idx_carrier = colunas_ordenadas.index("Voyage Carrier")
+            idx_carrier = colunas_ordenadas.index("Carrier")
             colunas_ordenadas.insert(idx_carrier + 1, "Voyage Code")
         
         # Função helper para mover uma coluna para antes de outra específica
@@ -582,7 +582,7 @@ def exibir_shipments():
             return colunas_list
         
         # Reordena as colunas seguindo a ordem específica enviada pelo usuário
-        # Ordem: Creation Of Booking, Booking Requested Date, Voyage Carrier, Vessel Name, Voyage Code, Terminal, 
+        # Ordem: Creation Of Booking, Booking Requested Date, Carrier, Vessel Name, Voyage Code, Port Terminal, 
         # Freight Forwarder, Transhipment Port, POD Country, POD Country Acronym, Destination Trade Region,
         # data_booking_confirmation, data_estimativa_saida, data_estimativa_chegada, data_deadline, 
         # data_draft_deadline, data_abertura_gate, data_confirmacao_embarque, data_atracacao, 
@@ -593,10 +593,10 @@ def exibir_shipments():
         specific_order = [
             "Booking Registered Date",
             "Booking Requested Date", 
-            "Voyage Carrier",
+            "Carrier",
             "Vessel Name", 
             "Voyage Code",
-            "Terminal",
+            "Port Terminal",
             "Freight Forwarder",
             "Transhipment Port",
             "POD Country",

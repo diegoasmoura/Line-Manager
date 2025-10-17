@@ -608,7 +608,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
             "data_chegada_destino_eta", "data_chegada_destino_ata",
             # Armador/viagem
-            "Voyage Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
             # Administração
@@ -757,7 +757,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date",
             
             # 3. INFORMAÇÕES DE NAVEGAÇÃO
-            "Voyage Carrier", "Vessel Name", "Voyage Code", "Terminal", "Freight Forwarder", 
+            "Carrier", "Vessel Name", "Voyage Code", "Port Terminal", "Freight Forwarder", 
             "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             
             # 4. PRAZOS E PERÍODOS
@@ -1847,7 +1847,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Booking": "B_BOOKING_REFERENCE",
             "Booking Reference": "B_BOOKING_REFERENCE", 
             "Splitted Booking Reference": "S_SPLITTED_BOOKING_REFERENCE",
-            "Voyage Carrier": "B_VOYAGE_CARRIER",
+            "Carrier": "B_VOYAGE_CARRIER",
             "Voyage Code": "B_VOYAGE_CODE",
             "Vessel Name": "B_VESSEL_NAME",
             "Quantity of Containers": "S_QUANTITY_OF_CONTAINERS",
@@ -1857,11 +1857,11 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Place of Receipt": "S_PLACE_OF_RECEIPT",
             "Final Destination": "S_FINAL_DESTINATION",
             "Transhipment Port": "B_TRANSHIPMENT_PORT",
-            "Terminal": "B_TERMINAL",
+            "Port Terminal": "B_TERMINAL",
             "Port Terminal City": "B_TERMINAL",
             "Requested Deadline Start Date": "S_REQUESTED_DEADLINE_START_DATE",
             "Requested Deadline End Date": "S_REQUESTED_DEADLINE_END_DATE",
-            "Required Arrival Date Expected": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
+            "Required Arrival Date": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
             "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE",
             "PDF Name": "P_PDF_NAME",
         }

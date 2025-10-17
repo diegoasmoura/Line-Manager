@@ -40,7 +40,7 @@ dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolis
  
 # ---------- 3. Constantes ----------
 required_fields = {
-            "b_voyage_carrier": "**:green[Voyage Carrier]***",
+            "b_voyage_carrier": "**:green[Carrier]***",
     "b_booking_request_date": "**:green[Booking Request Date]***"
 }
  
@@ -90,7 +90,7 @@ def show_booking_management_form():
             booking_data["final_destination"] = sales_row.get("Final Destination", "")
             booking_data["dthc"] = sales_row.get("DTHC", "")
             booking_data["requested_shipment_week"] = sales_row.get("Requested Shipment Week", "")
-            booking_data["required_arrival_date"] = sales_row.get("Required Arrival Date Expected", "")
+            booking_data["required_arrival_date"] = sales_row.get("Required Arrival Date", "")
             booking_data["shipment_period_start_date"] = sales_row.get("Shipment Period Start Date", "")
             booking_data["shipment_period_end_date"] = sales_row.get("Shipment Period End Date", "")
  
@@ -150,7 +150,7 @@ def show_booking_management_form():
         # Nova linha: Required Arrival Date Expected, Shipment Period Start Date, Shipment Period End Date
         col_arr, col_start, col_end = st.columns(3)
         with col_arr:
-            st.text_input("Required Arrival Date Expected", value=format_date_only(booking_data.get("required_arrival_date", "")), disabled=True)
+            st.text_input("Required Arrival Date", value=format_date_only(booking_data.get("required_arrival_date", "")), disabled=True)
         with col_start:
             st.text_input("Shipment Period Start Date", value=format_date_only(booking_data.get("shipment_period_start_date", "")), disabled=True)
         with col_end:
@@ -182,7 +182,7 @@ def show_booking_management_form():
             current_carrier = booking_data.get("b_voyage_carrier", "")
             carriers_with_blank = [""] + carriers
             selected_index = carriers_with_blank.index(current_carrier) if current_carrier in carriers_with_blank else 0
-            values["b_voyage_carrier"] = st.selectbox("**:green[Voyage Carrier]***", carriers_with_blank, index=selected_index)
+            values["b_voyage_carrier"] = st.selectbox("**:green[Carrier]***", carriers_with_blank, index=selected_index)
  
         with col2:
             values["b_freight_forwarder"] = st.text_input("Freight Forwarder", value=booking_data.get("b_freight_forwarder", ""))
