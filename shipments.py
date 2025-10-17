@@ -71,6 +71,11 @@ def aplicar_filtros_interativos(df, colunas_ordenadas):
         # Converte nomes amigáveis de volta para nomes internos
         nome_para_interno = {opcao[0]: opcao[1] for opcao in opcoes_filtro}
         colunas_filtradas_internas = [nome_para_interno[nome] for nome in colunas_filtradas]
+        # Reordena a seleção para seguir a ordem da grade exibida
+        colunas_filtradas_internas = sorted(
+            colunas_filtradas_internas,
+            key=lambda c: colunas_ordenadas.index(c) if c in colunas_ordenadas else 10**9
+        )
         # Salva seleção interna no estado para uso na paginação baseada em filtros
         st.session_state["colunas_filtradas_internas"] = colunas_filtradas_internas
         filtros = {}
