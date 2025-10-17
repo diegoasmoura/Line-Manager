@@ -331,6 +331,7 @@ Observação: se notar um novo alias de terminal em PDFs, informe para incluirmo
 - **Status visual em tempo real**: 🟢 Online / 🟡 Lento / 🔴 Desconectado
 - **Interface interativa** para configuração de credenciais
 - **Métricas de performance**: IMO, MMSI, posição atual, ETA, atrasos
+  - Nota: O campo "Confirmação Embarque" não é exibido nesta tela (Tracking); ele permanece disponível na tela principal (shipments.py).
 
 ### 🔄 Controle de Status
 - **Workflow personalizado** com múltiplos status

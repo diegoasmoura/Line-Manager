@@ -185,6 +185,8 @@ def exibir_atualizacao_manual():
     st.info("Edite as datas diretamente na grade. As alterações serão destacadas. Clique em 'Salvar Alterações' para confirmar.")
 
     df_display = df_filtered.copy()
+    # Oculta coluna de confirmação de embarque apenas nesta tela
+    df_display.drop(columns=["b_data_confirmacao_embarque"], errors="ignore", inplace=True)
     df_display["Selecionar"] = False
 
     # Restaura a seleção se ela existir na session_state, para que não se perca ao descartar alterações
@@ -214,7 +216,6 @@ def exibir_atualizacao_manual():
         "data_partida": st.column_config.DatetimeColumn("Partida (ATD)", format="DD/MM/YYYY HH:mm"),
         "data_chegada": st.column_config.DatetimeColumn("Chegada (ATA)", format="DD/MM/YYYY HH:mm"),
         "data_estimativa_atracacao": st.column_config.DatetimeColumn("Estimativa Atracação (ETB)", format="DD/MM/YYYY HH:mm"),
-        "b_data_confirmacao_embarque": st.column_config.DatetimeColumn("Confirmação Embarque", format="DD/MM/YYYY HH:mm"),
         "b_data_estimada_transbordo_etd": st.column_config.DatetimeColumn("Estimativa Transbordo (ETD)", format="DD/MM/YYYY HH:mm"),
         "b_data_transbordo_atd": st.column_config.DatetimeColumn("Transbordo (ATD)", format="DD/MM/YYYY HH:mm"),
         "b_data_chegada_destino_eta": st.column_config.DatetimeColumn("Estimativa Chegada Destino (ETA)", format="DD/MM/YYYY HH:mm"),
@@ -228,7 +229,7 @@ def exibir_atualizacao_manual():
         "data_deadline", "data_draft_deadline", "data_abertura_gate", "data_abertura_gate_reefer",
         "data_estimativa_saida", "data_estimativa_chegada", "data_estimativa_atracacao",
         "data_atracacao", "data_partida", "data_chegada",
-        "b_data_confirmacao_embarque", "b_data_estimada_transbordo_etd", "b_data_transbordo_atd",
+        "b_data_estimada_transbordo_etd", "b_data_transbordo_atd",
         "b_data_chegada_destino_eta", "b_data_chegada_destino_ata"
     ] + [col for col in df_display.columns if col not in [
         "Selecionar", "navio", "viagem", "terminal", "farol_references_count",
@@ -350,7 +351,6 @@ def exibir_atualizacao_manual():
                         'data_partida': 'Partida (ATD)',
                         'data_chegada': 'Chegada (ATA)',
                         'data_estimativa_atracacao': 'Estimativa Atracação (ETB)',
-                        'b_data_confirmacao_embarque': 'Confirmação Embarque',
                         'b_data_estimada_transbordo_etd': 'Estimativa Transbordo (ETD)',
                         'b_data_transbordo_atd': 'Transbordo (ATD)',
                         'b_data_chegada_destino_eta': 'Estimativa Chegada Destino (ETA)',
@@ -377,7 +377,6 @@ def exibir_atualizacao_manual():
                         'Atracação (ATB)', 
                         'Partida (ATD)', 
                         'Chegada (ATA)', 
-                        'Confirmação Embarque',
                         'Estimativa Transbordo (ETD)',
                         'Transbordo (ATD)',
                         'Estimativa Chegada Destino (ETA)',
