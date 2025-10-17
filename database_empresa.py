@@ -470,6 +470,10 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
         
+        # Garante a existência de 'Booking Status' para alinhamento quando ausente
+        if "Booking Status" not in df.columns:
+            df["Booking Status"] = pd.NA
+        
         #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         df = df[[
             # Identificação
