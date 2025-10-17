@@ -27,6 +27,388 @@ from booking_new import show_booking_management_form
 from history import exibir_history
  
  
+# --- NOVA PÁGINA: Formulário detalhado por referência ---
+def exibir_formulario():
+    st.title("📝 Shipment Form View")
+    farol_ref = st.session_state.get("selected_reference")
+    if not farol_ref:
+        st.warning("Selecione uma linha na grade e clique em 📝 Form View.")
+        if st.button("⬅️ Voltar"):
+            st.session_state["current_page"] = "main"
+            st.rerun()
+        return
+
+    st.caption(f"Farol Reference: {farol_ref}")
+
+    # Carregar dados por referência
+    from database import (
+        get_sales_record_by_reference,
+        get_booking_record_by_reference,
+        get_database_connection,
+        begin_change_batch,
+        end_change_batch,
+        audit_change,
+        update_field_in_sales_booking_data,
+    )
+    from shipments_mapping import (
+        non_editable_columns,
+        drop_downs,
+        get_display_names,
+        get_database_column_name,
+        clean_farol_status_value,
+        process_farol_status_for_database,
+    )
+
+    df_sales = get_sales_record_by_reference(str(farol_ref))
+    df_booking = get_booking_record_by_reference(str(farol_ref))
+
+    # Garantir existência de DF mesmo vazio
+    if df_sales is None:
+        df_sales = pd.DataFrame()
+    if df_booking is None:
+        df_booking = pd.DataFrame()
+
+    # UDC e configs
+    df_udc = load_df_udc()
+
+    # Sempre manter as duas abas visíveis
+    tab_sales, tab_booking = st.tabs(["Sales Data", "Booking Management"])
+
+    # --- SALES TAB (formulário) ---
+    with tab_sales:
+        stage = "Sales Data"
+        disabled_cols = set(non_editable_columns(stage))
+        df_s_view = df_sales.copy()
+        if not df_s_view.empty and "Sales Farol Reference" in df_s_view.columns:
+            df_s_view.rename(columns={"Sales Farol Reference": "Farol Reference"}, inplace=True)
+        if "Farol Reference" not in df_s_view.columns:
+            df_s_view["Farol Reference"] = farol_ref
+
+        # Extrai linha única de referência
+        row_sales = df_s_view.iloc[0] if not df_s_view.empty else pd.Series(dtype=object)
+
+        # Opções UDC
+        farol_status_options = sorted(list(set([
+            opt for opt in df_udc[df_udc["grupo"] == "Farol Status"]["dado"].dropna().astype(str).tolist()
+        ])))
+        # Adiciona ícones conforme mapeamento
+        from shipments_mapping import get_display_from_status
+        farol_status_options = [get_display_from_status(s) for s in farol_status_options]
+        type_of_shipment_options = [""
+        ] + df_udc[df_udc["grupo"] == "Type of Shipment"]["dado"].dropna().astype(str).unique().tolist()
+        container_type_options = [""
+        ] + df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().astype(str).unique().tolist()
+        ports_pol_options = [""
+        ] + df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().astype(str).unique().tolist()
+        ports_pod_options = [""
+        ] + df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().astype(str).unique().tolist()
+        yes_no_options = ["", "Yes", "No"]
+        dthc_options = [""
+        ] + df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().astype(str).unique().tolist()
+        vip_pnl_risk_options = [""
+        ] + df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().astype(str).unique().tolist()
+
+        st.subheader("Sales Data")
+        with st.form(f"sales_form_{farol_ref}"):
+            # Ordem exata conforme grid
+            sales_order = [
+                "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
+                "Sales Quantity of Containers", "Container Type",
+                "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+                "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
+                "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
+                "Sales Order Reference", "data_sales_order", "Business", "Customer",
+                "Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
+                "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
+                "Comments Sales"
+            ]
+
+            # Helper para rótulos amigáveis
+            from shipments_mapping import get_display_names
+            display_names_local = get_display_names()
+
+            # Captura de novos valores para diff
+            new_values_sales = {}
+
+            # Renderização em 3 colunas mantendo a ordem
+            cols = st.columns(3)
+            for idx, col_name in enumerate([c for c in sales_order if c in df_s_view.columns or (c == "Sales Farol Reference" and "Farol Reference" in df_s_view.columns) ]):
+                col_container = cols[idx % 3]
+                with col_container:
+                    label = col_name
+                    internal_key = col_name
+                    if col_name == "Sales Farol Reference":
+                        label = "Farol Reference"
+                        internal_key = "Farol Reference"
+                    label_display = display_names_local.get(label, label)
+
+                    disabled_flag = (label in disabled_cols) or (label == "Splitted Booking Reference")
+                    current_val = row_sales.get(internal_key, "")
+
+                    # Seletores e tipos
+                    if label == "Farol Status":
+                        try:
+                            default_index = farol_status_options.index(str(current_val))
+                        except Exception:
+                            default_index = 0
+                        new_values_sales[label] = st.selectbox(label, farol_status_options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                    elif label in ("Type of Shipment", "Container Type"):
+                        options = type_of_shipment_options if label == "Type of Shipment" else container_type_options
+                        try:
+                            default_index = options.index(str(current_val))
+                        except Exception:
+                            default_index = 0
+                        new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                    elif label in ("Port of Loading POL", "Port of Delivery POD"):
+                        options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
+                        try:
+                            default_index = options.index(str(current_val))
+                        except Exception:
+                            default_index = 0
+                        new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                    elif label in ("DTHC", "Afloat", "VIP PNL Risk"):
+                        options_map = {"DTHC": dthc_options, "Afloat": yes_no_options, "VIP PNL Risk": vip_pnl_risk_options}
+                        options = options_map[label]
+                        try:
+                            default_index = options.index(str(current_val))
+                        except Exception:
+                            default_index = 0
+                        new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                    elif label in ("Sales Quantity of Containers", "Requested Shipment Week"):
+                        try:
+                            default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
+                        except Exception:
+                            default_num = 0
+                        new_values_sales[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                    elif label.startswith("data_") or label in ("Shipment Requested Date",):
+                        dt = pd.to_datetime(current_val, errors='coerce')
+                        new_values_sales[label] = st.date_input(label_display, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                    else:
+                        new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
+
+            info_sales = st.text_area("📌 Informações adicionais (Sales)", key=f"info_sales_{farol_ref}")
+            submit_sales = st.form_submit_button("✅ Confirmar alterações (Sales)")
+
+        # (removido) blocos fora do formulário – mantidos dentro do st.form
+
+        # Processa submissão Sales
+        if submit_sales:
+            if not has_access_level('EDIT'):
+                st.warning("⚠️ Você não tem permissão para editar dados (Sales)")
+            elif not info_sales.strip():
+                st.error("⚠️ O campo de informações adicionais é obrigatório.")
+            else:
+                # Monta diffs com base nos campos exibidos
+                changes_sales = []
+                def add_change(label, old_val, new_val):
+                    if pd.isna(old_val) and (new_val is None or new_val == ""):
+                        return
+                    if str(old_val) != str(new_val):
+                        changes_sales.append({"Column": label, "Previous Value": old_val, "New Value": new_val})
+
+                add_change("Farol Status", row_sales.get("Farol Status", ""), field_farol_status)
+                add_change("Type of Shipment", row_sales.get("Type of Shipment", ""), field_type_of_shipment)
+                add_change("Sales Quantity of Containers", row_sales.get("Sales Quantity of Containers", 0), field_qty)
+                add_change("Container Type", row_sales.get("Container Type", ""), field_container_type)
+                add_change("Port of Loading POL", row_sales.get("Port of Loading POL", ""), field_pol)
+                add_change("Port of Delivery POD", row_sales.get("Port of Delivery POD", ""), field_pod)
+                add_change("Place of Receipt", row_sales.get("Place of Receipt", ""), field_por)
+                add_change("Final Destination", row_sales.get("Final Destination", ""), field_final_dest)
+                add_change("Requested Shipment Week", row_sales.get("Requested Shipment Week", 0), field_req_week)
+                add_change("data_requested_deadline_start", row_sales.get("data_requested_deadline_start", None), field_req_deadline_start)
+                add_change("data_requested_deadline_end", row_sales.get("data_requested_deadline_end", None), field_req_deadline_end)
+                add_change("data_shipment_period_start", row_sales.get("data_shipment_period_start", None), field_ship_period_start)
+                add_change("data_shipment_period_end", row_sales.get("data_shipment_period_end", None), field_ship_period_end)
+                add_change("data_required_arrival_expected", row_sales.get("data_required_arrival_expected", None), field_required_arrival)
+                add_change("DTHC", row_sales.get("DTHC", ""), field_dthc)
+                add_change("Afloat", row_sales.get("Afloat", ""), field_afloat)
+                add_change("VIP PNL Risk", row_sales.get("VIP PNL Risk", ""), field_vip_pnl_risk)
+                add_change("Comments Sales", row_sales.get("Comments Sales", ""), field_comments_sales)
+
+                # Validação de bloqueio para Farol Status
+                for ch in changes_sales:
+                    if ch["Column"] == "Farol Status":
+                        from_status = clean_farol_status_value(ch["Previous Value"]) if ch["Previous Value"] is not None else ""
+                        to_status = clean_farol_status_value(ch["New Value"]) if ch["New Value"] is not None else ""
+                        if (
+                            (from_status == "Adjustment Requested" and to_status != "Adjustment Requested") or
+                            (from_status != "Adjustment Requested" and to_status == "Adjustment Requested")
+                        ):
+                            st.warning("⚠️ Status 'Adjustment Requested' não pode ser alterado diretamente.")
+                            changes_sales = []
+                            break
+
+                if not changes_sales:
+                    st.info("Nenhuma alteração detectada para Sales.")
+                else:
+                    batch_id = str(uuid.uuid4())
+                    begin_change_batch(batch_id)
+                    try:
+                        conn = get_database_connection()
+                        transaction = conn.begin()
+                        for ch in changes_sales:
+                            db_col = get_database_column_name(ch["Column"])  # nome técnico
+                            new_val = ch["New Value"]
+                            if db_col == "FAROL_STATUS":
+                                new_val = process_farol_status_for_database(new_val)
+                            if hasattr(new_val, 'to_pydatetime'):
+                                new_val = new_val.to_pydatetime()
+                            if db_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA'] and hasattr(new_val, 'date'):
+                                new_val = new_val.date()
+                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, ch["Previous Value"], new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
+                            update_field_in_sales_booking_data(conn, farol_ref, db_col, new_val)
+                        transaction.commit()
+                        conn.close()
+                        st.success("✅ Alterações de Sales salvas!")
+                        st.cache_data.clear()
+                        st.session_state["current_page"] = "main"
+                        st.rerun()
+                    finally:
+                        end_change_batch()
+
+    # --- BOOKING TAB (formulário) ---
+    with tab_booking:
+        stage_b = "Booking Management"
+        disabled_cols_b = set(non_editable_columns(stage_b))
+        df_b_view = df_booking.copy()
+        if not df_b_view.empty and "Booking Farol Reference" in df_b_view.columns:
+            df_b_view.rename(columns={"Booking Farol Reference": "Farol Reference"}, inplace=True)
+        if "Farol Reference" not in df_b_view.columns:
+            df_b_view["Farol Reference"] = farol_ref
+        row_booking = df_b_view.iloc[0] if not df_b_view.empty else pd.Series(dtype=object)
+
+        # Opções UDC
+        carriers = [""
+        ] + df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().astype(str).unique().tolist()
+        ports_pol_options = [""
+        ] + df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().astype(str).unique().tolist()
+        ports_pod_options = [""
+        ] + df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().astype(str).unique().tolist()
+
+        st.subheader("Booking Management")
+        with st.form(f"booking_form_{farol_ref}"):
+            # Ordem exata conforme grid
+            booking_order = [
+                "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
+                "Sales Quantity of Containers", "Container Type",
+                "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+                "Shipment Requested Date", "Sales Order Reference", "data_sales_order", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
+                "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
+                "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada",
+                "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
+                "data_chegada_destino_eta", "data_chegada_destino_ata",
+                "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+                "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+                "Booking Owner",
+                "Comments Booking"
+            ]
+
+            # Captura de novos valores para diff
+            new_values_booking = {}
+
+            # Renderização em 3 colunas mantendo a ordem
+            cols_b = st.columns(3)
+            for idx, col_name in enumerate([c for c in booking_order if c in df_b_view.columns or (c == "Booking Farol Reference" and "Farol Reference" in df_b_view.columns) ]):
+                col_container = cols_b[idx % 3]
+                with col_container:
+                    label = col_name
+                    internal_key = col_name
+                    if col_name == "Booking Farol Reference":
+                        label = "Farol Reference"
+                        internal_key = "Farol Reference"
+                    current_val = row_booking.get(internal_key, "")
+                    disabled_flag = (label in disabled_cols_b) or (label == "Booking Registered Date")
+
+                    if label == "Carrier":
+                        try:
+                            default_index = carriers.index(str(current_val))
+                        except Exception:
+                            default_index = 0
+                        new_values_booking[label] = st.selectbox(label, carriers, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                    elif label in ("Port of Loading POL", "Port of Delivery POD"):
+                        options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
+                        try:
+                            default_index = options.index(str(current_val))
+                        except Exception:
+                            default_index = 0
+                        new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                    elif label in ("Booking Requested Date", "data_booking_confirmation") or label.startswith("data_"):
+                        dt = pd.to_datetime(current_val, errors='coerce')
+                        # Usa nome amigável para labels de data quando existir
+                        from shipments_mapping import get_display_names
+                        disp = get_display_names().get(label, label)
+                        new_values_booking[label] = st.date_input(disp, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                    elif label in ("Sales Quantity of Containers",):
+                        try:
+                            default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
+                        except Exception:
+                            default_num = 0
+                        new_values_booking[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                    else:
+                        new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
+
+            info_booking = st.text_area("📌 Informações adicionais (Booking)", key=f"info_booking_{farol_ref}")
+            submit_booking = st.form_submit_button("✅ Confirmar alterações (Booking)")
+
+        # (removido) blocos fora do formulário – mantidos dentro do st.form
+
+        # Processa submissão Booking
+        if submit_booking:
+            if not has_access_level('EDIT'):
+                st.warning("⚠️ Você não tem permissão para editar dados (Booking)")
+            elif not info_booking.strip():
+                st.error("⚠️ O campo de informações adicionais é obrigatório.")
+            else:
+                changes_booking = []
+                def add_change_b(label, old_val, new_val):
+                    if pd.isna(old_val) and (new_val is None or new_val == ""):
+                        return
+                    if str(old_val) != str(new_val):
+                        changes_booking.append({"Column": label, "Previous Value": old_val, "New Value": new_val})
+
+                add_change_b("Carrier", row_booking.get("Carrier", ""), field_carrier)
+                add_change_b("Freight Forwarder", row_booking.get("Freight Forwarder", ""), field_ff)
+                add_change_b("Booking Requested Date", row_booking.get("Booking Requested Date", None), field_req_date)
+                add_change_b("data_booking_confirmation", row_booking.get("data_booking_confirmation", None), field_conf_date)
+                add_change_b("Vessel Name", row_booking.get("Vessel Name", ""), field_vessel)
+                add_change_b("Voyage Code", row_booking.get("Voyage Code", ""), field_voyage)
+                add_change_b("Port Terminal", row_booking.get("Port Terminal", ""), field_terminal)
+                add_change_b("Port of Loading POL", row_booking.get("Port of Loading POL", ""), field_pol_b)
+                add_change_b("Port of Delivery POD", row_booking.get("Port of Delivery POD", ""), field_pod_b)
+                add_change_b("Comments Booking", row_booking.get("Comments Booking", ""), field_comments_b)
+
+                if not changes_booking:
+                    st.info("Nenhuma alteração detectada para Booking.")
+                else:
+                    batch_id = str(uuid.uuid4())
+                    begin_change_batch(batch_id)
+                    try:
+                        conn = get_database_connection()
+                        transaction = conn.begin()
+                        for ch in changes_booking:
+                            db_col = get_database_column_name(ch["Column"])  # nome técnico
+                            new_val = ch["New Value"]
+                            if db_col == "FAROL_STATUS":
+                                new_val = process_farol_status_for_database(new_val)
+                            if hasattr(new_val, 'to_pydatetime'):
+                                new_val = new_val.to_pydatetime()
+                            if db_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA'] and hasattr(new_val, 'date'):
+                                new_val = new_val.date()
+                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, ch["Previous Value"], new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
+                            update_field_in_sales_booking_data(conn, farol_ref, db_col, new_val)
+                        transaction.commit()
+                        conn.close()
+                        st.success("✅ Alterações de Booking salvas!")
+                        st.cache_data.clear()
+                        st.session_state["current_page"] = "main"
+                        st.rerun()
+                    finally:
+                        end_change_batch()
+
+    st.divider()
+    if st.button("⬅️ Voltar"):
+        st.session_state["current_page"] = "main"
+        st.rerun()
 # Função para aplicar filtros avançados interativos no DataFrame
 def aplicar_filtros_interativos(df, colunas_ordenadas):
     # Inicializa o estado da expansão, se não existir
@@ -154,6 +536,8 @@ def main():
         show_booking_management_form()
     elif st.session_state["current_page"] == "history":
         exibir_history()
+    elif st.session_state["current_page"] == "form":
+        exibir_formulario()
  
  
 # Função para limpar o estado da sessão (usado ao descartar alterações)
@@ -1037,11 +1421,12 @@ def exibir_shipments():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key=f"download_xlsx_{int(datetime.now().timestamp())}"
         )
-        
-        # Botão para limpar cache
-        if st.button("🔄 Refresh Data", help="Clear cache and reload data"):
-            st.cache_data.clear()
-            st.rerun()
+        # Abrir visualização em formulário (requer 1 seleção)
+        form_view_disabled = len(selected_rows) != 1
+        if st.button("📝 Form View", disabled=form_view_disabled, help="Abrir formulário da linha selecionada"):
+            if not form_view_disabled:
+                st.session_state["current_page"] = "form"
+                st.rerun()
     # Seção de anexos
     if st.session_state.get("show_shipments_attachments", False):
         # Sincroniza referência se seleção mudar
