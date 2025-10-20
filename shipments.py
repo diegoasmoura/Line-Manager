@@ -699,8 +699,10 @@ def exibir_formulario():
                 
                 # Campos extra grandes (largura completa)
                 xl_fields = {
-                    "Comments Booking": {"width": 1, "cols": 1},
+                    # Igualar ao Comments Sales: ocupar 2 colunas e usar text_area
+                    "Comments Booking": {"width": 1, "cols": 2},
                     "Booking Reference": {"width": 1, "cols": 1},
+                    # Booking Owner segue padrão de coluna simples; manteremos a renderização
                     "Booking Owner": {"width": 1, "cols": 1}
                 }
                 
@@ -732,9 +734,9 @@ def exibir_formulario():
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
                 "📅 Cronograma": ["Booking Registered Date", "Booking Requested Date", "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada"],
                 "⚙️ Configurações": [],  # mantém ordem consistente com Sales
-                "💬 Observações": ["Comments Booking", "Booking Owner"],
                 "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal"],
-                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"]
+                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"],
+                "💬 Observações": ["Comments Booking", "Booking Owner"]
             }
             
             for section_title, section_fields in booking_sections.items():
@@ -801,6 +803,33 @@ def exibir_formulario():
 
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_b_log2]
+
+                # Observações (Booking): Comments Booking (2 colunas) | Booking Owner (1 coluna)
+                if section_title == "💬 Observações":
+                    obs_fields = [f for f in ["Comments Booking", "Booking Owner"] if f in available_fields]
+                    if obs_fields:
+                        cols_obs = st.columns([2,1,1,1,1])
+                        # Comments Booking
+                        if "Comments Booking" in obs_fields:
+                            with cols_obs[0]:
+                                current_val = row_booking.get("Comments Booking", "")
+                                new_values_booking["Comments Booking"] = st.text_area(
+                                    "Comments Booking",
+                                    value=str(current_val if current_val is not None else ""),
+                                    height=140,
+                                    key=f"booking_obs_{farol_ref}_comments"
+                                )
+                        # Booking Owner
+                        if "Booking Owner" in obs_fields:
+                            with cols_obs[1]:
+                                current_val = row_booking.get("Booking Owner", "")
+                                new_values_booking["Booking Owner"] = st.text_input(
+                                    "Booking Owner",
+                                    value=str(current_val if current_val is not None else ""),
+                                    key=f"booking_obs_{farol_ref}_owner"
+                                )
+                        # Evita duplicar no restante
+                        available_fields = [f for f in available_fields if f not in ("Comments Booking", "Booking Owner")]
 
                 # Linha fixa no topo (Booking): Farol Reference | Farol Status | Type of Shipment | Booking Status
                 if section_title == "📋 Informações Básicas":
@@ -1000,7 +1029,16 @@ def exibir_formulario():
                                         default_num = 0
                                     new_values_booking[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
                                 else:
-                                    new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
+                                    if label == "Comments Booking":
+                                        new_values_booking[label] = st.text_area(
+                                            label,
+                                            value=str(current_val if current_val is not None else ""),
+                                            height=140,  # igual ao Comments Sales
+                                            disabled=disabled_flag,
+                                            key=f"booking_{farol_ref}_{label}"
+                                        )
+                                    else:
+                                        new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
 
             info_booking = st.text_area("📌 Informações adicionais (Booking)", key=f"info_booking_{farol_ref}")
             submit_booking = st.form_submit_button("✅ Confirmar alterações (Booking)")
