@@ -451,10 +451,10 @@ def exibir_formulario():
                                     height=140,
                                     key=f"sales_obs_{farol_ref}_comments"
                                 )
-                        # 📌 Informações adicionais (Sales)
+                        # 📌 Reasons for Change (Sales)
                         with cols_obs_s[1]:
                             info_sales = st.text_area(
-                                "📌 Informações adicionais (Sales)",
+                                "📌 Reasons for Change (Sales)",
                                 key=f"info_sales_{farol_ref}",
                                 height=140
                             )
@@ -854,10 +854,10 @@ def exibir_formulario():
                                     height=140,
                                     key=f"booking_obs_{farol_ref}_comments"
                                 )
-                        # 📌 Informações adicionais (Booking)
+                        # 📌 Reasons for Change (Booking)
                         with cols_obs[1]:
                             info_booking = st.text_area(
-                                "📌 Informações adicionais (Booking)",
+                                "📌 Reasons for Change (Booking)",
                                 key=f"info_booking_{farol_ref}",
                                 height=140
                             )
