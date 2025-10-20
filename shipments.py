@@ -130,61 +130,170 @@ def exibir_formulario():
             # Captura de novos valores para diff
             new_values_sales = {}
 
-            # Renderização em 3 colunas mantendo a ordem
-            cols = st.columns(3)
-            for idx, col_name in enumerate([c for c in sales_order if c in df_s_view.columns or (c == "Sales Farol Reference" and "Farol Reference" in df_s_view.columns) ]):
-                col_container = cols[idx % 3]
-                with col_container:
-                    label = col_name
-                    internal_key = col_name
-                    if col_name == "Sales Farol Reference":
-                        label = "Farol Reference"
-                        internal_key = "Farol Reference"
-                    label_display = display_names_local.get(label, label)
+            # Layout inteligente baseado no tipo de campo
+            def get_field_config(field_name):
+                """Retorna configuração de largura e agrupamento para cada campo"""
+                # Campos pequenos (1/4 da largura) - códigos, números simples
+                small_fields = {
+                    "Container Type": {"width": 1, "cols": 4},
+                    "Sales Quantity of Containers": {"width": 1, "cols": 4}, 
+                    "DTHC": {"width": 1, "cols": 4},
+                    "Afloat": {"width": 1, "cols": 4},
+                    "Partial Allowed": {"width": 1, "cols": 4},
+                    "VIP PNL Risk": {"width": 1, "cols": 4},
+                    "LC Received": {"width": 1, "cols": 4},
+                    "Requested Shipment Week": {"width": 1, "cols": 4}
+                }
+                
+                # Campos médios (1/3 da largura) - status, tipos
+                medium_fields = {
+                    "Farol Status": {"width": 1, "cols": 3},
+                    "Type of Shipment": {"width": 1, "cols": 3},
+                    "Mode": {"width": 1, "cols": 3},
+                    "Incoterm": {"width": 1, "cols": 3},
+                    "Business": {"width": 1, "cols": 3},
+                    "SKU": {"width": 1, "cols": 3}
+                }
+                
+                # Campos grandes (1/2 da largura) - nomes, locais
+                large_fields = {
+                    "Customer": {"width": 1, "cols": 2},
+                    "Plant of Origin": {"width": 1, "cols": 2},
+                    "Port of Loading POL": {"width": 1, "cols": 2},
+                    "Port of Delivery POD": {"width": 1, "cols": 2},
+                    "Place of Receipt": {"width": 1, "cols": 2},
+                    "Final Destination": {"width": 1, "cols": 2},
+                    "PNL Destination": {"width": 1, "cols": 2}
+                }
+                
+                # Campos extra grandes (largura completa) - textos longos
+                xl_fields = {
+                    "Comments Sales": {"width": 1, "cols": 1},
+                    "Sales Order Reference": {"width": 1, "cols": 1},
+                    "Customer PO": {"width": 1, "cols": 1},
+                    "Splitted Booking Reference": {"width": 1, "cols": 1}
+                }
+                
+                if field_name in small_fields:
+                    return small_fields[field_name]
+                elif field_name in medium_fields:
+                    return medium_fields[field_name]
+                elif field_name in large_fields:
+                    return large_fields[field_name]
+                elif field_name in xl_fields:
+                    return xl_fields[field_name]
+                else:
+                    return {"width": 1, "cols": 3}  # padrão médio
+            
+            # Agrupa campos por configuração de layout
+            field_groups = {}
+            for col_name in [c for c in sales_order if c in df_s_view.columns or (c == "Sales Farol Reference" and "Farol Reference" in df_s_view.columns)]:
+                config = get_field_config(col_name)
+                cols_key = config["cols"]
+                if cols_key not in field_groups:
+                    field_groups[cols_key] = []
+                field_groups[cols_key].append(col_name)
+            
+            # Renderiza campos agrupados por layout com seções organizadas
+            sections = {
+                "📋 Informações Básicas": ["Sales Farol Reference", "Farol Status", "Type of Shipment"],
+                "📦 Produto e Quantidade": ["Sales Quantity of Containers", "Container Type", "SKU"],
+                "🏢 Cliente e Negócio": ["Customer", "Business", "Customer PO", "Sales Order Reference"],
+                "🚢 Logística": ["Mode", "Incoterm", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination"],
+                "📅 Datas e Prazos": ["data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end"],
+                "⚙️ Configurações": ["DTHC", "Afloat", "Partial Allowed", "VIP PNL Risk", "LC Received"],
+                "💬 Observações": ["Comments Sales"]
+            }
+            
+            for section_title, section_fields in sections.items():
+                # Verifica se a seção tem campos disponíveis
+                available_fields = [f for f in section_fields if f in [c for c in sales_order if c in df_s_view.columns or (c == "Sales Farol Reference" and "Farol Reference" in df_s_view.columns)]]
+                if not available_fields:
+                    continue
+                
+                if section_title != "📋 Informações Básicas":  # Não adiciona espaço antes da primeira seção
+                    st.markdown("---")  # Linha divisória
+                st.markdown(f"**{section_title}**")
+                
+                # Agrupa campos da seção por layout
+                section_groups = {}
+                for field in available_fields:
+                    config = get_field_config(field)
+                    cols_key = config["cols"]
+                    if cols_key not in section_groups:
+                        section_groups[cols_key] = []
+                    section_groups[cols_key].append(field)
+                
+                # Renderiza campos da seção
+                for cols_count in [1, 2, 3, 4]:
+                    if cols_count not in section_groups:
+                        continue
+                        
+                    fields = section_groups[cols_count]
+                    if not fields:
+                        continue
+                    
+                    for i in range(0, len(fields), cols_count):
+                        batch = fields[i:i + cols_count]
+                        cols = st.columns(cols_count)
+                        
+                        for j, col_name in enumerate(batch):
+                            if j < len(cols):
+                                col_container = cols[j]
+                            else:
+                                break
+                            
+                            with col_container:
+                                label = col_name
+                                internal_key = col_name
+                                if col_name == "Sales Farol Reference":
+                                    label = "Farol Reference"
+                                    internal_key = "Farol Reference"
+                                label_display = display_names_local.get(label, label)
 
-                    disabled_flag = (label in disabled_cols) or (label == "Splitted Booking Reference")
-                    current_val = row_sales.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols) or (label == "Splitted Booking Reference")
+                                current_val = row_sales.get(internal_key, "")
 
-                    # Seletores e tipos
-                    if label == "Farol Status":
-                        try:
-                            default_index = farol_status_options.index(str(current_val))
-                        except Exception:
-                            default_index = 0
-                        new_values_sales[label] = st.selectbox(label, farol_status_options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                    elif label in ("Type of Shipment", "Container Type"):
-                        options = type_of_shipment_options if label == "Type of Shipment" else container_type_options
-                        try:
-                            default_index = options.index(str(current_val))
-                        except Exception:
-                            default_index = 0
-                        new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                    elif label in ("Port of Loading POL", "Port of Delivery POD"):
-                        options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
-                        try:
-                            default_index = options.index(str(current_val))
-                        except Exception:
-                            default_index = 0
-                        new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                    elif label in ("DTHC", "Afloat", "VIP PNL Risk"):
-                        options_map = {"DTHC": dthc_options, "Afloat": yes_no_options, "VIP PNL Risk": vip_pnl_risk_options}
-                        options = options_map[label]
-                        try:
-                            default_index = options.index(str(current_val))
-                        except Exception:
-                            default_index = 0
-                        new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                    elif label in ("Sales Quantity of Containers", "Requested Shipment Week"):
-                        try:
-                            default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
-                        except Exception:
-                            default_num = 0
-                        new_values_sales[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                    elif label.startswith("data_") or label in ("Shipment Requested Date",):
-                        dt = pd.to_datetime(current_val, errors='coerce')
-                        new_values_sales[label] = st.date_input(label_display, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                    else:
-                        new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
+                                # Seletores e tipos
+                                if label == "Farol Status":
+                                    try:
+                                        default_index = farol_status_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, farol_status_options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label in ("Type of Shipment", "Container Type"):
+                                    options = type_of_shipment_options if label == "Type of Shipment" else container_type_options
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label in ("Port of Loading POL", "Port of Delivery POD"):
+                                    options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label in ("DTHC", "Afloat", "VIP PNL Risk"):
+                                    options_map = {"DTHC": dthc_options, "Afloat": yes_no_options, "VIP PNL Risk": vip_pnl_risk_options}
+                                    options = options_map[label]
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label in ("Sales Quantity of Containers", "Requested Shipment Week"):
+                                    try:
+                                        default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
+                                    except Exception:
+                                        default_num = 0
+                                    new_values_sales[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label.startswith("data_") or label in ("Shipment Requested Date",):
+                                    dt = pd.to_datetime(current_val, errors='coerce')
+                                    new_values_sales[label] = st.date_input(label_display, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                else:
+                                    new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
 
             info_sales = st.text_area("📌 Informações adicionais (Sales)", key=f"info_sales_{farol_ref}")
             submit_sales = st.form_submit_button("✅ Confirmar alterações (Sales)")
@@ -198,32 +307,27 @@ def exibir_formulario():
             elif not info_sales.strip():
                 st.error("⚠️ O campo de informações adicionais é obrigatório.")
             else:
-                # Monta diffs com base nos campos exibidos
+                # Monta diffs com base nos campos exibidos (em ordem), usando new_values_sales
                 changes_sales = []
                 def add_change(label, old_val, new_val):
-                    if pd.isna(old_val) and (new_val is None or new_val == ""):
+                    if old_val is None and (new_val is None or new_val == ""):
                         return
+                    # Normaliza datas para string comparável
+                    if hasattr(old_val, 'to_pydatetime'):
+                        old_val = old_val.to_pydatetime()
+                    if hasattr(new_val, 'to_pydatetime'):
+                        new_val = new_val.to_pydatetime()
                     if str(old_val) != str(new_val):
                         changes_sales.append({"Column": label, "Previous Value": old_val, "New Value": new_val})
 
-                add_change("Farol Status", row_sales.get("Farol Status", ""), field_farol_status)
-                add_change("Type of Shipment", row_sales.get("Type of Shipment", ""), field_type_of_shipment)
-                add_change("Sales Quantity of Containers", row_sales.get("Sales Quantity of Containers", 0), field_qty)
-                add_change("Container Type", row_sales.get("Container Type", ""), field_container_type)
-                add_change("Port of Loading POL", row_sales.get("Port of Loading POL", ""), field_pol)
-                add_change("Port of Delivery POD", row_sales.get("Port of Delivery POD", ""), field_pod)
-                add_change("Place of Receipt", row_sales.get("Place of Receipt", ""), field_por)
-                add_change("Final Destination", row_sales.get("Final Destination", ""), field_final_dest)
-                add_change("Requested Shipment Week", row_sales.get("Requested Shipment Week", 0), field_req_week)
-                add_change("data_requested_deadline_start", row_sales.get("data_requested_deadline_start", None), field_req_deadline_start)
-                add_change("data_requested_deadline_end", row_sales.get("data_requested_deadline_end", None), field_req_deadline_end)
-                add_change("data_shipment_period_start", row_sales.get("data_shipment_period_start", None), field_ship_period_start)
-                add_change("data_shipment_period_end", row_sales.get("data_shipment_period_end", None), field_ship_period_end)
-                add_change("data_required_arrival_expected", row_sales.get("data_required_arrival_expected", None), field_required_arrival)
-                add_change("DTHC", row_sales.get("DTHC", ""), field_dthc)
-                add_change("Afloat", row_sales.get("Afloat", ""), field_afloat)
-                add_change("VIP PNL Risk", row_sales.get("VIP PNL Risk", ""), field_vip_pnl_risk)
-                add_change("Comments Sales", row_sales.get("Comments Sales", ""), field_comments_sales)
+                from shipments_mapping import get_display_names
+                display_names_local2 = get_display_names()
+                for label, new_val in new_values_sales.items():
+                    if label in ("Farol Reference",):
+                        continue  # nunca atualiza referência
+                    internal_key = "Farol Reference" if label == "Farol Reference" else label
+                    old_val = row_sales.get(internal_key, None)
+                    add_change(label, old_val, new_val)
 
                 # Validação de bloqueio para Farol Status
                 for ch in changes_sales:
@@ -246,8 +350,12 @@ def exibir_formulario():
                     try:
                         conn = get_database_connection()
                         transaction = conn.begin()
+                        from shipments_mapping import get_reverse_mapping
+                        reverse_map_all = get_reverse_mapping()
                         for ch in changes_sales:
-                            db_col = get_database_column_name(ch["Column"])  # nome técnico
+                            # 1) tenta mapear friendly -> alias; 2) alias/display -> coluna DB
+                            alias_or_label = reverse_map_all.get(ch["Column"], ch["Column"])  # ex.: 'Sales Quantity of Containers' -> 's_quantity_of_containers'
+                            db_col = get_database_column_name(alias_or_label)
                             new_val = ch["New Value"]
                             if db_col == "FAROL_STATUS":
                                 new_val = process_farol_status_for_database(new_val)
@@ -306,46 +414,156 @@ def exibir_formulario():
             # Captura de novos valores para diff
             new_values_booking = {}
 
-            # Renderização em 3 colunas mantendo a ordem
-            cols_b = st.columns(3)
-            for idx, col_name in enumerate([c for c in booking_order if c in df_b_view.columns or (c == "Booking Farol Reference" and "Farol Reference" in df_b_view.columns) ]):
-                col_container = cols_b[idx % 3]
-                with col_container:
-                    label = col_name
-                    internal_key = col_name
-                    if col_name == "Booking Farol Reference":
-                        label = "Farol Reference"
-                        internal_key = "Farol Reference"
-                    current_val = row_booking.get(internal_key, "")
-                    disabled_flag = (label in disabled_cols_b) or (label == "Booking Registered Date")
+            # Layout inteligente para Booking (similar ao Sales)
+            def get_booking_field_config(field_name):
+                """Retorna configuração de largura para campos de Booking"""
+                # Campos pequenos (1/4 da largura)
+                small_fields = {
+                    "Container Type": {"width": 1, "cols": 4},
+                    "Sales Quantity of Containers": {"width": 1, "cols": 4},
+                    "Booking Status": {"width": 1, "cols": 4},
+                    "Type of Shipment": {"width": 1, "cols": 4},
+                    "POD Country Acronym": {"width": 1, "cols": 4}
+                }
+                
+                # Campos médios (1/3 da largura)
+                medium_fields = {
+                    "Farol Status": {"width": 1, "cols": 3},
+                    "Carrier": {"width": 1, "cols": 3},
+                    "Freight Forwarder": {"width": 1, "cols": 3},
+                    "Vessel Name": {"width": 1, "cols": 3},
+                    "Voyage Code": {"width": 1, "cols": 3},
+                    "Port Terminal": {"width": 1, "cols": 3},
+                    "POD Country": {"width": 1, "cols": 3},
+                    "Destination Trade Region": {"width": 1, "cols": 3},
+                    "Award Status": {"width": 1, "cols": 3}
+                }
+                
+                # Campos grandes (1/2 da largura)
+                large_fields = {
+                    "Port of Loading POL": {"width": 1, "cols": 2},
+                    "Port of Delivery POD": {"width": 1, "cols": 2},
+                    "Place of Receipt": {"width": 1, "cols": 2},
+                    "Final Destination": {"width": 1, "cols": 2},
+                    "Transhipment Port": {"width": 1, "cols": 2},
+                    "Sales Order Reference": {"width": 1, "cols": 2},
+                    "Freight Rate USD": {"width": 1, "cols": 2},
+                    "Bogey Sale Price USD": {"width": 1, "cols": 2},
+                    "Freight PNL": {"width": 1, "cols": 2}
+                }
+                
+                # Campos extra grandes (largura completa)
+                xl_fields = {
+                    "Comments Booking": {"width": 1, "cols": 1},
+                    "Booking Reference": {"width": 1, "cols": 1},
+                    "Booking Owner": {"width": 1, "cols": 1}
+                }
+                
+                if field_name in small_fields:
+                    return small_fields[field_name]
+                elif field_name in medium_fields:
+                    return medium_fields[field_name]
+                elif field_name in large_fields:
+                    return large_fields[field_name]
+                elif field_name in xl_fields:
+                    return xl_fields[field_name]
+                else:
+                    return {"width": 1, "cols": 3}  # padrão médio
+            
+            # Agrupa campos de Booking por layout
+            booking_field_groups = {}
+            for col_name in [c for c in booking_order if c in df_b_view.columns or (c == "Booking Farol Reference" and "Farol Reference" in df_b_view.columns)]:
+                config = get_booking_field_config(col_name)
+                cols_key = config["cols"]
+                if cols_key not in booking_field_groups:
+                    booking_field_groups[cols_key] = []
+                booking_field_groups[cols_key].append(col_name)
+            
+            # Renderiza campos de Booking organizados por seções
+            booking_sections = {
+                "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status"],
+                "📦 Produto e Transporte": ["Sales Quantity of Containers", "Container Type", "Sales Order Reference"],
+                "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal"],
+                "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
+                "📅 Cronograma": ["Booking Registered Date", "Booking Requested Date", "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada"],
+                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"],
+                "💬 Observações": ["Comments Booking", "Booking Owner"]
+            }
+            
+            for section_title, section_fields in booking_sections.items():
+                # Verifica campos disponíveis na seção
+                available_fields = [f for f in section_fields if f in [c for c in booking_order if c in df_b_view.columns or (c == "Booking Farol Reference" and "Farol Reference" in df_b_view.columns)]]
+                if not available_fields:
+                    continue
+                
+                if section_title != "📋 Informações Básicas":  # Não adiciona espaço antes da primeira seção
+                    st.markdown("---")  # Linha divisória
+                st.markdown(f"**{section_title}**")
+                
+                # Agrupa campos da seção por layout
+                section_groups = {}
+                for field in available_fields:
+                    config = get_booking_field_config(field)
+                    cols_key = config["cols"]
+                    if cols_key not in section_groups:
+                        section_groups[cols_key] = []
+                    section_groups[cols_key].append(field)
+                
+                # Renderiza campos da seção
+                for cols_count in [1, 2, 3, 4]:
+                    if cols_count not in section_groups:
+                        continue
+                        
+                    fields = section_groups[cols_count]
+                    if not fields:
+                        continue
+                    
+                    for i in range(0, len(fields), cols_count):
+                        batch = fields[i:i + cols_count]
+                        cols_b = st.columns(cols_count)
+                        
+                        for j, col_name in enumerate(batch):
+                            if j < len(cols_b):
+                                col_container = cols_b[j]
+                            else:
+                                break
+                            
+                            with col_container:
+                                label = col_name
+                                internal_key = col_name
+                                if col_name == "Booking Farol Reference":
+                                    label = "Farol Reference"
+                                    internal_key = "Farol Reference"
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b) or (label == "Booking Registered Date")
 
-                    if label == "Carrier":
-                        try:
-                            default_index = carriers.index(str(current_val))
-                        except Exception:
-                            default_index = 0
-                        new_values_booking[label] = st.selectbox(label, carriers, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
-                    elif label in ("Port of Loading POL", "Port of Delivery POD"):
-                        options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
-                        try:
-                            default_index = options.index(str(current_val))
-                        except Exception:
-                            default_index = 0
-                        new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
-                    elif label in ("Booking Requested Date", "data_booking_confirmation") or label.startswith("data_"):
-                        dt = pd.to_datetime(current_val, errors='coerce')
-                        # Usa nome amigável para labels de data quando existir
-                        from shipments_mapping import get_display_names
-                        disp = get_display_names().get(label, label)
-                        new_values_booking[label] = st.date_input(disp, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
-                    elif label in ("Sales Quantity of Containers",):
-                        try:
-                            default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
-                        except Exception:
-                            default_num = 0
-                        new_values_booking[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
-                    else:
-                        new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
+                                if label == "Carrier":
+                                    try:
+                                        default_index = carriers.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, carriers, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                                elif label in ("Port of Loading POL", "Port of Delivery POD"):
+                                    options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                                elif label in ("Booking Requested Date", "data_booking_confirmation") or label.startswith("data_"):
+                                    dt = pd.to_datetime(current_val, errors='coerce')
+                                    # Usa nome amigável para labels de data quando existir
+                                    from shipments_mapping import get_display_names
+                                    disp = get_display_names().get(label, label)
+                                    new_values_booking[label] = st.date_input(disp, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                                elif label in ("Sales Quantity of Containers",):
+                                    try:
+                                        default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
+                                    except Exception:
+                                        default_num = 0
+                                    new_values_booking[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                                else:
+                                    new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
 
             info_booking = st.text_area("📌 Informações adicionais (Booking)", key=f"info_booking_{farol_ref}")
             submit_booking = st.form_submit_button("✅ Confirmar alterações (Booking)")
@@ -359,23 +577,24 @@ def exibir_formulario():
             elif not info_booking.strip():
                 st.error("⚠️ O campo de informações adicionais é obrigatório.")
             else:
+                # Monta diffs com base nos campos exibidos (em ordem), usando new_values_booking
                 changes_booking = []
                 def add_change_b(label, old_val, new_val):
-                    if pd.isna(old_val) and (new_val is None or new_val == ""):
+                    if old_val is None and (new_val is None or new_val == ""):
                         return
+                    if hasattr(old_val, 'to_pydatetime'):
+                        old_val = old_val.to_pydatetime()
+                    if hasattr(new_val, 'to_pydatetime'):
+                        new_val = new_val.to_pydatetime()
                     if str(old_val) != str(new_val):
                         changes_booking.append({"Column": label, "Previous Value": old_val, "New Value": new_val})
 
-                add_change_b("Carrier", row_booking.get("Carrier", ""), field_carrier)
-                add_change_b("Freight Forwarder", row_booking.get("Freight Forwarder", ""), field_ff)
-                add_change_b("Booking Requested Date", row_booking.get("Booking Requested Date", None), field_req_date)
-                add_change_b("data_booking_confirmation", row_booking.get("data_booking_confirmation", None), field_conf_date)
-                add_change_b("Vessel Name", row_booking.get("Vessel Name", ""), field_vessel)
-                add_change_b("Voyage Code", row_booking.get("Voyage Code", ""), field_voyage)
-                add_change_b("Port Terminal", row_booking.get("Port Terminal", ""), field_terminal)
-                add_change_b("Port of Loading POL", row_booking.get("Port of Loading POL", ""), field_pol_b)
-                add_change_b("Port of Delivery POD", row_booking.get("Port of Delivery POD", ""), field_pod_b)
-                add_change_b("Comments Booking", row_booking.get("Comments Booking", ""), field_comments_b)
+                for label, new_val in new_values_booking.items():
+                    if label in ("Farol Reference",):
+                        continue
+                    internal_key = "Farol Reference" if label == "Farol Reference" else label
+                    old_val = row_booking.get(internal_key, None)
+                    add_change_b(label, old_val, new_val)
 
                 if not changes_booking:
                     st.info("Nenhuma alteração detectada para Booking.")
@@ -385,8 +604,11 @@ def exibir_formulario():
                     try:
                         conn = get_database_connection()
                         transaction = conn.begin()
+                        from shipments_mapping import get_reverse_mapping
+                        reverse_map_all_b = get_reverse_mapping()
                         for ch in changes_booking:
-                            db_col = get_database_column_name(ch["Column"])  # nome técnico
+                            alias_or_label = reverse_map_all_b.get(ch["Column"], ch["Column"])  # friendly -> alias quando possível
+                            db_col = get_database_column_name(alias_or_label)  # nome técnico
                             new_val = ch["New Value"]
                             if db_col == "FAROL_STATUS":
                                 new_val = process_farol_status_for_database(new_val)
