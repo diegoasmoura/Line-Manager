@@ -436,11 +436,11 @@ def exibir_formulario():
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_pq]
                 
-                # Observações (Sales): Comments Sales (2 colunas) | Sales Owner (1 coluna)
+                # Observações (Sales): Comments Sales (2 colunas) | 📌 Informações adicionais (2 colunas) | Sales Owner (1 coluna)
                 if section_title == "💬 Observações":
                     obs_fields_s = [f for f in ["Comments Sales", "Sales Owner"] if f in available_fields]
                     if obs_fields_s:
-                        cols_obs_s = st.columns([2,1,1,1,1])
+                        cols_obs_s = st.columns([2,2,1,1,1])
                         # Comments Sales
                         if "Comments Sales" in obs_fields_s:
                             with cols_obs_s[0]:
@@ -451,9 +451,16 @@ def exibir_formulario():
                                     height=140,
                                     key=f"sales_obs_{farol_ref}_comments"
                                 )
+                        # 📌 Informações adicionais (Sales)
+                        with cols_obs_s[1]:
+                            info_sales = st.text_area(
+                                "📌 Informações adicionais (Sales)",
+                                key=f"info_sales_{farol_ref}",
+                                height=140
+                            )
                         # Sales Owner
                         if "Sales Owner" in obs_fields_s:
-                            with cols_obs_s[1]:
+                            with cols_obs_s[2]:
                                 current_val = row_sales.get("Sales Owner", "")
                                 new_values_sales["Sales Owner"] = st.text_input(
                                     "Sales Owner",
@@ -566,7 +573,7 @@ def exibir_formulario():
                                     else:
                                         new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
 
-            info_sales = st.text_area("📌 Informações adicionais (Sales)", key=f"info_sales_{farol_ref}")
+            # info_sales agora é definido dentro da seção Observações (Sales)
             submit_sales = st.form_submit_button("✅ Confirmar alterações (Sales)")
 
         # (removido) blocos fora do formulário – mantidos dentro do st.form
@@ -835,7 +842,7 @@ def exibir_formulario():
                 if section_title == "💬 Observações":
                     obs_fields = [f for f in ["Comments Booking", "Booking Owner"] if f in available_fields]
                     if obs_fields:
-                        cols_obs = st.columns([2,1,1,1,1])
+                        cols_obs = st.columns([2,2,1,1,1])
                         # Comments Booking
                         if "Comments Booking" in obs_fields:
                             with cols_obs[0]:
@@ -846,9 +853,16 @@ def exibir_formulario():
                                     height=140,
                                     key=f"booking_obs_{farol_ref}_comments"
                                 )
+                        # 📌 Informações adicionais (Booking)
+                        with cols_obs[1]:
+                            info_booking = st.text_area(
+                                "📌 Informações adicionais (Booking)",
+                                key=f"info_booking_{farol_ref}",
+                                height=140
+                            )
                         # Booking Owner
                         if "Booking Owner" in obs_fields:
-                            with cols_obs[1]:
+                            with cols_obs[2]:
                                 current_val = row_booking.get("Booking Owner", "")
                                 new_values_booking["Booking Owner"] = st.text_input(
                                     "Booking Owner",
@@ -1067,7 +1081,7 @@ def exibir_formulario():
                                     else:
                                         new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
 
-            info_booking = st.text_area("📌 Informações adicionais (Booking)", key=f"info_booking_{farol_ref}")
+            # info_booking agora é definido dentro da seção Observações (Booking)
             submit_booking = st.form_submit_button("✅ Confirmar alterações (Booking)")
 
         # (removido) blocos fora do formulário – mantidos dentro do st.form
