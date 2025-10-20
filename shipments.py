@@ -440,7 +440,7 @@ def exibir_formulario():
                 if section_title == "💬 Observações":
                     obs_fields_s = [f for f in ["Comments Sales", "Sales Owner"] if f in available_fields]
                     if obs_fields_s:
-                        cols_obs_s = st.columns([2,2,1,1,1])
+                        cols_obs_s = st.columns([3,2,1])
                         # Comments Sales
                         if "Comments Sales" in obs_fields_s:
                             with cols_obs_s[0]:
@@ -465,7 +465,8 @@ def exibir_formulario():
                                 new_values_sales["Sales Owner"] = st.text_input(
                                     "Sales Owner",
                                     value=str(current_val if current_val is not None else ""),
-                                    key=f"sales_obs_{farol_ref}_sales_owner"
+                                    key=f"sales_obs_{farol_ref}_sales_owner",
+                                    disabled=True
                                 )
                         # Evita duplicar no restante
                         available_fields = [f for f in available_fields if f not in ("Comments Sales", "Sales Owner")]
@@ -842,7 +843,7 @@ def exibir_formulario():
                 if section_title == "💬 Observações":
                     obs_fields = [f for f in ["Comments Booking", "Booking Owner"] if f in available_fields]
                     if obs_fields:
-                        cols_obs = st.columns([2,2,1,1,1])
+                        cols_obs = st.columns([3,2,1])
                         # Comments Booking
                         if "Comments Booking" in obs_fields:
                             with cols_obs[0]:
