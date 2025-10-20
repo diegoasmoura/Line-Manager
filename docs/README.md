@@ -117,6 +117,15 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - `Splitted Farol Reference` é preenchida automaticamente quando vazia para referências com sufixo `.n`.
 - `Linked Reference` somente é definida na aprovação; formato hierárquico `FR_...-R01`, `-R02`, ... e opção especial "New Adjustment".
 
+### v4.3.0 - UI/UX Standardization (2025-01-04)
+- **Padronização de Botões**: Todos os botões de confirmação agora usam "✅ Save Changes" e "❌ Discard Changes" em inglês
+- **Campo Renomeado**: "📌 Additional Information" → "📌 Reasons for Change" na tela principal
+- **Botões Adicionados**: "❌ Discard Changes" dentro dos formulários da Form View (Sales Data & Booking Management)
+- **Navegação Melhorada**: "⬅️ Voltar" → "🔙 Back to Shipments" na Form View
+- **Consistência Global**: Interface padronizada em todas as telas (shipments.py, booking_new.py, shipments_split.py, history.py)
+- **Layout Otimizado**: Botões organizados em colunas para melhor usabilidade
+- **Experiência do Usuário**: Interface mais intuitiva e profissional com nomenclatura consistente
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.
