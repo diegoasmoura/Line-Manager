@@ -1191,8 +1191,7 @@ def exibir_formulario():
                     finally:
                         end_change_batch()
 
-    st.divider()
-    if st.button("⬅️ Voltar"):
+    if st.button("🔙 Back to Shipments"):
         st.session_state["current_page"] = "main"
         st.rerun()
 # Função para aplicar filtros avançados interativos no DataFrame
@@ -2023,7 +2022,7 @@ def exibir_shipments():
                 hide_index=True)
    
         with col_right:
-            st.text_area("📌 Additional Information", key="info_complementar")
+            st.text_area("📌 Reasons for Change", key="info_complementar")
    
            
         col1, col2, col3, col4  = st.columns([1, 1, 2, 3])
@@ -2089,7 +2088,7 @@ def exibir_shipments():
                             # Encerrar batch
                             end_change_batch()
                     else:
-                        st.error("⚠️ The 'Additional Information' field is required.")
+                        st.error("⚠️ The 'Reasons for Change' field is required.")
             else:
                 st.warning("⚠️ Você não tem permissão para editar dados. Nível de acesso: Visualização")
  
