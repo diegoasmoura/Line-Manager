@@ -58,6 +58,7 @@ def exibir_formulario():
         get_database_column_name,
         clean_farol_status_value,
         process_farol_status_for_database,
+        get_reverse_mapping,
     )
 
     df_sales = get_sales_record_by_reference(str(farol_ref))
@@ -241,7 +242,11 @@ def exibir_formulario():
                                     internal_key = "Farol Reference"
                                 label_display = display_names_local.get(label, label)
 
-                                disabled_flag = (label in disabled_cols) or (label == "Splitted Booking Reference")
+                                # Regra: campos duplicados só editáveis na sua stage-mãe (prefixos s_ e b_)
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or (label == "Splitted Booking Reference") or only_booking
                                 current_val = row_sales.get(internal_key, "")
 
                                 if label == "Farol Status":
@@ -277,7 +282,10 @@ def exibir_formulario():
                                 label = col_name
                                 internal_key = col_name
                                 current_val = row_sales.get(internal_key, "")
-                                disabled_flag = (label in disabled_cols)
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or only_booking
 
                                 if label in ("Business", "SKU"):
                                     options_map = {"Business": business_options, "SKU": sku_options}
@@ -307,7 +315,10 @@ def exibir_formulario():
                                 label = col_name
                                 internal_key = col_name
                                 current_val = row_sales.get(internal_key, "")
-                                disabled_flag = (label in disabled_cols)
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or only_booking
 
                                 if label in ("Port of Loading POL", "Port of Delivery POD"):
                                     options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
@@ -339,7 +350,10 @@ def exibir_formulario():
                                 label = col_name
                                 internal_key = col_name
                                 current_val = row_sales.get(internal_key, "")
-                                disabled_flag = (label in disabled_cols)
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or only_booking
 
                                 if label == "DTHC":
                                     options = dthc_options
@@ -364,7 +378,10 @@ def exibir_formulario():
                             label = "Incoterm"
                             internal_key = "Incoterm"
                             current_val = row_sales.get(internal_key, "")
-                            disabled_flag = (label in disabled_cols)
+                            db_col_candidate = get_database_column_name(internal_key)
+                            only_sales = db_col_candidate.lower().startswith("s_")
+                            only_booking = db_col_candidate.lower().startswith("b_")
+                            disabled_flag = (label in disabled_cols) or only_booking
                             try:
                                 default_index = incoterm_options.index(str(current_val))
                             except Exception:
@@ -387,7 +404,10 @@ def exibir_formulario():
                                 label = col_name
                                 internal_key = col_name
                                 current_val = row_sales.get(internal_key, "")
-                                disabled_flag = (label in disabled_cols)
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or only_booking
                                 # Usa nome amigável para datas
                                 disp_label = display_names_local.get(label, label)
                                 dt = pd.to_datetime(current_val, errors='coerce')
@@ -416,7 +436,10 @@ def exibir_formulario():
                                 label = col_name
                                 internal_key = col_name
                                 current_val = row_sales.get(internal_key, "")
-                                disabled_flag = (label in disabled_cols)
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or only_booking
 
                                 if label == "Sales Quantity of Containers":
                                     try:
