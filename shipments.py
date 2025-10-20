@@ -212,7 +212,7 @@ def exibir_formulario():
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Incoterm", "Mode"],
                 "📅 Datas e Prazos": ["data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end"],
                 "⚙️ Configurações": ["DTHC", "Afloat", "Partial Allowed", "VIP PNL Risk", "LC Received"],
-                "💬 Observações": ["Comments Sales"]
+                "💬 Observações": ["Comments Sales", "Sales Owner"]
             }
             
             for section_title, section_fields in sections.items():
@@ -436,6 +436,33 @@ def exibir_formulario():
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_pq]
                 
+                # Observações (Sales): Comments Sales (2 colunas) | Sales Owner (1 coluna)
+                if section_title == "💬 Observações":
+                    obs_fields_s = [f for f in ["Comments Sales", "Sales Owner"] if f in available_fields]
+                    if obs_fields_s:
+                        cols_obs_s = st.columns([2,1,1,1,1])
+                        # Comments Sales
+                        if "Comments Sales" in obs_fields_s:
+                            with cols_obs_s[0]:
+                                current_val = row_sales.get("Comments Sales", "")
+                                new_values_sales["Comments Sales"] = st.text_area(
+                                    "Comments Sales",
+                                    value=str(current_val if current_val is not None else ""),
+                                    height=140,
+                                    key=f"sales_obs_{farol_ref}_comments"
+                                )
+                        # Sales Owner
+                        if "Sales Owner" in obs_fields_s:
+                            with cols_obs_s[1]:
+                                current_val = row_sales.get("Sales Owner", "")
+                                new_values_sales["Sales Owner"] = st.text_input(
+                                    "Sales Owner",
+                                    value=str(current_val if current_val is not None else ""),
+                                    key=f"sales_obs_{farol_ref}_sales_owner"
+                                )
+                        # Evita duplicar no restante
+                        available_fields = [f for f in available_fields if f not in ("Comments Sales", "Sales Owner")]
+
                 # Agrupa campos da seção por layout
                 section_groups = {}
                 for field in available_fields:
