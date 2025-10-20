@@ -203,19 +203,27 @@ def show_booking_management_form():
             if not values.get(field):
                 missing_fields.append(label)
  
-        col_btn1, col_btn2 = st.columns(2)
+        col_btn1, col_btn2, col_btn3 = st.columns(3)
         with col_btn1:
             salvar = st.form_submit_button(
-                "✅ Confirm",
+                "✅ Save Changes",
                 disabled=st.session_state.get("button_disabled", False)
             )
         with col_btn2:
+            discard = st.form_submit_button("❌ Discard Changes")
+        with col_btn3:
             back = st.form_submit_button("🔙 Back to Shipments")
  
     if back:
         st.session_state.pop("button_disabled", None)
         st.session_state["current_page"] = "main"
         st.session_state.pop("selected_reference", None)  # Limpar referência ao voltar
+        st.rerun()
+    
+    if discard:
+        st.session_state.pop("button_disabled", None)
+        st.session_state["current_page"] = "main"
+        st.session_state.pop("selected_reference", None)  # Limpar referência ao descartar
         st.rerun()
  
     if salvar and not st.session_state.get("button_disabled", False):

@@ -598,9 +598,21 @@ def exibir_formulario():
                                         new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
 
             # info_sales agora é definido dentro da seção Observações (Sales)
-            submit_sales = st.form_submit_button("✅ Confirmar alterações (Sales)")
+            
+            # Botões dentro do formulário Sales
+            col_save_sales, col_discard_sales = st.columns([1, 1])
+            with col_save_sales:
+                submit_sales = st.form_submit_button("✅ Save Changes")
+            with col_discard_sales:
+                discard_sales = st.form_submit_button("❌ Discard Changes")
 
         # (removido) blocos fora do formulário – mantidos dentro do st.form
+
+        # Processa descarte Sales
+        if discard_sales:
+            st.warning("Changes discarded.")
+            st.session_state["current_page"] = "main"
+            st.rerun()
 
         # Processa submissão Sales
         if submit_sales:
@@ -1106,9 +1118,21 @@ def exibir_formulario():
                                         new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"booking_{farol_ref}_{label}")
 
             # info_booking agora é definido dentro da seção Observações (Booking)
-            submit_booking = st.form_submit_button("✅ Confirmar alterações (Booking)")
+            
+            # Botões dentro do formulário Booking
+            col_save_booking, col_discard_booking = st.columns([1, 1])
+            with col_save_booking:
+                submit_booking = st.form_submit_button("✅ Save Changes")
+            with col_discard_booking:
+                discard_booking = st.form_submit_button("❌ Discard Changes")
 
         # (removido) blocos fora do formulário – mantidos dentro do st.form
+
+        # Processa descarte Booking
+        if discard_booking:
+            st.warning("Changes discarded.")
+            st.session_state["current_page"] = "main"
+            st.rerun()
 
         # Processa submissão Booking
         if submit_booking:
@@ -2005,7 +2029,7 @@ def exibir_shipments():
         col1, col2, col3, col4  = st.columns([1, 1, 2, 3])
         with col1:
             if has_access_level('EDIT'):
-                if st.button("✅ Confirm Changes"):
+                if st.button("✅ Save Changes"):
                     comments = st.session_state.get("info_complementar", "").strip()
        
                     if comments:

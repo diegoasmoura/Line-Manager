@@ -272,7 +272,7 @@ def show_split_form():
  
         with col_btn1:
             if st.button(
-                "✅ Confirm",
+                "✅ Save Changes",
                 disabled=st.session_state.get("button_disabled", False)
             ):
                 # Debounce: se já está processando, ignora novo clique

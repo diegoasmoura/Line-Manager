@@ -2544,10 +2544,10 @@ def exibir_history():
                 col_confirm, col_cancel = st.columns([1, 1])
                 
                 with col_confirm:
-                    confirm_manual_clicked = st.form_submit_button("✅ Confirmar", type="primary")
+                    confirm_manual_clicked = st.form_submit_button("✅ Save Changes", type="primary")
                 
                 with col_cancel:
-                    cancel_manual_clicked = st.form_submit_button("❌ Cancelar")
+                    cancel_manual_clicked = st.form_submit_button("❌ Discard Changes")
                 
                 if confirm_manual_clicked:
                     # Preparar dados para inserção
@@ -2796,7 +2796,7 @@ def exibir_history():
             col_confirm, col_cancel = st.columns([1, 1])
             
             with col_confirm:
-                if st.button("✅ Confirmar Aprovação", key=f"confirm_approval_{adjustment_id}", type="primary", disabled=not can_confirm):
+                if st.button("✅ Save Changes", key=f"confirm_approval_{adjustment_id}", type="primary", disabled=not can_confirm):
                     justification = {}
                     related_reference = ""
 
