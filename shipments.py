@@ -39,6 +39,7 @@ def exibir_formulario():
         return
 
     st.caption(f"Farol Reference: {farol_ref}")
+    # Sem CSS personalizado - usando estrutura padrão do Streamlit
 
     # Carregar dados por referência
     from database import (
@@ -107,6 +108,14 @@ def exibir_formulario():
         ] + df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().astype(str).unique().tolist()
         vip_pnl_risk_options = [""
         ] + df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().astype(str).unique().tolist()
+        business_options = [""
+        ] + df_udc[df_udc["grupo"] == "Business"]["dado"].dropna().astype(str).unique().tolist()
+        mode_options = [""
+        ] + df_udc[df_udc["grupo"] == "Mode"]["dado"].dropna().astype(str).unique().tolist()
+        sku_options = [""
+        ] + df_udc[df_udc["grupo"] == "Sku"]["dado"].dropna().astype(str).unique().tolist()
+        incoterm_options = [""
+        ] + df_udc[df_udc["grupo"] == "Incoterm"]["dado"].dropna().astype(str).unique().tolist()
 
         st.subheader("Sales Data")
         with st.form(f"sales_form_{farol_ref}"):
@@ -135,6 +144,8 @@ def exibir_formulario():
                 """Retorna configuração de largura e agrupamento para cada campo"""
                 # Campos pequenos (1/4 da largura) - códigos, números simples
                 small_fields = {
+                    "Farol Reference": {"width": 1, "cols": 4},
+                    "Farol Status": {"width": 1, "cols": 4},
                     "Container Type": {"width": 1, "cols": 4},
                     "Sales Quantity of Containers": {"width": 1, "cols": 4}, 
                     "DTHC": {"width": 1, "cols": 4},
@@ -147,7 +158,6 @@ def exibir_formulario():
                 
                 # Campos médios (1/3 da largura) - status, tipos
                 medium_fields = {
-                    "Farol Status": {"width": 1, "cols": 3},
                     "Type of Shipment": {"width": 1, "cols": 3},
                     "Mode": {"width": 1, "cols": 3},
                     "Incoterm": {"width": 1, "cols": 3},
@@ -163,12 +173,12 @@ def exibir_formulario():
                     "Port of Delivery POD": {"width": 1, "cols": 2},
                     "Place of Receipt": {"width": 1, "cols": 2},
                     "Final Destination": {"width": 1, "cols": 2},
-                    "PNL Destination": {"width": 1, "cols": 2}
+                    "PNL Destination": {"width": 1, "cols": 2},
+                    "Comments Sales": {"width": 1, "cols": 2}
                 }
                 
                 # Campos extra grandes (largura completa) - textos longos
                 xl_fields = {
-                    "Comments Sales": {"width": 1, "cols": 1},
                     "Sales Order Reference": {"width": 1, "cols": 1},
                     "Customer PO": {"width": 1, "cols": 1},
                     "Splitted Booking Reference": {"width": 1, "cols": 1}
@@ -197,9 +207,9 @@ def exibir_formulario():
             # Renderiza campos agrupados por layout com seções organizadas
             sections = {
                 "📋 Informações Básicas": ["Sales Farol Reference", "Farol Status", "Type of Shipment"],
-                "📦 Produto e Quantidade": ["Sales Quantity of Containers", "Container Type", "SKU"],
-                "🏢 Cliente e Negócio": ["Customer", "Business", "Customer PO", "Sales Order Reference"],
-                "🚢 Logística": ["Mode", "Incoterm", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination"],
+                "📦 Produto e Quantidade": ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer", "SKU"],
+                "🏢 Cliente e Negócio": ["Customer PO"],
+                "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Incoterm", "Mode"],
                 "📅 Datas e Prazos": ["data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end"],
                 "⚙️ Configurações": ["DTHC", "Afloat", "Partial Allowed", "VIP PNL Risk", "LC Received"],
                 "💬 Observações": ["Comments Sales"]
@@ -214,6 +224,217 @@ def exibir_formulario():
                 if section_title != "📋 Informações Básicas":  # Não adiciona espaço antes da primeira seção
                     st.markdown("---")  # Linha divisória
                 st.markdown(f"**{section_title}**")
+
+                # Linha padrão: Farol Reference | Farol Status | Type of Shipment
+                if section_title == "📋 Informações Básicas":
+                    first_row_fields = ["Sales Farol Reference", "Farol Status", "Type of Shipment"]
+                    available_top = [f for f in first_row_fields if f in available_fields]
+                    if available_top:
+                        # Padronizado: [1,1,1,1,1] (5 colunas iguais) para manter mesmas medidas em todas as abas
+                        cols_top = st.columns([1,1,1,1,1])
+                        for j, col_name in enumerate(available_top):
+                            with cols_top[j]:
+                                label = col_name
+                                internal_key = col_name
+                                if col_name == "Sales Farol Reference":
+                                    label = "Farol Reference"
+                                    internal_key = "Farol Reference"
+                                label_display = display_names_local.get(label, label)
+
+                                disabled_flag = (label in disabled_cols) or (label == "Splitted Booking Reference")
+                                current_val = row_sales.get(internal_key, "")
+
+                                if label == "Farol Status":
+                                    try:
+                                        default_index = farol_status_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, farol_status_options, index=default_index, disabled=disabled_flag, key=f"sales_top_{farol_ref}_{label}")
+                                elif label == "Type of Shipment":
+                                    try:
+                                        default_index = type_of_shipment_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, type_of_shipment_options, index=default_index, disabled=disabled_flag, key=f"sales_top_{farol_ref}_{label}")
+                                else:
+                                    new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=True, key=f"sales_top_{farol_ref}_{label}")
+
+                        # Remove do restante da seção para não duplicar
+                        available_fields = [f for f in available_fields if f not in available_top]
+                
+                # Linha fixa na seção Cliente e Negócio: Customer | Business | SKU
+                if section_title == "🏢 Cliente e Negócio":
+                    first_row_fields_cn = ["Customer", "Business"]
+                    available_top_cn = [f for f in first_row_fields_cn if f in available_fields]
+                    if available_top_cn:
+                        # Customer (3), Business (2), espaçador (7)
+                        if set(available_top_cn) >= {"Customer", "Business"}:
+                            cols_top_cn = st.columns([1,1,2])
+                        else:
+                            cols_top_cn = st.columns([1]*len(available_top_cn) + [max(1, 5-len(available_top_cn))])
+                        for j, col_name in enumerate(available_top_cn):
+                            with cols_top_cn[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_sales.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols)
+
+                                if label in ("Business", "SKU"):
+                                    options_map = {"Business": business_options, "SKU": sku_options}
+                                    options = options_map[label]
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_top_cn_{farol_ref}_{label}")
+                                else:
+                                    new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"sales_top_cn_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_cn]
+
+                # Linha fixa na seção Portos e Destinos: POL | POD | Place of Receipt | Final Destination | Incoterm
+                if section_title == "🌍 Portos e Destinos":
+                    first_row_fields_log = ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Incoterm"]
+                    available_top_log = [f for f in first_row_fields_log if f in available_fields]
+                    if available_top_log:
+                        # Padrão: [1,1,1,1,1] (5 colunas iguais)
+                        cols_top_log = st.columns([1,1,1,1,1])
+                        for idx, col_name in enumerate(["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Incoterm"]):
+                            if col_name not in available_top_log:
+                                continue
+                            with cols_top_log[idx]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_sales.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols)
+
+                                if label in ("Port of Loading POL", "Port of Delivery POD"):
+                                    options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_top_log_{farol_ref}_{label}")
+                                elif label == "Incoterm":
+                                    try:
+                                        default_index = incoterm_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, incoterm_options, index=default_index, disabled=disabled_flag, key=f"sales_top_log_{farol_ref}_{label}")
+                                else:
+                                    new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"sales_top_log_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_log]
+
+                # Linha fixa em Configurações: DTHC | Afloat | VIP PNL Risk
+                if section_title == "⚙️ Configurações":
+                    first_row_fields_cfg = ["DTHC", "Afloat", "VIP PNL Risk"]
+                    available_top_cfg = [f for f in first_row_fields_cfg if f in available_fields]
+                    if available_top_cfg:
+                        cols_top_cfg = st.columns([1, 1, 1, 2])
+                        for j, col_name in enumerate(available_top_cfg):
+                            with cols_top_cfg[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_sales.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols)
+
+                                if label == "DTHC":
+                                    options = dthc_options
+                                elif label == "Afloat":
+                                    options = yes_no_options
+                                else:
+                                    options = vip_pnl_risk_options
+
+                                try:
+                                    default_index = options.index(str(current_val))
+                                except Exception:
+                                    default_index = 0
+                                new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_top_cfg_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_cfg]
+
+                    # Linha única apenas para Incoterm, com pesos [1,1,1,2] (mesma largura de um campo em POL/POD)
+                    if "Incoterm" in available_fields:
+                        cols_inc = st.columns([1,1,1,2])
+                        with cols_inc[0]:
+                            label = "Incoterm"
+                            internal_key = "Incoterm"
+                            current_val = row_sales.get(internal_key, "")
+                            disabled_flag = (label in disabled_cols)
+                            try:
+                                default_index = incoterm_options.index(str(current_val))
+                            except Exception:
+                                default_index = 0
+                            new_values_sales[label] = st.selectbox(label, incoterm_options, index=default_index, disabled=disabled_flag, key=f"sales_top_inc_{farol_ref}_{label}")
+
+                        # Remove Incoterm do restante da seção
+                        available_fields = [f for f in available_fields if f != "Incoterm"]
+
+                # Linha fixa na seção Datas e Prazos: Sales Order Date | Shipment Requested Date | Requested Deadline Start | Requested Deadline End
+                if section_title == "📅 Datas e Prazos":
+                    first_row_fields_dt = [
+                        "data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end"
+                    ]
+                    available_top_dt = [f for f in first_row_fields_dt if f in available_fields]
+                    if available_top_dt:
+                        cols_top_dt = st.columns([1]*len(available_top_dt) + [max(1, 5-len(available_top_dt))])
+                        for j, col_name in enumerate(available_top_dt):
+                            with cols_top_dt[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_sales.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols)
+                                # Usa nome amigável para datas
+                                disp_label = display_names_local.get(label, label)
+                                dt = pd.to_datetime(current_val, errors='coerce')
+                                new_values_sales[label] = st.date_input(
+                                    disp_label,
+                                    value=(dt.date() if pd.notna(dt) else None),
+                                    disabled=disabled_flag,
+                                    key=f"sales_top_dt_{farol_ref}_{label}"
+                                )
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_dt]
+
+                # Linha fixa na seção Produto e Quantidade: Sales Order Reference | Sales Quantity of Containers | Container Type | Customer
+                if section_title == "📦 Produto e Quantidade":
+                    first_row_fields_pq = ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]
+                    available_top_pq = [f for f in first_row_fields_pq if f in available_fields]
+                    if available_top_pq:
+                        # Padrão: [1,1,1,1,1] (5 colunas iguais)
+                        cols_top_pq = st.columns([1,1,1,1,1])
+                        # Ordem fixa: Sales Order Reference | Sales Quantity of Containers | Container Type | Customer (Customer usa a 4ª coluna se existir)
+                        for idx, col_name in enumerate(["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]):
+                            if col_name not in available_top_pq:
+                                continue
+                            with cols_top_pq[idx]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_sales.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols)
+
+                                if label == "Sales Quantity of Containers":
+                                    try:
+                                        default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
+                                    except Exception:
+                                        default_num = 0
+                                    new_values_sales[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"sales_top_pq_{farol_ref}_{label}")
+                                elif label == "Container Type":
+                                    try:
+                                        default_index = container_type_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, container_type_options, index=default_index, disabled=disabled_flag, key=f"sales_top_pq_{farol_ref}_{label}")
+                                else:
+                                    new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"sales_top_pq_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_pq]
                 
                 # Agrupa campos da seção por layout
                 section_groups = {}
@@ -283,6 +504,20 @@ def exibir_formulario():
                                     except Exception:
                                         default_index = 0
                                     new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label in ("Business", "Mode", "SKU"):
+                                    options_map = {"Business": business_options, "Mode": mode_options, "SKU": sku_options}
+                                    options = options_map[label]
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
+                                elif label in ("Partial Allowed", "PNL Destination"):
+                                    try:
+                                        default_index = yes_no_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_sales[label] = st.selectbox(label, yes_no_options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
                                 elif label in ("Sales Quantity of Containers", "Requested Shipment Week"):
                                     try:
                                         default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
@@ -293,7 +528,16 @@ def exibir_formulario():
                                     dt = pd.to_datetime(current_val, errors='coerce')
                                     new_values_sales[label] = st.date_input(label_display, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
                                 else:
-                                    new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
+                                    if label == "Comments Sales":
+                                        new_values_sales[label] = st.text_area(
+                                            label,
+                                            value=str(current_val if current_val is not None else ""),
+                                            height=140,  # ~2 linhas a mais
+                                            disabled=disabled_flag,
+                                            key=f"sales_{farol_ref}_{label}"
+                                        )
+                                    else:
+                                        new_values_sales[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag or (label == "Farol Reference"), key=f"sales_{farol_ref}_{label}")
 
             info_sales = st.text_area("📌 Informações adicionais (Sales)", key=f"info_sales_{farol_ref}")
             submit_sales = st.form_submit_button("✅ Confirmar alterações (Sales)")
@@ -419,6 +663,8 @@ def exibir_formulario():
                 """Retorna configuração de largura para campos de Booking"""
                 # Campos pequenos (1/4 da largura)
                 small_fields = {
+                    "Farol Reference": {"width": 1, "cols": 4},
+                    "Farol Status": {"width": 1, "cols": 4},
                     "Container Type": {"width": 1, "cols": 4},
                     "Sales Quantity of Containers": {"width": 1, "cols": 4},
                     "Booking Status": {"width": 1, "cols": 4},
@@ -428,7 +674,6 @@ def exibir_formulario():
                 
                 # Campos médios (1/3 da largura)
                 medium_fields = {
-                    "Farol Status": {"width": 1, "cols": 3},
                     "Carrier": {"width": 1, "cols": 3},
                     "Freight Forwarder": {"width": 1, "cols": 3},
                     "Vessel Name": {"width": 1, "cols": 3},
@@ -482,12 +727,14 @@ def exibir_formulario():
             # Renderiza campos de Booking organizados por seções
             booking_sections = {
                 "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status"],
-                "📦 Produto e Transporte": ["Sales Quantity of Containers", "Container Type", "Sales Order Reference"],
-                "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal"],
+                "📦 Produto e Quantidade": ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"],
+                "🏢 Cliente e Negócio": [],  # mantém ordem consistente com Sales
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
                 "📅 Cronograma": ["Booking Registered Date", "Booking Requested Date", "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada"],
-                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"],
-                "💬 Observações": ["Comments Booking", "Booking Owner"]
+                "⚙️ Configurações": [],  # mantém ordem consistente com Sales
+                "💬 Observações": ["Comments Booking", "Booking Owner"],
+                "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal"],
+                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"]
             }
             
             for section_title, section_fields in booking_sections.items():
@@ -499,6 +746,196 @@ def exibir_formulario():
                 if section_title != "📋 Informações Básicas":  # Não adiciona espaço antes da primeira seção
                     st.markdown("---")  # Linha divisória
                 st.markdown(f"**{section_title}**")
+
+                # Linha fixa na seção Portos e Destinos: POL | POD | Place of Receipt | Final Destination | Transhipment Port
+                if section_title == "🌍 Portos e Destinos":
+                    # Primeira linha: campos compartilhados com Sales
+                    first_row_fields_b_log = ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port"]
+                    available_top_b_log = [f for f in first_row_fields_b_log if f in available_fields]
+                    if available_top_b_log:
+                        # Padrão: [1,1,1,1,1] (5 colunas iguais)
+                        cols_top_b_log = st.columns([1,1,1,1,1])
+                        for idx, col_name in enumerate(["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port"]):
+                            if col_name not in available_top_b_log:
+                                continue
+                            with cols_top_b_log[idx]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b)
+
+                                if label in ("Port of Loading POL", "Port of Delivery POD"):
+                                    options = ports_pol_options if label == "Port of Loading POL" else ports_pod_options
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_top_log_{farol_ref}_{label}")
+                                else:
+                                    new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"booking_top_log_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_b_log]
+
+                    # Segunda linha: POD Country | Destination Trade Region
+                    second_row_fields_b_log = ["POD Country", "Destination Trade Region"]
+                    available_top_b_log2 = [f for f in second_row_fields_b_log if f in available_fields]
+                    if available_top_b_log2:
+                        # Padrão: [1,1,1,1,1] (5 colunas iguais)
+                        cols_top_b_log2 = st.columns([1,1,1,1,1])
+                        for idx, col_name in enumerate(["POD Country", "Destination Trade Region"]):
+                            if col_name not in available_top_b_log2:
+                                continue
+                            with cols_top_b_log2[idx]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b)
+
+                                new_values_booking[label] = st.text_input(
+                                    label,
+                                    value=str(current_val if current_val is not None else ""),
+                                    disabled=disabled_flag,
+                                    key=f"booking_top_log2_{farol_ref}_{label}"
+                                )
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_b_log2]
+
+                # Linha fixa no topo (Booking): Farol Reference | Farol Status | Type of Shipment | Booking Status
+                if section_title == "📋 Informações Básicas":
+                    first_row_fields_b = ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status"]
+                    available_top_b = [f for f in first_row_fields_b if f in available_fields]
+                    if available_top_b:
+                        # Padronizado: [1,1,1,1,1] (5 colunas iguais) para manter mesmas medidas em todas as abas
+                        cols_top_b = st.columns([1,1,1,1,1])
+                        for j, col_name in enumerate(available_top_b):
+                            with cols_top_b[j]:
+                                label = col_name
+                                internal_key = col_name
+                                if col_name == "Booking Farol Reference":
+                                    label = "Farol Reference"
+                                    internal_key = "Farol Reference"
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b) or (label == "Booking Registered Date")
+
+                                if label == "Farol Status":
+                                    # UDC igual ao Sales: selectbox
+                                    try:
+                                        default_index = farol_status_options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, farol_status_options, index=default_index, disabled=disabled_flag, key=f"booking_top_{farol_ref}_{label}")
+                                elif label in ("Type of Shipment", "Booking Status"):
+                                    # Ambos são UDC na grade principal → usar select quando editável
+                                    if label == "Type of Shipment":
+                                        options = type_of_shipment_options
+                                    else:
+                                        options = [""] + df_udc[df_udc["grupo"] == "Booking Status"]["dado"].dropna().astype(str).unique().tolist()
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_top_{farol_ref}_{label}")
+                                else:
+                                    new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=True, key=f"booking_top_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_b]
+
+                # Linha fixa em Produto e Quantidade (Booking): Sales Order Reference | Sales Quantity of Containers | Container Type | Customer
+                if section_title == "📦 Produto e Quantidade":
+                    first_row_fields_bt = ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]
+                    available_top_bt = [f for f in first_row_fields_bt if f in available_fields]
+                    if available_top_bt:
+                        # Padrão: [1,1,1,1,1] (5 colunas iguais)
+                        cols_top_bt = st.columns([1,1,1,1,1])
+                        # Ordem fixa igual à Sales
+                        for idx, col_name in enumerate(["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]):
+                            if col_name not in available_top_bt:
+                                continue
+                            with cols_top_bt[idx]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b)
+
+                                if label == "Sales Quantity of Containers":
+                                    try:
+                                        default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
+                                    except Exception:
+                                        default_num = 0
+                                    new_values_booking[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"booking_top_bt_{farol_ref}_{label}")
+                                elif label == "Container Type":
+                                    # Reutiliza opções de container type
+                                    container_type_options_b = [""] + df_udc[df_udc["grupo"] == "Container Type"]["dado"].dropna().astype(str).unique().tolist()
+                                    try:
+                                        default_index = container_type_options_b.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, container_type_options_b, index=default_index, disabled=disabled_flag, key=f"booking_top_bt_{farol_ref}_{label}")
+                                else:
+                                    new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"booking_top_bt_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_bt]
+
+                # Linha única em Cronograma (Booking): Registered | Requested | Confirmation | ETD | ETA
+                if section_title == "📅 Cronograma":
+                    first_row_fields_time = [
+                        "Booking Registered Date",
+                        "Booking Requested Date",
+                        "data_booking_confirmation",
+                        "data_estimativa_saida",
+                        "data_estimativa_chegada",
+                    ]
+                    available_top_time = [f for f in first_row_fields_time if f in available_fields]
+                    if available_top_time:
+                        cols_top_time = st.columns([1]*len(available_top_time) + [max(1, 5-len(available_top_time))])
+                        for j, col_name in enumerate(available_top_time):
+                            with cols_top_time[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b)
+                                from shipments_mapping import get_display_names
+                                disp = get_display_names().get(label, label)
+
+                                if label == "Booking Registered Date":
+                                    # Preserva data+hora conforme solicitado
+                                    new_values_booking[label] = st.text_input(disp, value=str(current_val if current_val is not None else ""), disabled=True, key=f"booking_top_time_{farol_ref}_{label}")
+                                else:
+                                    dt = pd.to_datetime(current_val, errors='coerce')
+                                    new_values_booking[label] = st.date_input(disp, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"booking_top_time_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_time]
+
+                # Linha única em Financeiro (Booking): Freight Rate USD | Bogey Sale Price USD | Freight PNL
+                if section_title == "💰 Financeiro":
+                    first_row_fields_fin = [
+                        "Freight Rate USD",
+                        "Bogey Sale Price USD",
+                        "Freight PNL",
+                    ]
+                    available_top_fin = [f for f in first_row_fields_fin if f in available_fields]
+                    if available_top_fin:
+                        cols_top_fin = st.columns([1]*len(available_top_fin) + [max(1, 5-len(available_top_fin))])
+                        for j, col_name in enumerate(available_top_fin):
+                            with cols_top_fin[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b)
+
+                                try:
+                                    default_num = float(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0.0
+                                except Exception:
+                                    default_num = 0.0
+                                new_values_booking[label] = st.number_input(label, value=default_num, step=0.01, disabled=disabled_flag, key=f"booking_top_fin_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_fin]
                 
                 # Agrupa campos da seção por layout
                 section_groups = {}
