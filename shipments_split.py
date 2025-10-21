@@ -2,7 +2,7 @@
  
 import streamlit as st
 import pandas as pd
-from database import load_df_udc, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales, upsert_return_carrier_from_unified, insert_return_carrier_snapshot, insert_return_carrier_from_ui
+from database import load_df_udc, perform_split_operation, get_split_data_by_farol_reference, fetch_shipments_data_sales, upsert_return_carrier_from_unified, insert_return_carrier_snapshot, insert_return_carrier_from_ui, list_terminal_names, list_terminal_names_from_unified
 import re
 from uuid import uuid4
 import time
@@ -154,7 +154,8 @@ def show_split_form():
             "Vessel Name": split_dict.get("b_vessel_name"),
             "Requested Deadline Start Date": split_data["s_requested_deadlines_start_date"],
             "Requested Deadline End Date": split_data["s_requested_deadlines_end_date"],
-            "Required Arrival Date Expected": split_data["s_required_arrival_date_expected"]
+            "Required Sail Date": split_dict.get("s_required_sail_date"),
+            "Required Arrival Date": split_dict.get("s_required_arrival_date_expected")
         }])
        
         new_refs = get_next_farol_refs(selected_farol, num_splits)
@@ -187,10 +188,22 @@ def show_split_form():
             "Vessel Name",
             "Requested Deadline Start Date",
             "Requested Deadline End Date",
-            "Required Arrival Date Expected"
+            "Required Sail Date",
+            "Required Arrival Date"
         ]
  
         df_split_display = df_split[editable_columns].copy()
+
+        # Converte os quatro últimos campos para date (editor de data no grid)
+        date_cols = [
+            "Requested Deadline Start Date",
+            "Requested Deadline End Date",
+            "Required Sail Date",
+            "Required Arrival Date"
+        ]
+        for dc in date_cols:
+            if dc in df_split_display.columns:
+                df_split_display[dc] = pd.to_datetime(df_split_display[dc], errors='coerce').dt.date
         st.markdown(f"#### You are splitting the original line into :green[{num_splits}] lines" if num_splits > 0 else "#### The main line will be adjusted")
         
         # Carregar opções de dropdown da UDC
@@ -199,6 +212,10 @@ def show_split_form():
         carrier_options = df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist()
 
         # Configuração de dropdowns para o data_editor
+        # Carregar opções de terminais do banco (fallback para vazio)
+        # Carrega nomes dos terminais da F_ELLOX_TERMINALS
+        terminal_options = list_terminal_names() or []
+
         column_config = {
             "Sales Quantity of Containers": st.column_config.NumberColumn(
                 "Quantity of Containers"
@@ -215,15 +232,34 @@ def show_split_form():
                 required=False,
                 help="Selecione o porto de destino"
             ),
-            "Terminal": st.column_config.TextColumn(
+            "Terminal": st.column_config.SelectboxColumn(
                 "Terminal",
-                help="Terminal do porto"
+                options=terminal_options,
+                required=False,
+                help="Selecione o terminal"
             ),
             "Voyage Carrier": st.column_config.SelectboxColumn(
                 "Voyage Carrier",
                 options=carrier_options,
                 required=False,
                 help="Selecione o voyage carrier"
+            ),
+            # Editores de data para os quatro últimos campos
+            "Requested Deadline Start Date": st.column_config.DateColumn(
+                "Requested Deadline Start Date",
+                format="YYYY/MM/DD"
+            ),
+            "Requested Deadline End Date": st.column_config.DateColumn(
+                "Requested Deadline End Date",
+                format="YYYY/MM/DD"
+            ),
+            "Required Sail Date": st.column_config.DateColumn(
+                "Required Sail Date",
+                format="YYYY/MM/DD"
+            ),
+            "Required Arrival Date": st.column_config.DateColumn(
+                "Required Arrival Date",
+                format="YYYY/MM/DD"
             ),
         }
 

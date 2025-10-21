@@ -1536,6 +1536,47 @@ def insert_container_release_if_not_exists(farol_reference, default_values=None)
     finally:
         conn.close()
 
+
+def list_terminal_names():
+    """Retorna lista de nomes da coluna Nome da F_ELLOX_TERMINALS."""
+    conn = get_database_connection()
+    try:
+        query = text(
+            """
+            SELECT DISTINCT NOME
+            FROM LogTransp.F_ELLOX_TERMINALS
+            WHERE NOME IS NOT NULL
+            ORDER BY 1
+            """
+        )
+        rows = conn.execute(query).fetchall()
+        return [row[0] for row in rows] if rows else []
+    finally:
+        conn.close()
+
+def list_terminal_names_from_unified():
+    """Fallback: retorna DISTINCT de B_TERMINAL da unificada."""
+    conn = get_database_connection()
+    try:
+        query = text(
+            """
+            SELECT DISTINCT B_TERMINAL, COUNT(*) as cnt
+            FROM LogTransp.F_CON_SALES_BOOKING_DATA
+            WHERE B_TERMINAL IS NOT NULL
+            GROUP BY B_TERMINAL
+            ORDER BY cnt DESC
+            """
+        )
+        rows = conn.execute(query).fetchall()
+        # Diagnóstico: imprime os primeiros 5 terminais e suas contagens
+        if rows:
+            print("\nTerminais mais usados na unificada:")
+            for row in rows[:5]:
+                print(f"- {row[0]}: {row[1]} ocorrências")
+        return [row[0] for row in rows] if rows else []
+    finally:
+        conn.close()
+
 #Função utilizada para atualizar os dados da tabela de booking
 def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada no arquivo booking_new.py
     from datetime import datetime
