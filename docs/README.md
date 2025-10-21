@@ -184,6 +184,44 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Funcionalidades**: Campo editável com valor atual carregado automaticamente
 - **Consistência**: Agora todas as telas mostram o campo "Transaction Number" corretamente
 
+### v4.9.1 - Otimização do Export XLSX (2025-01-21)
+- **Problemas Resolvidos**:
+  1. Erro `UnboundLocalError` ao clicar em "Export XLSX"
+  2. Dois botões para uma única ação (Export + Download)
+  3. Lógica complexa com estados intermediários
+  4. Imports locais causando conflitos de escopo
+
+- **Causas Identificadas**: 
+  - Imports de `datetime` e `io` dentro de blocos condicionais
+  - Lógica de dois passos (gerar arquivo + download) com estado intermediário
+  - Interface confusa com botão adicional de download
+
+- **Correções Implementadas**: 
+  1. **Organização de Imports**:
+     ```python
+     import io
+     from datetime import datetime
+     ```
+  2. **Simplificação da Interface**:
+     - Removido botão de download adicional
+     - Unificado em um único botão "📊 Export XLSX"
+  3. **Otimização do Código**:
+     - Removida lógica de estado intermediário (`export_triggered`)
+     - Geração do Excel e download em um único passo
+     - Código mais direto e eficiente
+
+- **Melhorias Alcançadas**: 
+  - ✅ Download direto ao clicar no botão
+  - ✅ Interface mais limpa e intuitiva
+  - ✅ Código mais robusto e organizado
+  - ✅ Imports centralizados no escopo global
+  - ✅ Sem estados intermediários desnecessários
+
+- **Observações Técnicas**:
+  - Mantida a funcionalidade de nomes amigáveis nas colunas do Excel
+  - Preservada a ordenação correta das colunas na exportação
+  - Mantido o formato de data/hora no nome do arquivo
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.

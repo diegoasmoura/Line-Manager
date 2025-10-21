@@ -6,6 +6,8 @@ import pandas as pd
 from sqlalchemy import text
 import time
 import uuid
+import io
+from datetime import datetime
 from auth.login import has_access_level  # NEW: Controle de acesso
  
 # Importa funções para interações com banco de dados e UDC
@@ -2151,9 +2153,38 @@ def exibir_shipments():
         
         with col_export:
             # Botão de exportação XLSX - sempre ativo
-            if st.button("📊 Export XLSX", key="export_btn_no_selection"):
-                st.session_state["export_triggered"] = True
-                st.rerun()
+            if len(df) > 0:  # Só mostra se houver dados para exportar
+                # Preparar dados para exportação
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    # Obter o dataframe com as colunas ordenadas, removendo a coluna "Select"
+                    columns_to_export = [col for col in colunas_ordenadas if col != "Select"]
+                    df_to_export = df[columns_to_export].copy()
+                    
+                    # Aplicar nomes amigáveis de exibição às colunas
+                    from shipments_mapping import get_display_names
+                    display_names = get_display_names()
+                    
+                    # Renomear as colunas usando os nomes amigáveis
+                    renamed_columns = {}
+                    for col in df_to_export.columns:
+                        if col in display_names:
+                            renamed_columns[col] = display_names[col]
+                        else:
+                            friendly_name = col.replace("data_", "").replace("_", " ").title()
+                            renamed_columns[col] = friendly_name
+                    
+                    df_to_export.rename(columns=renamed_columns, inplace=True)
+                    df_to_export.to_excel(writer, index=False, sheet_name='Data')
+                
+                # Botão de download direto
+                st.download_button(
+                    label="📊 Export XLSX",
+                    data=output.getvalue(),
+                    file_name=f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="export_btn_no_selection"
+                )
     
     else:
         # Quando UMA linha está selecionada: 6 botões (sem New Shipment)
@@ -2213,62 +2244,38 @@ def exibir_shipments():
             
         with col_export:
             # Botão de exportação XLSX - sempre ativo
-            if st.button("📊 Export XLSX", key="export_btn_with_selection"):
-                st.session_state["export_triggered"] = True
-                st.rerun()
-    
-    # Processar exportação quando botão for clicado
-    if st.session_state.get("export_triggered"):
-        from datetime import datetime
-        import io
-        
-        # Converter o dataframe atual (filtrado) para XLSX
-        output = io.BytesIO()
-        
-        # Criar um writer do pandas para Excel
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Obter o dataframe com as colunas ordenadas, removendo a coluna "Select"
-            columns_to_export = [col for col in colunas_ordenadas if col != "Select"]
-            df_to_export = df[columns_to_export].copy()
-            
-            # Aplicar nomes amigáveis de exibição às colunas, se disponível
-            from shipments_mapping import get_display_names
-            display_names = get_display_names()
-            
-            # Renomear as colunas usando os nomes amigáveis, se existirem
-            renamed_columns = {}
-            for col in df_to_export.columns:
-                if col in display_names:
-                    renamed_columns[col] = display_names[col]
-                else:
-                    # Para colunas que não estão no mapeamento, converter nomes técnicos para nomes mais amigáveis
-                    friendly_name = col.replace("data_", "").replace("_", " ").title()
-                    renamed_columns[col] = friendly_name
-            
-            df_to_export.rename(columns=renamed_columns, inplace=True)
-            df_to_export.to_excel(writer, index=False, sheet_name='Data')
-        
-        # Obter o conteúdo do buffer
-        processed_data = output.getvalue()
-        
-        # Armazenar dados para download
-        st.session_state["export_data"] = processed_data
-        st.session_state["export_filename"] = f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        st.session_state.pop("export_triggered", None)
-        st.rerun()
-    
-    # Download automático quando dados estão prontos
-    if st.session_state.get("export_data"):
-        st.download_button(
-            label="⬇️ Download XLSX",
-            data=st.session_state["export_data"],
-            file_name=st.session_state["export_filename"],
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key=f"download_xlsx_{int(datetime.now().timestamp())}"
-        )
-        # Limpar dados após download
-        st.session_state.pop("export_data", None)
-        st.session_state.pop("export_filename", None)
+            if len(df) > 0:  # Só mostra se houver dados para exportar
+                # Preparar dados para exportação
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    # Obter o dataframe com as colunas ordenadas, removendo a coluna "Select"
+                    columns_to_export = [col for col in colunas_ordenadas if col != "Select"]
+                    df_to_export = df[columns_to_export].copy()
+                    
+                    # Aplicar nomes amigáveis de exibição às colunas
+                    from shipments_mapping import get_display_names
+                    display_names = get_display_names()
+                    
+                    # Renomear as colunas usando os nomes amigáveis
+                    renamed_columns = {}
+                    for col in df_to_export.columns:
+                        if col in display_names:
+                            renamed_columns[col] = display_names[col]
+                        else:
+                            friendly_name = col.replace("data_", "").replace("_", " ").title()
+                            renamed_columns[col] = friendly_name
+                    
+                    df_to_export.rename(columns=renamed_columns, inplace=True)
+                    df_to_export.to_excel(writer, index=False, sheet_name='Data')
+                
+                # Botão de download direto
+                st.download_button(
+                    label="📊 Export XLSX",
+                    data=output.getvalue(),
+                    file_name=f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="export_btn_with_selection"
+                )
     # Seção de anexos
     if st.session_state.get("show_shipments_attachments", False):
         # Sincroniza referência se seleção mudar
