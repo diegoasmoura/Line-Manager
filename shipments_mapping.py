@@ -57,6 +57,7 @@ def get_column_mapping():
         "b_farol_reference": "Booking Farol Reference",
         "b_creation_of_booking": "Booking Registered Date",
         "b_booking_reference": "Booking Reference",
+        "b_transaction_number": "Transaction Number",
         "b_booking_status": "Booking Status",
         "b_farol_status" : "Farol Status",
 
@@ -364,6 +365,9 @@ def drop_downs(data_show, df_udc):
 def get_display_names():
     """Retorna o mapeamento de nomes internos para nomes amigáveis de exibição"""
     return {
+        # Transaction Number
+        "Transaction Number": "Transaction Number",
+        "b_transaction_number": "Transaction Number",
         # Sales Data
         "data_sales_order": "Sales Order Date",
         "data_requested_deadline_start": "Requested Deadline Start",
@@ -465,6 +469,7 @@ def get_alias_to_database_column_mapping():
         "b_farol_status": "FAROL_STATUS",
         "b_creation_of_booking": "B_CREATION_OF_BOOKING",
         "b_booking_reference": "B_BOOKING_REFERENCE",
+        "b_transaction_number": "B_TRANSACTION_NUMBER",
         "b_booking_status": "B_BOOKING_STATUS",
         "b_booking_owner": "USER_LOGIN_BOOKING_CREATED",
         "b_voyage_carrier": "B_VOYAGE_CARRIER",
@@ -539,6 +544,8 @@ def get_database_column_name(display_name_or_alias: str) -> str:
         "Farol Status": "FAROL_STATUS",
         "Farol Reference": "FAROL_REFERENCE",
         "Select": "SELECT",  # Coluna UI, não existe no banco
+        "Transaction Number": "B_TRANSACTION_NUMBER",
+        "b_transaction_number": "B_TRANSACTION_NUMBER",
     }
     
     if display_name_or_alias in special_cases:

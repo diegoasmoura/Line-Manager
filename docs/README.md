@@ -161,6 +161,29 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Consistência**: Mesma lógica aplicada em ambos os arquivos de banco (database.py e database_empresa.py)
 - **Flexibilidade**: Sistema decide automaticamente quando preservar ou sobrescrever baseado na fonte dos dados
 
+### v4.8.0 - Campo Transaction Number (2025-01-21)
+- **Novo Campo**: Adicionado campo Transaction Number na tabela F_CON_SALES_BOOKING_DATA (VARCHAR2(50))
+- **Disponibilidade**: Campo Transaction Number disponível em:
+  - Stage Booking Management (após coluna Booking Reference)
+  - Stage General View
+  - Form View (Booking Management section)
+  - Advanced Filters
+- **Funcionalidades**: Campo editável pelos usuários com mudanças registradas automaticamente no Audit Trail
+- **Mapeamento**: Mapeamento completo b_transaction_number → B_TRANSACTION_NUMBER
+- **Integração**: Totalmente integrado ao sistema de auditoria e formulários existentes
+
+### v4.9.0 - Correção da Form View - Transaction Number (2025-01-21)
+- **Problema Resolvido**: Campo "Transaction Number" não aparecia na Form View (tela de formulário detalhado)
+- **Correção Implementada**: 
+  - Adicionado "Transaction Number" na lista `first_row_fields_b` da seção "📋 Informações Básicas"
+  - Campo agora aparece na mesma linha dos outros campos básicos (última posição)
+  - Adicionado `B_TRANSACTION_NUMBER` na consulta SQL da função `get_booking_record_by_reference()`
+- **Layout Atualizado**: 
+  - **Antes**: Farol Reference | Farol Status | Type of Shipment | Booking Status
+  - **Depois**: Farol Reference | Farol Status | Type of Shipment | Booking Status | **Transaction Number**
+- **Funcionalidades**: Campo editável com valor atual carregado automaticamente
+- **Consistência**: Agora todas as telas mostram o campo "Transaction Number" corretamente
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.

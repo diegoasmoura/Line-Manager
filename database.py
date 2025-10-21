@@ -521,6 +521,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         FAROL_STATUS                         AS b_farol_status,
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
+        B_TRANSACTION_NUMBER                 AS b_transaction_number,
         B_BOOKING_STATUS                     AS b_booking_status,
         USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
@@ -604,6 +605,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         df = df[[
             # Identificação
             "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
+            "Transaction Number",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -683,6 +685,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         S_COMMENTS                         AS s_comments,
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
+        B_TRANSACTION_NUMBER                 AS b_transaction_number,
         B_BOOKING_STATUS                     AS b_booking_status,
         USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
@@ -758,6 +761,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         combined_cols = [
             # 1. IDENTIFICAÇÃO BÁSICA
             "Sales Farol Reference", "Farol Status", "Carrier Returns Status", "Type of Shipment", "Booking Status",
+            "Transaction Number",
             "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             
             # 2. DATAS INICIAIS
@@ -876,6 +880,7 @@ def get_booking_record_by_reference(farol_reference: str) -> pd.DataFrame:
         FAROL_STATUS                         AS b_farol_status,
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
+        B_TRANSACTION_NUMBER                 AS b_transaction_number,
         B_BOOKING_STATUS                     AS b_booking_status,
         USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,

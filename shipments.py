@@ -716,6 +716,7 @@ def exibir_formulario():
             # Ordem exata conforme grid
             booking_order = [
                 "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
+                "Transaction Number",
                 "Sales Quantity of Containers", "Container Type",
                 "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
                 "Shipment Requested Date", "Sales Order Reference", "data_sales_order", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
@@ -755,7 +756,8 @@ def exibir_formulario():
                     "Port Terminal": {"width": 1, "cols": 3},
                     "POD Country": {"width": 1, "cols": 3},
                     "Destination Trade Region": {"width": 1, "cols": 3},
-                    "Award Status": {"width": 1, "cols": 3}
+                    "Award Status": {"width": 1, "cols": 3},
+                    "Transaction Number": {"width": 1, "cols": 3}
                 }
                 
                 # Campos grandes (1/2 da largura)
@@ -802,7 +804,7 @@ def exibir_formulario():
             
             # Renderiza campos de Booking organizados por seções
             booking_sections = {
-                "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status"],
+                "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Transaction Number"],
                 "📦 Produto e Quantidade": ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"],
                 "🏢 Cliente e Negócio": [],  # mantém ordem consistente com Sales
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
@@ -913,9 +915,9 @@ def exibir_formulario():
                         # Evita duplicar no restante
                         available_fields = [f for f in available_fields if f not in ("Comments Booking", "Booking Owner")]
 
-                # Linha fixa no topo (Booking): Farol Reference | Farol Status | Type of Shipment | Booking Status
+                # Linha fixa no topo (Booking): Farol Reference | Farol Status | Type of Shipment | Booking Status | Transaction Number
                 if section_title == "📋 Informações Básicas":
-                    first_row_fields_b = ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status"]
+                    first_row_fields_b = ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Transaction Number"]
                     available_top_b = [f for f in first_row_fields_b if f in available_fields]
                     if available_top_b:
                         # Padronizado: [1,1,1,1,1] (5 colunas iguais) para manter mesmas medidas em todas as abas
@@ -948,6 +950,9 @@ def exibir_formulario():
                                     except Exception:
                                         default_index = 0
                                     new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_top_{farol_ref}_{label}")
+                                elif label == "Transaction Number":
+                                    # Campo editável para Transaction Number
+                                    new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"booking_top_{farol_ref}_{label}")
                                 else:
                                     new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=True, key=f"booking_top_{farol_ref}_{label}")
 
@@ -1854,6 +1859,12 @@ def exibir_shipments():
         if c in colunas_ordenadas:
             colunas_ordenadas.remove(c)
     colunas_ordenadas = preferred_prefix + colunas_ordenadas
+
+    # Posiciona "Transaction Number" após "Booking Reference"
+    if "Transaction Number" in colunas_ordenadas and booking_ref_col:
+        colunas_ordenadas.remove("Transaction Number")
+        idx_booking = colunas_ordenadas.index(booking_ref_col)
+        colunas_ordenadas.insert(idx_booking + 1, "Transaction Number")
 
     # Aplica filtros avançados APÓS a reordenação das colunas
     df = aplicar_filtros_interativos(df, colunas_ordenadas)
