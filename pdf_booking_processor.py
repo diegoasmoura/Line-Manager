@@ -2266,6 +2266,10 @@ def standardize_terminal_name(terminal_name):
         "DPW": "DPW",
         "DP WORLD": "DPW",
         
+        # Embraport (DP World Santos)
+        "EMBRAPORT EMPRESA BRASILEIRA": "DPW",
+        "EMBRAPORT": "DPW",
+        
         "ECOPORTO": "Ecoporto",
         
         # Rio de Janeiro

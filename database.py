@@ -2309,20 +2309,35 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         cnpj_client = "60.498.706/0001-57"  # CNPJ Cargill padrão
         mon_resp = api_client.view_vessel_monitoring(cnpj_client, cnpj_terminal, vessel_name, voyage_code)
         
-        if not mon_resp.get("success") or not mon_resp.get("data"):
+        # Verificar se a consulta foi bem-sucedida
+        if not mon_resp.get("success"):
             return {
                 "success": False,
                 "data": None,
-                "message": f"🔵 Voyage Não Encontrada na API\n\n🚢 {vessel_name} | {voyage_code} | {terminal} não localizada na base atual. Use o formulário manual abaixo para inserir os dados.",
+                "message": f"🔵 Voyage Não Encontrada na API\n\n🚢 {vessel_name} | {voyage_code} | {terminal}\n\nEsta viagem não está disponível na base da API Ellox. Isso é normal - nem todas as viagens estão na API.\n\nUse o formulário manual abaixo para inserir os dados de monitoramento.",
                 "requires_manual": True,
                 "error_type": "voyage_not_found",
                 "cnpj_terminal": cnpj_terminal,
                 "agencia": ""
             }
         
-        # 5. Processar dados da API
+        # Se success=True mas data está vazio, ainda assim a viagem foi encontrada
+        # A API pode retornar success=True com data=None para viagens sem dados de monitoramento
         data_list = mon_resp.get("data", [])
         
+        # Se não há dados de monitoramento, mas a viagem foi encontrada, usar formulário manual
+        if not data_list or (isinstance(data_list, list) and len(data_list) == 0):
+            return {
+                "success": False,
+                "data": None,
+                "message": f"🔵 Viagem Encontrada na API, mas sem Dados de Monitoramento\n\n🚢 {vessel_name} | {voyage_code} | {terminal}\n\nA viagem foi localizada na API Ellox, mas não possui dados de monitoramento disponíveis.\n\nUse o formulário manual abaixo para inserir os dados de monitoramento.",
+                "requires_manual": True,
+                "error_type": "voyage_found_no_data",
+                "cnpj_terminal": cnpj_terminal,
+                "agencia": ""
+            }
+        
+        # 5. Processar dados da API (data_list já foi definido acima)
         if isinstance(data_list, list) and len(data_list) > 0:
             payload = data_list[0]
         elif isinstance(data_list, dict):

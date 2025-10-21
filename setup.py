@@ -27,8 +27,9 @@ def exibir_setup():
                 original_https_proxy = None
 
                 proxies = {}
-                # Check if proxy credentials are set in session state
-                if (st.session_state.proxy_host and st.session_state.proxy_port and
+                # Check if proxy is enabled and credentials are set in session state
+                if (st.session_state.get("use_proxy", False) and
+                    st.session_state.proxy_host and st.session_state.proxy_port and
                     st.session_state.proxy_username and st.session_state.proxy_password):
                     
                     proxy_url = f"http://{st.session_state.proxy_username}:{st.session_state.proxy_password}@{st.session_state.proxy_host}:{st.session_state.proxy_port}"
@@ -88,6 +89,10 @@ def exibir_setup():
     # NEW: Initialize last validated time
     if 'api_last_validated' not in st.session_state:
         st.session_state.api_last_validated = "Nunca validado"
+
+    # Initialize proxy enabled flag
+    if 'use_proxy' not in st.session_state:
+        st.session_state.use_proxy = False  # Default: sem proxy (para uso em casa)
 
     # Initialize session state for proxy credentials
     if 'proxy_username' not in st.session_state:
@@ -218,19 +223,50 @@ def exibir_setup():
         if 'api_save_message' in st.session_state:
             st.success(st.session_state.api_save_message)
 
+        # --- Proxy Configuration Section ---
+        st.markdown("### 🔧 Configuração de Proxy")
+        
+        # Status atual do proxy
+        col_status, col_toggle = st.columns([2, 1])
+
+        with col_status:
+            if st.session_state.get("use_proxy", False):
+                st.info("🏢 **Modo:** Empresa (com proxy)")
+            else:
+                st.success("🌐 **Modo:** Conexão Direta (sem proxy)")
+
+        with col_toggle:
+            use_proxy = st.checkbox(
+                "Usar Proxy Corporativo",
+                value=st.session_state.get("use_proxy", False),
+                help="Habilite esta opção quando estiver na empresa. Desabilite para conexão direta.",
+                key="use_proxy_checkbox"
+            )
+
+        if use_proxy != st.session_state.get("use_proxy", False):
+            st.session_state.use_proxy = use_proxy
+            st.info("✅ Configuração de proxy atualizada!")
+            
+        st.markdown("---")
+
         # --- Proxy Credentials Section ---
         with st.form("proxy_credentials_form_individual"): # NEW: Separate form for Proxy credentials
-            with st.expander("Credenciais do Proxy Corporativo", expanded=False):
-                proxy_username_input = st.text_input("Usuário do Proxy", value=st.session_state.proxy_username, key="proxy_username_input")
-                proxy_password_input = st.text_input("Senha do Proxy", value=st.session_state.proxy_password, type="password", key="proxy_password_input")
-                col_proxy_host, col_proxy_port = st.columns(2)
-                with col_proxy_host:
-                    proxy_host_input = st.text_input("Host do Proxy", value=st.session_state.proxy_host, key="proxy_host_input")
-                with col_proxy_port:
-                    proxy_port_input = st.text_input("Porta do Proxy", value=st.session_state.proxy_port, key="proxy_port_input")
-                submitted_proxy = st.form_submit_button("Salvar Credenciais do Proxy") # MOVED INSIDE EXPANDER
+            # Mostrar expander de credenciais apenas se proxy estiver habilitado
+            if st.session_state.get("use_proxy", False):
+                with st.expander("Credenciais do Proxy Corporativo", expanded=False):
+                    proxy_username_input = st.text_input("Usuário do Proxy", value=st.session_state.proxy_username, key="proxy_username_input")
+                    proxy_password_input = st.text_input("Senha do Proxy", value=st.session_state.proxy_password, type="password", key="proxy_password_input")
+                    col_proxy_host, col_proxy_port = st.columns(2)
+                    with col_proxy_host:
+                        proxy_host_input = st.text_input("Host do Proxy", value=st.session_state.proxy_host, key="proxy_host_input")
+                    with col_proxy_port:
+                        proxy_port_input = st.text_input("Porta do Proxy", value=st.session_state.proxy_port, key="proxy_port_input")
+                    submitted_proxy = st.form_submit_button("Salvar Credenciais do Proxy") # MOVED INSIDE EXPANDER
+            else:
+                st.info("ℹ️ Proxy desabilitado. Usando conexão direta.")
+                submitted_proxy = st.form_submit_button("Salvar Credenciais do Proxy", disabled=True)
             
-            if submitted_proxy:
+            if submitted_proxy and st.session_state.get("use_proxy", False):
                 st.session_state.proxy_username = proxy_username_input
                 st.session_state.proxy_password = proxy_password_input
                 st.session_state.proxy_host = proxy_host_input

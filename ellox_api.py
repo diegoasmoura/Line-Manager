@@ -1175,12 +1175,25 @@ def get_default_api_client() -> ElloxAPI:
 
         base_url = st.session_state.get("api_base_url", ELLOX_API_CONFIG.get("base_url"))
 
-        proxy_config = {
-            "host": st.session_state.get("proxy_host"),
-            "port": st.session_state.get("proxy_port"),
-            "username": st.session_state.get("proxy_username"),
-            "password": st.session_state.get("proxy_password"),
-        }
+        # Verificar se proxy está habilitado
+        use_proxy = st.session_state.get("use_proxy", False)
+
+        if use_proxy:
+            # Usar configurações de proxy do session state
+            proxy_config = {
+                "host": st.session_state.get("proxy_host"),
+                "port": st.session_state.get("proxy_port"),
+                "username": st.session_state.get("proxy_username"),
+                "password": st.session_state.get("proxy_password"),
+            }
+        else:
+            # Sem proxy - conexão direta
+            proxy_config = {
+                "host": None,
+                "port": None,
+                "username": None,
+                "password": None,
+            }
 
         # Reutiliza token se disponível e válido
         api_token = st.session_state.get("api_token")
@@ -1194,16 +1207,12 @@ def get_default_api_client() -> ElloxAPI:
         return ElloxAPI(email=email, password=password, api_key=api_token, base_url=base_url, token_expires_at=token_expires_at, proxy_config=proxy_config)
     except:
         # Fallback para credenciais do app_config se streamlit não estiver disponível
+        # Não força proxy - deixa detecção automática funcionar
         return ElloxAPI(
             email=ELLOX_API_CONFIG.get("email"), 
             password=ELLOX_API_CONFIG.get("password"), 
             base_url=ELLOX_API_CONFIG.get("base_url"),
-            proxy_config={
-                "host": PROXY_CONFIG.get("host"),
-                "port": PROXY_CONFIG.get("port"),
-                "username": PROXY_CONFIG.get("username"),
-                "password": PROXY_CONFIG.get("password"),
-            }
+            proxy_config=None  # Permite detecção automática de ambiente
         )
 
 def enrich_booking_data(booking_data: Dict[str, Any], client: ElloxAPI = None) -> Dict[str, Any]:

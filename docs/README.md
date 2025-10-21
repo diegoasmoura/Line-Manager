@@ -143,6 +143,16 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Contador de Reset**: Sistema robusto usando `form_reset_counter` para evitar conflitos
 - **Experiência Consistente**: Funciona igualmente para Sales Data e Booking Management
 
+### v4.6.0 - Flag de Proxy e Correção de Consulta API (2025-01-21)
+- **Flag de Proxy**: Adicionado checkbox "Usar Proxy Corporativo" no Setup para alternar entre conexão direta e proxy
+- **Interface Intuitiva**: Indicador visual claro do modo atual (🌐 Conexão Direta vs 🏢 Empresa)
+- **Configuração Persistente**: Flag mantida no session state, não precisa reconfigurar toda vez
+- **Credenciais Condicionais**: Campos de proxy só aparecem quando habilitado
+- **Correção de Lógica**: API agora distingue entre "viagem não encontrada" e "viagem encontrada sem dados"
+- **Mensagens Precisas**: Usuário recebe feedback correto sobre o status da consulta à API
+- **Normalização de Terminal**: "Embraport Empresa Brasileira" mapeado corretamente para "DPW"
+- **Funcionamento Universal**: Sistema funciona tanto na empresa (com proxy) quanto em qualquer lugar (conexão direta)
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.
