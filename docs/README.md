@@ -237,6 +237,22 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Filtros**: Campo participa dos Filtros Avançados como tipo data
 - **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
 
+### v4.11.0 - Layout Otimizado da Form View - Datas e Prazos (2025-10-21)
+- **Melhoria na Form View**: Reorganização da seção "📅 Datas e Prazos" (aba Sales Data)
+- **Layout em Duas Linhas**:
+  - **Linha 1**: Sales Order Date | Shipment Requested Date | Requested Deadline Start | Requested Deadline End
+  - **Linha 2**: Required Sail Date | Required Arrival Date (mesma largura)
+- **Implementação**:
+  - Adicionado `S_REQUIRED_SAIL_DATE` na query `get_sales_record_by_reference` em `database.py`
+  - Modificado rendering da seção "📅 Datas e Prazos" em `shipments.py` para duas linhas separadas
+  - Campos "Required Sail Date" e "Required Arrival Date" com `st.columns([1, 1])` para largura igual
+  - Mapeamentos já existentes em `shipments_mapping.py` validados e funcionais
+- **Benefícios**:
+  - Layout mais organizado e visualmente equilibrado
+  - Campos de data agrupados logicamente
+  - Melhor aproveitamento do espaço horizontal
+  - Consistência com o padrão de layout das outras seções
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.

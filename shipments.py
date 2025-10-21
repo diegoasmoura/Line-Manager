@@ -89,6 +89,17 @@ def exibir_formulario():
         if "Farol Reference" not in df_s_view.columns:
             df_s_view["Farol Reference"] = farol_ref
 
+        # Fallback: garantir presença de data_required_sail_date no Form View
+        # Caso apenas s_required_sail_date exista (vindo da query), cria a coluna normalizada
+        if "data_required_sail_date" not in df_s_view.columns:
+            if "s_required_sail_date" in df_s_view.columns:
+                try:
+                    df_s_view["data_required_sail_date"] = df_s_view["s_required_sail_date"]
+                except Exception:
+                    df_s_view["data_required_sail_date"] = None
+            else:
+                df_s_view["data_required_sail_date"] = None
+
         # Extrai linha única de referência
         row_sales = df_s_view.iloc[0] if not df_s_view.empty else pd.Series(dtype=object)
 
@@ -129,7 +140,7 @@ def exibir_formulario():
                 "Sales Quantity of Containers", "Container Type",
                 "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
                 "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
-                "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
+                "data_shipment_period_start", "data_shipment_period_end", "data_required_sail_date", "data_required_arrival_expected",
                 "Sales Order Reference", "data_sales_order", "Business", "Customer",
                 "Incoterm", "DTHC", "Afloat", "VIP PNL Risk", "PNL Destination",
                 "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
@@ -423,6 +434,34 @@ def exibir_formulario():
 
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_dt]
+
+                    # Segunda linha: Required Sail Date | Required Arrival Date
+                    second_row_fields_dt = ["data_required_sail_date", "data_required_arrival_expected"]
+                    available_second_dt = [f for f in second_row_fields_dt if f in available_fields]
+                    if available_second_dt:
+                        # Mesma padronização visual da linha acima: 5 colunas com pesos iguais
+                        cols_second_dt = st.columns([1,1,1,1,1])
+                        for j, col_name in enumerate(available_second_dt):
+                            with cols_second_dt[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_sales.get(internal_key, "")
+                                db_col_candidate = get_database_column_name(internal_key)
+                                only_sales = db_col_candidate.lower().startswith("s_")
+                                only_booking = db_col_candidate.lower().startswith("b_")
+                                disabled_flag = (label in disabled_cols) or only_booking
+                                # Usa nome amigável para datas
+                                disp_label = display_names_local.get(label, label)
+                                dt = pd.to_datetime(current_val, errors='coerce')
+                                new_values_sales[label] = st.date_input(
+                                    disp_label,
+                                    value=(dt.date() if pd.notna(dt) else None),
+                                    disabled=disabled_flag,
+                                    key=f"sales_second_dt_{farol_ref}_{label}"
+                                )
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_second_dt]
 
                 # Linha fixa na seção Produto e Quantidade: Sales Order Reference | Sales Quantity of Containers | Container Type | Customer
                 if section_title == "📦 Produto e Quantidade":

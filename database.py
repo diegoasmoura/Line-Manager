@@ -1457,6 +1457,7 @@ def get_split_data_by_farol_reference(farol_reference):
             B_VESSEL_NAME AS b_vessel_name,
             S_REQUESTED_DEADLINE_START_DATE AS s_requested_deadlines_start_date,
             S_REQUESTED_DEADLINE_END_DATE AS s_requested_deadlines_end_date,
+            S_REQUIRED_SAIL_DATE AS s_required_sail_date,
             S_REQUIRED_ARRIVAL_DATE_EXPECTED AS s_required_arrival_date_expected
         FROM LogTransp.F_CON_SALES_BOOKING_DATA
         WHERE FAROL_REFERENCE = :ref

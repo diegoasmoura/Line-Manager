@@ -376,6 +376,7 @@ def get_display_names():
         "data_requested_deadline_end": "Requested Deadline End",
         "data_shipment_period_start": "Shipment Period Start",
         "data_shipment_period_end": "Shipment Period End",
+        "data_required_sail_date": "Required Sail Date",
         "data_required_arrival_expected": "Required Arrival Date",
         "data_lc_received": "LC Received",
         "data_allocation": "Allocation Date",
