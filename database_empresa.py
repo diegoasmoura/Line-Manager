@@ -2584,6 +2584,17 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 if isinstance(val, str) and val.strip() == "":
                     continue
                 main_update_fields[field] = val
+            elif field == "B_DATA_DRAFT_DEADLINE":
+                # Preservar Draft Deadline manual existente se PDF não tem valor
+                # Não adicionar ao update se:
+                # 1. PDF não tem valor (row[field] is None ou vazio)
+                # 2. Já existe valor manual no banco (current_row[field] is not None)
+                if current_row and field in current_row._fields:
+                    existing_value = getattr(current_row, field, None)
+                    if existing_value is not None:
+                        # Preservar valor manual existente
+                        main_update_fields[field] = existing_value
+                # Se não há valor existente e PDF não tem valor, não adicionar ao update
 
         # Mapeamento especial: S_REQUIRED_ARRIVAL_DATE_EXPECTED (carriers) -> S_REQUIRED_ARRIVAL_DATE_EXPECTED (principal)
         if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in row and row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] is not None:

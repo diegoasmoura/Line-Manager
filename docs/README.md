@@ -153,6 +153,14 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Normalização de Terminal**: "Embraport Empresa Brasileira" mapeado corretamente para "DPW"
 - **Funcionamento Universal**: Sistema funciona tanto na empresa (com proxy) quanto em qualquer lugar (conexão direta)
 
+### v4.7.0 - Preservação de Draft Deadline Manual (2025-01-21)
+- **Problema Resolvido**: Draft Deadline preenchido manualmente no Tracking não é mais sobrescrito por PDFs
+- **Lógica Inteligente**: Sistema preserva valores manuais quando PDF/API não possui Draft Deadline
+- **Atualizações da API**: Quando Ellox fornece novo Draft Deadline, o valor é atualizado normalmente
+- **Proteção de Dados**: Informações manuais valiosas não são perdidas durante processamento de PDFs
+- **Consistência**: Mesma lógica aplicada em ambos os arquivos de banco (database.py e database_empresa.py)
+- **Flexibilidade**: Sistema decide automaticamente quando preservar ou sobrescrever baseado na fonte dos dados
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.
