@@ -180,8 +180,8 @@ def show_split_form():
             "Place of Receipt",
             "Final Destination",
             "Transhipment Port",
-            "Port Terminal",
-            "Carrier",
+            "Terminal",
+            "Voyage Carrier",
             "Voyage Code",
             "Booking Reference",
             "Vessel Name",
@@ -215,8 +215,12 @@ def show_split_form():
                 required=False,
                 help="Selecione o porto de destino"
             ),
-            "Carrier": st.column_config.SelectboxColumn(
-                "Carrier",
+            "Terminal": st.column_config.TextColumn(
+                "Terminal",
+                help="Terminal do porto"
+            ),
+            "Voyage Carrier": st.column_config.SelectboxColumn(
+                "Voyage Carrier",
                 options=carrier_options,
                 required=False,
                 help="Selecione o voyage carrier"
