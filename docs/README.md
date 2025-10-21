@@ -126,6 +126,15 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Layout Otimizado**: Botões organizados em colunas para melhor usabilidade
 - **Experiência do Usuário**: Interface mais intuitiva e profissional com nomenclatura consistente
 
+### v4.4.0 - Layout de Botões Otimizado (2025-01-21)
+- **Alinhamento de Botões**: Botões "New Shipment" e "Export XLSX" agora ficam alinhados à esquerda e próximos
+- **Proporções Ajustadas**: Layout [2, 2, 6] para dar espaço adequado aos botões sem ocupar toda a largura
+- **Separação Visual**: Linha divisória entre botões de paginação (Previous/Next) e botões principais
+- **CSS Simplificado**: Removido CSS customizado que causava espaçamento inconsistente
+- **Estrutura Padronizada**: Todos os botões usam mesma estrutura com keys consistentes
+- **Performance**: Lógica de exportação otimizada para renderização mais rápida
+- **Layout Responsivo**: Interface mais limpa e organizada visualmente
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.

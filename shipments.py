@@ -903,6 +903,7 @@ def exibir_formulario():
                                 new_values_booking["Booking Owner"] = st.text_input(
                                     "Booking Owner",
                                     value=str(current_val if current_val is not None else ""),
+                                    disabled=True,
                                     key=f"booking_obs_{farol_ref}_owner"
                                 )
                         # Evita duplicar no restante
@@ -2116,6 +2117,9 @@ def exibir_shipments():
         selected_index = selected_rows.index[0]
         if "Farol Status" in df_filtered_original.columns:
             original_status = df_filtered_original.loc[selected_index, "Farol Status"]
+    
+    # Linha separadora entre paginação e botões principais
+    st.markdown("---")
     
     # Botões principais com layout condicional baseado na seleção
     if len(selected_rows) == 0:
