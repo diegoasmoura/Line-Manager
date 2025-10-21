@@ -103,23 +103,65 @@ def show_add_form():
             with col2:
                 values["s_quantity_of_containers"] = st.number_input("**:green[Quantity of Containers]***", min_value=0, step=1)
 
+            # Linha 1: Requested Shipment Week com mesma largura dos demais (1/2 da linha)
             col1, col2 = st.columns(2)
             with col1:
                 values["s_requested_shipment_week"] = st.number_input("**:green[Requested Shipment Week]***", min_value=1, max_value=52, step=1)
             with col2:
-                values["s_required_arrival_date_expected"] = st.date_input("Required Arrival Date Expected", value=None)
+                st.empty()
 
+            # Linha 2: Required Sail Date | Required Arrival Date
             col1, col2 = st.columns(2)
             with col1:
-                values["s_requested_deadlines_start_date"] = st.date_input("Requested Deadline Start Date", value=None)
+                values["s_required_sail_date"] = st.date_input(
+                    "Required Sail Date",
+                    value=None,
+                    key=f"add_required_sail_date_{st.session_state.current_farol_reference}"
+                )
             with col2:
-                values["s_requested_deadlines_end_date"] = st.date_input("Requested Deadline End Date", value=None)
+                values["s_required_arrival_date_expected"] = st.date_input(
+                    "Required Arrival Date",
+                    value=None,
+                    key=f"add_required_arrival_date_{st.session_state.current_farol_reference}"
+                )
+
+            # Linha 3: Requested Deadline Start | Requested Deadline End
+            col1, col2 = st.columns(2)
+            with col1:
+                values["s_requested_deadlines_start_date"] = st.date_input(
+                    "Requested Deadline Start Date",
+                    value=None,
+                    key=f"add_requested_deadline_start_{st.session_state.current_farol_reference}"
+                )
+            with col2:
+                values["s_requested_deadlines_end_date"] = st.date_input(
+                    "Requested Deadline End Date",
+                    value=None,
+                    key=f"add_requested_deadline_end_{st.session_state.current_farol_reference}"
+                )
+
+            # Linha 4: Shipment Period Start | Shipment Period End
+            col1, col2 = st.columns(2)
+            with col1:
+                values["s_shipment_period_start_date"] = st.date_input(
+                    "Shipment Period Start Date",
+                    value=None,
+                    key=f"add_shipment_period_start_{st.session_state.current_farol_reference}"
+                )
+            with col2:
+                values["s_shipment_period_end_date"] = st.date_input(
+                    "Shipment Period End Date",
+                    value=None,
+                    key=f"add_shipment_period_end_{st.session_state.current_farol_reference}"
+                )
 
             col1, col2 = st.columns(2)
             with col1:
                 values["s_shipment_period_start_date"] = st.date_input("Shipment Period Start Date", value=None)
             with col2:
                 values["s_shipment_period_end_date"] = st.date_input("Shipment Period End Date", value=None)
+
+            # (Mantido sem campo adicional aqui; já foi exibido logo após Required Sail Date)
 
             col1, col2 = st.columns(2)
             with col1:

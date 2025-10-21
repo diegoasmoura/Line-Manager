@@ -222,6 +222,21 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
   - Preservada a ordenação correta das colunas na exportação
   - Mantido o formato de data/hora no nome do arquivo
 
+### v4.10.0 - Campo Required Sail Date (2025-10-21)
+- **Novo Campo**: Adicionado `S_REQUIRED_SAIL_DATE` (Sales) ao sistema
+- **Disponibilidade**:
+  - Stage Sales Data: exibido entre "Shipment Period End" e "Required Arrival Date"
+  - Stage General View: mesma posição relativa entre as datas de período e chegada
+  - Form View (Sales → 📅 Datas e Prazos): inclui "Required Sail Date" e "Required Arrival Date" no mesmo grupo
+  - New Shipment: layout atualizado
+    - Linha 1: Requested Shipment Week
+    - Linha 2: Required Sail Date | Required Arrival Date
+    - Linha 3: Requested Deadline Start | Requested Deadline End
+    - Linha 4: Shipment Period Start | Shipment Period End
+- **Renomeação**: "Required Arrival Date Expected" → "Required Arrival Date" na tela de criação
+- **Filtros**: Campo participa dos Filtros Avançados como tipo data
+- **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.

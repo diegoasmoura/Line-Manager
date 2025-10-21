@@ -214,7 +214,7 @@ def exibir_formulario():
                 "📦 Produto e Quantidade": ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer", "SKU"],
                 "🏢 Cliente e Negócio": ["Customer PO"],
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Incoterm", "Mode"],
-                "📅 Datas e Prazos": ["data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end"],
+                "📅 Datas e Prazos": ["data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end", "data_required_sail_date", "data_required_arrival_expected"],
                 "⚙️ Configurações": ["DTHC", "Afloat", "Partial Allowed", "VIP PNL Risk", "LC Received"],
                 "💬 Observações": ["Comments Sales", "Sales Owner"]
             }
@@ -1867,6 +1867,16 @@ def exibir_shipments():
         colunas_ordenadas.remove("Transaction Number")
         idx_booking = colunas_ordenadas.index(booking_ref_col)
         colunas_ordenadas.insert(idx_booking + 1, "Transaction Number")
+
+    # Posicionar "Required Sail Date" entre Shipment Period End e Required Arrival Date
+    if "data_required_sail_date" in colunas_ordenadas:
+        try:
+            if "data_shipment_period_end" in colunas_ordenadas:
+                colunas_ordenadas.remove("data_required_sail_date")
+                idx_end = colunas_ordenadas.index("data_shipment_period_end")
+                colunas_ordenadas.insert(idx_end + 1, "data_required_sail_date")
+        except Exception:
+            pass
 
     # Aplica filtros avançados APÓS a reordenação das colunas
     df = aplicar_filtros_interativos(df, colunas_ordenadas)

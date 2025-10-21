@@ -443,6 +443,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         S_AFLOAT                           AS s_afloat,
         S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
         S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
+        S_REQUIRED_SAIL_DATE               AS s_required_sail_date,
         S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
@@ -487,7 +488,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas
             "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
-            "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
+            "data_shipment_period_start", "data_shipment_period_end", "data_required_sail_date", "data_required_arrival_expected",
             # Pedido e cliente
             "Sales Order Reference", "data_sales_order", "Business", "Customer",
             # Condições
@@ -594,7 +595,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             'data_partida', 'data_estimada_transbordo', 'data_chegada', 
             'data_transbordo', 'data_chegada_destino_eta', 'data_chegada_destino_ata',
             'data_estimativa_atracacao', 'data_atracacao',
-            'data_required_arrival_expected', 'data_requested_deadline_start', 'data_requested_deadline_end'
+            'data_required_sail_date', 'data_required_arrival_expected', 'data_requested_deadline_start', 'data_requested_deadline_end'
         ]
         
         for col in datetime_columns:
@@ -672,6 +673,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         S_AFLOAT                           AS s_afloat,
         S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
         S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
+        S_REQUIRED_SAIL_DATE               AS s_required_sail_date,
         S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
@@ -773,7 +775,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             
             # 4. PRAZOS E PERÍODOS
             "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
-            "data_shipment_period_start", "data_shipment_period_end", "data_required_arrival_expected",
+            "data_shipment_period_start", "data_shipment_period_end", "data_required_sail_date", "data_required_arrival_expected",
             
             # 5. PROCESSO DE BOOKING
             "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada", 
@@ -845,6 +847,7 @@ def get_sales_record_by_reference(farol_reference: str) -> pd.DataFrame:
         S_AFLOAT                           AS s_afloat,
         S_SHIPMENT_PERIOD_START_DATE       AS s_shipment_period_start_date,
         S_SHIPMENT_PERIOD_END_DATE         AS s_shipment_period_end_date,
+        S_REQUIRED_SAIL_DATE               AS s_required_sail_date,
         S_REQUIRED_ARRIVAL_DATE_EXPECTED   AS s_required_arrival_date_expected,
         S_REQUESTED_DEADLINE_START_DATE    AS s_requested_deadlines_start_date,
         S_REQUESTED_DEADLINE_END_DATE      AS s_requested_deadlines_end_date,
