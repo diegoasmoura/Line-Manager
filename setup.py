@@ -138,7 +138,8 @@ def exibir_setup():
 
     # Define as abas disponíveis com base no nível de acesso
     if has_access_level('ADMIN'):
-        tab_names = ["Alterar Senha", "Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
+        # Admin não precisa de "Alterar Senha" pois tem "Gerenciamento de Credenciais"
+        tab_names = ["Gerenciamento de Credenciais", "Administração de Usuários", "Sincronização Automática"]
     else:
         # Usuários não-admin: permitir visualizar conectividade (sem formulários de credenciais)
         tab_names = ["Alterar Senha", "Conectividade"]
