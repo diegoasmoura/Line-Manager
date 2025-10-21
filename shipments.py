@@ -2117,107 +2117,123 @@ def exibir_shipments():
         if "Farol Status" in df_filtered_original.columns:
             original_status = df_filtered_original.loc[selected_index, "Farol Status"]
     
-    st.markdown("---")
-    
-    # Botões principais ocupando toda a largura com distribuição igual
-    col_new, col_form, col_booking, col_history, col_split, col_attachments, col_export = st.columns([1, 1, 1, 1, 1, 1, 1], gap="small")
-    
-    with col_new:
-        if st.button("🚢 New Shipment"):
-            st.session_state["current_page"] = "add"
-            st.rerun()
-    
-    with col_form:
-        # Botão Form View na segunda posição
-        form_view_disabled = len(selected_rows) != 1
-        if st.button("📝 Form View", disabled=form_view_disabled, help="Abrir formulário da linha selecionada"):
-            if not form_view_disabled:
-                st.session_state["current_page"] = "form"
+    # Botões principais com layout condicional baseado na seleção
+    if len(selected_rows) == 0:
+        # Quando NENHUMA linha está selecionada: apenas 2 botões lado a lado
+        col_new, col_export, col_spacer = st.columns([1, 1, 8], gap="small")
+        
+        with col_new:
+            if st.button("🚢 New Shipment", key="new_shipment_btn"):
+                st.session_state["current_page"] = "add"
+                st.rerun()
+        
+        with col_export:
+            # Botão de exportação XLSX - sempre ativo
+            if st.button("📊 Export XLSX", key="export_btn_no_selection"):
+                st.session_state["export_triggered"] = True
                 st.rerun()
     
-    with col_booking:
-        new_booking_disabled = True
-        if len(selected_rows) == 1 and original_status is not None:
-            cleaned_status = clean_farol_status_value(original_status)
-            new_booking_disabled = not (cleaned_status.strip().lower() == "new request".lower())
-        st.button("📦 New Booking", disabled=new_booking_disabled, key="new_booking_btn")
-        if st.session_state.get("new_booking_btn") and not new_booking_disabled:
-            st.session_state["current_page"] = "booking"
-            st.rerun()
-    
-    with col_history:
-        history_disabled = True
-        if len(selected_rows) == 1 and original_status is not None:
-            cleaned_status = clean_farol_status_value(original_status)
-            history_disabled = not (cleaned_status.strip().lower() != "new request".lower())
-        st.button("🎫 Ticket Journey", disabled=history_disabled, key="history_btn")
-        if st.session_state.get("history_btn") and not history_disabled:
-            st.session_state["selected_reference"] = selected_farol_ref
-            st.session_state["current_page"] = "history"
-            st.rerun()
-    
-    with col_split:
-        adjustments_disabled = True
-        if len(selected_rows) == 1 and original_status is not None:
-            cleaned_status = clean_farol_status_value(original_status)
-            adjustments_disabled = not (cleaned_status.strip().lower() != "new request".lower())
-        st.button("🛠️ Adjustments", disabled=adjustments_disabled, key="adjustments_btn")
-        if st.session_state.get("adjustments_btn") and not adjustments_disabled:
-            st.session_state["original_data"] = df
-            st.session_state["selected_reference"] = selected_farol_ref
-            st.session_state["current_page"] = "split"
-            st.rerun()
-    
-    with col_attachments:
-        view_attachments_open = st.session_state.get("show_shipments_attachments", False)
-        if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
-            if view_attachments_open:
-                st.session_state["show_shipments_attachments"] = False
-                st.session_state["shipments_attachments_farol_ref"] = None
-            else:
-                st.session_state["show_shipments_attachments"] = True
-                st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
-            st.rerun()
-    
-    with col_export:
-        # Botão de exportação XLSX - sempre ativo
-        from datetime import datetime
+    else:
+        # Quando UMA linha está selecionada: 6 botões (sem New Shipment)
+        col_form, col_booking, col_history, col_split, col_attachments, col_export = st.columns([1, 1, 1, 1, 1, 1], gap="medium")
         
-        if st.button("📊 Export XLSX", key="export_btn"):
-            # Converter o dataframe atual (filtrado) para XLSX
-            import io
-            output = io.BytesIO()
+        with col_form:
+            # Botão Form View na segunda posição
+            form_view_disabled = len(selected_rows) != 1
+            if st.button("📝 Form View", disabled=form_view_disabled, key="form_view_btn"):
+                if not form_view_disabled:
+                    st.session_state["current_page"] = "form"
+                    st.rerun()
             
-            # Criar um writer do pandas para Excel
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                # Obter o dataframe com as colunas ordenadas, removendo a coluna "Select"
-                columns_to_export = [col for col in colunas_ordenadas if col != "Select"]
-                df_to_export = df[columns_to_export].copy()  # Usar o dataframe atual com colunas ordenadas (exceto "Select")
-                
-                # Aplicar nomes amigáveis de exibição às colunas, se disponível
-                from shipments_mapping import get_display_names
-                display_names = get_display_names()
-                
-                # Renomear as colunas usando os nomes amigáveis, se existirem
-                renamed_columns = {}
-                for col in df_to_export.columns:
-                    if col in display_names:
-                        renamed_columns[col] = display_names[col]
-                    else:
-                        # Para colunas que não estão no mapeamento, converter nomes técnicos para nomes mais amigáveis
-                        friendly_name = col.replace("data_", "").replace("_", " ").title()
-                        renamed_columns[col] = friendly_name
-                
-                df_to_export.rename(columns=renamed_columns, inplace=True)
-                df_to_export.to_excel(writer, index=False, sheet_name='Data')
+        with col_booking:
+            new_booking_disabled = True
+            if len(selected_rows) == 1 and original_status is not None:
+                cleaned_status = clean_farol_status_value(original_status)
+                new_booking_disabled = not (cleaned_status.strip().lower() == "new request".lower())
+            if st.button("📦 New Booking", disabled=new_booking_disabled, key="new_booking_btn"):
+                if not new_booking_disabled:
+                    st.session_state["current_page"] = "booking"
+                    st.rerun()
             
-            # Obter o conteúdo do buffer
-            processed_data = output.getvalue()
+        with col_history:
+            history_disabled = True
+            if len(selected_rows) == 1 and original_status is not None:
+                cleaned_status = clean_farol_status_value(original_status)
+                history_disabled = not (cleaned_status.strip().lower() != "new request".lower())
+            if st.button("🎫 Ticket Journey", disabled=history_disabled, key="history_btn"):
+                if not history_disabled:
+                    st.session_state["selected_reference"] = selected_farol_ref
+                    st.session_state["current_page"] = "history"
+                    st.rerun()
             
-            # Armazenar dados para download
-            st.session_state["export_data"] = processed_data
-            st.session_state["export_filename"] = f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            st.rerun()
+        with col_split:
+            adjustments_disabled = True
+            if len(selected_rows) == 1 and original_status is not None:
+                cleaned_status = clean_farol_status_value(original_status)
+                adjustments_disabled = not (cleaned_status.strip().lower() != "new request".lower())
+            if st.button("🛠️ Adjustments", disabled=adjustments_disabled, key="adjustments_btn"):
+                if not adjustments_disabled:
+                    st.session_state["original_data"] = df
+                    st.session_state["selected_reference"] = selected_farol_ref
+                    st.session_state["current_page"] = "split"
+                    st.rerun()
+            
+        with col_attachments:
+            view_attachments_open = st.session_state.get("show_shipments_attachments", False)
+            if st.button("📎 View Attachments", disabled=(len(selected_rows) != 1), key="view_attachments_shipments"):
+                if view_attachments_open:
+                    st.session_state["show_shipments_attachments"] = False
+                    st.session_state["shipments_attachments_farol_ref"] = None
+                else:
+                    st.session_state["show_shipments_attachments"] = True
+                    st.session_state["shipments_attachments_farol_ref"] = selected_farol_ref
+                st.rerun()
+            
+        with col_export:
+            # Botão de exportação XLSX - sempre ativo
+            if st.button("📊 Export XLSX", key="export_btn_with_selection"):
+                st.session_state["export_triggered"] = True
+                st.rerun()
+    
+    # Processar exportação quando botão for clicado
+    if st.session_state.get("export_triggered"):
+        from datetime import datetime
+        import io
+        
+        # Converter o dataframe atual (filtrado) para XLSX
+        output = io.BytesIO()
+        
+        # Criar um writer do pandas para Excel
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Obter o dataframe com as colunas ordenadas, removendo a coluna "Select"
+            columns_to_export = [col for col in colunas_ordenadas if col != "Select"]
+            df_to_export = df[columns_to_export].copy()
+            
+            # Aplicar nomes amigáveis de exibição às colunas, se disponível
+            from shipments_mapping import get_display_names
+            display_names = get_display_names()
+            
+            # Renomear as colunas usando os nomes amigáveis, se existirem
+            renamed_columns = {}
+            for col in df_to_export.columns:
+                if col in display_names:
+                    renamed_columns[col] = display_names[col]
+                else:
+                    # Para colunas que não estão no mapeamento, converter nomes técnicos para nomes mais amigáveis
+                    friendly_name = col.replace("data_", "").replace("_", " ").title()
+                    renamed_columns[col] = friendly_name
+            
+            df_to_export.rename(columns=renamed_columns, inplace=True)
+            df_to_export.to_excel(writer, index=False, sheet_name='Data')
+        
+        # Obter o conteúdo do buffer
+        processed_data = output.getvalue()
+        
+        # Armazenar dados para download
+        st.session_state["export_data"] = processed_data
+        st.session_state["export_filename"] = f"shipments_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        st.session_state.pop("export_triggered", None)
+        st.rerun()
     
     # Download automático quando dados estão prontos
     if st.session_state.get("export_data"):
