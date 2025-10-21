@@ -2120,7 +2120,7 @@ def exibir_shipments():
     # Botões principais com layout condicional baseado na seleção
     if len(selected_rows) == 0:
         # Quando NENHUMA linha está selecionada: apenas 2 botões lado a lado
-        col_new, col_export, col_spacer = st.columns([1, 1, 8], gap="small")
+        col_new, col_export, col_spacer = st.columns([2, 2, 6], gap="small")
         
         with col_new:
             if st.button("🚢 New Shipment", key="new_shipment_btn"):
