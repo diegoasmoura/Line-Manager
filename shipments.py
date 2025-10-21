@@ -39,6 +39,7 @@ def exibir_formulario():
         return
 
     st.caption(f"Farol Reference: {farol_ref}")
+    
     # Sem CSS personalizado - usando estrutura padrão do Streamlit
 
     # Carregar dados por referência
@@ -119,7 +120,7 @@ def exibir_formulario():
         ] + df_udc[df_udc["grupo"] == "Incoterm"]["dado"].dropna().astype(str).unique().tolist()
 
         st.subheader("Sales Data")
-        with st.form(f"sales_form_{farol_ref}"):
+        with st.form(f"sales_form_{farol_ref}_{st.session_state.get('form_reset_counter', 0)}"):
             # Ordem exata conforme grid
             sales_order = [
                 "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
@@ -610,8 +611,11 @@ def exibir_formulario():
 
         # Processa descarte Sales
         if discard_sales:
+            # Incrementar contador para forçar recriação do form
+            if "form_reset_counter" not in st.session_state:
+                st.session_state["form_reset_counter"] = 0
+            st.session_state["form_reset_counter"] += 1
             st.warning("Changes discarded.")
-            st.session_state["current_page"] = "main"
             st.rerun()
 
         # Processa submissão Sales
@@ -708,7 +712,7 @@ def exibir_formulario():
         ] + df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().astype(str).unique().tolist()
 
         st.subheader("Booking Management")
-        with st.form(f"booking_form_{farol_ref}"):
+        with st.form(f"booking_form_{farol_ref}_{st.session_state.get('form_reset_counter', 0)}"):
             # Ordem exata conforme grid
             booking_order = [
                 "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
@@ -1131,8 +1135,11 @@ def exibir_formulario():
 
         # Processa descarte Booking
         if discard_booking:
+            # Incrementar contador para forçar recriação do form
+            if "form_reset_counter" not in st.session_state:
+                st.session_state["form_reset_counter"] = 0
+            st.session_state["form_reset_counter"] += 1
             st.warning("Changes discarded.")
-            st.session_state["current_page"] = "main"
             st.rerun()
 
         # Processa submissão Booking

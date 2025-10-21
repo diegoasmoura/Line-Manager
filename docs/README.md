@@ -135,6 +135,14 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Performance**: Lógica de exportação otimizada para renderização mais rápida
 - **Layout Responsivo**: Interface mais limpa e organizada visualmente
 
+### v4.5.0 - Reset de Campos na Form View (2025-01-21)
+- **Reset Inteligente**: Botão "❌ Discard Changes" agora limpa os campos e permanece na Form View
+- **Sistema de Chaves Únicas**: Forms com chaves dinâmicas que forçam recriação completa dos campos
+- **Separação de Funções**: "❌ Discard Changes" limpa campos, "🔙 Back to Shipments" volta para tela principal
+- **UX Melhorada**: Usuário pode resetar e continuar editando na mesma tela sem perder contexto
+- **Contador de Reset**: Sistema robusto usando `form_reset_counter` para evitar conflitos
+- **Experiência Consistente**: Funciona igualmente para Sales Data e Booking Management
+
 ## ⚠️ Observações Importantes
 
 - Os módulos `Operation Control`, `Performance Control` e `Tracking` estão como placeholders.
