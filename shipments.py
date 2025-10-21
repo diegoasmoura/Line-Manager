@@ -1942,6 +1942,9 @@ def exibir_shipments():
     # Guarda cópias sem a coluna "Select" para comparação (com nomes amigáveis)
     df_filtered_original = df_display.drop(columns=["Select"], errors="ignore").copy()
 
+    # Filtra column_config para chaves válidas do DataFrame exibido
+    filtered_column_config = {k: v for k, v in column_config.items() if k in df_display.columns}
+
     # Exibe data_editor (os dados já vêm ordenados do banco por Farol Reference)
     edited_df = st.data_editor(
         df_display,
@@ -1949,7 +1952,7 @@ def exibir_shipments():
         use_container_width=True,
         num_rows="fixed",
         disabled=disabled_columns,
-        column_config=column_config,
+        column_config=filtered_column_config,
         hide_index=True,
     )
 

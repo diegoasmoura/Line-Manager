@@ -478,8 +478,8 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         if "Booking Status" not in df.columns:
             df["Booking Status"] = pd.NA
         
-        #Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
-        df = df[[
+        # Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
+        desired_cols_sales = [
             # Identificação
             "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             # Capacidade
@@ -497,7 +497,8 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
             "data_allocation", "data_producer_nomination", "data_lc_received", "Sales Owner",
             # Observações
             "Comments Sales"
-        ]]
+        ]
+        df = df[[c for c in desired_cols_sales if c in df.columns]]
  
         # Adiciona ícones ao Farol Status para exibição
         df = process_farol_status_for_display(df)
