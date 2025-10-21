@@ -237,6 +237,19 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Filtros**: Campo participa dos Filtros Avançados como tipo data
 - **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
 
+### v4.12.0 - Atualização de Terminais via API (2025-10-21)
+- **Novo Script**: Adicionado `update_terminals.py` para atualizar F_ELLOX_TERMINALS
+- **Funcionalidades**:
+  - Busca terminais atualizados da API Ellox
+  - Atualiza tabela F_ELLOX_TERMINALS com dados mais recentes
+  - Mantém CNPJs e nomes normalizados
+  - Integração com dropdown de Terminal em Adjustments
+- **Benefícios**:
+  - Lista de terminais sempre atualizada
+  - Dados consistentes com a API
+  - Melhor experiência na seleção de terminais
+  - Normalização automática de nomes
+
 ### v4.11.0 - Layout Otimizado da Form View - Datas e Prazos (2025-10-21)
 - **Melhoria na Form View**: Reorganização da seção "📅 Datas e Prazos" (aba Sales Data)
 - **Layout em Duas Linhas**:
