@@ -135,7 +135,15 @@ def get_column_mapping():
 def non_editable_columns(stage):
  
     if stage == "Sales Data":
-        non_editable = ["Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic", "Sales Owner", "Booking Owner"]
+        non_editable = [
+            "Sales Farol Reference",
+            "Shipment Requested Date",
+            "Adjusts Basic",
+            "Adjusts Critic",
+            "Sales Owner",
+            "Booking Owner",
+            "Booking Status",  # Não editável no stage Sales Data
+        ]
     elif stage == "Booking Management":
         non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
     elif stage == "General View":
@@ -288,7 +296,7 @@ def drop_downs(data_show, df_udc):
         # Booking Management
         #"Booking Status": True,
         "Booking Container Type": True,
-        "Port of Loading POL": True,
+        # "Port of Loading POL" não é obrigatório
         "Port of Delivery POD": True,
 
         # Container Delivery at Port
@@ -349,14 +357,9 @@ def drop_downs(data_show, df_udc):
 
         if editor_type == "select" and col in dropdown_options:
             required_field = campos_obrigatorios.get(col, False)
-            # Tornar 'Port of Loading POL' obrigatório apenas quando a grade é de Booking
+            # Nunca exigir 'Port of Loading POL' como obrigatório
             if col == "Port of Loading POL":
-                is_booking_view = (
-                    "Booking Status" in data_show.columns
-                    or "Booking Reference" in data_show.columns
-                    or "Carrier" in data_show.columns
-                )
-                required_field = bool(is_booking_view)
+                required_field = False
             if col == "Farol Status":
                 column_config[col] = st.column_config.SelectboxColumn(
                     label=display_name,
