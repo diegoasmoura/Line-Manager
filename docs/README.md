@@ -237,6 +237,12 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Filtros**: Campo participa dos Filtros Avançados como tipo data
 - **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
 
+### v4.13.0 - Aumento do Tamanho da Página (2025-10-21)
+- **Paginação Otimizada**: Aumentado tamanho da página de 25 para 200 registros
+- **Melhoria de Performance**: Reduz necessidade de navegação entre páginas
+- **Experiência do Usuário**: Visualização de mais dados por vez na tabela principal
+- **Configuração**: `page_size = 200` em `shipments.py`
+
 ### v4.12.0 - Atualização de Terminais via API (2025-10-21)
 - **Novo Script**: Adicionado `update_terminals.py` para atualizar F_ELLOX_TERMINALS
 - **Funcionalidades**:

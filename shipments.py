@@ -1412,7 +1412,7 @@ def exibir_shipments():
     if 'shipments_current_page' not in st.session_state:
         st.session_state.shipments_current_page = 1
 
-    page_size = 25  # Tamanho fixo de página
+    page_size = 200  # Tamanho fixo de página
 
     # Carrega dados (paginados por padrão)
     if choose == "Sales Data":
