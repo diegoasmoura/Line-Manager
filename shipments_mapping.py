@@ -135,17 +135,17 @@ def get_column_mapping():
 def non_editable_columns(stage):
  
     if stage == "Sales Data":
-        non_editable = ["Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic"]
+        non_editable = ["Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic", "Sales Owner", "Booking Owner"]
     elif stage == "Booking Management":
-        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD"]
+        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
     elif stage == "General View":
         non_editable = list(dict.fromkeys([
             "Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic",
             "Booking Registered Date", "Type of Shipment", "Sales Quantity of Containers", "Container Type", 
-            "Port of Loading POL", "Port of Delivery POD"
+            "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"
         ]))
     elif stage == "Container Delivery at Port":
-        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD"]
+        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
     else:
         non_editable = []
  

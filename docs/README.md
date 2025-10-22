@@ -237,6 +237,12 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Filtros**: Campo participa dos Filtros Avançados como tipo data
 - **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
 
+### v4.16.0 - Correção de Campos Owner Não Editáveis (2025-10-22)
+- **Correção**: Campos "Sales Owner" e "Booking Owner" agora são não editáveis
+- **Auditoria**: Campos de auditoria que registram quem criou o registro não devem ser alteráveis
+- **Todos os Stages**: Aplicado em Sales Data, Booking Management, General View e Container Delivery at Port
+- **Segurança**: Previne alteração acidental de informações de auditoria importantes
+
 ### v4.15.0 - Correção de Posicionamento dos Campos de Desvio (2025-10-22)
 - **Correção**: Campos de desvio agora aparecem corretamente nas tabelas principais
 - **Booking Management**: Campos posicionados após "Freight PNL" na lista de colunas filtradas

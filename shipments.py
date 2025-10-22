@@ -2030,6 +2030,15 @@ def exibir_shipments():
     filtered_column_config = {k: v for k, v in column_config.items() if k in df_display.columns}
 
     # Exibe data_editor (os dados já vêm ordenados do banco por Farol Reference)
+    # Configuração para manter colunas fixas sempre à esquerda
+    fixed_columns = ["Select", farol_ref_col]
+    
+    # Separa as colunas fixas das reordenáveis
+    reorderable_columns = [col for col in colunas_ordenadas if col not in fixed_columns]
+    
+    # Combina as colunas na ordem correta
+    final_column_order = fixed_columns + reorderable_columns
+    
     edited_df = st.data_editor(
         df_display,
         key=st.session_state["grid_update_key"],
@@ -2038,6 +2047,7 @@ def exibir_shipments():
         disabled=disabled_columns,
         column_config=filtered_column_config,
         hide_index=True,
+        column_order=final_column_order,  # Define a ordem inicial das colunas
     )
 
     # Contador discreto de registros
