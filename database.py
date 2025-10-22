@@ -560,6 +560,9 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_FreightPpnl                        AS b_freightppnl,
         B_AWARD_STATUS                       AS b_award_status,
         B_COMMENTS                           AS b_comments,
+        B_DEVIATION_DOCUMENT                 AS b_deviation_document,
+        B_DEVIATION_RESPONSIBLE              AS b_deviation_responsible,
+        B_DEVIATION_REASON                   AS b_deviation_reason,
         ADJUSTMENT_ID                        AS adjustment_id,
         /* Campos de Sales necessários para exibição no Booking */
         S_CREATION_OF_SHIPMENT               AS s_creation_of_shipment,
@@ -721,6 +724,9 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_FreightPpnl                        AS b_freightppnl,
         B_AWARD_STATUS                       AS b_award_status,
         B_COMMENTS                           AS b_comments,
+        B_DEVIATION_DOCUMENT                 AS b_deviation_document,
+        B_DEVIATION_RESPONSIBLE              AS b_deviation_responsible,
+        B_DEVIATION_REASON                   AS b_deviation_reason,
         ADJUSTMENT_ID                        AS adjustment_id
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
     ORDER BY FAROL_REFERENCE DESC'''
@@ -919,6 +925,9 @@ def get_booking_record_by_reference(farol_reference: str) -> pd.DataFrame:
         B_FreightPpnl                        AS b_freightppnl,
         B_AWARD_STATUS                       AS b_award_status,
         B_COMMENTS                           AS b_comments,
+        B_DEVIATION_DOCUMENT                 AS b_deviation_document,
+        B_DEVIATION_RESPONSIBLE              AS b_deviation_responsible,
+        B_DEVIATION_REASON                   AS b_deviation_reason,
         ADJUSTMENT_ID                        AS adjustment_id,
         S_CREATION_OF_SHIPMENT               AS s_creation_of_shipment,
         S_TYPE_OF_SHIPMENT                   AS s_type_of_shipment,

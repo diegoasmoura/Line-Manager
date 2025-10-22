@@ -237,6 +237,18 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Filtros**: Campo participa dos Filtros Avançados como tipo data
 - **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
 
+### v4.14.0 - Campos de Justificativa de Desvio (2025-10-21)
+- **Novos Campos**: Adicionados campos para registro de justificativas de desvio
+  - `Deviation Document`: Documento relacionado ao desvio (13 opções: OBL, CNN BL, eCO, PC, PN, eFC, SD, WC, PL, HVI, SSCO, DRAFTS, IP)
+  - `Deviation Responsible`: Responsável pelo desvio (12 opções: ARMADOR, DESPACHANTE, CONTROLADORA, FUMIGADORA, ANALISTA DOCUMENTAÇÃO, MEMPHIS, COMERCIAL, PRODUTOR, MALLORY, CBS ÍNDIA, D&B, MAPA)
+  - `Deviation Reason`: Motivo do desvio (21 opções: ERRO COBRANÇA DO FRETE, PROBLEMAS NO SISTEMA, FALTA DE PAGAMENTO DE TAXAS LOCAIS, etc.)
+- **Integração UDC**: 46 novos valores populados na F_CON_Global_Variables para dropdowns
+- **Form View**: Nova seção "⚠️ Justificativa de Desvios" na aba Booking Management
+- **Tabelas Principais**: Campos posicionados após "Freight PNL" em Booking Management e General View
+- **Interface**: Nomes limpos sem prefixos técnicos (B_Deviation_* → Deviation *)
+- **Auditoria**: Integração completa com sistema de auditoria e mapeamento
+- **Script SQL**: Arquivo `insert_deviation_options.sql` para popular UDC
+
 ### v4.13.0 - Aumento do Tamanho da Página (2025-10-21)
 - **Paginação Otimizada**: Aumentado tamanho da página de 25 para 200 registros
 - **Melhoria de Performance**: Reduz necessidade de navegação entre páginas

@@ -751,6 +751,12 @@ def exibir_formulario():
         ] + df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().astype(str).unique().tolist()
         ports_pod_options = [""
         ] + df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().astype(str).unique().tolist()
+        deviation_doc_options = [""
+        ] + df_udc[df_udc["grupo"] == "Deviation Document"]["dado"].dropna().astype(str).unique().tolist()
+        deviation_resp_options = [""
+        ] + df_udc[df_udc["grupo"] == "Deviation Responsible"]["dado"].dropna().astype(str).unique().tolist()
+        deviation_reason_options = [""
+        ] + df_udc[df_udc["grupo"] == "Deviation Reason"]["dado"].dropna().astype(str).unique().tolist()
 
         st.subheader("Booking Management")
         with st.form(f"booking_form_{farol_ref}_{st.session_state.get('form_reset_counter', 0)}"):
@@ -767,6 +773,7 @@ def exibir_formulario():
                 "data_chegada_destino_eta", "data_chegada_destino_ata",
                 "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
                 "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+                "Deviation Document", "Deviation Responsible", "Deviation Reason",
                 "Booking Owner",
                 "Comments Booking"
             ]
@@ -853,6 +860,7 @@ def exibir_formulario():
                 "⚙️ Configurações": [],  # mantém ordem consistente com Sales
                 "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal"],
                 "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"],
+                "⚠️ Justificativa de Desvios": ["Deviation Document", "Deviation Responsible", "Deviation Reason"],
                 "💬 Observações": ["Comments Booking", "Booking Owner"]
             }
             
@@ -1093,6 +1101,39 @@ def exibir_formulario():
 
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_fin]
+
+                # Linha única em Justificativa de Desvios (Booking): Deviation Document | Deviation Responsible | Deviation Reason
+                if section_title == "⚠️ Justificativa de Desvios":
+                    first_row_fields_dev = [
+                        "Deviation Document",
+                        "Deviation Responsible",
+                        "Deviation Reason",
+                    ]
+                    available_top_dev = [f for f in first_row_fields_dev if f in available_fields]
+                    if available_top_dev:
+                        cols_top_dev = st.columns([1]*len(available_top_dev) + [max(1, 5-len(available_top_dev))])
+                        for j, col_name in enumerate(available_top_dev):
+                            with cols_top_dev[j]:
+                                label = col_name
+                                internal_key = col_name
+                                current_val = row_booking.get(internal_key, "")
+                                disabled_flag = (label in disabled_cols_b)
+
+                                if label == "Deviation Document":
+                                    options = deviation_doc_options
+                                elif label == "Deviation Responsible":
+                                    options = deviation_resp_options
+                                else:  # Deviation Reason
+                                    options = deviation_reason_options
+
+                                try:
+                                    default_index = options.index(str(current_val))
+                                except Exception:
+                                    default_index = 0
+                                new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_top_dev_{farol_ref}_{label}")
+
+                        # Evita duplicar esses campos no restante da seção
+                        available_fields = [f for f in available_fields if f not in available_top_dev]
                 
                 # Agrupa campos da seção por layout
                 section_groups = {}
@@ -1845,7 +1886,10 @@ def exibir_shipments():
             "data_transbordo",
             "data_chegada_destino_eta",
             "data_chegada_destino_ata",
-            "Freight Rate USD"
+            "Freight Rate USD",
+            "Deviation Document",
+            "Deviation Responsible",
+            "Deviation Reason"
         ]
         
         # Remove todas as colunas da ordem específica da lista atual

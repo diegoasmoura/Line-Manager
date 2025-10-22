@@ -98,6 +98,9 @@ def get_column_mapping():
         "b_award_status": "Award Status",
         "b_place_of_receipt":"Place of Receipt",
         "b_comments": "Comments Booking",
+        "b_deviation_document": "Deviation Document",
+        "b_deviation_responsible": "Deviation Responsible",
+        "b_deviation_reason": "Deviation Reason",
  
         # Loading Container
         "l_id": "ID Loading",
@@ -173,6 +176,11 @@ def drop_downs(data_show, df_udc):
         "Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
         "Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
         
+        # Deviation Fields
+        "Deviation Document": df_udc[df_udc["grupo"] == "Deviation Document"]["dado"].dropna().unique().tolist(),
+        "Deviation Responsible": df_udc[df_udc["grupo"] == "Deviation Responsible"]["dado"].dropna().unique().tolist(),
+        "Deviation Reason": df_udc[df_udc["grupo"] == "Deviation Reason"]["dado"].dropna().unique().tolist(),
+        
         # Container Delivery at Port
         "Truck Loading Status": df_udc[df_udc["grupo"] == "Truck Loading Status"]["dado"].dropna().unique().tolist(),
         "Status ITAS": df_udc[df_udc["grupo"] == "Status ITAS"]["dado"].dropna().unique().tolist(),
@@ -236,6 +244,11 @@ def drop_downs(data_show, df_udc):
         "Freight Rate USD": "numeric",
         "Bogey Sale Price USD": "numeric",
         "Freight PNL": "numeric",
+        
+        # Deviation Fields
+        "Deviation Document": "select",
+        "Deviation Responsible": "select",
+        "Deviation Reason": "select",
 
         # Container Delivery at Port
         "Truck Loading Status": "select",
@@ -314,7 +327,12 @@ def drop_downs(data_show, df_udc):
         "data_actual_truck_load": "Actual Truck Load",
         "data_expected_container_release_start": "Expected Container Release Start",
         "data_expected_container_release_end": "Expected Container Release End",
-        "data_actual_container_release": "Actual Container Release"
+        "data_actual_container_release": "Actual Container Release",
+        
+        # Deviation Fields
+        "Deviation Document": "Deviation Document",
+        "Deviation Responsible": "Deviation Responsible",
+        "Deviation Reason": "Deviation Reason"
     }
 
     column_config = {}
@@ -406,7 +424,12 @@ def get_display_names():
         "data_actual_truck_load": "Actual Truck Load",
         "data_expected_container_release_start": "Expected Container Release Start",
         "data_expected_container_release_end": "Expected Container Release End",
-        "data_actual_container_release": "Actual Container Release"
+        "data_actual_container_release": "Actual Container Release",
+        
+        # Deviation Fields
+        "Deviation Document": "Deviation Document",
+        "Deviation Responsible": "Deviation Responsible",
+        "Deviation Reason": "Deviation Reason"
     }
  
  
@@ -506,6 +529,9 @@ def get_alias_to_database_column_mapping():
         "b_freightppnl": "B_FREIGHTPPNL",
         "b_award_status": "B_AWARD_STATUS",
         "b_comments": "B_COMMENTS",
+        "b_deviation_document": "B_DEVIATION_DOCUMENT",
+        "b_deviation_responsible": "B_DEVIATION_RESPONSIBLE",
+        "b_deviation_reason": "B_DEVIATION_REASON",
         
         # ⚠️ IMPORTANTE: Aliases com b_ que na verdade apontam para colunas S_*
         # (usado em Booking Management para exibir campos de Sales)
@@ -550,6 +576,9 @@ def get_database_column_name(display_name_or_alias: str) -> str:
         "Select": "SELECT",  # Coluna UI, não existe no banco
         "Transaction Number": "B_TRANSACTION_NUMBER",
         "b_transaction_number": "B_TRANSACTION_NUMBER",
+        "Deviation Document": "B_DEVIATION_DOCUMENT",
+        "Deviation Responsible": "B_DEVIATION_RESPONSIBLE",
+        "Deviation Reason": "B_DEVIATION_REASON",
     }
     
     if display_name_or_alias in special_cases:
