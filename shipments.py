@@ -1111,7 +1111,8 @@ def exibir_formulario():
                     ]
                     available_top_dev = [f for f in first_row_fields_dev if f in available_fields]
                     if available_top_dev:
-                        cols_top_dev = st.columns([1]*len(available_top_dev) + [max(1, 5-len(available_top_dev))])
+                        # Layout especial: Deviation Document e Responsible em uma linha, Deviation Reason em linha separada com largura maior
+                        cols_top_dev = st.columns([1, 1, 2])  # 2 colunas para Deviation Reason
                         for j, col_name in enumerate(available_top_dev):
                             with cols_top_dev[j]:
                                 label = col_name

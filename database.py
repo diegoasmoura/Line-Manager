@@ -625,6 +625,8 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+            # Justificativa de Desvios
+            "Deviation Document", "Deviation Responsible", "Deviation Reason",
             # Administração
             "Booking Owner",
             # Observações
@@ -795,12 +797,15 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             # 7. FRETE
             "Freight Rate USD",
             
-            # 8. INFORMAÇÕES DE SALES
+            # 8. JUSTIFICATIVA DE DESVIOS
+            "Deviation Document", "Deviation Responsible", "Deviation Reason",
+            
+            # 9. INFORMAÇÕES DE SALES
             "Sales Order Reference", "data_sales_order", "Business", "Customer", "Incoterm", "DTHC", "Afloat", 
             "VIP PNL Risk", "PNL Destination", "data_allocation", "data_producer_nomination", "data_lc_received", 
             "Sales Owner", "Splitted Booking Reference", "Comments Sales",
             
-            # 9. INFORMAÇÕES DE BOOKING
+            # 10. INFORMAÇÕES DE BOOKING
             "Booking Status", "Booking Reference", "Booking Owner", "Bogey Sale Price USD", "Freight PNL", "Comments Booking"
         ]
 

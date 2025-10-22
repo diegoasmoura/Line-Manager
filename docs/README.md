@@ -237,6 +237,13 @@ Consulte o guia de ícones em `docs/farol_status_icons_guide.md` para regras de 
 - **Filtros**: Campo participa dos Filtros Avançados como tipo data
 - **Mapeamento/Auditoria**: Mapeado em `shipments_mapping.py` e incluído nas queries de `database.py` (Sales/General), preservando auditoria
 
+### v4.15.0 - Correção de Posicionamento dos Campos de Desvio (2025-10-22)
+- **Correção**: Campos de desvio agora aparecem corretamente nas tabelas principais
+- **Booking Management**: Campos posicionados após "Freight PNL" na lista de colunas filtradas
+- **General View**: Campos posicionados após "Freight Rate USD" na lista de colunas filtradas
+- **Database**: Atualizadas funções `get_data_bookingData` e `get_data_generalView` em `database.py`
+- **Layout**: Campos "Deviation Document", "Deviation Responsible", "Deviation Reason" visíveis em ambos os stages
+
 ### v4.14.0 - Campos de Justificativa de Desvio (2025-10-21)
 - **Novos Campos**: Adicionados campos para registro de justificativas de desvio
   - `Deviation Document`: Documento relacionado ao desvio (13 opções: OBL, CNN BL, eCO, PC, PN, eFC, SD, WC, PL, HVI, SSCO, DRAFTS, IP)
