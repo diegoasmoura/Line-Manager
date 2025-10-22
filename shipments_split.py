@@ -213,8 +213,8 @@ def show_split_form():
 
         # Configuração de dropdowns para o data_editor
         # Carregar opções de terminais do banco (fallback para vazio)
-        # Carrega nomes dos terminais da F_ELLOX_TERMINALS
-        terminal_options = list_terminal_names() or []
+        # Carrega nomes dos terminais da F_ELLOX_TERMINALS (fallback: unificada)
+        terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
 
         column_config = {
             "Sales Quantity of Containers": st.column_config.NumberColumn(
@@ -359,6 +359,38 @@ def show_split_form():
                                                 from sqlalchemy import text
                                                 conn = get_database_connection()
                                                 transaction = conn.begin()
+                                                
+                                                # Atualiza campos específicos da linha original
+                                                for change in changes:
+                                                    column = change["Coluna"]
+                                                    new_value = change["Novo Valor"]
+                                                    
+                                                    # Mapeia nomes de colunas da UI para nomes de colunas do banco
+                                                    column_mapping = {
+                                                        "Terminal": "B_TERMINAL",
+                                                        "Port of Loading POL": "S_PORT_OF_LOADING_POL",
+                                                        "Port of Delivery POD": "S_PORT_OF_DELIVERY_POD",
+                                                        "Place of Receipt": "S_PLACE_OF_RECEIPT",
+                                                        "Final Destination": "S_FINAL_DESTINATION",
+                                                        "Transhipment Port": "B_TRANSHIPMENT_PORT",
+                                                        "Voyage Carrier": "B_VOYAGE_CARRIER",
+                                                        "Voyage Code": "B_VOYAGE_CODE",
+                                                        "Booking Reference": "B_BOOKING_REFERENCE",
+                                                        "Vessel Name": "B_VESSEL_NAME",
+                                                        "Sales Quantity of Containers": "S_QUANTITY_OF_CONTAINERS"
+                                                    }
+                                                    
+                                                    if column in column_mapping:
+                                                        db_column = column_mapping[column]
+                                                        update_field_query = text(f"""
+                                                            UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                                                            SET {db_column} = :new_value
+                                                            WHERE FAROL_REFERENCE = :ref
+                                                        """)
+                                                        conn.execute(update_field_query, {
+                                                            "new_value": new_value if new_value != "" else None,
+                                                            "ref": farol_reference
+                                                        })
                                                 
                                                 update_unified_query = text("""
                                                     UPDATE LogTransp.F_CON_SALES_BOOKING_DATA

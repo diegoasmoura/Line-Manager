@@ -18,6 +18,7 @@ Sistema completo de gerenciamento de embarques marítimos com interface web intu
 - [Sistema de Sincronização Automática Ellox](#-sistema-de-sincronização-automática-ellox)
 - [Boas Práticas](#-boas-práticas---identificação-de-carriers)
 - [Boas Práticas - Coleta de Hora Atual](#-boas-práticas---coleta-de-hora-atual)
+- [Padronização de Campos](#-padronização-de-campos)
 - [Contribuição](#-contribuição)
 - [Suporte](#-suporte)
 
@@ -4522,3 +4523,56 @@ python ellox_sync_daemon.py stop
 - [ ] **Kubernetes**: Orquestração de containers
 - [ ] **Machine Learning**: Previsão de atrasos
 - [ ] **Mobile Native**: App iOS/Android
+
+## 📋 Padronização de Campos
+
+### Campo Terminal
+
+O campo **Terminal** é padronizado em todo o sistema para garantir consistência visual e funcional. Este campo aparece nos seguintes módulos:
+
+#### 📍 Localização do Campo
+- **shipments.py** (Tabela Principal): Exibido como "Terminal" em todos os stages
+- **shipments_new.py** (Novo Sales Record): Campo opcional após "Final Destination"
+- **booking_new.py** (Novo Booking): Campo editável abaixo de "Final Destination"
+- **shipments_split.py** (Adjustments): Campo editável no formulário de splits
+
+#### 🔧 Configuração Técnica
+- **Fonte de Dados**: Tabela `F_ELLOX_TERMINALS` via função `list_terminal_names()`
+- **Tipo de Campo**: Dropdown (Selectbox) com opções carregadas dinamicamente
+- **Mapeamento**: `b_terminal` → "Terminal" (nome de exibição)
+- **Obrigatório**: Não (campo opcional em todos os formulários)
+
+#### 🧭 Comportamento nas Telas
+- **shipments_new.py (New Sales Record)**: Carrega opções de `F_ELLOX_TERMINALS` com fallback para `DISTINCT B_TERMINAL` da `F_CON_SALES_BOOKING_DATA` quando a tabela de terminais estiver vazia.
+- **booking_new.py (New Booking)**: Exibe automaticamente o valor já salvo em `B_TERMINAL` para a `FAROL_REFERENCE` selecionada. Dropdown usa `list_terminal_names()` com fallback `list_terminal_names_from_unified()`.
+- **shipments_split.py (Adjustments)**: Editor em grade com `SelectboxColumn("Terminal")` usando as mesmas opções e persistindo mudanças na unificada.
+- **shipments.py (Tabela Principal)**: Rótulo padronizado como "Terminal" em todos os stages; edição via `shipments_mapping.py` com editor `select` e opções de banco.
+
+#### ♻️ Persistência
+- `booking_new.py`: `b_terminal` persiste em `LogTransp.F_CON_SALES_BOOKING_DATA.B_TERMINAL` via `update_booking_data_by_farol_reference()`.
+- `shipments_new.py`: `b_terminal` incluído no `add_sales_record()` via mapeamento `b_terminal -> B_TERMINAL`.
+- `shipments_split.py`: alterações no campo "Terminal" atualizam diretamente `B_TERMINAL` da linha original e refletem nos splits.
+
+#### 🛡️ Fallback de Opções
+Quando `F_ELLOX_TERMINALS` não possui registros ou está inacessível, as opções do dropdown de Terminal são carregadas de `F_CON_SALES_BOOKING_DATA` (`DISTINCT B_TERMINAL`) através de `list_terminal_names_from_unified()`.
+
+#### 📊 Implementação
+```python
+# Carregamento das opções
+from database import list_terminal_names
+terminal_options = list_terminal_names() or []
+
+# Configuração no data_editor
+"Terminal": st.column_config.SelectboxColumn(
+    "Terminal",
+    options=terminal_options,
+    required=False,
+    help="Selecione o terminal"
+)
+```
+
+#### ✅ Benefícios da Padronização
+- **Consistência Visual**: Mesmo nome em toda a aplicação
+- **Fonte Única**: Dados sempre atualizados da tabela oficial
+- **Experiência do Usuário**: Interface uniforme e intuitiva
+- **Manutenibilidade**: Configuração centralizada no `shipments_mapping.py`

@@ -771,7 +771,7 @@ def exibir_formulario():
                 "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada",
                 "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
                 "data_chegada_destino_eta", "data_chegada_destino_ata",
-                "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+                "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
                 "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
                 "Deviation Document", "Deviation Responsible", "Deviation Reason",
                 "Booking Owner",
@@ -801,7 +801,7 @@ def exibir_formulario():
                     "Freight Forwarder": {"width": 1, "cols": 3},
                     "Vessel Name": {"width": 1, "cols": 3},
                     "Voyage Code": {"width": 1, "cols": 3},
-                    "Port Terminal": {"width": 1, "cols": 3},
+                    "Terminal": {"width": 1, "cols": 3},
                     "POD Country": {"width": 1, "cols": 3},
                     "Destination Trade Region": {"width": 1, "cols": 3},
                     "Award Status": {"width": 1, "cols": 3},
@@ -858,7 +858,7 @@ def exibir_formulario():
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
                 "📅 Cronograma": ["Booking Registered Date", "Booking Requested Date", "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada"],
                 "⚙️ Configurações": [],  # mantém ordem consistente com Sales
-                "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal"],
+                "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal"],
                 "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"],
                 "⚠️ Justificativa de Desvios": ["Deviation Document", "Deviation Responsible", "Deviation Reason"],
                 "💬 Observações": ["Comments Booking", "Booking Owner"]
@@ -1852,7 +1852,7 @@ def exibir_shipments():
             return colunas_list
         
         # Reordena as colunas seguindo a ordem específica enviada pelo usuário
-        # Ordem: Creation Of Booking, Booking Requested Date, Carrier, Vessel Name, Voyage Code, Port Terminal, 
+        # Ordem: Creation Of Booking, Booking Requested Date, Carrier, Vessel Name, Voyage Code, Terminal, 
         # Freight Forwarder, Transhipment Port, POD Country, POD Country Acronym, Destination Trade Region,
         # data_booking_confirmation, data_estimativa_saida, data_estimativa_chegada, data_deadline, 
         # data_draft_deadline, data_abertura_gate, data_confirmacao_embarque, data_atracacao, 
@@ -1866,7 +1866,7 @@ def exibir_shipments():
             "Carrier",
             "Vessel Name", 
             "Voyage Code",
-            "Port Terminal",
+            "Terminal",
             "Freight Forwarder",
             "Transhipment Port",
             "POD Country",

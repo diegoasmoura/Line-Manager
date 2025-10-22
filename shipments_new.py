@@ -16,6 +16,9 @@ ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().u
 ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
 dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist()
 vip_pnl_risk_options = df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist()
+# Carregar terminais da tabela F_ELLOX_TERMINALS (com fallback para unificada)
+from database import list_terminal_names, list_terminal_names_from_unified
+terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
  
 # ---------- 3. Constantes ----------
 # Mapeamento de valores POD do Excel para valores da tabela UDC
@@ -179,6 +182,11 @@ def show_add_form():
             with col1:
                 values["s_final_destination"] = st.text_input("Final Destination")
             with col2:
+                values["b_terminal"] = st.selectbox("Terminal", [""] + terminal_options)
+            
+            # Restriction Type na linha de baixo, ocupando 1 coluna
+            col1, col2 = st.columns(2)
+            with col1:
                 values["s_vip_pnl_risk"] = st.selectbox("Restriction Type", [""] + vip_pnl_risk_options)
 
             values["s_comments"] = st.text_area("Sales Comments")

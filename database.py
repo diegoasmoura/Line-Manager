@@ -622,7 +622,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
             "data_chegada_destino_eta", "data_chegada_destino_ata",
             # Armador/viagem
-            "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Port Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             # Financeiro
             "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
             # Justificativa de Desvios
@@ -779,7 +779,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date",
             
             # 3. INFORMAÇÕES DE NAVEGAÇÃO
-            "Carrier", "Vessel Name", "Voyage Code", "Port Terminal", "Freight Forwarder", 
+            "Carrier", "Vessel Name", "Voyage Code", "Terminal", "Freight Forwarder", 
             "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
             
             # 4. PRAZOS E PERÍODOS
@@ -1158,6 +1158,7 @@ def add_sales_record(form_values):
             "s_producer_nomination_date": "S_PRODUCER_NOMINATION_DATE",
             "s_sales_owner": "USER_LOGIN_SALES_CREATED",
             "s_comments": "S_COMMENTS",
+            "b_terminal": "B_TERMINAL",
         }
 
         unified_values = {}
@@ -1492,6 +1493,7 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
             B_FREIGHT_FORWARDER   AS b_freight_forwarder,
             B_BOOKING_REQUEST_DATE AS b_booking_request_date,
             B_COMMENTS            AS b_comments,
+            B_TERMINAL            AS b_terminal,
             -- Pré-preenchimento (campos de Sales na unificada)
             S_DTHC_PREPAID                    AS dthc,
             S_REQUESTED_SHIPMENT_WEEK         AS requested_shipment_week,
@@ -1652,6 +1654,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                 S_DTHC_PREPAID = :s_dthc_prepaid,
                 S_REQUESTED_SHIPMENT_WEEK = :s_requested_shipment_week,
                 S_FINAL_DESTINATION = :s_final_destination,
+                B_TERMINAL = :b_terminal,
                 USER_LOGIN_BOOKING_CREATED = CASE 
                     WHEN USER_LOGIN_BOOKING_CREATED IS NULL THEN :user_login 
                     ELSE USER_LOGIN_BOOKING_CREATED 
@@ -1680,6 +1683,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
                     "s_dthc_prepaid": new_values["s_dthc_prepaid"],
                     "s_requested_shipment_week": new_values["s_requested_shipment_week"],
                     "s_final_destination": new_values["s_final_destination"],
+                    "b_terminal": values.get("b_terminal", ""),
                     "user_login": get_current_user_login(),
                     "ref": farol_reference,
                 },
@@ -2065,7 +2069,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Place of Receipt": "S_PLACE_OF_RECEIPT",
             "Final Destination": "S_FINAL_DESTINATION",
             "Transhipment Port": "B_TRANSHIPMENT_PORT",
-            "Port Terminal": "B_TERMINAL",
+            "Terminal": "B_TERMINAL",
             "Port Terminal City": "B_TERMINAL",
             "Requested Deadline Start Date": "S_REQUESTED_DEADLINE_START_DATE",
             "Requested Deadline End Date": "S_REQUESTED_DEADLINE_END_DATE",

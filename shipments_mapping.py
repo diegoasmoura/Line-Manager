@@ -70,7 +70,7 @@ def get_column_mapping():
         "b_voyage_code": "Voyage Code",
         "b_container_type": "Booking Container Type",
         "b_quantity_of_containers": "Booking Quantity of Containers",
-        "b_terminal": "Port Terminal",
+        "b_terminal": "Terminal",
         "b_port_of_loading_pol": "Port of Loading POL",
         "b_port_of_delivery_pod": "Port of Delivery POD",
         "b_final_destination": "Final Destination",
@@ -152,6 +152,10 @@ def non_editable_columns(stage):
     return non_editable
  
 def drop_downs(data_show, df_udc):
+    # Carrega opções de terminal da tabela F_ELLOX_TERMINALS (fallback: unificada)
+    from database import list_terminal_names, list_terminal_names_from_unified
+    terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
+    
     # Define opções de dropdown com base no grupo do UDC
     dropdown_options = {
         # Sales Data (mantido como está)
@@ -175,6 +179,7 @@ def drop_downs(data_show, df_udc):
         "Port of Loading POL": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
         "Port of Delivery POD": df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist(),
         "Carrier": df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist(),
+        "Terminal": terminal_options,
         
         # Deviation Fields
         "Deviation Document": df_udc[df_udc["grupo"] == "Deviation Document"]["dado"].dropna().unique().tolist(),
@@ -225,6 +230,7 @@ def drop_downs(data_show, df_udc):
         "Port of Loading POL": "select",
         "Port of Delivery POD": "select",
         "Carrier": "select",
+        "Terminal": "select",
         "data_booking_request": "date",
         "data_booking_confirmation": "date",
         "Booking Registered Date": "datetime",  # Adiciona coluna de criação como datetime

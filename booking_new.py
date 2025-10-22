@@ -37,6 +37,9 @@ carriers = df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist
 ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
 ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
 dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist()
+# Carregar terminais da tabela F_ELLOX_TERMINALS (com fallback para unificada)
+from database import list_terminal_names, list_terminal_names_from_unified
+terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
  
 # ---------- 3. Constantes ----------
 required_fields = {
@@ -176,6 +179,14 @@ def show_booking_management_form():
             )
         with col6:
             values["s_final_destination"] = st.text_input("Final Destination", value=booking_data.get("final_destination", "") or "")
+
+        # Terminal na linha de baixo, ocupando 1 coluna
+        col_term, col_empty = st.columns(2)
+        with col_term:
+            current_terminal = booking_data.get("b_terminal", "") or ""
+            terminal_with_blank = [""] + terminal_options
+            selected_terminal_index = terminal_with_blank.index(current_terminal) if current_terminal in terminal_with_blank else 0
+            values["b_terminal"] = st.selectbox("Terminal", terminal_with_blank, index=selected_terminal_index)
 
         col1, col2 = st.columns(2)
         with col1:
