@@ -758,6 +758,13 @@ def exibir_formulario():
         deviation_reason_options = [""
         ] + df_udc[df_udc["grupo"] == "Deviation Reason"]["dado"].dropna().astype(str).unique().tolist()
 
+        # Opções de Terminal (banco de terminais com fallback da unificada)
+        try:
+            from database import list_terminal_names, list_terminal_names_from_unified
+            terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
+        except Exception:
+            terminal_options = []
+
         st.subheader("Booking Management")
         with st.form(f"booking_form_{farol_ref}_{st.session_state.get('form_reset_counter', 0)}"):
             # Ordem exata conforme grid
@@ -1198,6 +1205,13 @@ def exibir_formulario():
                                     except Exception:
                                         default_num = 0
                                     new_values_booking[label] = st.number_input(label, min_value=0, step=1, value=default_num, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
+                                elif label == "Terminal":
+                                    options = [""] + terminal_options
+                                    try:
+                                        default_index = options.index(str(current_val))
+                                    except Exception:
+                                        default_index = 0
+                                    new_values_booking[label] = st.selectbox(label, options, index=default_index, disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
                                 else:
                                     if label == "Comments Booking":
                                         new_values_booking[label] = st.text_area(
