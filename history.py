@@ -1191,6 +1191,27 @@ def exibir_history():
     
     # Separa os dados em duas abas baseado no status
     df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
+    
+    # Remove splits informativos da Request Timeline
+    if not df_other_status.empty:
+        # Filtrar linhas que são splits
+        has_split_col = "S_SPLITTED_BOOKING_REFERENCE" in df_other_status.columns
+        has_ref_col = "FAROL_REFERENCE" in df_other_status.columns
+        
+        if has_split_col:
+            # Remove linhas com Splitted Reference preenchido
+            df_other_status = df_other_status[
+                df_other_status["S_SPLITTED_BOOKING_REFERENCE"].isna() | 
+                (df_other_status["S_SPLITTED_BOOKING_REFERENCE"] == "")
+            ].copy()
+        
+        if has_ref_col:
+            # Remove linhas com padrão .n no Farol Reference
+            import re
+            df_other_status = df_other_status[
+                ~df_other_status["FAROL_REFERENCE"].astype(str).str.match(r'.*\.\d+$', na=False)
+            ].copy()
+    
     df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
 
     # Na aba "Returns Awaiting Review", exibir apenas linhas do Farol Reference principal acessado (exato)
