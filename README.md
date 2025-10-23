@@ -2159,6 +2159,15 @@ CREATE TABLE LogTransp.F_ELLOX_SYNC_CONFIG (
 - Aumentar intervalo de sincronização
 - Verificar estabilidade da conexão
 
+**5. Colunas de Data Não Aparecem na Grade Principal (Booking Management)**
+- **Sintoma**: Colunas como "ETD", "ETA", "Deadline", "Abertura Gate", etc. não são exibidas na grade principal do stage "Booking Management"
+- **Causa Raiz**: Conflito entre nomes técnicos das colunas (`data_booking_confirmation`) e nomes amigáveis ("Booking Confirmation Date") no parâmetro `column_order` do `st.data_editor`
+- **Solução**: Remover o parâmetro `column_order=final_column_order` da chamada do `st.data_editor` em `shipments.py` (linha ~2064)
+- **Prevenção**: 
+  - Sempre usar nomes amigáveis no `column_order` quando necessário
+  - Ou deixar o Streamlit usar a ordem natural do DataFrame (recomendado)
+  - Verificar se `column_editors` em `shipments_mapping.py` contém todas as colunas de data necessárias
+
 #### Comandos de Diagnóstico
 
 ```bash

@@ -2061,7 +2061,6 @@ def exibir_shipments():
         disabled=disabled_columns,
         column_config=filtered_column_config,
         hide_index=True,
-        column_order=final_column_order,  # Define a ordem inicial das colunas
     )
 
     # Contador discreto de registros
