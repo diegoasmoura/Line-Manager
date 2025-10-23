@@ -1194,22 +1194,20 @@ def exibir_history():
     
     # Remove splits informativos da Request Timeline
     if not df_other_status.empty:
-        # Filtrar linhas que são splits
-        has_split_col = "S_SPLITTED_BOOKING_REFERENCE" in df_other_status.columns
+        # Filtrar linhas que são splits EXCETO a referência atual
         has_ref_col = "FAROL_REFERENCE" in df_other_status.columns
         
-        if has_split_col:
-            # Remove linhas com Splitted Reference preenchido
-            df_other_status = df_other_status[
-                df_other_status["S_SPLITTED_BOOKING_REFERENCE"].isna() | 
-                (df_other_status["S_SPLITTED_BOOKING_REFERENCE"] == "")
-            ].copy()
-        
-        if has_ref_col:
-            # Remove linhas com padrão .n no Farol Reference
+        if has_ref_col and farol_reference:
             import re
+            # Mantém apenas:
+            # 1. A referência atual (seja original ou split)
+            # 2. Registros que NÃO são splits (não têm padrão .n)
+            current_ref = str(farol_reference).strip()
+            
             df_other_status = df_other_status[
-                ~df_other_status["FAROL_REFERENCE"].astype(str).str.match(r'.*\.\d+$', na=False)
+                # É a referência atual OU não é um split
+                (df_other_status["FAROL_REFERENCE"].astype(str) == current_ref) |
+                (~df_other_status["FAROL_REFERENCE"].astype(str).str.match(r'.*\.\d+$', na=False))
             ].copy()
     
     df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
