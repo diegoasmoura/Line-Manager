@@ -404,11 +404,11 @@ def show_split_form():
                                                 """)
                                                 
                                                 conn.execute(update_unified_query, {
-                                                    "farol_status": "Adjustment Requested",
+                                                    "farol_status": "New Adjustment",
                                                     "ref": farol_reference
                                                 })
                                                 conn.execute(update_loading_query, {
-                                                    "farol_status": "Adjustment Requested",
+                                                    "farol_status": "New Adjustment",
                                                     "ref": farol_reference
                                                 })
                                                 
@@ -462,7 +462,7 @@ def show_split_form():
                                                     insert_return_carrier_from_ui(
                                                         ui_row, 
                                                         user_insert=st.session_state.get('current_user', 'system'),
-                                                        status_override="Adjustment Requested",  # Explicitamente definir para ativar pré-preenchimento
+                                                        status_override="New Adjustment",  # Explicitamente definir para ativar pré-preenchimento
                                                         p_status_override="Adjusts Cargill",  # Define P_STATUS para ajustes da Cargill
                                                         area=area,
                                                         request_reason=reason,

@@ -693,11 +693,8 @@ def exibir_formulario():
                     if ch["Column"] == "Farol Status":
                         from_status = clean_farol_status_value(ch["Previous Value"]) if ch["Previous Value"] is not None else ""
                         to_status = clean_farol_status_value(ch["New Value"]) if ch["New Value"] is not None else ""
-                        if (
-                            (from_status == "Adjustment Requested" and to_status != "Adjustment Requested") or
-                            (from_status != "Adjustment Requested" and to_status == "Adjustment Requested")
-                        ):
-                            st.warning("⚠️ Status 'Adjustment Requested' não pode ser alterado diretamente.")
+                        if from_status == "New Adjustment" and to_status != "Adjustment Requested":
+                            st.error("⚠️ Status 'New Adjustment' só pode ser alterado para 'Adjustment Requested'")
                             changes_sales = []
                             break
 
@@ -716,14 +713,28 @@ def exibir_formulario():
                             alias_or_label = reverse_map_all.get(ch["Column"], ch["Column"])  # ex.: 'Sales Quantity of Containers' -> 's_quantity_of_containers'
                             db_col = get_database_column_name(alias_or_label)
                             new_val = ch["New Value"]
+                            old_val = ch["Previous Value"]
+
                             if db_col == "FAROL_STATUS":
-                                new_val = process_farol_status_for_database(new_val)
-                            if hasattr(new_val, 'to_pydatetime'):
-                                new_val = new_val.to_pydatetime()
-                            if db_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA'] and hasattr(new_val, 'date'):
-                                new_val = new_val.date()
-                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, ch["Previous Value"], new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
-                            update_field_in_sales_booking_data(conn, farol_ref, db_col, new_val)
+                                db_new_val = clean_farol_status_value(new_val)
+                            else:
+                                db_new_val = new_val
+
+                            if hasattr(db_new_val, 'to_pydatetime'):
+                                db_new_val = db_new_val.to_pydatetime()
+                            if db_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA'] and hasattr(db_new_val, 'date'):
+                                db_new_val = db_new_val.date()
+                            
+                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, old_val, new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
+                            update_field_in_sales_booking_data(conn, farol_ref, db_col, db_new_val)
+
+                            if db_col == "FAROL_STATUS":
+                                from_status = clean_farol_status_value(old_val)
+                                to_status = clean_farol_status_value(new_val)
+                                if from_status == "New Adjustment" and to_status == "Adjustment Requested":
+                                    from database import create_adjustment_requested_timeline_record
+                                    current_user = st.session_state.get("username", "System")
+                                    create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
                         transaction.commit()
                         conn.close()
                         st.success("✅ Alterações de Sales salvas!")
@@ -1270,6 +1281,16 @@ def exibir_formulario():
                     old_val = row_booking.get(internal_key, None)
                     add_change_b(label, old_val, new_val)
 
+                # Validação de bloqueio para Farol Status
+                for ch in changes_booking:
+                    if ch["Column"] == "Farol Status":
+                        from_status = clean_farol_status_value(ch["Previous Value"]) if ch["Previous Value"] is not None else ""
+                        to_status = clean_farol_status_value(ch["New Value"]) if ch["New Value"] is not None else ""
+                        if from_status == "New Adjustment" and to_status != "Adjustment Requested":
+                            st.error("⚠️ Status 'New Adjustment' só pode ser alterado para 'Adjustment Requested'")
+                            changes_booking = []  # Limpa para não salvar
+                            break
+
                 if not changes_booking:
                     st.info("Nenhuma alteração detectada para Booking.")
                 else:
@@ -1284,14 +1305,28 @@ def exibir_formulario():
                             alias_or_label = reverse_map_all_b.get(ch["Column"], ch["Column"])  # friendly -> alias quando possível
                             db_col = get_database_column_name(alias_or_label)  # nome técnico
                             new_val = ch["New Value"]
+                            old_val = ch["Previous Value"]
+
                             if db_col == "FAROL_STATUS":
-                                new_val = process_farol_status_for_database(new_val)
-                            if hasattr(new_val, 'to_pydatetime'):
-                                new_val = new_val.to_pydatetime()
-                            if db_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA'] and hasattr(new_val, 'date'):
-                                new_val = new_val.date()
-                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, ch["Previous Value"], new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
-                            update_field_in_sales_booking_data(conn, farol_ref, db_col, new_val)
+                                db_new_val = clean_farol_status_value(new_val)
+                            else:
+                                db_new_val = new_val
+
+                            if hasattr(db_new_val, 'to_pydatetime'):
+                                db_new_val = db_new_val.to_pydatetime()
+                            if db_col in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA'] and hasattr(db_new_val, 'date'):
+                                db_new_val = db_new_val.date()
+                            
+                            audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, old_val, new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
+                            update_field_in_sales_booking_data(conn, farol_ref, db_col, db_new_val)
+
+                            if db_col == "FAROL_STATUS":
+                                from_status = clean_farol_status_value(old_val)
+                                to_status = clean_farol_status_value(new_val)
+                                if from_status == "New Adjustment" and to_status == "Adjustment Requested":
+                                    from database import create_adjustment_requested_timeline_record
+                                    current_user = st.session_state.get("username", "System")
+                                    create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
                         transaction.commit()
                         conn.close()
                         st.success("✅ Alterações de Booking salvas!")
@@ -1562,6 +1597,7 @@ def exibir_shipments():
     k1, k2, k3, k4 = st.columns(4)
 
     if "Farol Status" in df.columns:
+        from shipments_mapping import clean_farol_status_value
         # Limpa os ícones da série de status antes de fazer a contagem
         status_series = df["Farol Status"].astype(str).apply(clean_farol_status_value).str.strip().str.lower()
         booking_requested = int((status_series == "booking requested").sum())
@@ -2114,13 +2150,9 @@ def exibir_shipments():
                         old_val = from_status
                         new_val = to_status
 
-                        if (
-                            from_status == "Adjustment Requested" and to_status != "Adjustment Requested"
-                        ) or (
-                            from_status != "Adjustment Requested" and to_status == "Adjustment Requested"
-                        ):
+                        if from_status == "New Adjustment" and to_status != "Adjustment Requested":
                             status_blocked = True
-                            status_blocked_message = "⚠️ Status 'Adjustment Requested' cannot be changed directly. Use the adjustments module to request changes."
+                            status_blocked_message = "⚠️ Status 'New Adjustment' só pode ser alterado para 'Adjustment Requested'"
                     
                     changes.append({
                         'Farol Reference': row.get(farol_ref_col, index),
@@ -2183,8 +2215,8 @@ def exibir_shipments():
                             transaction = conn.begin()
                             
                             for _, row in st.session_state["changes"].iterrows():
-                                from database import audit_change, update_field_in_sales_booking_data
-                                from shipments_mapping import process_farol_status_for_database, get_database_column_name
+                                from database import audit_change, update_field_in_sales_booking_data, create_adjustment_requested_timeline_record
+                                from shipments_mapping import get_database_column_name, clean_farol_status_value
                                 
                                 farol_ref = row["Farol Reference"]
                                 column = row["Column"]
@@ -2196,16 +2228,18 @@ def exibir_shipments():
                                 
                                 # Processar tipos de dados especiais
                                 if column == "Farol Status" or db_column_name == "FAROL_STATUS":
-                                    new_value = process_farol_status_for_database(new_value)
+                                    db_new_value = clean_farol_status_value(new_value)
+                                else:
+                                    db_new_value = new_value
                                 
                                 # Converter pandas.Timestamp para datetime nativo
-                                if hasattr(new_value, 'to_pydatetime'):
-                                    new_value = new_value.to_pydatetime()
+                                if hasattr(db_new_value, 'to_pydatetime'):
+                                    db_new_value = db_new_value.to_pydatetime()
                                 
                                 # Converter para date se for coluna de data específica
                                 if db_column_name in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
-                                    if new_value is not None and hasattr(new_value, 'date'):
-                                        new_value = new_value.date()
+                                    if db_new_value is not None and hasattr(db_new_value, 'date'):
+                                        db_new_value = db_new_value.date()
                                 
                                 # 1. Auditar a mudança (usa nome técnico)
                                 audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', 
@@ -2213,7 +2247,13 @@ def exibir_shipments():
                                             'shipments', 'UPDATE', adjustment_id=random_uuid)
                                 
                                 # 2. Persistir a mudança na tabela principal (usa nome técnico)
-                                update_field_in_sales_booking_data(conn, farol_ref, db_column_name, new_value)
+                                update_field_in_sales_booking_data(conn, farol_ref, db_column_name, db_new_value)
+
+                                # 3. Trigger para criar Timeline
+                                if db_column_name == "FAROL_STATUS":
+                                    if old_value == "New Adjustment" and new_value == "Adjustment Requested":
+                                        current_user = st.session_state.get("username", "System")
+                                        create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
                             
                             transaction.commit()
                             conn.close()

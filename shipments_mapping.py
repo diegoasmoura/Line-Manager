@@ -560,6 +560,20 @@ def get_database_column_name(display_name_or_alias: str) -> str:
     Returns:
         Nome real da coluna em UPPER CASE ("S_PORT_OF_LOADING_POL")
     """
+    # Casos especiais que não passam pelo mapeamento (MAIOR PRIORIDADE)
+    special_cases = {
+        "Farol Status": "FAROL_STATUS",
+        "Farol Reference": "FAROL_REFERENCE",
+        "Select": "SELECT",  # Coluna UI, não existe no banco
+        "Transaction Number": "B_TRANSACTION_NUMBER",
+        "b_transaction_number": "B_TRANSACTION_NUMBER",
+        "Deviation Document": "B_DEVIATION_DOCUMENT",
+        "Deviation Responsible": "B_DEVIATION_RESPONSIBLE",
+        "Deviation Reason": "B_DEVIATION_REASON",
+    }
+    if display_name_or_alias in special_cases:
+        return special_cases[display_name_or_alias]
+
     # Primeiro tenta como alias SQL (mais preciso)
     alias_mapping = get_alias_to_database_column_mapping()
     lower_input = display_name_or_alias.lower()
@@ -578,21 +592,6 @@ def get_database_column_name(display_name_or_alias: str) -> str:
         # Fallback: converte para UPPER CASE
         return alias.upper()
     
-    # Casos especiais que não passam pelo mapeamento
-    special_cases = {
-        "Farol Status": "FAROL_STATUS",
-        "Farol Reference": "FAROL_REFERENCE",
-        "Select": "SELECT",  # Coluna UI, não existe no banco
-        "Transaction Number": "B_TRANSACTION_NUMBER",
-        "b_transaction_number": "B_TRANSACTION_NUMBER",
-        "Deviation Document": "B_DEVIATION_DOCUMENT",
-        "Deviation Responsible": "B_DEVIATION_RESPONSIBLE",
-        "Deviation Reason": "B_DEVIATION_REASON",
-    }
-    
-    if display_name_or_alias in special_cases:
-        return special_cases[display_name_or_alias]
-    
     # Fallback final: assume que o nome já é técnico e converte para UPPER
     return display_name_or_alias.upper().replace(" ", "_")
 
@@ -605,6 +604,7 @@ def get_farol_status_icons():
         "Booking Requested": "📋",
         "Received from Carrier": "📨",
         "Booking Under Review": "🔍",
+        "New Adjustment": "✏️",
         "Adjustment Requested": "✏️",
         "Booking Approved": "✅",
         "Booking Cancelled": "❌",

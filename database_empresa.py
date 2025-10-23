@@ -160,6 +160,76 @@ def get_database_connection():
     """Cria e retorna a conexão com o banco de dados (conn deve ser fechado pelo chamador)."""
     return ENGINE.connect()
 
+def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
+    """
+    Creates a new record in F_CON_RETURN_CARRIERS when the status of a shipment
+    is manually changed from 'New Adjustment' to 'Adjustment Requested'.
+
+    This function fetches the current data from F_CON_SALES_BOOKING_DATA and creates
+    a new timeline event with P_STATUS = 'Adjusts Cargill'.
+
+    Args:
+        conn: The database connection object.
+        farol_ref (str): The Farol Reference of the shipment.
+        user_id (str): The ID of the user performing the action.
+
+    Returns:
+        bool: True if the record was created successfully, False otherwise.
+    """
+    try:
+        # 1. Fetch current data from F_CON_SALES_BOOKING_DATA
+        fetch_query = text("""
+            SELECT
+                S_QUANTITY_OF_CONTAINERS, S_PORT_OF_LOADING_POL, S_PORT_OF_DELIVERY_POD,
+                S_PLACE_OF_RECEIPT, S_FINAL_DESTINATION, B_TERMINAL, B_VOYAGE_CARRIER,
+                B_VESSEL_NAME, B_VOYAGE_CODE, B_BOOKING_REFERENCE, B_DATA_DRAFT_DEADLINE,
+                B_DATA_DEADLINE, S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE,
+                S_REQUIRED_ARRIVAL_DATE_EXPECTED, B_DATA_ESTIMATIVA_SAIDA_ETD,
+                B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_CONFIRMACAO_EMBARQUE,
+                B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, B_DATA_CHEGADA_ATA,
+                B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB, S_SPLITTED_BOOKING_REFERENCE,
+                B_TRANSHIPMENT_PORT
+            FROM LogTransp.F_CON_SALES_BOOKING_DATA
+            WHERE FAROL_REFERENCE = :farol_ref
+        """)
+        source_data = conn.execute(fetch_query, {"farol_ref": farol_ref}).mappings().fetchone()
+
+        if not source_data:
+            # If no data is found, we cannot proceed.
+            return False
+
+        # 2. Prepare the dictionary for the new record
+        record_data = {
+            "FAROL_REFERENCE": farol_ref,
+            "B_BOOKING_STATUS": "Adjustment Requested",
+            "P_STATUS": "Adjusts Cargill",
+            "COMMENTS": f"Status changed manually from 'New Adjustment' to 'Adjustment Requested' by {user_id}",
+            "USER_INSERT": user_id,
+            "ADJUSTMENT_ID": str(uuid.uuid4()),
+            "ROW_INSERTED_DATE": get_brazil_time(),
+            **source_data
+        }
+
+        # 3. Insert the new record into F_CON_RETURN_CARRIERS
+        columns = ", ".join(record_data.keys())
+        placeholders = ", ".join([f":{col}" for col in record_data.keys()])
+        
+        insert_sql = text(f"""
+            INSERT INTO LogTransp.F_CON_RETURN_CARRIERS ({columns})
+            VALUES ({placeholders})
+        """)
+        
+        conn.execute(insert_sql, record_data)
+        
+        return True
+
+    except Exception as e:
+        # Log the error, but don't crash the application
+        print(f"Error in create_adjustment_requested_timeline_record: {e}")
+        return False
+
+
 def ensure_ellox_monitoring_id_column(conn):
     """
     Verifica se a coluna ELLOX_MONITORING_ID existe em F_CON_RETURN_CARRIERS e a adiciona se não existir.
@@ -1146,11 +1216,11 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         if "s_splitted_booking_reference" in unified_copy.columns:
             unified_copy.at[0, "s_splitted_booking_reference"] = farol_ref_original
         
-        # Define o Farol Status como "Adjustment Requested" para os splits
+        # Define o Farol Status como "New Adjustment" para os splits
         if "FAROL_STATUS" in unified_copy.columns:
-            unified_copy.at[0, "FAROL_STATUS"] = "Adjustment Requested"
+            unified_copy.at[0, "FAROL_STATUS"] = "New Adjustment"
         if "l_farol_status" in loading_copy.columns:
-            loading_copy.at[0, "l_farol_status"] = "Adjustment Requested"
+            loading_copy.at[0, "l_farol_status"] = "New Adjustment"
  
         # Cria dicionários limpos apenas com as colunas necessárias
         unified_dict = {}
@@ -1196,7 +1266,7 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
     # Auditoria já é feita via insert_return_carrier_from_ui em shipments_split.py
     # Não precisa mais gravar em F_CON_ADJUSTMENTS_LOG
  
-    # Atualiza o Farol Status da linha original para "Adjustment Requested"
+    # Atualiza o Farol Status da linha original para "New Adjustment"
     update_unified_original = text("""
         UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
         SET FAROL_STATUS = :farol_status
@@ -1209,11 +1279,11 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
     """)
  
     conn.execute(update_unified_original, {
-        "farol_status": "Adjustment Requested",
+        "farol_status": "New Adjustment",
         "ref": farol_ref_original
     })
     conn.execute(update_loading_original, {
-        "farol_status": "Adjustment Requested",
+        "farol_status": "New Adjustment",
         "ref": farol_ref_original
     })
  
