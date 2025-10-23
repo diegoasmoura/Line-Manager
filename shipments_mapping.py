@@ -604,7 +604,7 @@ def get_farol_status_icons():
         "Booking Requested": "📋",
         "Received from Carrier": "📨",
         "Booking Under Review": "🔍",
-        "New Adjustment": "✏️",
+        "New Adjustment": "🛠️",
         "Adjustment Requested": "✏️",
         "Booking Approved": "✅",
         "Booking Cancelled": "❌",

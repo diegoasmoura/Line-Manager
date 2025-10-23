@@ -1899,6 +1899,35 @@ graph TD
 - Salvamento do campo como string no formato "YYYY-MM-DD HH:MM".
 - Validação de duplicidade: bloqueia processamento se já existir registro com mesma combinação (Farol Reference, Booking Reference, Carrier, Voyage Code, Vessel Name, PDF Print Date).
 
+### 3. Fluxo de Ajustes: New Adjustment e Adjustment Requested
+
+Este fluxo gerencia ajustes e splits, integrando o sistema Farol com sistemas externos e rastreando automaticamente as mudanças de status no Timeline.
+
+#### Etapa 1: Criação do Ajuste/Split (`shipments_split.py`)
+
+- **Comportamento**: Quando um split é criado, tanto a referência original quanto os novos splits recebem o status `"✏️ New Adjustment"`.
+- **Arquivos Modificados**: `database.py`, `database_empresa.py`, `shipments_split.py`.
+
+#### Etapa 2: Validação da Mudança de Status (`shipments.py`)
+
+- **Regra de Negócio**: O status `"New Adjustment"` é controlado. Ele só pode ser alterado para `"Adjustment Requested"`.
+- **Implementação**: Uma validação foi adicionada na tela principal (`st.data_editor`) e nos formulários de Sales e Booking para garantir essa regra. Qualquer outra tentativa de mudança resultará em um erro.
+
+#### Etapa 3: Liberação do Status "Adjustment Requested"
+
+- **Comportamento**: O status `"Adjustment Requested"` pode ser editado livremente para qualquer outro status, conforme a necessidade do fluxo de trabalho. Todos os bloqueios anteriores para este status foram removidos.
+
+#### Etapa 4: Criação Automática de Registro no Timeline
+
+- **Gatilho**: Quando o `FAROL_STATUS` muda de `"New Adjustment"` para `"Adjustment Requested"`.
+- **Ação**: Um registro é criado automaticamente na tabela `F_CON_RETURN_CARRIERS` com `P_STATUS = 'Adjusts Cargill'`.
+- **Implementação**: A nova função `create_adjustment_requested_timeline_record` foi adicionada aos arquivos `database.py` e `database_empresa.py` para centralizar essa lógica.
+
+#### Etapa 5: Visualização no Timeline (`history.py`)
+
+- **Aba**: "Request Timeline"
+- **Exibição**: O novo registro criado é exibido com o status `"🛠️ Adjustment Requested"`, indicando que a solicitação de ajuste foi processada pelo analista.
+
 ## 🔌 API e Integrações
 
 ### Endpoints Internos

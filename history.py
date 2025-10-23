@@ -1121,7 +1121,6 @@ def exibir_history():
     # Grade principal com colunas relevantes (ADJUSTMENT_ID oculto mas usado internamente)
     # ID removido da visualização - não é mais necessário para o usuário
     display_cols = [
-        "P_STATUS",
         "ROW_INSERTED_DATE",
         "FAROL_REFERENCE",
         "B_BOOKING_STATUS",
@@ -1416,7 +1415,6 @@ def exibir_history():
             "B_BOOKING_STATUS": "Farol Status",
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
-            "P_STATUS": "Status",
             "P_PDF_NAME": "PDF Name",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",
@@ -1503,68 +1501,7 @@ def exibir_history():
         
         
 
-        # Adiciona ícones na coluna de Status (origem do ajuste), com prioridade:
-        # 1) Linhas de Split → "📄 Split"
-        # 2) Linked Reference presente → "🚢 Carrier Return (Linked|New Adjustment)"
-        # 3) P_STATUS categorizado → "🛠️ Cargill (Adjusts)" / "🚢 Adjusts Carrier" / fallback
-        try:
-            has_status = "Status" in df_processed.columns
-            has_linked = "Linked Reference" in df_processed.columns
-            has_splitcol = "Splitted Farol Reference" in df_processed.columns
-            if has_status:
-                def _render_status_row(row):
-                    # Se for split, mostrar informação reduzida (via coluna explícita ou pelo padrão .n)
-                    if has_splitcol:
-                        split_val = row.get("Splitted Farol Reference")
-                        if split_val is not None:
-                            split_str = str(split_val).strip()
-                            if split_str and split_str.upper() != "NULL":
-                                return "📄 Split"
-                    fr_val = row.get("Farol Reference")
-                    if fr_val is not None:
-                        fr_str = str(fr_val).strip()
-                        if "." in fr_str:
-                            last_part = fr_str.split(".")[-1]
-                            if last_part.isdigit():
-                                return "📄 Split"
-                    # Se há Linked Reference, indicar retorno do carrier
-                    if has_linked:
-                        linked = row.get("Linked Reference")
-                        if linked is not None:
-                            linked_str = str(linked).strip()
-                            if linked_str and linked_str.upper() != "NULL":
-                                if linked_str == "New Adjustment":
-                                    return "🚢 Carrier Return (New Adjustment)"
-                                return "🚢 Carrier Return (Linked)"
-                    # Caso contrário, usar origem padrão
-                    val = row.get("Status")
-                    try:
-                        txt = str(val).strip() if val is not None else ""
-                    except Exception:
-                        txt = ""
-                    if not txt:
-                        return "⚙️"
-                    low = txt.lower()
-                    # Novos nomes mais claros
-                    if low == "booking request - company":
-                        return "📋 Booking Request"
-                    if low == "booking requested":
-                        return "📋 Booking Requested"
-                    if low == "pdf document - carrier":
-                        return "📄 PDF Document"
-                    if low == "adjustment request - company":
-                        return "🛠️ Adjustment Request"
-                    if low == "other request - company":
-                        return "⚙️ Other Request"
-                    # Compatibilidade com nomes antigos
-                    if low == "adjusts cargill":
-                        return "🛠️ Cargill (Adjusts)"
-                    if low == "adjusts carrier":
-                        return "🚢 Adjusts Carrier"
-                    return f"⚙️ {txt}"
-                df_processed["Status"] = df_processed.apply(_render_status_row, axis=1)
-        except Exception:
-            pass
+
         
         # Aplica a formatação de ícones no Farol Status
         df_processed = process_farol_status_for_display(df_processed)
@@ -1686,10 +1623,9 @@ def exibir_history():
         try:
             desired_order = [
                 "Selecionar",
-                "Status",
+                "Farol Status",
                 "Inserted Date",
                 "Farol Reference",
-                "Farol Status",
                 "Booking",
                 "Vessel Name",
                 "Voyage Carrier",

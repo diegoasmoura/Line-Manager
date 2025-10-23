@@ -203,7 +203,7 @@ def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
         record_data = {
             "FAROL_REFERENCE": farol_ref,
             "B_BOOKING_STATUS": "Adjustment Requested",
-            "P_STATUS": "Adjusts Cargill",
+            "P_STATUS": "Manual Adjustment Request",
             "COMMENTS": f"Status changed manually from 'New Adjustment' to 'Adjustment Requested' by {user_id}",
             "USER_INSERT": user_id,
             "ADJUSTMENT_ID": str(uuid.uuid4()),
