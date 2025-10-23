@@ -1127,6 +1127,37 @@ values["s_required_arrival_date_expected"] = st.date_input(...)
 - Orquestra a exibição do histórico de alterações (`F_CON_RETURN_CARRIERS`) e do histórico de monitoramento de viagens (`F_ELLOX_TERMINAL_MONITORINGS`).
 - Contém a lógica da interface de usuário para o fluxo de aprovação de retornos do carrier, coletando os dados necessários e invocando a lógica de negócio que foi centralizada em `database.py`.
 - Gerencia a seção de upload e visualização de anexos para cada referência.
+
+#### 🔍 **Filtro Inteligente de Splits na Request Timeline (v3.9.20)**
+
+**Funcionalidade**: Sistema de filtro que exibe apenas o registro relevante na aba Request Timeline, eliminando confusão visual com múltiplos splits.
+
+**Comportamento**:
+- **Referência Original** (ex: `FR_25.10_0001`): Exibe apenas o registro original, ocultando todos os splits (.1, .2, etc.)
+- **Referência Split** (ex: `FR_25.10_0001.2`): Exibe apenas o split selecionado, ocultando o original e outros splits
+
+**Implementação Técnica**:
+```python
+# Filtro aplicado em history.py (linha ~1195-1211)
+if has_ref_col and farol_reference:
+    current_ref = str(farol_reference).strip()
+    df_other_status = df_other_status[
+        # É a referência atual OU não é um split
+        (df_other_status["FAROL_REFERENCE"].astype(str) == current_ref) |
+        (~df_other_status["FAROL_REFERENCE"].astype(str).str.match(r'.*\.\d+$', na=False))
+    ].copy()
+```
+
+**Critérios de Identificação de Splits**:
+- **Padrão Regex**: `.*\.\d+$` - identifica referências terminadas com `.n` (ex: `.1`, `.2`, `.10`)
+- **Referência Atual**: Mantém sempre o registro da `farol_reference` selecionada
+- **Registros Não-Split**: Mantém registros que não seguem o padrão de split
+
+**Benefícios**:
+- ✅ Interface mais limpa e focada
+- ✅ Elimina confusão visual com múltiplos splits
+- ✅ Melhora experiência do usuário no histórico
+- ✅ Atende solicitação específica do time
 - **Interface Otimizada**: Colunas ETD/ETA (Data Draft Deadline, Data Deadline, Data Estimativa Saída ETD, Data Estimativa Chegada ETA, Data Abertura Gate) são automaticamente ocultas na aba "Returns Awaiting Review" para melhor experiência do usuário.
 - **Status Exibido Inteligente (v3.9.4)**: Sistema gera status visuais baseados na origem dos registros com ícones descritivos (📋 Booking Request, 📄 PDF Document, 🛠️ Adjustment Request).
 
@@ -3300,6 +3331,16 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🔽 Expander Removido**: Eliminada seção "Ver Detalhes do Ambiente e Conexão" para interface mais limpa
 - **📋 Estrutura de Abas Preparada**: Mantida estrutura de abas com uma aba atual para futuras expansões
 - **✨ Interface Mais Limpa**: Foco nas funcionalidades principais (testes de conexão e formulários de credenciais)
+
+### 📌 v3.9.20 - Filtro Inteligente de Splits na Request Timeline (Janeiro 2025)
+- **🔍 Filtro de Splits Implementado**: Request Timeline agora exibe apenas o registro relevante (original ou split selecionado)
+- **🎯 Comportamento Inteligente**:
+  - **Acessando original** (FR_25.10_0001): mostra apenas ele, sem splits (.1, .2, etc.)
+  - **Acessando split** (FR_25.10_0001.2): mostra apenas ele, sem original nem outros splits
+- **⚙️ Lógica de Filtro**: Sistema mantém sempre a referência atual e remove outros splits baseado no padrão `.n`
+- **📊 Melhoria na UX**: Interface mais limpa e focada, eliminando confusão visual com múltiplos splits
+- **🔧 Implementação Técnica**: Filtro aplicado em `history.py` usando regex para identificar padrões de split
+- **⚠️ Impacto**: Simplificação significativa da visualização do histórico, atendendo solicitação do time
 
 ### 📌 v3.9.19 - Remoção da Opção History do Menu (Janeiro 2025)
 - **🗂️ Remoção da Opção "History"**: Removida opção do menu lateral para simplificar a navegação
