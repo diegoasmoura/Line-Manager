@@ -1715,9 +1715,7 @@ def exibir_history():
             if idx == 0:
                 if len(df_processed) > 1:
                     previous_row = df_processed.iloc[1]  # Compara com a segunda linha
-                    print(f"🔍 Debug: Linha {idx} (primeira) comparando com linha 1")
                 else:
-                    print(f"🔍 Debug: Linha {idx} é a única linha, pulando...")
                     continue
             else:
                 previous_row = df_processed.iloc[idx - 1]
@@ -1729,10 +1727,7 @@ def exibir_history():
             else:
                 status = str(status)
             
-            print(f"🔍 Debug: Linha {idx}, Status='{status}', Comparando com linha {idx-1}")
-            
             if status == "🛠️ New Adjustment":
-                print(f"✅ Encontrada linha New Adjustment na posição {idx}")
                 # Compara cada campo editável
                 for field in editable_fields:
                     if field in df_processed.columns:
@@ -1751,19 +1746,12 @@ def exibir_history():
                         current_normalized = normalize_value(current_val)
                         previous_normalized = normalize_value(previous_val)
                         
-                        print(f"  🔍 Campo '{field}': '{previous_val}' → '{current_val}' (norm: '{previous_normalized}' → '{current_normalized}')")
-                        
                         # Se os valores normalizados são diferentes
                         if current_normalized != previous_normalized:
-                            print(f"  ✅ DIFERENÇA DETECTADA em linha {idx}, campo '{field}'")
                             changes[(idx, field)] = {
                                 'current': current_val,
                                 'previous': previous_val
                             }
-                        else:
-                            print(f"  ⚪ Valores iguais em linha {idx}, campo '{field}'")
-            else:
-                print(f"❌ Linha {idx} não é New Adjustment, pulando...")
         
         return changes
 
@@ -1815,29 +1803,10 @@ def exibir_history():
         df_other_processed_reversed = df_other_processed.iloc[::-1].reset_index(drop=True)
         changes = detect_changes_for_new_adjustment(df_other_processed_reversed)
         
-        # Debug: Mostrar informações sobre detecção
-        st.info(f"🔍 **Debug:** Detectadas {len(changes)} alterações em linhas New Adjustment")
-        
-        # Debug adicional: Mostrar todos os status encontrados
-        st.write("🔍 **Debug Status:** Todos os status encontrados no DataFrame ORIGINAL:")
-        for idx, row in df_other_processed.iterrows():
-            farol_status = row.get("Farol Status", "")
-            regular_status = row.get("Status", "")
-            st.write(f"Linha {idx}: Farol Status='{farol_status}', Status='{regular_status}'")
-        
-        st.write("🔍 **Debug Status:** Todos os status encontrados no DataFrame INVERTIDO:")
-        for idx, row in df_other_processed_reversed.iterrows():
-            farol_status = row.get("Farol Status", "")
-            regular_status = row.get("Status", "")
-            st.write(f"Linha {idx}: Farol Status='{farol_status}', Status='{regular_status}'")
-        
-        if changes:
-            for (row_idx, col_name), change_info in changes.items():
-                st.write(f"- Linha {row_idx}, Coluna '{col_name}': '{change_info['previous']}' → '{change_info['current']}'")
+        # Detecção de alterações (sem debug visual)
         
         # Aplicar estilização usando Pandas Styler
         if changes:
-            st.info("🎨 **Debug:** Aplicando estilização com Pandas Styler...")
             styled_df = apply_highlight_styling(df_other_processed_reversed, changes)
             
             # Usar st.dataframe com o DataFrame estilizado
@@ -1850,8 +1819,6 @@ def exibir_history():
             
             # Para compatibilidade com o resto do código, usar o DataFrame original
             edited_df_other = df_other_processed
-            
-            st.info("✅ **Debug:** Estilização aplicada com sucesso!")
         else:
             # Se não há alterações, usar o data_editor normal
             edited_df_other = st.data_editor(

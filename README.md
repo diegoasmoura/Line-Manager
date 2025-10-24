@@ -1772,6 +1772,39 @@ O sistema agora inclui três novas colunas para monitoramento avançado de booki
 - **Banco**: `DATE` (para B_DATA_CHEGADA_DESTINO_*), `TIMESTAMP(6)` (para outras colunas)
 - **Validação**: Conversão automática com tratamento de erros
 
+#### 🎨 **Destaque Visual de Alterações em New Adjustment (v3.9.21)**
+
+**Funcionalidade**: Sistema de destaque visual que identifica e destaca células alteradas em linhas com status "🛠️ New Adjustment" na aba Request Timeline.
+
+**Comportamento**:
+- **Detecção Automática**: Identifica linhas com `Farol Status = "🛠️ New Adjustment"`
+- **Comparação Inteligente**: Compara campos editáveis com a linha anterior (ou segunda linha se for primeira)
+- **Destaque Visual**: Aplica fundo amarelo claro (`#FFF9C4`) e borda dourada (`#FFD54F`) nas células alteradas
+- **Campos Monitorados**: 15 campos editáveis baseados em `shipments_split.py`:
+  - Quantity of Containers, Port of Loading POL, Port of Delivery POD
+  - Place of Receipt, Final Destination, Transhipment Port, Port Terminal
+  - Carrier, Voyage Code, Booking, Vessel Name
+  - Requested Deadline Start, Requested Deadline End, Required Arrival Date
+
+**Implementação Técnica**:
+- **Função `detect_changes_for_new_adjustment()`**: Percorre DataFrame identificando alterações
+- **Função `apply_highlight_styling()`**: Aplica estilização usando Pandas Styler
+- **Normalização de Valores**: Trata `None`, `NaN`, `NaT`, `""` como equivalentes
+- **Comparação de Datas**: Converte datas para string para comparação consistente
+- **Inversão de Ordem**: Ajusta ordem do DataFrame para corresponder à exibição visual
+
+**Interface**:
+- **Com Alterações**: Exibe `st.dataframe` estilizado com destaque visual
+- **Sem Alterações**: Exibe `st.data_editor` normal com funcionalidade de seleção
+- **Performance**: Processa apenas quando há linhas "New Adjustment" detectadas
+
+**Vantagens**:
+- ✅ **Visualização Clara**: Alterações destacadas imediatamente
+- ✅ **Comparação Precisa**: Compara apenas campos editáveis relevantes
+- ✅ **Performance Otimizada**: Processamento condicional baseado na presença de alterações
+- ✅ **Compatibilidade**: Usa Pandas Styler (suporte nativo do Streamlit)
+- ✅ **Manutenibilidade**: Fácil adaptação para outras telas do sistema
+
 ### Relacionamentos
 
 ```
@@ -3360,6 +3393,25 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🔽 Expander Removido**: Eliminada seção "Ver Detalhes do Ambiente e Conexão" para interface mais limpa
 - **📋 Estrutura de Abas Preparada**: Mantida estrutura de abas com uma aba atual para futuras expansões
 - **✨ Interface Mais Limpa**: Foco nas funcionalidades principais (testes de conexão e formulários de credenciais)
+
+### 📌 v3.9.21 - Destaque Visual de Alterações em New Adjustment (Janeiro 2025)
+- **🎨 Sistema de Destaque Implementado**: Request Timeline agora destaca visualmente células alteradas em linhas "🛠️ New Adjustment"
+- **🔍 Detecção Inteligente**:
+  - **Identificação Automática**: Detecta linhas com `Farol Status = "🛠️ New Adjustment"`
+  - **Comparação Precisa**: Compara 15 campos editáveis com a linha anterior
+  - **Normalização de Valores**: Trata `None`, `NaN`, `NaT`, `""` como equivalentes
+- **🎯 Destaque Visual**:
+  - **Fundo Amarelo Claro**: `#FFF9C4` para células alteradas
+  - **Borda Dourada**: `#FFD54F` para realce adicional
+  - **Campos Monitorados**: Quantity of Containers, Ports, Carrier, Vessel, Dates, etc.
+- **⚙️ Implementação Técnica**:
+  - **Função `detect_changes_for_new_adjustment()`**: Identifica alterações comparando campos editáveis
+  - **Função `apply_highlight_styling()`**: Aplica estilização usando Pandas Styler
+  - **Inversão de Ordem**: Ajusta DataFrame para corresponder à exibição visual
+  - **Performance Otimizada**: Processa apenas quando há alterações detectadas
+- **📊 Melhoria na UX**: Visualização imediata e clara das alterações em ajustes
+- **🔧 Compatibilidade**: Usa Pandas Styler (suporte nativo do Streamlit)
+- **⚠️ Impacto**: Melhoria significativa na identificação de mudanças em ajustes, facilitando análise e validação
 
 ### 📌 v3.9.20 - Filtro Inteligente de Splits na Request Timeline (Janeiro 2025)
 - **🔍 Filtro de Splits Implementado**: Request Timeline agora exibe apenas o registro relevante (original ou split selecionado)
