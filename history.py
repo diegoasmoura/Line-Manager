@@ -1708,6 +1708,7 @@ def exibir_history():
                 "Farol Status",
                 "Inserted Date",
                 "Farol Reference",
+                "Carrier",
                 "Booking",
                 "Vessel Name",
                 "Voyage Carrier",
