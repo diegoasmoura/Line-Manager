@@ -1811,6 +1811,36 @@ O sistema agora inclui três novas colunas para monitoramento avançado de booki
 - ✅ **Interface Limpa**: Tratamento robusto de valores nulos em colunas de data
 - ✅ **Layout Profissional**: Zebra-striping e cores consistentes
 
+#### 🔗 **Campo Linked Reference Inteligente (v3.9.22)**
+
+**Funcionalidade**: Campo Linked Reference agora exibe informações contextuais da linha referenciada, facilitando a identificação e rastreamento de relacionamentos.
+
+**Comportamento**:
+- **Formato Inteligente**: Exibe `"Line X | YYYY-MM-DD HH:MM:SS"` para IDs numéricos
+- **Busca Dinâmica**: Consulta automaticamente dados da linha referenciada no banco
+- **Contexto Visual**: Mostra número da linha e data de inserção da referência
+- **Tratamento Especial**: Mantém `"🆕 New Adjustment"` para ajustes sem referência
+
+**Implementação Técnica**:
+- **Função `get_referenced_line_data()`**: Busca dados da linha pelo ID no banco
+- **Função `format_linked_reference_display()`**: Formata exibição com contexto
+- **Consulta SQL**: `SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, B_BOOKING_STATUS`
+- **Tratamento de Erros**: Fallback seguro se linha não for encontrada
+- **Formatação de Data**: Converte para formato `YYYY-MM-DD HH:MM:SS`
+
+**Exemplos de Exibição**:
+- **ID 123**: `"Line 2 | 2025-10-24 15:35:24"` (se ID 123 for linha 2)
+- **New Adjustment**: `"🆕 New Adjustment"`
+- **Valores vazios**: Campo em branco (sem texto)
+- **Formato hierárquico**: `"📋 Request #01 (FR_25.09_0001)"` (mantido)
+
+**Vantagens**:
+- ✅ **Contexto Completo**: Mostra linha e data da referência
+- ✅ **Rastreabilidade**: Facilita identificação de relacionamentos
+- ✅ **Interface Limpa**: Valores vazios aparecem como campos em branco
+- ✅ **Performance**: Busca otimizada com fallback seguro
+- ✅ **Manutenibilidade**: Fácil adaptação para outros campos similares
+
 ### Relacionamentos
 
 ```
@@ -3399,6 +3429,29 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🔽 Expander Removido**: Eliminada seção "Ver Detalhes do Ambiente e Conexão" para interface mais limpa
 - **📋 Estrutura de Abas Preparada**: Mantida estrutura de abas com uma aba atual para futuras expansões
 - **✨ Interface Mais Limpa**: Foco nas funcionalidades principais (testes de conexão e formulários de credenciais)
+
+### 📌 v3.9.22 - Campo Linked Reference Inteligente e Tratamento de Valores Nulos (Janeiro 2025)
+- **🔗 Campo Linked Reference Inteligente**:
+  - **Formato Contextual**: Exibe `"Line X | YYYY-MM-DD HH:MM:SS"` para IDs numéricos
+  - **Busca Dinâmica**: Consulta automaticamente dados da linha referenciada no banco
+  - **Contexto Visual**: Mostra número da linha e data de inserção da referência
+  - **Tratamento Especial**: Mantém `"🆕 New Adjustment"` para ajustes sem referência
+  - **Valores Vazios**: Campos vazios aparecem como células em branco (sem texto)
+- **🛠️ Tratamento Robusto de Valores Nulos**:
+  - **Tratamento Duplo**: Aplicado em `process_dataframe()` e `apply_highlight_styling()`
+  - **Conversão NaT**: Converte `NaT` para string vazia em colunas de data mistas
+  - **Tratamento Final**: Garante que DataFrame final não tenha valores `NaT` ou `None`
+  - **Debug Completo**: Logs detalhados para rastreamento de valores nulos
+- **⚙️ Implementação Técnica**:
+  - **Função `get_referenced_line_data()`**: Busca dados da linha pelo ID no banco
+  - **Função `format_linked_reference_display()`**: Formata exibição com contexto
+  - **Consulta SQL**: `SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, B_BOOKING_STATUS`
+  - **Tratamento de Erros**: Fallback seguro se linha não for encontrada
+- **✨ Vantagens**:
+  - **Contexto Completo**: Mostra linha e data da referência
+  - **Rastreabilidade**: Facilita identificação de relacionamentos
+  - **Interface Limpa**: Valores vazios aparecem como campos em branco
+  - **Performance**: Busca otimizada com fallback seguro
 
 ### 📌 v3.9.21 - Destaque Visual de Alterações em New Adjustment (Janeiro 2025)
 - **🎨 Sistema de Destaque Implementado**: Request Timeline agora destaca visualmente células alteradas em linhas "🛠️ New Adjustment"

@@ -69,37 +69,97 @@ def get_next_linked_reference_number(farol_reference=None):
         st.error(f"❌ Erro ao obter próximo número sequencial: {str(e)}")
         return f"{farol_reference}-R01" if farol_reference else 1
 
+def get_referenced_line_data(linked_ref):
+    """
+    Busca dados da linha referenciada pelo ID do Linked Reference.
+    Retorna dicionário com dados da linha ou None se não encontrar.
+    """
+    if not linked_ref or str(linked_ref).strip() == "" or str(linked_ref).upper() == "NULL":
+        return None
+    
+    linked_ref_str = str(linked_ref)
+    
+    # Se for "New Adjustment", não há linha referenciada
+    if linked_ref_str == "New Adjustment":
+        return None
+    
+    # Se for um ID numérico, busca a linha
+    if linked_ref_str.isdigit():
+        try:
+            conn = get_database_connection()
+            query = text("""
+                SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, B_BOOKING_STATUS
+                FROM LogTransp.F_CON_RETURN_CARRIERS
+                WHERE ID = :line_id
+            """)
+            result = conn.execute(query, {"line_id": int(linked_ref_str)}).fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    'id': result[0],
+                    'inserted_date': result[1],
+                    'farol_reference': result[2],
+                    'status': result[3]
+                }
+        except Exception as e:
+            print(f"Erro ao buscar linha referenciada: {e}")
+    
+    return None
+
 def format_linked_reference_display(linked_ref, farol_ref=None):
     """
     Formata Linked Reference para exibição amigável na UI.
     Exemplos:
-    - "FR_25.09_0001-R01" -> "Request #01 (FR_25.09_0001)"
-    - "New Adjustment" -> "New Adjustment"
-    - "123" -> "Global Request #123"
-    - None/NULL -> "🔄 Pending Assignment" (para registros antigos)
+    - "123" -> "Line 2 | 2025-10-24 15:35:24" (se ID 123 for linha 2)
+    - "New Adjustment" -> "🆕 New Adjustment"
+    - None/NULL -> "" (campo vazio)
     """
+    # Se não há linked_ref, retorna vazio
     if not linked_ref or str(linked_ref).strip() == "" or str(linked_ref).upper() == "NULL":
-        # Para registros antigos sem Linked Reference, oferece opção de auto-assignment
-        if farol_ref:
-            return f"🔄 Auto-assign Next ({farol_ref})"
-        return "🔄 Pending Assignment"
+        return ""
     
     linked_ref_str = str(linked_ref)
     
     if linked_ref_str == "New Adjustment":
         return "🆕 New Adjustment"
     
-    # Formato hierárquico: FR_25.09_0001-R01
+    # Se for um ID numérico, busca dados da linha referenciada
+    if linked_ref_str.isdigit():
+        line_data = get_referenced_line_data(linked_ref_str)
+        if line_data:
+            # Formata a data
+            inserted_date = line_data.get('inserted_date')
+            if inserted_date:
+                try:
+                    # Converte para datetime se necessário
+                    if isinstance(inserted_date, str):
+                        from datetime import datetime
+                        parsed_date = datetime.fromisoformat(inserted_date.replace('Z', '+00:00'))
+                    else:
+                        parsed_date = inserted_date
+                    
+                    # Formata para YYYY-MM-DD HH:MM:SS
+                    date_str = parsed_date.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    # Se não conseguir formatar, usa a string original
+                    date_str = str(inserted_date)
+            else:
+                date_str = "N/A"
+            
+            # Retorna no formato: Line X | YYYY-MM-DD HH:MM:SS
+            return f"Line {line_data['id']} | {date_str}"
+        else:
+            # Se não encontrar a linha, mostra o ID original
+            return f"📋 Global Request #{linked_ref_str}"
+    
+    # Formato hierárquico: FR_25.09_0001-R01 (mantém formato original)
     if "-R" in linked_ref_str:
         parts = linked_ref_str.split("-R")
         if len(parts) == 2:
             farol_part = parts[0]
             request_num = parts[1]
             return f"📋 Request #{request_num} ({farol_part})"
-    
-    # Formato numérico simples (legacy)
-    if linked_ref_str.isdigit():
-        return f"📋 Global Request #{linked_ref_str}"
     
     # Fallback
     return str(linked_ref)
@@ -1339,7 +1399,7 @@ def exibir_history():
         config = {
             "ADJUSTMENT_ID": None,  # Sempre oculta
             "Status": None,  # Sempre oculta
-            "Index": st.column_config.NumberColumn("Index", help="Índice da linha", width="small", disabled=True),
+            "Index": st.column_config.NumberColumn("Index", help="Índice da linha", width="small", disabled=True, format="%d"),
         }
         
         # Gera configuração para cada coluna
@@ -1496,6 +1556,25 @@ def exibir_history():
             print(f"🔍 DEBUG: Valores únicos DEPOIS: {unique_after[:5]}...")  # Mostra apenas os primeiros 5
             print(f"🔍 DEBUG: Tipo final: {df_processed[col].dtype}")
             print("---")
+        
+        # Debug: verifica valores de data após tratamento
+        print("🔍 DEBUG: Verificando colunas de data após tratamento...")
+        for col in df_processed.columns:
+            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
+                unique_vals = df_processed[col].unique()
+                print(f"🔍 DEBUG: Coluna '{col}' - Valores únicos: {unique_vals[:3]}...")
+        
+        # Aplica formatação amigável para Linked Reference
+        if "Linked Reference" in df_processed.columns:
+            print("🔍 DEBUG: Aplicando formatação amigável para Linked Reference...")
+            df_processed["Linked Reference"] = df_processed.apply(
+                lambda row: format_linked_reference_display(
+                    row.get("Linked Reference"), 
+                    row.get("Farol Reference")
+                ), 
+                axis=1
+            )
+            print("🔍 DEBUG: Formatação do Linked Reference aplicada com sucesso!")
         
         # Campo "Status" removido - usando apenas "Farol Status" para exibição
         
@@ -1789,6 +1868,13 @@ def exibir_history():
                 # Para outras colunas: substitui valores nulos por string vazia
                 df_styled[col] = df_styled[col].fillna('')
         
+        # Debug: verifica se o tratamento foi aplicado corretamente
+        print("🔍 DEBUG: Verificando tratamento na cópia após estilização...")
+        for col in df_styled.columns:
+            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
+                unique_vals = df_styled[col].unique()
+                print(f"🔍 DEBUG: Coluna '{col}' - Valores únicos: {unique_vals[:3]}...")
+        
         # Debug: verifica valores nulos após tratamento
         print("🔍 DEBUG: Verificando valores nulos após tratamento na cópia...")
         for col in df_styled.columns:
@@ -1847,28 +1933,56 @@ def exibir_history():
             # Se não há alterações, usar DataFrame normal
             styled_df = df_other_processed_reversed
         
-        # Debug: verifica o que está sendo passado para st.dataframe
-        print("🔍 DEBUG: Verificando DataFrame final antes de exibir...")
+        # Aplica tratamento de valores nulos no DataFrame final antes da exibição
+        print("🔍 DEBUG: Aplicando tratamento final de valores nulos...")
         if hasattr(styled_df, 'data'):
-            # Se é um Styler, verifica o DataFrame subjacente
-            df_to_check = styled_df.data
-            print(f"🔍 DEBUG: DataFrame subjacente do Styler - Shape: {df_to_check.shape}")
+            # Se é um Styler, trata o DataFrame subjacente
+            df_to_check = styled_df.data.copy()
+            print(f"🔍 DEBUG: Tratando DataFrame subjacente do Styler - Shape: {df_to_check.shape}")
         else:
             # Se é um DataFrame normal
-            df_to_check = styled_df
-            print(f"🔍 DEBUG: DataFrame normal - Shape: {df_to_check.shape}")
+            df_to_check = styled_df.copy()
+            print(f"🔍 DEBUG: Tratando DataFrame normal - Shape: {df_to_check.shape}")
         
-        # Verifica colunas de data especificamente
+        # Aplica tratamento de valores nulos no DataFrame final
+        for col in df_to_check.columns:
+            if df_to_check[col].dtype == 'datetime64[ns]':
+                # Para colunas de data: converte NaT para string vazia
+                df_to_check[col] = df_to_check[col].astype(str).replace('NaT', '')
+            else:
+                # Para outras colunas: substitui valores nulos por string vazia
+                df_to_check[col] = df_to_check[col].fillna('')
+        
+        # Debug: verifica colunas de data após tratamento final
+        print("🔍 DEBUG: Verificando colunas de data após tratamento final...")
         for col in df_to_check.columns:
             if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
                 unique_vals = df_to_check[col].unique()
                 print(f"🔍 DEBUG: Coluna de data '{col}' - Valores únicos: {unique_vals[:3]}...")
+        
+        # Atualiza o styled_df com o DataFrame tratado
+        if hasattr(styled_df, 'data'):
+            styled_df.data = df_to_check
+        else:
+            styled_df = df_to_check
+        
+        # Configuração básica da coluna Index
+        column_config = {
+            "Index": st.column_config.NumberColumn(
+                "Index", 
+                help="Índice da linha", 
+                width=50,  # Largura fixa em pixels
+                disabled=True,
+                format="%d"
+            )
+        }
         
         # Usar st.dataframe com o DataFrame (estilizado ou normal)
         st.dataframe(
             styled_df,
             use_container_width=True,
             hide_index=True,
+            column_config=column_config,
             key=f"history_other_status_{farol_reference}"
         )
         
