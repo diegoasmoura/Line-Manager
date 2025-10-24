@@ -1185,7 +1185,7 @@ def exibir_history():
         else:
             df_show = df_show.sort_values(by=["ROW_INSERTED_DATE"], ascending=[True], kind="mergesort")
     
-    # Cria cópia do DataFrame (coluna Selecionar será adicionada na função display_tab_content)
+    # Cria cópia do DataFrame (coluna Index será adicionada na função display_tab_content)
     df_display = df_show.copy()
     
     # Separa os dados em duas abas baseado no status
@@ -1338,7 +1338,8 @@ def exibir_history():
         """Gera configuração de colunas com larguras dinâmicas"""
         config = {
             "ADJUSTMENT_ID": None,  # Sempre oculta
-            "Selecionar": st.column_config.CheckboxColumn("Select", help="Selecione apenas uma linha para aplicar mudanças", pinned="left"),
+            "Status": None,  # Sempre oculta
+            "Index": st.column_config.NumberColumn("Index", help="Índice da linha", width="small", disabled=True),
         }
         
         # Gera configuração para cada coluna
@@ -1362,11 +1363,11 @@ def exibir_history():
             
             # Larguras específicas para colunas específicas
             # Identifica a última coluna (excluindo colunas ocultas)
-            visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Selecionar"] and not (c == "Status" and hide_status) and not (c == "Linked Reference" and hide_linked_reference)]
+            visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Index", "Status"] and not (c == "Linked Reference" and hide_linked_reference)]
             is_last_column = col == visible_columns[-1] if visible_columns else False
             
-            if col == "Status" or is_last_column:
-                width = None  # Largura automática para Status e última coluna
+            if is_last_column:
+                width = None  # Largura automática para última coluna
             else:
                 width = "medium"  # Todas as outras colunas são medium
             
@@ -1471,9 +1472,7 @@ def exibir_history():
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
         
-        # Cria campo "Status" baseado em "Farol Status" (B_BOOKING_STATUS)
-        if "Farol Status" in df_processed.columns:
-            df_processed["Status"] = df_processed["Farol Status"].copy()
+        # Campo "Status" removido - usando apenas "Farol Status" para exibição
         
         # A ordenação de colunas foi movida para a função display_tab_content para centralizar a lógica.
 
@@ -1564,13 +1563,7 @@ def exibir_history():
                     )
                     if mask_sel.any():
                         first_idx_sel = df_processed.loc[mask_sel].sort_values("Inserted Date").index[0]
-                        # Verificar P_STATUS antes de sobrescrever
-                        if "Status" in df_processed.columns:
-                            current_p_status = df_processed.loc[first_idx_sel, "Status"] if "Status" in df_processed.columns else ""
-                            current_p_status_str = str(current_p_status).strip().lower()
-                            # Se não for um dos novos P_STATUS, manter comportamento legado
-                            if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                                df_processed.loc[first_idx_sel, "Status"] = "📦 Cargill Booking Request"
+                        # Lógica de status removida - usando apenas "Farol Status"
         except Exception:
             pass
 
@@ -1588,22 +1581,8 @@ def exibir_history():
                             linked_val = df_processed.loc[i, "Linked Reference"] if "Linked Reference" in df_processed.columns else None
                             is_empty = (linked_val is None) or (isinstance(linked_val, str) and linked_val.strip() == "") or (str(linked_val).upper() == "NULL") or (hasattr(_pd, 'isna') and _pd.isna(linked_val))
                             if is_empty:
-                                # Verificar P_STATUS antes de sobrescrever
-                                current_p_status = df_processed.loc[i, "Status"] if "Status" in df_processed.columns else ""
-                                current_p_status_str = str(current_p_status).strip().lower()
-                                # Se não for um dos novos P_STATUS, manter comportamento legado
-                                if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                                    # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                                    df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
-                    else:
-                        # Verificar P_STATUS antes de sobrescrever para cada linha
-                        for i in idx_first:
-                            current_p_status = df_processed.loc[i, "Status"] if "Status" in df_processed.columns else ""
-                            current_p_status_str = str(current_p_status).strip().lower()
-                            # Se não for um dos novos P_STATUS, manter comportamento legado
-                            if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                                # SOBRESCREVE qualquer Status anterior (incluindo "Split Info")
-                                df_processed.loc[i, "Status"] = "📦 Cargill Booking Request"
+                                # Lógica de status removida - usando apenas "Farol Status"
+                                pass
         except Exception:
             pass
 
@@ -1614,19 +1593,14 @@ def exibir_history():
                 mask_same_ref = df_processed["Farol Reference"].astype(str) == sel_ref_str
                 if mask_same_ref.any():
                     first_idx_any = df_processed.loc[mask_same_ref].sort_values("Inserted Date").index[0]
-                    # Verificar P_STATUS antes de sobrescrever
-                    current_p_status = df_processed.loc[first_idx_any, "Status"] if "Status" in df_processed.columns else ""
-                    current_p_status_str = str(current_p_status).strip().lower()
-                    # Se não for um dos novos P_STATUS, manter comportamento legado
-                    if current_p_status_str not in ["📋 booking request", "📄 pdf document", "🛠️ adjustment request", "⚙️ other request"]:
-                        df_processed.loc[first_idx_any, "Status"] = "📦 Cargill Booking Request"
+                    # Lógica de status removida - usando apenas "Farol Status"
         except Exception:
             pass
 
         # Reordenar colunas conforme ordem solicitada nas duas abas
         try:
             desired_order = [
-                "Selecionar",
+                "Index",
                 "Farol Status",
                 "Inserted Date",
                 "Farol Reference",
@@ -1665,7 +1639,9 @@ def exibir_history():
             # Helper function to reorder columns safely
             def reorder_columns(df, ordered_list):
                 existing_cols = [col for col in ordered_list if col in df.columns]
-                remaining_cols = [col for col in df.columns if col not in existing_cols]
+                # Filtra colunas ocultas das colunas restantes
+                hidden_cols = ["ADJUSTMENT_ID", "Status"]
+                remaining_cols = [col for col in df.columns if col not in existing_cols and col not in hidden_cols]
                 return df[existing_cols + remaining_cols]
 
             df_processed = reorder_columns(df_processed, desired_order)
@@ -1673,8 +1649,8 @@ def exibir_history():
         except Exception:
             pass
         
-        # Adiciona coluna de seleção APÓS a reordenação
-        df_processed.insert(0, "Selecionar", False)
+        # Adiciona coluna de índice APÓS a reordenação
+        df_processed.insert(0, "Index", range(len(df_processed)))
                 
         return df_processed
 
@@ -1808,49 +1784,23 @@ def exibir_history():
         # Aplicar estilização usando Pandas Styler
         if changes:
             styled_df = apply_highlight_styling(df_other_processed_reversed, changes)
-            
-            # Usar st.dataframe com o DataFrame estilizado
-            st.dataframe(
-                styled_df,
-                use_container_width=True,
-                hide_index=True,
-                key=f"history_other_status_styled_{farol_reference}"
-            )
-            
-            # Para compatibilidade com o resto do código, usar o DataFrame original
-            edited_df_other = df_other_processed
         else:
-            # Se não há alterações, usar o data_editor normal
-            edited_df_other = st.data_editor(
-                df_other_processed,
-                use_container_width=True,
-                hide_index=True,
-                column_config=column_config,
-                disabled=df_other_processed.columns.drop(["Selecionar"]),
-                key=f"history_other_status_editor_{farol_reference}"
-            )
+            # Se não há alterações, usar DataFrame normal
+            styled_df = df_other_processed_reversed
         
-        # Aviso imediato para seleção múltipla
-        if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() > 1:
-            st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
+        # Usar st.dataframe com o DataFrame (estilizado ou normal)
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            key=f"history_other_status_{farol_reference}"
+        )
         
-        # Aviso para seleção de linha "Cargill Booking Request" ou "Split Info" na aba Request Timeline
-        if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() == 1:
-            selected_row = edited_df_other[edited_df_other["Selecionar"] == True].iloc[0]
-            status = selected_row.get("Status")
-            
-            if status == "📦 Cargill Booking Request":
-                st.info("ℹ️ **Pedido Original da Cargill:** Esta linha representa o pedido inicial. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "📋 Booking Request":
-                st.info("ℹ️ **Booking Request:** Esta linha marca a fase inicial nos registros históricos, indicando como o pedido de booking foi originado. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "📄 Split":
-                st.info("ℹ️ **Split:** Esta linha representa divisão de carga. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "🛠️ Cargill (Adjusts)":
-                st.info("ℹ️ **Ajuste da Cargill:** Esta linha representa ajuste interno. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status == "🛠️ Adjustment Request":
-                st.info("ℹ️ **Solicitação de Ajuste:** Esta linha representa uma solicitação de ajuste da empresa. Para aprovar retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
-            elif status and "🚢 Carrier Return" in status:
-                st.info("ℹ️ **Retorno do Armador:** Esta linha já foi processada. Para aprovar novos retornos de armadores, acesse a aba '📨 Returns Awaiting Review'.")
+        # Para compatibilidade com o resto do código, usar o DataFrame original
+        edited_df_other = df_other_processed
+        
+        # Informações sobre a timeline
+        st.info("ℹ️ **Request Timeline:** Visualize o histórico de alterações. Use a aba '📨 Returns Awaiting Review' para aprovar retornos de armadores.")
 
     # Conteúdo da "aba" Retornos do Armador
     df_received_processed = None
@@ -1877,13 +1827,12 @@ def exibir_history():
             use_container_width=True,
             hide_index=True,
             column_config=column_config,
-            disabled=df_for_display.columns.drop(["Selecionar"]),
+            disabled=df_for_display.columns.drop(["Index"]),
             key=f"history_received_carrier_editor_{farol_reference}"
         )
         
-        # Aviso imediato para seleção múltipla
-        if "Selecionar" in edited_df_received.columns and (edited_df_received["Selecionar"] == True).sum() > 1:
-            st.warning("⚠️ **Seleção inválida:** Selecione apenas uma linha por vez.")
+        # Informações sobre retornos do armador
+        st.info("ℹ️ **Returns Awaiting Review:** Aprove ou rejeite retornos de armadores.")
 
     # Conteúdo da aba "Histórico de Viagens" 
     if active_tab == voyages_label:
@@ -2219,13 +2168,9 @@ def exibir_history():
 
     # Determina qual DataFrame usar baseado na aba ativa
     if edited_df_other is not None and not edited_df_other.empty:
-        selected = edited_df_other[edited_df_other["Selecionar"] == True]
-        # Regra: apenas uma seleção permitida por vez (apenas bloqueia ações; aviso já é exibido abaixo da grade)
-        # Nenhum rerun aqui para permitir a visualização do aviso sob a grade
+        selected = pd.DataFrame()  # Sem seleção - apenas visualização
     elif edited_df_received is not None and not edited_df_received.empty:
-        selected = edited_df_received[edited_df_received["Selecionar"] == True]
-        # Regra: apenas uma seleção permitida por vez (apenas bloqueia ações; aviso já é exibido abaixo da grade)
-        # Nenhum rerun aqui para permitir a visualização do aviso sob a grade
+        selected = pd.DataFrame()  # Sem seleção - apenas visualização
     else:
         selected = pd.DataFrame()
     
