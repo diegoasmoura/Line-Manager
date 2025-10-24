@@ -1736,7 +1736,7 @@ def exibir_history():
 
     def apply_highlight_styling(df_processed, changes_dict):
         """
-        Aplica estilização usando Pandas Styler para destacar células alteradas.
+        Aplica estilização usando Pandas Styler para destacar células alteradas e layout zebra.
         
         Args:
             df_processed: DataFrame processado
@@ -1745,27 +1745,38 @@ def exibir_history():
         Returns:
             DataFrame estilizado com Pandas Styler
         """
-        if not changes_dict or df_processed is None or df_processed.empty:
+        if df_processed is None or df_processed.empty:
             return df_processed
         
         # Cria uma cópia para não modificar o original
         df_styled = df_processed.copy()
         
-        # Função para aplicar estilo baseado nas alterações detectadas
-        def highlight_changes(row):
+        # Função para aplicar estilo baseado nas alterações detectadas e layout zebra
+        def highlight_changes_and_zebra(row):
             styles = [''] * len(row)
-            
-            # Verifica se esta linha tem alterações
             row_idx = row.name
+            
+            # Layout zebra - linhas pares mais claras, ímpares mais escuras
+            if row_idx % 2 == 0:
+                base_bg = 'background-color: #F8F9FA;'  # Cinza muito claro
+            else:
+                base_bg = 'background-color: #FFFFFF;'  # Branco
+            
+            # Aplica cor de fundo base para toda a linha
+            for i in range(len(styles)):
+                styles[i] = base_bg
+            
+            # Verifica se esta linha tem alterações e aplica destaque
             for (change_row_idx, col_name), change_info in changes_dict.items():
                 if change_row_idx == row_idx and col_name in df_styled.columns:
                     col_idx = df_styled.columns.get_loc(col_name)
+                    # Destaque de alteração sobrescreve a cor zebra
                     styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
             
             return styles
         
         # Aplica o estilo usando Pandas Styler
-        styled_df = df_styled.style.apply(highlight_changes, axis=1)
+        styled_df = df_styled.style.apply(highlight_changes_and_zebra, axis=1)
         
         return styled_df
 
