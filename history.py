@@ -1472,8 +1472,30 @@ def exibir_history():
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
         
-        # Substitui valores None por string vazia para melhor exibição
-        df_processed = df_processed.fillna("")
+        # Tratamento robusto para valores nulos (None, NaN, NaT)
+        print("🔍 DEBUG: Iniciando tratamento de valores nulos...")
+        
+        for col in df_processed.columns:
+            print(f"🔍 DEBUG: Processando coluna '{col}' - Tipo: {df_processed[col].dtype}")
+            
+            # Verifica valores únicos antes do tratamento
+            unique_before = df_processed[col].unique()
+            print(f"🔍 DEBUG: Valores únicos ANTES: {unique_before[:5]}...")  # Mostra apenas os primeiros 5
+            
+            if df_processed[col].dtype == 'datetime64[ns]':
+                print(f"🔍 DEBUG: Coluna de data detectada - aplicando tratamento específico")
+                # Para colunas de data: converte NaT para string vazia diretamente
+                df_processed[col] = df_processed[col].astype(str).replace('NaT', '')
+            else:
+                print(f"🔍 DEBUG: Coluna não-datetime - aplicando fillna('')")
+                # Para outras colunas: substitui valores nulos por string vazia
+                df_processed[col] = df_processed[col].fillna('')
+            
+            # Verifica valores únicos depois do tratamento
+            unique_after = df_processed[col].unique()
+            print(f"🔍 DEBUG: Valores únicos DEPOIS: {unique_after[:5]}...")  # Mostra apenas os primeiros 5
+            print(f"🔍 DEBUG: Tipo final: {df_processed[col].dtype}")
+            print("---")
         
         # Campo "Status" removido - usando apenas "Farol Status" para exibição
         
@@ -1751,6 +1773,29 @@ def exibir_history():
         # Cria uma cópia para não modificar o original
         df_styled = df_processed.copy()
         
+        # Aplica o mesmo tratamento de valores nulos na cópia
+        print("🔍 DEBUG: Aplicando tratamento de valores nulos na cópia para estilização...")
+        for col in df_styled.columns:
+            if df_styled[col].dtype == 'datetime64[ns]':
+                print(f"🔍 DEBUG: Tratando coluna de data '{col}' - Tipo: {df_styled[col].dtype}")
+                print(f"🔍 DEBUG: Valores únicos ANTES: {df_styled[col].unique()[:3]}")
+                
+                # Para colunas de data: converte NaT para string vazia diretamente
+                df_styled[col] = df_styled[col].astype(str).replace('NaT', '')
+                
+                print(f"🔍 DEBUG: Valores únicos DEPOIS: {df_styled[col].unique()[:3]}")
+                print(f"🔍 DEBUG: Tipo final: {df_styled[col].dtype}")
+            else:
+                # Para outras colunas: substitui valores nulos por string vazia
+                df_styled[col] = df_styled[col].fillna('')
+        
+        # Debug: verifica valores nulos após tratamento
+        print("🔍 DEBUG: Verificando valores nulos após tratamento na cópia...")
+        for col in df_styled.columns:
+            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
+                unique_vals = df_styled[col].unique()
+                print(f"🔍 DEBUG: Coluna '{col}' - Valores únicos: {unique_vals[:3]}...")
+        
         # Função para aplicar estilo baseado nas alterações detectadas e layout zebra
         def highlight_changes_and_zebra(row):
             styles = [''] * len(row)
@@ -1758,7 +1803,7 @@ def exibir_history():
             
             # Layout zebra - linhas pares mais claras, ímpares mais escuras
             if row_idx % 2 == 0:
-                base_bg = 'background-color: #F8F9FA;'  # Cinza muito claro
+                base_bg = 'background-color: #F1F3F4;'  # Cinza mais escuro (5% mais escuro)
             else:
                 base_bg = 'background-color: #FFFFFF;'  # Branco
             
@@ -1801,6 +1846,23 @@ def exibir_history():
         else:
             # Se não há alterações, usar DataFrame normal
             styled_df = df_other_processed_reversed
+        
+        # Debug: verifica o que está sendo passado para st.dataframe
+        print("🔍 DEBUG: Verificando DataFrame final antes de exibir...")
+        if hasattr(styled_df, 'data'):
+            # Se é um Styler, verifica o DataFrame subjacente
+            df_to_check = styled_df.data
+            print(f"🔍 DEBUG: DataFrame subjacente do Styler - Shape: {df_to_check.shape}")
+        else:
+            # Se é um DataFrame normal
+            df_to_check = styled_df
+            print(f"🔍 DEBUG: DataFrame normal - Shape: {df_to_check.shape}")
+        
+        # Verifica colunas de data especificamente
+        for col in df_to_check.columns:
+            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
+                unique_vals = df_to_check[col].unique()
+                print(f"🔍 DEBUG: Coluna de data '{col}' - Valores únicos: {unique_vals[:3]}...")
         
         # Usar st.dataframe com o DataFrame (estilizado ou normal)
         st.dataframe(

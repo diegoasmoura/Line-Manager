@@ -1792,11 +1792,15 @@ O sistema agora inclui três novas colunas para monitoramento avançado de booki
 - **Normalização de Valores**: Trata `None`, `NaN`, `NaT`, `""` como equivalentes
 - **Comparação de Datas**: Converte datas para string para comparação consistente
 - **Inversão de Ordem**: Ajusta ordem do DataFrame para corresponder à exibição visual
+- **Tratamento Robusto de NaT**: Converte `NaT` para string vazia em colunas de data mistas
+- **Layout Zebra**: Implementa alternância de cores de fundo para melhor legibilidade
 
 **Interface**:
-- **Com Alterações**: Exibe `st.dataframe` estilizado com destaque visual
-- **Sem Alterações**: Exibe `st.data_editor` normal com funcionalidade de seleção
-- **Performance**: Processa apenas quando há linhas "New Adjustment" detectadas
+- **Sempre `st.dataframe`**: Interface consistente independente de alterações
+- **Coluna Index**: Substitui "Selecionar" por "Index" para identificação de linhas
+- **Colunas Ocultas**: Remove "ADJUSTMENT_ID" e "Status" da exibição
+- **Valores Vazios**: Exibe campos nulos como células em branco (não "None" ou "NaT")
+- **Performance**: Processamento condicional baseado na presença de alterações
 
 **Vantagens**:
 - ✅ **Visualização Clara**: Alterações destacadas imediatamente
@@ -1804,6 +1808,8 @@ O sistema agora inclui três novas colunas para monitoramento avançado de booki
 - ✅ **Performance Otimizada**: Processamento condicional baseado na presença de alterações
 - ✅ **Compatibilidade**: Usa Pandas Styler (suporte nativo do Streamlit)
 - ✅ **Manutenibilidade**: Fácil adaptação para outras telas do sistema
+- ✅ **Interface Limpa**: Tratamento robusto de valores nulos em colunas de data
+- ✅ **Layout Profissional**: Zebra-striping e cores consistentes
 
 ### Relacionamentos
 
@@ -3403,12 +3409,19 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 - **🎯 Destaque Visual**:
   - **Fundo Amarelo Claro**: `#FFF9C4` para células alteradas
   - **Borda Dourada**: `#FFD54F` para realce adicional
+  - **Layout Zebra**: Alternância de cores de fundo (#F1F3F4/#FFFFFF) para melhor legibilidade
   - **Campos Monitorados**: Quantity of Containers, Ports, Carrier, Vessel, Dates, etc.
 - **⚙️ Implementação Técnica**:
   - **Função `detect_changes_for_new_adjustment()`**: Identifica alterações comparando campos editáveis
   - **Função `apply_highlight_styling()`**: Aplica estilização usando Pandas Styler
+  - **Tratamento Robusto de NaT**: Converte `NaT` para string vazia em colunas de data mistas
   - **Inversão de Ordem**: Ajusta DataFrame para corresponder à exibição visual
   - **Performance Otimizada**: Processa apenas quando há alterações detectadas
+- **🎨 Melhorias na Interface**:
+  - **Interface Consistente**: Sempre usa `st.dataframe` (não mais `st.data_editor`)
+  - **Coluna Index**: Substitui "Selecionar" por "Index" para identificação de linhas
+  - **Colunas Ocultas**: Remove "ADJUSTMENT_ID" e "Status" da exibição
+  - **Valores Limpos**: Exibe campos nulos como células em branco (não "None" ou "NaT")
 - **📊 Melhoria na UX**: Visualização imediata e clara das alterações em ajustes
 - **🔧 Compatibilidade**: Usa Pandas Styler (suporte nativo do Streamlit)
 - **⚠️ Impacto**: Melhoria significativa na identificação de mudanças em ajustes, facilitando análise e validação
