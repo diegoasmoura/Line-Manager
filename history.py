@@ -1412,7 +1412,7 @@ def exibir_history():
             "B_BOOKING_REFERENCE": "Booking",
             "ADJUSTMENT_ID": "ADJUSTMENT_ID",
             "LINKED_REFERENCE": "Linked Reference",
-            "B_BOOKING_STATUS": "Farol Status",
+            "B_BOOKING_STATUS": "Farol Status",  # Mantém Farol Status
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
             "P_PDF_NAME": "PDF Name",
@@ -1470,6 +1470,10 @@ def exibir_history():
         
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
+        
+        # Cria campo "Status" baseado em "Farol Status" (B_BOOKING_STATUS)
+        if "Farol Status" in df_processed.columns:
+            df_processed["Status"] = df_processed["Farol Status"].copy()
         
         # A ordenação de colunas foi movida para a função display_tab_content para centralizar a lógica.
 
@@ -1674,6 +1678,130 @@ def exibir_history():
                 
         return df_processed
 
+    def detect_changes_for_new_adjustment(df_processed):
+        """
+        Detecta alterações em linhas com Status = "New Adjustment" comparando com a linha anterior.
+        Retorna dicionário com pares (row_index, column_name) onde há diferença.
+        """
+        if df_processed is None or df_processed.empty:
+            return {}
+        
+        # Campos editáveis baseados em shipments_split.py (usando aliases corretos)
+        editable_fields = [
+            "Quantity of Containers",
+            "Port of Loading POL",
+            "Port of Delivery POD", 
+            "Place of Receipt",
+            "Final Destination",
+            "Transhipment Port",
+            "Port Terminal",
+            "Carrier",
+            "Voyage Code",
+            "Booking",
+            "Vessel Name",
+            "Requested Deadline Start",
+            "Requested Deadline End",
+            "Required Sail Date",
+            "Required Arrival Date"
+        ]
+        
+        changes = {}
+        
+        # Percorre o DataFrame linha a linha
+        for idx in range(len(df_processed)):  # Começa do índice 0 (primeira linha)
+            current_row = df_processed.iloc[idx]
+            
+            # Se é a primeira linha, compara com a segunda linha (índice 1)
+            if idx == 0:
+                if len(df_processed) > 1:
+                    previous_row = df_processed.iloc[1]  # Compara com a segunda linha
+                    print(f"🔍 Debug: Linha {idx} (primeira) comparando com linha 1")
+                else:
+                    print(f"🔍 Debug: Linha {idx} é a única linha, pulando...")
+                    continue
+            else:
+                previous_row = df_processed.iloc[idx - 1]
+            
+            # Verifica se a linha atual é "New Adjustment"
+            status = current_row.get("Farol Status", "")
+            if pd.isna(status) or status is None:
+                status = ""
+            else:
+                status = str(status)
+            
+            print(f"🔍 Debug: Linha {idx}, Status='{status}', Comparando com linha {idx-1}")
+            
+            if status == "🛠️ New Adjustment":
+                print(f"✅ Encontrada linha New Adjustment na posição {idx}")
+                # Compara cada campo editável
+                for field in editable_fields:
+                    if field in df_processed.columns:
+                        current_val = current_row[field]
+                        previous_val = previous_row[field]
+                        
+                        # Normaliza valores para comparação
+                        def normalize_value(val):
+                            if pd.isna(val) or val is None or val == "":
+                                return None
+                            # Para datas, converte para string para comparação
+                            if hasattr(val, 'strftime'):
+                                return val.strftime('%Y-%m-%d %H:%M:%S') if hasattr(val, 'hour') else val.strftime('%Y-%m-%d')
+                            return str(val)
+                        
+                        current_normalized = normalize_value(current_val)
+                        previous_normalized = normalize_value(previous_val)
+                        
+                        print(f"  🔍 Campo '{field}': '{previous_val}' → '{current_val}' (norm: '{previous_normalized}' → '{current_normalized}')")
+                        
+                        # Se os valores normalizados são diferentes
+                        if current_normalized != previous_normalized:
+                            print(f"  ✅ DIFERENÇA DETECTADA em linha {idx}, campo '{field}'")
+                            changes[(idx, field)] = {
+                                'current': current_val,
+                                'previous': previous_val
+                            }
+                        else:
+                            print(f"  ⚪ Valores iguais em linha {idx}, campo '{field}'")
+            else:
+                print(f"❌ Linha {idx} não é New Adjustment, pulando...")
+        
+        return changes
+
+    def apply_highlight_styling(df_processed, changes_dict):
+        """
+        Aplica estilização usando Pandas Styler para destacar células alteradas.
+        
+        Args:
+            df_processed: DataFrame processado
+            changes_dict: Dicionário com pares (row_idx, col_name) -> change_info
+        
+        Returns:
+            DataFrame estilizado com Pandas Styler
+        """
+        if not changes_dict or df_processed is None or df_processed.empty:
+            return df_processed
+        
+        # Cria uma cópia para não modificar o original
+        df_styled = df_processed.copy()
+        
+        # Função para aplicar estilo baseado nas alterações detectadas
+        def highlight_changes(row):
+            styles = [''] * len(row)
+            
+            # Verifica se esta linha tem alterações
+            row_idx = row.name
+            for (change_row_idx, col_name), change_info in changes_dict.items():
+                if change_row_idx == row_idx and col_name in df_styled.columns:
+                    col_idx = df_styled.columns.get_loc(col_name)
+                    styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
+            
+            return styles
+        
+        # Aplica o estilo usando Pandas Styler
+        styled_df = df_styled.style.apply(highlight_changes, axis=1)
+        
+        return styled_df
+
     # Conteúdo da "aba" Pedidos da Empresa
     df_other_processed = None
     if active_tab == other_label:
@@ -1682,14 +1810,58 @@ def exibir_history():
     if df_other_processed is not None and active_tab == other_label:
         # Gera configuração dinâmica baseada no conteúdo (Status visível)
         column_config = generate_dynamic_column_config(df_other_processed, hide_status=False)
-        edited_df_other = st.data_editor(
-            df_other_processed,
-            use_container_width=True,
-            hide_index=True,
-            column_config=column_config,
-            disabled=df_other_processed.columns.drop(["Selecionar"]),
-            key=f"history_other_status_editor_{farol_reference}"
-        )
+        # Detectar e destacar alterações em linhas "New Adjustment"
+        # Inverte o DataFrame para que a ordem visual corresponda ao índice
+        df_other_processed_reversed = df_other_processed.iloc[::-1].reset_index(drop=True)
+        changes = detect_changes_for_new_adjustment(df_other_processed_reversed)
+        
+        # Debug: Mostrar informações sobre detecção
+        st.info(f"🔍 **Debug:** Detectadas {len(changes)} alterações em linhas New Adjustment")
+        
+        # Debug adicional: Mostrar todos os status encontrados
+        st.write("🔍 **Debug Status:** Todos os status encontrados no DataFrame ORIGINAL:")
+        for idx, row in df_other_processed.iterrows():
+            farol_status = row.get("Farol Status", "")
+            regular_status = row.get("Status", "")
+            st.write(f"Linha {idx}: Farol Status='{farol_status}', Status='{regular_status}'")
+        
+        st.write("🔍 **Debug Status:** Todos os status encontrados no DataFrame INVERTIDO:")
+        for idx, row in df_other_processed_reversed.iterrows():
+            farol_status = row.get("Farol Status", "")
+            regular_status = row.get("Status", "")
+            st.write(f"Linha {idx}: Farol Status='{farol_status}', Status='{regular_status}'")
+        
+        if changes:
+            for (row_idx, col_name), change_info in changes.items():
+                st.write(f"- Linha {row_idx}, Coluna '{col_name}': '{change_info['previous']}' → '{change_info['current']}'")
+        
+        # Aplicar estilização usando Pandas Styler
+        if changes:
+            st.info("🎨 **Debug:** Aplicando estilização com Pandas Styler...")
+            styled_df = apply_highlight_styling(df_other_processed_reversed, changes)
+            
+            # Usar st.dataframe com o DataFrame estilizado
+            st.dataframe(
+                styled_df,
+                use_container_width=True,
+                hide_index=True,
+                key=f"history_other_status_styled_{farol_reference}"
+            )
+            
+            # Para compatibilidade com o resto do código, usar o DataFrame original
+            edited_df_other = df_other_processed
+            
+            st.info("✅ **Debug:** Estilização aplicada com sucesso!")
+        else:
+            # Se não há alterações, usar o data_editor normal
+            edited_df_other = st.data_editor(
+                df_other_processed,
+                use_container_width=True,
+                hide_index=True,
+                column_config=column_config,
+                disabled=df_other_processed.columns.drop(["Selecionar"]),
+                key=f"history_other_status_editor_{farol_reference}"
+            )
         
         # Aviso imediato para seleção múltipla
         if "Selecionar" in edited_df_other.columns and (edited_df_other["Selecionar"] == True).sum() > 1:

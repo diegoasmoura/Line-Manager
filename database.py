@@ -2150,7 +2150,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
         
         # PRÉ-PREENCHIMENTO: Buscar datas da tabela principal F_CON_SALES_BOOKING_DATA
         prefill_dates = {}
-        if status_override in ["Adjustment Requested", "Received from Carrier"] and "Farol Reference" in ui_data:
+        if status_override in ["Adjustment Requested", "Received from Carrier", "New Adjustment"] and "Farol Reference" in ui_data:
             farol_ref = ui_data["Farol Reference"]
             try:
                 # Buscar dados da tabela principal (última versão atualizada pelo Tracking)
