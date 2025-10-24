@@ -1472,6 +1472,9 @@ def exibir_history():
         df_processed = df_to_process.copy()
         df_processed.rename(columns=rename_map, inplace=True)
         
+        # Substitui valores None por string vazia para melhor exibição
+        df_processed = df_processed.fillna("")
+        
         # Campo "Status" removido - usando apenas "Farol Status" para exibição
         
         # A ordenação de colunas foi movida para a função display_tab_content para centralizar a lógica.
