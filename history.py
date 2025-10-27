@@ -770,7 +770,21 @@ def display_attachments_section(farol_reference):
         
         # Processamento baseado no tipo de upload
         if process_booking_pdf and uploaded_file:
-            if st.button("🔍 Process Booking PDF", key=f"process_booking_{farol_reference}", type="primary"):
+            # Verificar se o arquivo é novo (automatizar processamento)
+            import hashlib
+            last_file_key = f"last_processed_file_{farol_reference}"
+            current_file_key = f"uploaded_file_key_{farol_reference}"
+            
+            # Gera hash do arquivo atual
+            uploaded_file.seek(0)
+            file_hash = hashlib.md5(uploaded_file.read()).hexdigest()
+            uploaded_file.seek(0)
+            
+            # Verifica se é um novo arquivo
+            is_new_file = st.session_state.get(last_file_key, "") != file_hash
+            
+            if is_new_file:
+                # Processa automaticamente o PDF
                 with st.spinner("🔄 Processando PDF e extraindo dados..."):
                     try:
                         # Reseta o ponteiro do arquivo
@@ -784,6 +798,7 @@ def display_attachments_section(farol_reference):
                             # Armazena os dados processados no session_state para validação
                             st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
                             st.session_state[f"booking_pdf_file_{farol_reference}"] = uploaded_file
+                            st.session_state[last_file_key] = file_hash  # Armazena hash do arquivo processado
                             
                             # Atualiza cache para estabilizar a interface
                             if cache_key in st.session_state:

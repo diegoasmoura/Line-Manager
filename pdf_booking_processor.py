@@ -2898,8 +2898,11 @@ def display_pdf_validation_interface(processed_data):
             else:
                 st.warning(api_message)
     
-    # Cria formulário de validação
-    with st.form("pdf_validation_form"):
+    # Armazenar dados do Formulário 1 no session_state quando necessário
+    farol_reference = processed_data.get("farol_reference")
+    
+    # FORMULÁRIO 1: Dados extraídos do PDF
+    with st.form("pdf_validation_form_part1"):
         # Layout mais compacto e organizado (padronizado com demais telas)
         st.markdown("**📋 Validação de Booking**")
         
@@ -3081,15 +3084,96 @@ def display_pdf_validation_interface(processed_data):
                 help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
-        # Seção de datas da API Ellox
-        st.markdown("---")
-        st.markdown("#### 📅 Datas Importantes")
+        # Botão de submit do Formulário 1 (apenas para validação interna)
+        submitted_part1 = st.form_submit_button("✅ Confirmar Dados do PDF", type="secondary", use_container_width=True)
         
-        # Função helper para converter date/hora para datetime
-        def get_api_date_value(processed_data, field_name):
+        if submitted_part1:
+            # Salvar dados do Formulário 1 no session_state
+            st.session_state[f"pdf_booking_reference_{farol_reference}"] = booking_reference
+            st.session_state[f"pdf_quantity_{farol_reference}"] = quantity
+            st.session_state[f"pdf_carrier_{farol_reference}"] = carrier
+            st.session_state[f"pdf_vessel_name_{farol_reference}"] = vessel_name
+            st.session_state[f"pdf_voyage_{farol_reference}"] = voyage
+            st.session_state[f"pdf_pol_{farol_reference}"] = pol
+            st.session_state[f"pdf_pod_{farol_reference}"] = pod
+            st.session_state[f"pdf_transhipment_{farol_reference}"] = transhipment_port
+            st.session_state[f"pdf_port_terminal_city_{farol_reference}"] = port_terminal_city
+            st.session_state[f"pdf_print_date_{farol_reference}"] = pdf_print_date
+            st.success("✅ Dados do PDF confirmados!")
+    
+    # ===== FIM DO FORMULÁRIO 1 =====
+    
+    # Botão para consultar API (fora dos formulários)
+    st.markdown("---")
+    st.markdown("#### 🔍 Consulta de Datas via API")
+    
+    if st.button("🔍 Consultar API para Datas", type="primary", use_container_width=True):
+        # Obter dados do formulário 1 do session_state ou usar valores padrão
+        vessel_name_val = st.session_state.get(f"pdf_vessel_name_{farol_reference}", processed_data.get("vessel_name", ""))
+        voyage_val = st.session_state.get(f"pdf_voyage_{farol_reference}", processed_data.get("voyage", ""))
+        terminal_val = st.session_state.get(f"pdf_port_terminal_city_{farol_reference}", processed_data.get("port_terminal_city", ""))
+        
+        # Consultar API
+        with st.spinner("🔄 Consultando API Ellox..."):
+            try:
+                from database import validate_and_collect_voyage_monitoring
+                
+                api_result = validate_and_collect_voyage_monitoring(
+                    vessel_name=vessel_name_val,
+                    voyage_code=voyage_val,
+                    terminal=terminal_val,
+                    save_to_db=False
+                )
+                
+                # Armazenar resultado no session_state para uso no Formulário 2
+                farol_reference = processed_data.get("farol_reference")
+                st.session_state[f"api_dates_{farol_reference}"] = api_result
+                
+                if api_result.get("success"):
+                    st.success("✅ Datas obtidas da API com sucesso! Confirme as informações no formulário abaixo.")
+                else:
+                    st.warning(f"⚠️ {api_result.get('message', 'Não foi possível obter datas da API')}")
+                    
+            except Exception as e:
+                st.error(f"❌ Erro ao consultar API: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
+    
+    st.markdown("---")
+    st.markdown("#### 📅 Datas Importantes")
+    
+    # FORMULÁRIO 2: Datas da API
+    with st.form("pdf_validation_form_part2"):
+        
+        # Função helper para obter dados do session_state ou processed_data
+        def get_form_data(key_base, default=""):
+            return st.session_state.get(f"pdf_{key_base}_{farol_reference}", processed_data.get(key_base, default))
+        
+        # Função helper para obter datas da API (do session_state ou processed_data)
+        def get_api_date_from_result(processed_data, field_name):
             """Extrai valor de data da API para o formulário"""
             import pandas as pd
-            # Check if processed_data is None before accessing it
+            from datetime import datetime
+            
+            # Primeiro, verificar se há dados da API no session_state
+            api_dates_key = f"api_dates_{farol_reference}"
+            if api_dates_key in st.session_state:
+                api_result = st.session_state[api_dates_key]
+                if api_result.get("success") and api_result.get("data"):
+                    api_data = api_result["data"]
+                    if field_name in api_data:
+                        date_val = api_data[field_name]
+                        if date_val and not pd.isna(date_val):
+                            try:
+                                if isinstance(date_val, str):
+                                    # Tentar converter string para datetime
+                                    date_val = pd.to_datetime(date_val)
+                                if hasattr(date_val, 'date'):
+                                    return date_val.date(), date_val.time()
+                            except:
+                                pass
+            
+            # Fallback: verificar processed_data
             if processed_data is None:
                 return None, None
             api_data = (processed_data.get("api_data") or {})
@@ -3122,14 +3206,7 @@ def display_pdf_validation_interface(processed_data):
         col_deadline1, col_deadline2 = st.columns(2)
         
         with col_deadline1:
-            deadline_date, deadline_time = get_api_date_value(processed_data, "DATA_DEADLINE")
-            if not deadline_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    deadline_date_str = (processed_data.get("api_data") or {}).get("DATA_DEADLINE")
-                else:
-                    deadline_date_str = None
-                deadline_date, deadline_time = parse_datetime_to_date_and_time(deadline_date_str) if deadline_date_str else (None, None)
+            deadline_date, deadline_time = get_api_date_from_result(processed_data, "DATA_DEADLINE")
             
             col_date_dl, col_time_dl = st.columns([2, 1])
             with col_date_dl:
@@ -3138,14 +3215,7 @@ def display_pdf_validation_interface(processed_data):
                 manual_deadline_time = st.time_input("Hora", value=deadline_time, key="pdf_deadline_time")
         
         with col_deadline2:
-            draft_date, draft_time = get_api_date_value(processed_data, "DATA_DRAFT_DEADLINE")
-            if not draft_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    draft_date_str = (processed_data.get("api_data") or {}).get("DATA_DRAFT_DEADLINE")
-                else:
-                    draft_date_str = None
-                draft_date, draft_time = parse_datetime_to_date_and_time(draft_date_str) if draft_date_str else (None, None)
+            draft_date, draft_time = get_api_date_from_result(processed_data, "DATA_DRAFT_DEADLINE")
             
             col_date_dd, col_time_dd = st.columns([2, 1])
             with col_date_dd:
@@ -3157,14 +3227,7 @@ def display_pdf_validation_interface(processed_data):
         col_gate1, col_gate2 = st.columns(2)
         
         with col_gate1:
-            gate_date, gate_time = get_api_date_value(processed_data, "DATA_ABERTURA_GATE")
-            if not gate_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    gate_date_str = (processed_data.get("api_data") or {}).get("DATA_ABERTURA_GATE")
-                else:
-                    gate_date_str = None
-                gate_date, gate_time = parse_datetime_to_date_and_time(gate_date_str) if gate_date_str else (None, None)
+            gate_date, gate_time = get_api_date_from_result(processed_data, "DATA_ABERTURA_GATE")
             
             col_date_gt, col_time_gt = st.columns([2, 1])
             with col_date_gt:
@@ -3173,14 +3236,7 @@ def display_pdf_validation_interface(processed_data):
                 manual_gate_time = st.time_input("Hora", value=gate_time, key="pdf_gate_time")
         
         with col_gate2:
-            reefer_date, reefer_time = get_api_date_value(processed_data, "DATA_ABERTURA_GATE_REEFER")
-            if not reefer_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    reefer_date_str = (processed_data.get("api_data") or {}).get("DATA_ABERTURA_GATE_REEFER")
-                else:
-                    reefer_date_str = None
-                reefer_date, reefer_time = parse_datetime_to_date_and_time(reefer_date_str) if reefer_date_str else (None, None)
+            reefer_date, reefer_time = get_api_date_from_result(processed_data, "DATA_ABERTURA_GATE_REEFER")
             
             col_date_rf, col_time_rf = st.columns([2, 1])
             with col_date_rf:
@@ -3194,14 +3250,7 @@ def display_pdf_validation_interface(processed_data):
         col_etd, col_eta = st.columns(2)
         
         with col_etd:
-            etd_date, etd_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_SAIDA")
-            if not etd_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    etd_date_str = (processed_data.get("api_data") or {}).get("DATA_ESTIMATIVA_SAIDA")
-                else:
-                    etd_date_str = None
-                etd_date, etd_time = parse_datetime_to_date_and_time(etd_date_str) if etd_date_str else (None, None)
+            etd_date, etd_time = get_api_date_from_result(processed_data, "DATA_ESTIMATIVA_SAIDA")
             
             col_date_etd, col_time_etd = st.columns([2, 1])
             with col_date_etd:
@@ -3210,14 +3259,7 @@ def display_pdf_validation_interface(processed_data):
                 manual_etd_time = st.time_input("Hora", value=etd_time, key="pdf_etd_time")
         
         with col_eta:
-            eta_date, eta_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_CHEGADA")
-            if not eta_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    eta_date_str = (processed_data.get("api_data") or {}).get("DATA_ESTIMATIVA_CHEGADA")
-                else:
-                    eta_date_str = None
-                eta_date, eta_time = parse_datetime_to_date_and_time(eta_date_str) if eta_date_str else (None, None)
+            eta_date, eta_time = get_api_date_from_result(processed_data, "DATA_ESTIMATIVA_CHEGADA")
             
             col_date_eta, col_time_eta = st.columns([2, 1])
             with col_date_eta:
@@ -3229,14 +3271,7 @@ def display_pdf_validation_interface(processed_data):
         col_etb, col_atb = st.columns(2)
         
         with col_etb:
-            etb_date, etb_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_ATRACACAO")
-            if not etb_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    etb_date_str = (processed_data.get("api_data") or {}).get("DATA_ESTIMATIVA_ATRACACAO")
-                else:
-                    etb_date_str = None
-                etb_date, etb_time = parse_datetime_to_date_and_time(etb_date_str) if etb_date_str else (None, None)
+            etb_date, etb_time = get_api_date_from_result(processed_data, "DATA_ESTIMATIVA_ATRACACAO")
             
             col_date_etb, col_time_etb = st.columns([2, 1])
             with col_date_etb:
@@ -3245,14 +3280,7 @@ def display_pdf_validation_interface(processed_data):
                 manual_etb_time = st.time_input("Hora", value=etb_time, key="pdf_etb_time")
         
         with col_atb:
-            atb_date, atb_time = get_api_date_value(processed_data, "DATA_ATRACACAO")
-            if not atb_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    atb_date_str = (processed_data.get("api_data") or {}).get("DATA_ATRACACAO")
-                else:
-                    atb_date_str = None
-                atb_date, atb_time = parse_datetime_to_date_and_time(atb_date_str) if atb_date_str else (None, None)
+            atb_date, atb_time = get_api_date_from_result(processed_data, "DATA_ATRACACAO")
             
             col_date_atb, col_time_atb = st.columns([2, 1])
             with col_date_atb:
@@ -3266,14 +3294,7 @@ def display_pdf_validation_interface(processed_data):
         col_atd, col_ata = st.columns(2)
         
         with col_atd:
-            atd_date, atd_time = get_api_date_value(processed_data, "DATA_PARTIDA")
-            if not atd_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    atd_date_str = (processed_data.get("api_data") or {}).get("DATA_PARTIDA")
-                else:
-                    atd_date_str = None
-                atd_date, atd_time = parse_datetime_to_date_and_time(atd_date_str) if atd_date_str else (None, None)
+            atd_date, atd_time = get_api_date_from_result(processed_data, "DATA_PARTIDA")
             
             col_date_atd, col_time_atd = st.columns([2, 1])
             with col_date_atd:
@@ -3282,14 +3303,7 @@ def display_pdf_validation_interface(processed_data):
                 manual_atd_time = st.time_input("Hora", value=atd_time, key="pdf_atd_time")
         
         with col_ata:
-            ata_date, ata_time = get_api_date_value(processed_data, "DATA_CHEGADA")
-            if not ata_date:
-                # Check if processed_data is None before accessing it
-                if processed_data is not None:
-                    ata_date_str = (processed_data.get("api_data") or {}).get("DATA_CHEGADA")
-                else:
-                    ata_date_str = None
-                ata_date, ata_time = parse_datetime_to_date_and_time(ata_date_str) if ata_date_str else (None, None)
+            ata_date, ata_time = get_api_date_from_result(processed_data, "DATA_CHEGADA")
             
             col_date_ata, col_time_ata = st.columns([2, 1])
             with col_date_ata:
@@ -3318,23 +3332,35 @@ def display_pdf_validation_interface(processed_data):
                     return datetime.combine(date_val, datetime.min.time())
                 return None
             
+            # Obter dados do Formulário 1 do session_state
+            booking_ref = get_form_data("booking_reference", "")
+            qty = st.session_state.get(f"pdf_quantity_{farol_reference}", processed_data.get("quantity", 1))
+            carrier_name = get_form_data("carrier", processed_data.get("carrier", ""))
+            voyage_code = get_form_data("voyage", "")
+            vessel_name_val = get_form_data("vessel_name", "")
+            pol_port = get_form_data("pol", "")
+            pod_port = get_form_data("pod", "")
+            trans_port = get_form_data("transhipment", "")
+            terminal_city = get_form_data("port_terminal_city", "")
+            pdf_date = get_form_data("print_date", "")
+            
             # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
             validated_data = {
                 "Farol Reference": processed_data["farol_reference"],
-                "Booking Reference": booking_reference,
-                "Voyage Carrier": carrier,
-                "Voyage Code": voyage,
-                "Vessel Name": vessel_name,
+                "Booking Reference": booking_ref,
+                "Voyage Carrier": carrier_name,
+                "Voyage Code": voyage_code,
+                "Vessel Name": vessel_name_val,
                 # Não é split neste fluxo de PDF; manter vazio
                 "Splitted Booking Reference": "",
-                "Quantity of Containers": int(quantity),
-                "Port of Loading POL": pol,
-                "Port of Delivery POD": pod,
-                "Place of Receipt": pol,
-                "Final Destination": pod,
-                "Transhipment Port": transhipment_port,
-                "Port Terminal City": port_terminal_city,
-                "PDF Booking Emission Date": pdf_print_date,
+                "Quantity of Containers": int(qty),
+                "Port of Loading POL": pol_port,
+                "Port of Delivery POD": pod_port,
+                "Place of Receipt": pol_port,
+                "Final Destination": pod_port,
+                "Transhipment Port": trans_port,
+                "Port Terminal City": terminal_city,
+                "PDF Booking Emission Date": pdf_date,
                 # Datas da API ou entrada manual
                 "B_DATA_DEADLINE": combine_date_time(manual_deadline_date, manual_deadline_time),
                 "B_DATA_DRAFT_DEADLINE": combine_date_time(manual_draft_date, manual_draft_time),
@@ -3349,8 +3375,8 @@ def display_pdf_validation_interface(processed_data):
             }
 
             # Compatibilidade: alguns fluxos esperam a chave 'Terminal'
-            if port_terminal_city:
-                validated_data["Terminal"] = port_terminal_city
+            if terminal_city:
+                validated_data["Terminal"] = terminal_city
             
             # Debug simples para verificar se chegou aqui
             st.info("🔍 Dados preparados para salvamento")
