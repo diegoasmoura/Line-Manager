@@ -2862,21 +2862,6 @@ def display_pdf_validation_interface(processed_data):
     # Armazenar dados no session_state quando necessário
     farol_reference = processed_data.get("farol_reference")
     
-    # DEBUG: Mostrar dados extraídos (antes do formulário)
-    st.caption("🔍 DEBUG - Dados extraídos do PDF")
-    st.json({
-        "booking_reference": processed_data.get("booking_reference"),
-        "quantity": processed_data.get("quantity"),
-        "carrier": processed_data.get("carrier"),
-        "vessel_name": processed_data.get("vessel_name"),
-        "voyage": processed_data.get("voyage"),
-        "pol": processed_data.get("pol"),
-        "pod": processed_data.get("pod"),
-        "transhipment_port": processed_data.get("transhipment_port"),
-        "port_terminal_city": processed_data.get("port_terminal_city"),
-        "pdf_print_date": processed_data.get("pdf_print_date")
-    })
-    
     # FORMULÁRIO ÚNICO: Dados extraídos do PDF + Datas
     with st.form("pdf_validation_form"):
         # Layout mais compacto e organizado (padronizado com demais telas)
@@ -3072,38 +3057,144 @@ def display_pdf_validation_interface(processed_data):
             voyage_val = voyage
             terminal_val = port_terminal_city
             
-            # Consultar API
+            # Consultar API Ellox diretamente
             try:
-                from database import validate_and_collect_voyage_monitoring
+                import requests
+                import pandas as pd
+                import json
+                from datetime import datetime
+                from database import get_database_connection
+                from sqlalchemy import text
+                
+                # Função para autenticar na API Ellox
+                def authenticate_ellox():
+                    EMAIL = "diego_moura@cargill.com"
+                    SENHA = "Cargill@25"
+                    url_auth = "https://apidtz.comexia.digital/api/auth"
+                    payload_auth = {"email": EMAIL, "senha": SENHA}
+                    resp_auth = requests.post(url_auth, json=payload_auth, headers={"Content-Type": "application/json"})
+                    
+                    if resp_auth.status_code != 200:
+                        return None
+                    
+                    data_auth = resp_auth.json()
+                    token = data_auth.get("access_token") or data_auth.get("token")
+                    if not token:
+                        return None
+                    return token
+                
+                # Função para visualizar monitoramentos
+                def visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code):
+                    url = "https://apidtz.comexia.digital/api/terminalmonitorings"
+                    payload = {
+                        "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
+                        "cnpj_terminal": cnpj_terminal,
+                        "nome_navio": vessel_name,
+                        "viagem_navio": voyage_code or ""
+                    }
+                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+                    resp = requests.post(url, headers=headers, json=payload)
+                    
+                    if resp.status_code >= 400:
+                        return pd.DataFrame()
+                    
+                    data = resp.json() if resp.content else []
+                    return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame()
+                
+                # Buscar CNPJ do terminal
+                terminal_cnpj_map = {
+                    "BTP": "04.887.625/0001-78",
+                    "BRASIL TERMINAL PORTUARIO": "04.887.625/0001-78", 
+                    "BRASIL TERMINAL PORTUARIO SA": "04.887.625/0001-78",
+                    "BRASIL TERMINAL PORTUARIO S/A": "04.887.625/0001-78",
+                    "SANTOS BRASIL": "02.762.121/0001-04",
+                    "SANTOS BRASIL S.A.": "02.762.121/0001-04",
+                    "SANTOS BRASIL SA": "02.762.121/0001-04",
+                    "TECON SANTOS": "03.518.221/0001-06",
+                    "COSCO": "02.762.121/0001-04",
+                    "DPW": "80.790.597/0001-70",
+                    "DP WORLD": "80.790.597/0001-70",
+                    "EMBRAPORT": "80.790.597/0001-70"
+                }
+                
+                cnpj_terminal = "02.762.121/0001-04"  # Default
+                terminal_normalized = (terminal_val or "").upper().strip()
+                
+                for terminal_key, cnpj in terminal_cnpj_map.items():
+                    if terminal_key in terminal_normalized:
+                        cnpj_terminal = cnpj
+                        break
+                
+                # Buscar no banco se não encontrou no mapeamento
+                if cnpj_terminal == "02.762.121/0001-04" and "SANTOS BRASIL" not in terminal_normalized:
+                    try:
+                        conn = get_database_connection()
+                        query = text("""
+                            SELECT DISTINCT CNPJ, NOME
+                            FROM LogTransp.F_ELLOX_TERMINALS
+                            WHERE UPPER(NOME) LIKE '%' || UPPER(:terminal) || '%'
+                            FETCH FIRST 1 ROWS ONLY
+                        """)
+                        res = conn.execute(query, {"terminal": terminal_val}).mappings().fetchone()
+                        conn.close()
+                        if res and res.get("cnpj"):
+                            cnpj_terminal = res["cnpj"]
+                    except Exception:
+                        pass
                 
                 with st.spinner("🔄 Consultando API Ellox..."):
-                    api_result = validate_and_collect_voyage_monitoring(
-                        vessel_name=vessel_name_val,
-                        voyage_code=voyage_val,
-                        terminal=terminal_val,
-                        save_to_db=False
-                    )
-                
-                # Armazenar resultado no session_state
-                st.session_state[f"api_dates_{farol_reference}"] = api_result
-                
-                # DEBUG: Mostrar resultado da API
-                st.write("🔍 DEBUG - Resultado da API:")
-                st.write(f"- Success: {api_result.get('success')}")
-                st.write(f"- Has data: {api_result.get('data') is not None}")
-                if api_result.get('data'):
-                    st.write(f"- Data keys: {list(api_result.get('data').keys())}")
-                    st.write(f"- Sample values (first 3):")
-                    for i, (k, v) in enumerate(list(api_result.get('data').items())[:3]):
-                        st.write(f"  - {k}: {v} (type: {type(v).__name__})")
-                else:
-                    st.write("- Message:", api_result.get('message'))
-                
-                if api_result.get("success"):
-                    st.success("✅ Datas obtidas da API com sucesso! Verifique as datas abaixo.")
-                    st.rerun()  # Force rerun to refresh form with API data
-                else:
-                    st.warning(f"⚠️ {api_result.get('message', 'Não foi possível obter datas da API')}")
+                    # 1. Autenticar
+                    token = authenticate_ellox()
+                    if not token:
+                        st.error("❌ Erro ao autenticar na API Ellox")
+                        return
+                    
+                    # 2. Buscar dados
+                    df_monitoring = visualizar_monitoramentos(token, cnpj_terminal, vessel_name_val, voyage_val)
+                    
+                    if df_monitoring.empty:
+                        st.warning("⚠️ Nenhum dado de monitoramento encontrado para essa combinação")
+                        return
+                    
+                    # 3. Converter DataFrame para dict e mostrar debug
+                    api_data_raw = df_monitoring.iloc[0].to_dict() if len(df_monitoring) > 0 else {}
+                    
+                    # 4. Mapear campos do DataFrame para os nomes esperados pelo formulário
+                    # A API pode retornar em lowercase ou com nomes diferentes
+                    field_mapping = {
+                        "data_deadline": "DATA_DEADLINE",
+                        "data_draft_deadline": "DATA_DRAFT_DEADLINE",
+                        "data_abertura_gate": "DATA_ABERTURA_GATE",
+                        "data_abertura_gate_reefer": "DATA_ABERTURA_GATE_REEFER",
+                        "data_estimativa_saida": "DATA_ESTIMATIVA_SAIDA",
+                        "data_estimativa_chegada": "DATA_ESTIMATIVA_CHEGADA",
+                        "data_estimativa_atracacao": "DATA_ESTIMATIVA_ATRACACAO",
+                        "data_atracacao": "DATA_ATRACACAO",
+                        "data_partida": "DATA_PARTIDA",
+                        "data_chegada": "DATA_CHEGADA"
+                    }
+                    
+                    # Converter para uppercase e aplicar mapeamento
+                    api_data = {}
+                    for key, value in api_data_raw.items():
+                        key_upper = key.upper()
+                        # Tentar mapear o campo
+                        mapped_key = field_mapping.get(key_upper, key_upper)
+                        # Se o campo for de data, incluir
+                        if "DATA_" in mapped_key or mapped_key in field_mapping.values():
+                            api_data[mapped_key] = value
+                    
+                    # 5. Armazenar no session_state no formato esperado
+                    api_result = {
+                        "success": True,
+                        "data": api_data,
+                        "message": f"✅ Dados obtidos da API Ellox ({len(api_data)} campos)"
+                    }
+                    
+                    st.session_state[f"api_dates_{farol_reference}"] = api_result
+                    st.session_state[f"api_consulted_{farol_reference}"] = True
+                    
+                    st.success(f"✅ Datas obtidas com sucesso! {len(api_data)} campos extraídos")
                     
             except Exception as e:
                 st.error(f"❌ Erro ao consultar API: {str(e)}")

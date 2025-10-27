@@ -2345,17 +2345,13 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         # 1. Verificar se os dados já existem no banco
         conn = get_database_connection()
         
-        # Verificar se há dados VÁLIDOS (não apenas registro vazio)
+        # Verificar se há dados (qualquer registro para esta combinação)
         existing_query = text("""
             SELECT COUNT(*) as count
             FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
             WHERE UPPER(NAVIO) = UPPER(:vessel_name)
             AND UPPER(VIAGEM) = UPPER(:voyage_code)
             AND UPPER(TERMINAL) = UPPER(:terminal)
-            AND (DATA_DEADLINE IS NOT NULL 
-                OR DATA_ESTIMATIVA_SAIDA IS NOT NULL 
-                OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL 
-                OR DATA_ABERTURA_GATE IS NOT NULL)
         """)
         
         existing_count = conn.execute(existing_query, {
@@ -2364,15 +2360,58 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             "terminal": terminal
         }).scalar()
         
-        conn.close()
-        
         if existing_count > 0:
-            return {
-                "success": True,
-                "data": None,
-                "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
-                "requires_manual": False
-            }
+            # Buscar os dados existentes do banco
+            data_query = text("""
+                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
+                WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+                AND UPPER(VIAGEM) = UPPER(:voyage_code)
+                AND UPPER(TERMINAL) = UPPER(:terminal)
+                ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+                FETCH FIRST 1 ROW ONLY
+            """)
+            
+            conn = get_database_connection()
+            result = conn.execute(data_query, {
+                "vessel_name": vessel_name,
+                "voyage_code": voyage_code,
+                "terminal": terminal
+            }).mappings().fetchone()
+            conn.close()
+            
+            # Convert result to dict with column names
+            if result:
+                existing_data = dict(result)
+                
+                # Check if any date field columns actually exist
+                all_fields_upper = {k.upper() for k in existing_data.keys()}
+                expected_date_fields_upper = {
+                    "DATA_DEADLINE", "DATA_DRAFT_DEADLINE", "DATA_ABERTURA_GATE",
+                    "DATA_ABERTURA_GATE_REEFER", "DATA_ESTIMATIVA_SAIDA",
+                    "DATA_ESTIMATIVA_CHEGADA", "DATA_ESTIMATIVA_ATRACACAO",
+                    "DATA_ATRACACAO", "DATA_PARTIDA", "DATA_CHEGADA"
+                }
+                
+                # Include all date fields from the record (even if None)
+                # Use case-insensitive matching
+                api_data = {}
+                for field in existing_data.keys():
+                    if field.upper() in expected_date_fields_upper:
+                        api_data[field] = existing_data[field]
+                
+                return {
+                    "success": True,
+                    "data": api_data,
+                    "message": f"✅ Dados de monitoramento encontrados no banco ({len(api_data)} campos)",
+                    "requires_manual": False
+                }
+            else:
+                return {
+                    "success": True,
+                    "data": None,
+                    "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
+                    "requires_manual": False
+                }
         
         # 2. Tentar obter dados da API Ellox
         api_client = get_default_api_client()
