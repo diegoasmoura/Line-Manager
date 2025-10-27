@@ -1967,7 +1967,7 @@ def exibir_history():
         
         # Informações sobre a timeline
         if not df_received_for_approval.empty:
-            st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use o selectbox na seção abaixo para selecionar e aprovar PDFs recebidos dos armadores.")
+            st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use o selectbox na seção abaixo para selecionar e avaliar retornos dos armadores.")
         else:
             st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações da referência.")
 
@@ -1977,7 +1977,7 @@ def exibir_history():
     
     if active_tab == unified_label and not df_received_for_approval.empty and df_for_approval is not None:
         st.markdown("---")
-        st.markdown("### ⚡ Aprovar PDF do Armador")
+        st.markdown("### ⚡ Avaliar Retorno do Armador")
         
         # Criar opções para o selectbox
         approval_options = ["Selecione um PDF para aprovar..."]
@@ -2009,7 +2009,7 @@ def exibir_history():
         
         # Selectbox para escolher PDF
         selected_pdf = st.selectbox(
-            "Selecione o PDF recebido do armador:",
+            "Selecione o retorno do armador para avaliar:",
             options=approval_options,
             key=f"pdf_approval_select_{farol_reference}"
         )
