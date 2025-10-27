@@ -2810,23 +2810,37 @@ def process_pdf_booking(pdf_content, farol_reference):
         api_message = None
         api_error_type = None
         
-        if vessel_name and terminal:
+        # Verifica se temos os dados necessários para buscar na API
+        if not vessel_name:
+            api_message = "⚠️ Nome do navio não encontrado no PDF"
+            st.warning(api_message)
+        elif not terminal:
+            api_message = f"⚠️ Terminal não encontrado no PDF (vessel: {vessel_name})"
+            st.warning(api_message)
+        elif vessel_name and terminal:
             try:
                 from database import validate_and_collect_voyage_monitoring
-                api_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                # For PDF processing, we want to save the data to DB to make them available in the voyage timeline
+                api_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=True)
                 
                 api_status = api_result.get("success", False)
                 api_error_type = api_result.get("error_type", None)
                 
                 if api_result.get("success"):
                     api_data = api_result.get("data", {})
-                    api_message = "✅ Dados de monitoramento obtidos da API Ellox"
+                    message_from_api = api_result.get("message", "✅ Dados de monitoramento obtidos da API Ellox")
+                    
+                    # Display API search result in the requested format - sempre mostra a mensagem customizada
+                    st.success(f"🟢 Dados de Voyage Monitoring encontrados e salvos da API\n\nForam encontrados e salvos dados de monitoramento na API 🚢 {vessel_name} | {voyage_code} | {terminal}.")
+                    
+                    api_message = message_from_api
                 elif api_result.get("requires_manual"):
                     api_message = api_result.get("message", "⚠️ Requer preenchimento manual")
                 else:
                     api_message = api_result.get("message", "⚠️ Não foi possível obter dados da API")
             except Exception as e:
                 api_message = f"⚠️ Erro ao validar dados de monitoramento: {str(e)}"
+                st.error(api_message)
         
         # Adicionar informações da API ao processed_data
         processed_data["api_data"] = api_data
@@ -3075,7 +3089,10 @@ def display_pdf_validation_interface(processed_data):
         def get_api_date_value(processed_data, field_name):
             """Extrai valor de data da API para o formulário"""
             import pandas as pd
-            api_data = processed_data.get("api_data", {})
+            # Check if processed_data is None before accessing it
+            if processed_data is None:
+                return None, None
+            api_data = (processed_data.get("api_data") or {})
             if api_data and field_name in api_data:
                 date_val = api_data[field_name]
                 if date_val and not pd.isna(date_val) and hasattr(date_val, 'date'):
@@ -3107,7 +3124,11 @@ def display_pdf_validation_interface(processed_data):
         with col_deadline1:
             deadline_date, deadline_time = get_api_date_value(processed_data, "DATA_DEADLINE")
             if not deadline_date:
-                deadline_date_str = processed_data.get("api_data", {}).get("DATA_DEADLINE")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    deadline_date_str = (processed_data.get("api_data") or {}).get("DATA_DEADLINE")
+                else:
+                    deadline_date_str = None
                 deadline_date, deadline_time = parse_datetime_to_date_and_time(deadline_date_str) if deadline_date_str else (None, None)
             
             col_date_dl, col_time_dl = st.columns([2, 1])
@@ -3119,7 +3140,11 @@ def display_pdf_validation_interface(processed_data):
         with col_deadline2:
             draft_date, draft_time = get_api_date_value(processed_data, "DATA_DRAFT_DEADLINE")
             if not draft_date:
-                draft_date_str = processed_data.get("api_data", {}).get("DATA_DRAFT_DEADLINE")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    draft_date_str = (processed_data.get("api_data") or {}).get("DATA_DRAFT_DEADLINE")
+                else:
+                    draft_date_str = None
                 draft_date, draft_time = parse_datetime_to_date_and_time(draft_date_str) if draft_date_str else (None, None)
             
             col_date_dd, col_time_dd = st.columns([2, 1])
@@ -3134,7 +3159,11 @@ def display_pdf_validation_interface(processed_data):
         with col_gate1:
             gate_date, gate_time = get_api_date_value(processed_data, "DATA_ABERTURA_GATE")
             if not gate_date:
-                gate_date_str = processed_data.get("api_data", {}).get("DATA_ABERTURA_GATE")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    gate_date_str = (processed_data.get("api_data") or {}).get("DATA_ABERTURA_GATE")
+                else:
+                    gate_date_str = None
                 gate_date, gate_time = parse_datetime_to_date_and_time(gate_date_str) if gate_date_str else (None, None)
             
             col_date_gt, col_time_gt = st.columns([2, 1])
@@ -3146,7 +3175,11 @@ def display_pdf_validation_interface(processed_data):
         with col_gate2:
             reefer_date, reefer_time = get_api_date_value(processed_data, "DATA_ABERTURA_GATE_REEFER")
             if not reefer_date:
-                reefer_date_str = processed_data.get("api_data", {}).get("DATA_ABERTURA_GATE_REEFER")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    reefer_date_str = (processed_data.get("api_data") or {}).get("DATA_ABERTURA_GATE_REEFER")
+                else:
+                    reefer_date_str = None
                 reefer_date, reefer_time = parse_datetime_to_date_and_time(reefer_date_str) if reefer_date_str else (None, None)
             
             col_date_rf, col_time_rf = st.columns([2, 1])
@@ -3163,7 +3196,11 @@ def display_pdf_validation_interface(processed_data):
         with col_etd:
             etd_date, etd_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_SAIDA")
             if not etd_date:
-                etd_date_str = processed_data.get("api_data", {}).get("DATA_ESTIMATIVA_SAIDA")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    etd_date_str = (processed_data.get("api_data") or {}).get("DATA_ESTIMATIVA_SAIDA")
+                else:
+                    etd_date_str = None
                 etd_date, etd_time = parse_datetime_to_date_and_time(etd_date_str) if etd_date_str else (None, None)
             
             col_date_etd, col_time_etd = st.columns([2, 1])
@@ -3175,7 +3212,11 @@ def display_pdf_validation_interface(processed_data):
         with col_eta:
             eta_date, eta_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_CHEGADA")
             if not eta_date:
-                eta_date_str = processed_data.get("api_data", {}).get("DATA_ESTIMATIVA_CHEGADA")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    eta_date_str = (processed_data.get("api_data") or {}).get("DATA_ESTIMATIVA_CHEGADA")
+                else:
+                    eta_date_str = None
                 eta_date, eta_time = parse_datetime_to_date_and_time(eta_date_str) if eta_date_str else (None, None)
             
             col_date_eta, col_time_eta = st.columns([2, 1])
@@ -3190,7 +3231,11 @@ def display_pdf_validation_interface(processed_data):
         with col_etb:
             etb_date, etb_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_ATRACACAO")
             if not etb_date:
-                etb_date_str = processed_data.get("api_data", {}).get("DATA_ESTIMATIVA_ATRACACAO")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    etb_date_str = (processed_data.get("api_data") or {}).get("DATA_ESTIMATIVA_ATRACACAO")
+                else:
+                    etb_date_str = None
                 etb_date, etb_time = parse_datetime_to_date_and_time(etb_date_str) if etb_date_str else (None, None)
             
             col_date_etb, col_time_etb = st.columns([2, 1])
@@ -3202,7 +3247,11 @@ def display_pdf_validation_interface(processed_data):
         with col_atb:
             atb_date, atb_time = get_api_date_value(processed_data, "DATA_ATRACACAO")
             if not atb_date:
-                atb_date_str = processed_data.get("api_data", {}).get("DATA_ATRACACAO")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    atb_date_str = (processed_data.get("api_data") or {}).get("DATA_ATRACACAO")
+                else:
+                    atb_date_str = None
                 atb_date, atb_time = parse_datetime_to_date_and_time(atb_date_str) if atb_date_str else (None, None)
             
             col_date_atb, col_time_atb = st.columns([2, 1])
@@ -3219,7 +3268,11 @@ def display_pdf_validation_interface(processed_data):
         with col_atd:
             atd_date, atd_time = get_api_date_value(processed_data, "DATA_PARTIDA")
             if not atd_date:
-                atd_date_str = processed_data.get("api_data", {}).get("DATA_PARTIDA")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    atd_date_str = (processed_data.get("api_data") or {}).get("DATA_PARTIDA")
+                else:
+                    atd_date_str = None
                 atd_date, atd_time = parse_datetime_to_date_and_time(atd_date_str) if atd_date_str else (None, None)
             
             col_date_atd, col_time_atd = st.columns([2, 1])
@@ -3231,7 +3284,11 @@ def display_pdf_validation_interface(processed_data):
         with col_ata:
             ata_date, ata_time = get_api_date_value(processed_data, "DATA_CHEGADA")
             if not ata_date:
-                ata_date_str = processed_data.get("api_data", {}).get("DATA_CHEGADA")
+                # Check if processed_data is None before accessing it
+                if processed_data is not None:
+                    ata_date_str = (processed_data.get("api_data") or {}).get("DATA_CHEGADA")
+                else:
+                    ata_date_str = None
                 ata_date, ata_time = parse_datetime_to_date_and_time(ata_date_str) if ata_date_str else (None, None)
             
             col_date_ata, col_time_ata = st.columns([2, 1])
