@@ -13,7 +13,7 @@ O sistema agora possui uma funcionalidade completa para processamento automátic
 ### 2. **Upload e Processamento do PDF**
 1. **Marque o checkbox**: "📄 Este é um PDF de Booking para processamento automático"
 2. **Selecione o arquivo**: O uploader mudará para "📄 Selecione o PDF de Booking" (apenas PDFs)
-3. **Processe**: Clique em "🔍 Process Booking PDF" para extrair os dados automaticamente
+3. **Processamento automático**: O sistema processa automaticamente ao selecionar o arquivo (sem precisar clicar em botão)
 
 ### 2.1. **Upload de Outros Arquivos**
 - **Deixe desmarcado** o checkbox para enviar outros tipos de arquivo (Word, Excel, imagens, etc.)
@@ -33,14 +33,28 @@ O sistema exibirá uma interface de validação com os dados extraídos:
 - **Porto de Origem (POL)**: Port of Loading
 - **Porto de Destino (POD)**: Port of Discharge
 
-#### **📅 Datas**
-- **ETD**: Estimated Time of Departure
-- **ETA**: Estimated Time of Arrival
+#### **📅 Datas Importantes e de Navegação**
+Após extrair os dados do PDF, o sistema permite consultar a API Ellox para preencher automaticamente as datas:
+
+**Datas Importantes:**
+- **⏳ Deadline**: Prazo final
+- **📝 Draft Deadline**: Prazo de rascunho
+- **🚪 Abertura Gate**: Data de abertura do portão
+- **🧊 Abertura Gate Reefer**: Data de abertura do portão reefer
+
+**Datas de Navegação:**
+- **🚢 ETD**: Estimated Time of Departure
+- **🎯 ETA**: Estimated Time of Arrival
+- **🛳️ ETB**: Estimativa Atracação
+- **✅ ATB**: Atracação
+- **📤 ATD**: Partida
+- **📥 ATA**: Chegada
 
 ### 4. **Validação e Salvamento**
 1. **Revise os dados**: Verifique se as informações extraídas estão corretas
 2. **Ajuste se necessário**: Edite qualquer campo que precise de correção
-3. **Salve**: Clique em "✅ Validar e Salvar" para confirmar
+3. **Consultar API (opcional)**: Clique em "🔍 Consultar API para Datas" para preencher automaticamente as datas
+4. **Salve**: Clique em "✅ Validar e Salvar" para confirmar
 
 ### 5. **Resultado**
 - Os dados são salvos na tabela `F_CON_RETURN_CARRIERS`
@@ -132,9 +146,11 @@ pip install PyPDF2
 ## 🎉 Benefícios
 
 ### **Automação**
+- ✅ **Processamento automático** ao selecionar PDF (sem botão extra)
 - ✅ **Extração automática** de dados de PDFs
 - ✅ **Identificação inteligente** de armadores
 - ✅ **Normalização** automática de dados
+- ✅ **Consulta à API Ellox** para preenchimento automático de datas
 
 ### **Eficiência**
 - ✅ **Reduz tempo** de entrada manual de dados
@@ -156,19 +172,24 @@ graph TD
     C --> D{É PDF de Booking?}
     D -->|Sim| E[Marca checkbox PDF Booking]
     D -->|Não| F[Deixa desmarcado - anexo normal]
-    E --> G[Upload PDF de Booking]
+    E --> G[Seleciona PDF de Booking]
     F --> H[Upload arquivo normal]
-    G --> I[Clica Process Booking PDF]
+    G --> I[🔄 Processamento Automático]
     H --> J[Clica Save Attachments]
     I --> K[Sistema identifica Carrier]
     K --> L[Extrai dados com padrões específicos]
-    L --> M[Exibe interface de validação]
+    L --> M[Exibe formulário de validação]
     M --> N[Usuário revisa e ajusta dados]
-    N --> O[Clica em Validar e Salvar]
-    O --> P[Dados salvos em F_CON_RETURN_CARRIERS]
-    P --> Q[PDF salvo como anexo também]
-    Q --> R[Status: Received from Carrier]
-    J --> S[Arquivo salvo como anexo normal]
+    N --> O{Consultar API para Datas?}
+    O -->|Sim| P[Clica Consultar API]
+    O -->|Não| Q[Clica em Validar e Salvar]
+    P --> R[API busca e preenche datas]
+    R --> S[Usuário revisa datas]
+    S --> Q
+    Q --> T[Dados salvos em F_CON_RETURN_CARRIERS]
+    T --> U[PDF salvo como anexo também]
+    U --> V[Status: Received from Carrier]
+    J --> W[Arquivo salvo como anexo normal]
 ```
 
 ## 📞 Suporte
@@ -178,6 +199,31 @@ Para dúvidas ou problemas:
 2. Confirme que o PDF contém texto extraível (não é apenas imagem)
 3. Teste com PDFs de diferentes armadores
 4. Verifique os logs do sistema para erros específicos
+
+---
+
+## 🔄 Mudanças Recentes (Última Atualização)
+
+### **Melhorias Implementadas**
+
+1. **Processamento Automático**
+   - Ao selecionar um PDF, o processamento inicia automaticamente
+   - Não é mais necessário clicar em "Process Booking PDF"
+   - Sistema detecta arquivo novo via hash MD5
+
+2. **Consulta à API Ellox**
+   - Botão "Consultar API para Datas" dentro do formulário
+   - Preenche automaticamente todas as datas importantes e de navegação
+   - Consulta ocorre apenas ao clicar no botão (não automática)
+
+3. **Formulário Unificado**
+   - Formulário único com seção de dados + botão de consulta + seção de datas
+   - Interface mais limpa e intuitiva
+   - Botões: "🔍 Consultar API para Datas" e "✅ Validar e Salvar"
+
+4. **Limpeza de Cache**
+   - Ao trocar de PDF, dados antigos são limpos automaticamente
+   - Campos sempre refletem o PDF atual
 
 ---
 

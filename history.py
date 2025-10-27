@@ -795,6 +795,11 @@ def display_attachments_section(farol_reference):
                         processed_data = process_pdf_booking(pdf_content, farol_reference)
                         
                         if processed_data:
+                            # Limpar dados de navegação/API do PDF anterior (se existir)
+                            # Isso garante que ao trocar de PDF, os campos sejam resetados
+                            if f"api_dates_{farol_reference}" in st.session_state:
+                                del st.session_state[f"api_dates_{farol_reference}"]
+                            
                             # Armazena os dados processados no session_state para validação
                             st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
                             st.session_state[f"booking_pdf_file_{farol_reference}"] = uploaded_file

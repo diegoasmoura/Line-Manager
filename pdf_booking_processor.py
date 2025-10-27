@@ -2862,6 +2862,21 @@ def display_pdf_validation_interface(processed_data):
     # Armazenar dados no session_state quando necessário
     farol_reference = processed_data.get("farol_reference")
     
+    # DEBUG: Mostrar dados extraídos (antes do formulário)
+    st.caption("🔍 DEBUG - Dados extraídos do PDF")
+    st.json({
+        "booking_reference": processed_data.get("booking_reference"),
+        "quantity": processed_data.get("quantity"),
+        "carrier": processed_data.get("carrier"),
+        "vessel_name": processed_data.get("vessel_name"),
+        "voyage": processed_data.get("voyage"),
+        "pol": processed_data.get("pol"),
+        "pod": processed_data.get("pod"),
+        "transhipment_port": processed_data.get("transhipment_port"),
+        "port_terminal_city": processed_data.get("port_terminal_city"),
+        "pdf_print_date": processed_data.get("pdf_print_date")
+    })
+    
     # FORMULÁRIO ÚNICO: Dados extraídos do PDF + Datas
     with st.form("pdf_validation_form"):
         # Layout mais compacto e organizado (padronizado com demais telas)
@@ -3058,29 +3073,42 @@ def display_pdf_validation_interface(processed_data):
             terminal_val = port_terminal_city
             
             # Consultar API
-            with st.spinner("🔄 Consultando API Ellox..."):
-                try:
-                    from database import validate_and_collect_voyage_monitoring
-                    
+            try:
+                from database import validate_and_collect_voyage_monitoring
+                
+                with st.spinner("🔄 Consultando API Ellox..."):
                     api_result = validate_and_collect_voyage_monitoring(
                         vessel_name=vessel_name_val,
                         voyage_code=voyage_val,
                         terminal=terminal_val,
                         save_to_db=False
                     )
+                
+                # Armazenar resultado no session_state
+                st.session_state[f"api_dates_{farol_reference}"] = api_result
+                
+                # DEBUG: Mostrar resultado da API
+                st.write("🔍 DEBUG - Resultado da API:")
+                st.write(f"- Success: {api_result.get('success')}")
+                st.write(f"- Has data: {api_result.get('data') is not None}")
+                if api_result.get('data'):
+                    st.write(f"- Data keys: {list(api_result.get('data').keys())}")
+                    st.write(f"- Sample values (first 3):")
+                    for i, (k, v) in enumerate(list(api_result.get('data').items())[:3]):
+                        st.write(f"  - {k}: {v} (type: {type(v).__name__})")
+                else:
+                    st.write("- Message:", api_result.get('message'))
+                
+                if api_result.get("success"):
+                    st.success("✅ Datas obtidas da API com sucesso! Verifique as datas abaixo.")
+                    st.rerun()  # Force rerun to refresh form with API data
+                else:
+                    st.warning(f"⚠️ {api_result.get('message', 'Não foi possível obter datas da API')}")
                     
-                    # Armazenar resultado no session_state
-                    st.session_state[f"api_dates_{farol_reference}"] = api_result
-                    
-                    if api_result.get("success"):
-                        st.success("✅ Datas obtidas da API com sucesso! Verifique as datas abaixo.")
-                    else:
-                        st.warning(f"⚠️ {api_result.get('message', 'Não foi possível obter datas da API')}")
-                        
-                except Exception as e:
-                    st.error(f"❌ Erro ao consultar API: {str(e)}")
-                    import traceback
-                    st.code(traceback.format_exc())
+            except Exception as e:
+                st.error(f"❌ Erro ao consultar API: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
         
         st.markdown("---")
         st.markdown("#### 📅 Datas Importantes")
