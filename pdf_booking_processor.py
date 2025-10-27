@@ -2800,53 +2800,14 @@ def process_pdf_booking(pdf_content, farol_reference):
             "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
         }
         
-        # Validar e coletar dados de Voyage Monitoring da API Ellox
-        vessel_name = normalized_data.get("vessel_name", "")
-        terminal = normalized_data.get("port_terminal_city", "")
-        voyage_code = normalized_data.get("voyage", "")
+        # Não fazer consulta automática à API durante o processamento do PDF
+        # A consulta será feita apenas quando o usuário clicar em "Consultar API para Datas"
         
-        api_data = {}
-        api_status = None
-        api_message = None
-        api_error_type = None
-        
-        # Verifica se temos os dados necessários para buscar na API
-        if not vessel_name:
-            api_message = "⚠️ Nome do navio não encontrado no PDF"
-            st.warning(api_message)
-        elif not terminal:
-            api_message = f"⚠️ Terminal não encontrado no PDF (vessel: {vessel_name})"
-            st.warning(api_message)
-        elif vessel_name and terminal:
-            try:
-                from database import validate_and_collect_voyage_monitoring
-                # For PDF processing, we want to save the data to DB to make them available in the voyage timeline
-                api_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=True)
-                
-                api_status = api_result.get("success", False)
-                api_error_type = api_result.get("error_type", None)
-                
-                if api_result.get("success"):
-                    api_data = api_result.get("data", {})
-                    message_from_api = api_result.get("message", "✅ Dados de monitoramento obtidos da API Ellox")
-                    
-                    # Display API search result in the requested format - sempre mostra a mensagem customizada
-                    st.success(f"🟢 Dados de Voyage Monitoring encontrados e salvos da API\n\nForam encontrados e salvos dados de monitoramento na API 🚢 {vessel_name} | {voyage_code} | {terminal}.")
-                    
-                    api_message = message_from_api
-                elif api_result.get("requires_manual"):
-                    api_message = api_result.get("message", "⚠️ Requer preenchimento manual")
-                else:
-                    api_message = api_result.get("message", "⚠️ Não foi possível obter dados da API")
-            except Exception as e:
-                api_message = f"⚠️ Erro ao validar dados de monitoramento: {str(e)}"
-                st.error(api_message)
-        
-        # Adicionar informações da API ao processed_data
-        processed_data["api_data"] = api_data
-        processed_data["api_status"] = api_status
-        processed_data["api_message"] = api_message
-        processed_data["api_error_type"] = api_error_type
+        # Inicializar campos da API como vazios
+        processed_data["api_data"] = {}
+        processed_data["api_status"] = None
+        processed_data["api_message"] = None
+        processed_data["api_error_type"] = None
         
         return processed_data
         
@@ -2898,11 +2859,11 @@ def display_pdf_validation_interface(processed_data):
             else:
                 st.warning(api_message)
     
-    # Armazenar dados do Formulário 1 no session_state quando necessário
+    # Armazenar dados no session_state quando necessário
     farol_reference = processed_data.get("farol_reference")
     
-    # FORMULÁRIO 1: Dados extraídos do PDF
-    with st.form("pdf_validation_form_part1"):
+    # FORMULÁRIO ÚNICO: Dados extraídos do PDF + Datas
+    with st.form("pdf_validation_form"):
         # Layout mais compacto e organizado (padronizado com demais telas)
         st.markdown("**📋 Validação de Booking**")
         
@@ -3084,70 +3045,46 @@ def display_pdf_validation_interface(processed_data):
                 help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
-        # Botão de submit do Formulário 1 (apenas para validação interna)
-        submitted_part1 = st.form_submit_button("✅ Confirmar Dados do PDF", type="secondary", use_container_width=True)
+        # Botão para consultar API (dentro do formulário, mas será executado condicionalmente)
+        st.markdown("---")
+        st.markdown("#### 🔍 Consulta de Datas via API")
         
-        if submitted_part1:
-            # Salvar dados do Formulário 1 no session_state
-            st.session_state[f"pdf_booking_reference_{farol_reference}"] = booking_reference
-            st.session_state[f"pdf_quantity_{farol_reference}"] = quantity
-            st.session_state[f"pdf_carrier_{farol_reference}"] = carrier
-            st.session_state[f"pdf_vessel_name_{farol_reference}"] = vessel_name
-            st.session_state[f"pdf_voyage_{farol_reference}"] = voyage
-            st.session_state[f"pdf_pol_{farol_reference}"] = pol
-            st.session_state[f"pdf_pod_{farol_reference}"] = pod
-            st.session_state[f"pdf_transhipment_{farol_reference}"] = transhipment_port
-            st.session_state[f"pdf_port_terminal_city_{farol_reference}"] = port_terminal_city
-            st.session_state[f"pdf_print_date_{farol_reference}"] = pdf_print_date
-            st.success("✅ Dados do PDF confirmados!")
-    
-    # ===== FIM DO FORMULÁRIO 1 =====
-    
-    # Botão para consultar API (fora dos formulários)
-    st.markdown("---")
-    st.markdown("#### 🔍 Consulta de Datas via API")
-    
-    if st.button("🔍 Consultar API para Datas", type="primary", use_container_width=True):
-        # Obter dados do formulário 1 do session_state ou usar valores padrão
-        vessel_name_val = st.session_state.get(f"pdf_vessel_name_{farol_reference}", processed_data.get("vessel_name", ""))
-        voyage_val = st.session_state.get(f"pdf_voyage_{farol_reference}", processed_data.get("voyage", ""))
-        terminal_val = st.session_state.get(f"pdf_port_terminal_city_{farol_reference}", processed_data.get("port_terminal_city", ""))
+        consult_api = st.form_submit_button("🔍 Consultar API para Datas", use_container_width=True)
         
-        # Consultar API
-        with st.spinner("🔄 Consultando API Ellox..."):
-            try:
-                from database import validate_and_collect_voyage_monitoring
-                
-                api_result = validate_and_collect_voyage_monitoring(
-                    vessel_name=vessel_name_val,
-                    voyage_code=voyage_val,
-                    terminal=terminal_val,
-                    save_to_db=False
-                )
-                
-                # Armazenar resultado no session_state para uso no Formulário 2
-                farol_reference = processed_data.get("farol_reference")
-                st.session_state[f"api_dates_{farol_reference}"] = api_result
-                
-                if api_result.get("success"):
-                    st.success("✅ Datas obtidas da API com sucesso! Confirme as informações no formulário abaixo.")
-                else:
-                    st.warning(f"⚠️ {api_result.get('message', 'Não foi possível obter datas da API')}")
+        if consult_api:
+            # Usar valores do formulário atual
+            vessel_name_val = vessel_name
+            voyage_val = voyage
+            terminal_val = port_terminal_city
+            
+            # Consultar API
+            with st.spinner("🔄 Consultando API Ellox..."):
+                try:
+                    from database import validate_and_collect_voyage_monitoring
                     
-            except Exception as e:
-                st.error(f"❌ Erro ao consultar API: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
-    
-    st.markdown("---")
-    st.markdown("#### 📅 Datas Importantes")
-    
-    # FORMULÁRIO 2: Datas da API
-    with st.form("pdf_validation_form_part2"):
+                    api_result = validate_and_collect_voyage_monitoring(
+                        vessel_name=vessel_name_val,
+                        voyage_code=voyage_val,
+                        terminal=terminal_val,
+                        save_to_db=False
+                    )
+                    
+                    # Armazenar resultado no session_state
+                    st.session_state[f"api_dates_{farol_reference}"] = api_result
+                    
+                    if api_result.get("success"):
+                        st.success("✅ Datas obtidas da API com sucesso! Verifique as datas abaixo.")
+                    else:
+                        st.warning(f"⚠️ {api_result.get('message', 'Não foi possível obter datas da API')}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erro ao consultar API: {str(e)}")
+                    import traceback
+                    st.code(traceback.format_exc())
         
-        # Função helper para obter dados do session_state ou processed_data
-        def get_form_data(key_base, default=""):
-            return st.session_state.get(f"pdf_{key_base}_{farol_reference}", processed_data.get(key_base, default))
+        st.markdown("---")
+        st.markdown("#### 📅 Datas Importantes")
+        
         
         # Função helper para obter datas da API (do session_state ou processed_data)
         def get_api_date_from_result(processed_data, field_name):
@@ -3332,17 +3269,17 @@ def display_pdf_validation_interface(processed_data):
                     return datetime.combine(date_val, datetime.min.time())
                 return None
             
-            # Obter dados do Formulário 1 do session_state
-            booking_ref = get_form_data("booking_reference", "")
-            qty = st.session_state.get(f"pdf_quantity_{farol_reference}", processed_data.get("quantity", 1))
-            carrier_name = get_form_data("carrier", processed_data.get("carrier", ""))
-            voyage_code = get_form_data("voyage", "")
-            vessel_name_val = get_form_data("vessel_name", "")
-            pol_port = get_form_data("pol", "")
-            pod_port = get_form_data("pod", "")
-            trans_port = get_form_data("transhipment", "")
-            terminal_city = get_form_data("port_terminal_city", "")
-            pdf_date = get_form_data("print_date", "")
+            # Usar dados do formulário atual (já estão nas variáveis definidas acima)
+            booking_ref = booking_reference
+            qty = quantity
+            carrier_name = carrier
+            voyage_code = voyage
+            vessel_name_val = vessel_name
+            pol_port = pol
+            pod_port = pod
+            trans_port = transhipment_port
+            terminal_city = port_terminal_city
+            pdf_date = pdf_print_date
             
             # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
             validated_data = {
