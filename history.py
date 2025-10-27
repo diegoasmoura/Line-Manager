@@ -981,23 +981,28 @@ def exibir_history():
     from datetime import datetime
     
     def convert_utc_to_brazil_time(utc_timestamp):
-        """Converte timestamp UTC do banco para horário local do Brasil"""
+        """Converte timestamp do banco para horário local do Brasil"""
         if utc_timestamp is None:
             return None
         
         try:
             # Se já é timezone-aware, assumir que é UTC
             if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
-                utc_dt = utc_timestamp
+                # Se tem timezone UTC, converter para Brasil
+                if str(utc_timestamp.tzinfo) == 'UTC' or str(utc_timestamp.tzinfo) == 'tzutc()':
+                    brazil_tz = pytz.timezone('America/Sao_Paulo')
+                    brazil_dt = utc_timestamp.astimezone(brazil_tz)
+                    return brazil_dt
+                else:
+                    # Se já tem outro timezone, retornar como está
+                    return utc_timestamp
             else:
-                # Se é naive, assumir que é UTC
-                utc_dt = pytz.UTC.localize(utc_timestamp)
+                # Se é naive, assumir que JÁ ESTÁ no horário local do Brasil
+                # (o banco Oracle armazena no horário local)
+                brazil_tz = pytz.timezone('America/Sao_Paulo')
+                brazil_dt = brazil_tz.localize(utc_timestamp)
+                return brazil_dt
             
-            # Converter para fuso horário do Brasil
-            brazil_tz = pytz.timezone('America/Sao_Paulo')
-            brazil_dt = utc_dt.astimezone(brazil_tz)
-            
-            return brazil_dt
         except Exception:
             return utc_timestamp  # Retorna original se houver erro
     
@@ -1961,7 +1966,7 @@ def exibir_history():
         edited_df_unified = df_unified_processed
         
         # Informações sobre a timeline
-        st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use a seção abaixo para aprovar retornos de armadores.")
+        st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use o selectbox na seção abaixo para selecionar e aprovar PDFs recebidos dos armadores.")
 
     # Seção de aprovação para PDFs "Received from Carrier" (abaixo da tabela unificada)
     # Usaremos o DataFrame ORIGINAL (antes da reversão) para buscar o Index correto
@@ -2541,10 +2546,6 @@ def exibir_history():
     # Seção antiga de botões removida - agora integrada na seção do selectbox acima
     # Toda a lógica foi movida para dentro da seção do selectbox na aba unificada
 
-    # Mensagens de dica para o usuário
-    if active_tab == unified_label:
-        st.markdown("💡 **Dica:** Use o selectbox acima para escolher um PDF do armador e aprová-lo. Use 'View Attachments' para gerenciar arquivos.")
-    
     # Atualizar seção de Export CSV para usar apenas o DataFrame unificado
     if edited_df_unified is not None and not edited_df_unified.empty:
         combined_df = edited_df_unified
