@@ -2042,54 +2042,6 @@ def exibir_history():
                         # Armazenar selected_row no session_state para uso posterior
                         st.session_state[f"selected_row_for_approval_{farol_reference}"] = selected_row
                         st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                        
-                        # Lógica de validação de voyage monitoring
-                        with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
-                            from database import validate_and_collect_voyage_monitoring
-                            conn = get_database_connection()
-                            vessel_data = conn.execute(text("""
-                                SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
-                                FROM LogTransp.F_CON_RETURN_CARRIERS 
-                                WHERE ADJUSTMENT_ID = :adj_id
-                            """), {"adj_id": adjustment_id}).mappings().fetchone()
-                            conn.close()
-                            
-                            if vessel_data:
-                                vessel_name = vessel_data.get("b_vessel_name")
-                                voyage_code = vessel_data.get("b_voyage_code") or ""
-                                terminal = vessel_data.get("b_terminal") or ""
-                                
-                                if vessel_name and terminal:
-                                    voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
-                                    
-                                    if voyage_validation_result.get("requires_manual"):
-                                        st.session_state["voyage_manual_entry_required"] = {
-                                            "adjustment_id": adjustment_id, "vessel_name": vessel_name,
-                                            "voyage_code": voyage_code, "terminal": terminal,
-                                            "message": voyage_validation_result.get("message", ""),
-                                            "error_type": voyage_validation_result.get("error_type", "unknown"),
-                                            "pending_approval": True
-                                        }
-                                    elif voyage_validation_result.get("success"):
-                                        try:
-                                            from database import upsert_terminal_monitorings_from_dataframe
-                                            api_data = voyage_validation_result.get("data", {})
-                                            if api_data:
-                                                monitoring_data = {
-                                                    "NAVIO": vessel_name,
-                                                    "VIAGEM": voyage_code,
-                                                    "TERMINAL": terminal,
-                                                    "CNPJ_TERMINAL": api_data.get("cnpj_terminal", ""),
-                                                    "AGENCIA": api_data.get("agencia", ""),
-                                                    **api_data
-                                                }
-                                                df_monitoring = pd.DataFrame([monitoring_data])
-                                                upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
-                                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": "✅ Dados de Voyage Monitoring salvos"}
-                                        except Exception as e:
-                                            st.error(f"❌ Erro ao salvar dados da API: {str(e)}")
-                                    else:
-                                        st.error(voyage_validation_result.get("message", ""))
                         st.rerun()
                 
                 with subcol2:

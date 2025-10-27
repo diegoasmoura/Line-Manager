@@ -2671,106 +2671,11 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             terminal = vessel_name_result.get("b_terminal") or ""
             
             if vessel_name and terminal and not manual_voyage_data:
-                # A validação de voyage monitoring já foi feita no botão "Booking Approved"
-                # Aqui precisamos salvar os dados da API se ainda não existem
+                # Dados de voyage monitoring já foram coletados durante o processamento do PDF
+                # Apenas buscar dados existentes de F_ELLOX_TERMINAL_MONITORINGS
                 
                 # Verificar se já existem dados para esta combinação
                 existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
-                
-                if not existing_monitoring_id:
-                    # Se não existem dados, tentar obter da API e salvar
-                    from ellox_api import get_default_api_client
-                    import pandas as pd
-                    
-                    try:
-                        api_client = get_default_api_client()
-                        
-                        # Verificar autenticação
-                        if not api_client.is_authenticated():
-                            print("⚠️ API não autenticada, pulando salvamento de dados da API")
-                        else:
-                            # Testar conexão
-                            api_test = api_client.test_connection()
-                            if api_test.get("success"):
-                                # Resolver CNPJ do terminal
-                                cnpj_terminal = None
-                                terminal_normalized = terminal.upper().strip()
-                                
-                                # Caso especial: Embraport
-                                if "EMBRAPORT" in terminal_normalized or "EMPRESA BRASILEIRA" in terminal_normalized:
-                                    try:
-                                        query = text("""
-                                            SELECT CNPJ, NOME
-                                            FROM LogTransp.F_ELLOX_TERMINALS
-                                            WHERE UPPER(NOME) LIKE '%DPW%'
-                                               OR UPPER(NOME) LIKE '%DP WORLD%'
-                                               OR UPPER(NOME) LIKE '%EMBRAPORT%'
-                                            FETCH FIRST 1 ROWS ONLY
-                                        """)
-                                        res = conn.execute(query).mappings().fetchone()
-                                        if res and res.get("cnpj"):
-                                            cnpj_terminal = res["cnpj"]
-                                    except Exception:
-                                        pass
-                                
-                                # Se não encontrou via normalização, buscar na API
-                                if not cnpj_terminal:
-                                    try:
-                                        terminals = api_client.get_terminals()
-                                        if terminals and len(terminals) > 0:
-                                            for t in terminals:
-                                                if terminal_normalized in t.get("nome", "").upper():
-                                                    cnpj_terminal = t.get("cnpj")
-                                                    break
-                                    except Exception:
-                                        pass
-                                
-                                # Buscar dados da API
-                                try:
-                                    voyages = api_client.get_voyages(
-                                        vessel_name=vessel_name,
-                                        voyage_code=voyage_code,
-                                        terminal_cnpj=cnpj_terminal
-                                    )
-                                    
-                                    if voyages and len(voyages) > 0:
-                                        # Processar dados da API
-                                        api_data = {}
-                                        for voyage in voyages:
-                                            for key, value in voyage.items():
-                                                if key.lower() in ['data_deadline', 'data_draft_deadline', 'data_abertura_gate',
-                                                                  'data_abertura_gate_reefer', 'data_estimativa_saida', 'data_estimativa_chegada',
-                                                                  'data_chegada', 'data_estimativa_atracacao', 'data_atracacao', 'data_partida']:
-                                                    if value:
-                                                        api_data[key] = value
-                                        
-                                        # Salvar dados da API
-                                        monitoring_data = {
-                                            "NAVIO": vessel_name,
-                                            "VIAGEM": voyage_code,
-                                            "TERMINAL": terminal,
-                                            "CNPJ_TERMINAL": cnpj_terminal,
-                                            "AGENCIA": "",
-                                            **api_data
-                                        }
-                                        
-                                        df_monitoring = pd.DataFrame([monitoring_data])
-                                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
-                                        
-                                        if processed_count > 0:
-                                            print(f"✅ Dados da API salvos para {vessel_name} - {voyage_code} - {terminal}")
-                                            # Buscar o ID do registro recém-criado
-                                            existing_monitoring_id = check_for_existing_monitoring(conn, vessel_name, voyage_code, terminal)
-                                        else:
-                                            print(f"⚠️ Falha ao salvar dados da API para {vessel_name} - {voyage_code} - {terminal}")
-                                    else:
-                                        print(f"⚠️ Nenhum dado encontrado na API para {vessel_name} - {voyage_code} - {terminal}")
-                                except Exception as e:
-                                    print(f"⚠️ Erro ao buscar dados da API: {str(e)}")
-                            else:
-                                print("⚠️ API indisponível, pulando salvamento de dados da API")
-                    except Exception as e:
-                        print(f"⚠️ Erro ao processar dados da API: {str(e)}")
                 
                 # Buscar dados do registro existente para preencher elox_update_values
                 if existing_monitoring_id:

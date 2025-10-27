@@ -2800,6 +2800,40 @@ def process_pdf_booking(pdf_content, farol_reference):
             "extracted_text": text[:500] + "..." if len(text) > 500 else text  # Primeiros 500 caracteres para debug
         }
         
+        # Validar e coletar dados de Voyage Monitoring da API Ellox
+        vessel_name = normalized_data.get("vessel_name", "")
+        terminal = normalized_data.get("port_terminal_city", "")
+        voyage_code = normalized_data.get("voyage", "")
+        
+        api_data = {}
+        api_status = None
+        api_message = None
+        api_error_type = None
+        
+        if vessel_name and terminal:
+            try:
+                from database import validate_and_collect_voyage_monitoring
+                api_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                
+                api_status = api_result.get("success", False)
+                api_error_type = api_result.get("error_type", None)
+                
+                if api_result.get("success"):
+                    api_data = api_result.get("data", {})
+                    api_message = "✅ Dados de monitoramento obtidos da API Ellox"
+                elif api_result.get("requires_manual"):
+                    api_message = api_result.get("message", "⚠️ Requer preenchimento manual")
+                else:
+                    api_message = api_result.get("message", "⚠️ Não foi possível obter dados da API")
+            except Exception as e:
+                api_message = f"⚠️ Erro ao validar dados de monitoramento: {str(e)}"
+        
+        # Adicionar informações da API ao processed_data
+        processed_data["api_data"] = api_data
+        processed_data["api_status"] = api_status
+        processed_data["api_message"] = api_message
+        processed_data["api_error_type"] = api_error_type
+        
         return processed_data
         
     except Exception as e:
@@ -2817,6 +2851,38 @@ def display_pdf_validation_interface(processed_data):
         dict: Dados validados pelo usuário ou None se cancelado
     """
     # Interface de validação dos dados extraídos do PDF
+    
+    # Exibir mensagem de status da API antes do formulário
+    api_status = processed_data.get("api_status")
+    api_message = processed_data.get("api_message", "")
+    api_error_type = processed_data.get("api_error_type")
+    
+    if api_message:
+        # Determinar tipo de mensagem baseado no error_type e status
+        if api_status and api_error_type is None:
+            # Dados encontrados na API
+            st.success(api_message)
+        elif api_error_type == "voyage_not_found":
+            # Voyage não encontrada
+            st.warning(api_message)
+        elif api_error_type == "connection_failed" or "indisponível" in api_message.lower():
+            # API indisponível
+            st.warning(api_message)
+        elif api_error_type == "authentication_failed":
+            # Falha de autenticação
+            st.error(api_message)
+        elif api_error_type == "terminal_not_found":
+            # Terminal não encontrado
+            st.info(api_message)
+        elif api_error_type == "no_valid_dates" or api_error_type == "data_format_error":
+            # Dados inválidos
+            st.warning(api_message)
+        else:
+            # Mensagem genérica (requer manual)
+            if "manual" in api_message.lower():
+                st.info(api_message)
+            else:
+                st.warning(api_message)
     
     # Cria formulário de validação
     with st.form("pdf_validation_form"):
@@ -3001,10 +3067,180 @@ def display_pdf_validation_interface(processed_data):
                 help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
             )
         
+        # Seção de datas da API Ellox
+        st.markdown("---")
+        st.markdown("#### 📅 Datas Importantes")
         
-        # Campos ETD e ETA movidos para a quarta linha acima
+        # Função helper para converter date/hora para datetime
+        def get_api_date_value(processed_data, field_name):
+            """Extrai valor de data da API para o formulário"""
+            import pandas as pd
+            api_data = processed_data.get("api_data", {})
+            if api_data and field_name in api_data:
+                date_val = api_data[field_name]
+                if date_val and not pd.isna(date_val) and hasattr(date_val, 'date'):
+                    try:
+                        return date_val.date(), date_val.time()
+                    except:
+                        return None, None
+            return None, None
         
-        # Área de texto extraído removida para interface mais limpa
+        # Função helper para parse de string datetime
+        def parse_datetime_to_date_and_time(date_str):
+            """Converte string datetime para date e time"""
+            if not date_str:
+                return None, None
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                return dt.date(), dt.time()
+            except:
+                try:
+                    dt = datetime.fromisoformat(date_str)
+                    return dt.date(), dt.time()
+                except:
+                    return None, None
+        
+        # Primeira linha: Deadline e Draft Deadline
+        col_deadline1, col_deadline2 = st.columns(2)
+        
+        with col_deadline1:
+            deadline_date, deadline_time = get_api_date_value(processed_data, "DATA_DEADLINE")
+            if not deadline_date:
+                deadline_date_str = processed_data.get("api_data", {}).get("DATA_DEADLINE")
+                deadline_date, deadline_time = parse_datetime_to_date_and_time(deadline_date_str) if deadline_date_str else (None, None)
+            
+            col_date_dl, col_time_dl = st.columns([2, 1])
+            with col_date_dl:
+                manual_deadline_date = st.date_input("⏳ Deadline", value=deadline_date, key="pdf_deadline_date")
+            with col_time_dl:
+                manual_deadline_time = st.time_input("Hora", value=deadline_time, key="pdf_deadline_time")
+        
+        with col_deadline2:
+            draft_date, draft_time = get_api_date_value(processed_data, "DATA_DRAFT_DEADLINE")
+            if not draft_date:
+                draft_date_str = processed_data.get("api_data", {}).get("DATA_DRAFT_DEADLINE")
+                draft_date, draft_time = parse_datetime_to_date_and_time(draft_date_str) if draft_date_str else (None, None)
+            
+            col_date_dd, col_time_dd = st.columns([2, 1])
+            with col_date_dd:
+                manual_draft_date = st.date_input("📝 Draft Deadline", value=draft_date, key="pdf_draft_date")
+            with col_time_dd:
+                manual_draft_time = st.time_input("Hora", value=draft_time, key="pdf_draft_time")
+        
+        # Segunda linha: Abertura Gate e Abertura Gate Reefer
+        col_gate1, col_gate2 = st.columns(2)
+        
+        with col_gate1:
+            gate_date, gate_time = get_api_date_value(processed_data, "DATA_ABERTURA_GATE")
+            if not gate_date:
+                gate_date_str = processed_data.get("api_data", {}).get("DATA_ABERTURA_GATE")
+                gate_date, gate_time = parse_datetime_to_date_and_time(gate_date_str) if gate_date_str else (None, None)
+            
+            col_date_gt, col_time_gt = st.columns([2, 1])
+            with col_date_gt:
+                manual_gate_date = st.date_input("🚪 Abertura Gate", value=gate_date, key="pdf_gate_date")
+            with col_time_gt:
+                manual_gate_time = st.time_input("Hora", value=gate_time, key="pdf_gate_time")
+        
+        with col_gate2:
+            reefer_date, reefer_time = get_api_date_value(processed_data, "DATA_ABERTURA_GATE_REEFER")
+            if not reefer_date:
+                reefer_date_str = processed_data.get("api_data", {}).get("DATA_ABERTURA_GATE_REEFER")
+                reefer_date, reefer_time = parse_datetime_to_date_and_time(reefer_date_str) if reefer_date_str else (None, None)
+            
+            col_date_rf, col_time_rf = st.columns([2, 1])
+            with col_date_rf:
+                manual_reefer_date = st.date_input("🧊 Abertura Gate Reefer", value=reefer_date, key="pdf_reefer_date")
+            with col_time_rf:
+                manual_reefer_time = st.time_input("Hora", value=reefer_time, key="pdf_reefer_time")
+        
+        st.markdown("#### 🚢 Datas de Navegação")
+        
+        # Primeira linha: ETD e ETA
+        col_etd, col_eta = st.columns(2)
+        
+        with col_etd:
+            etd_date, etd_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_SAIDA")
+            if not etd_date:
+                etd_date_str = processed_data.get("api_data", {}).get("DATA_ESTIMATIVA_SAIDA")
+                etd_date, etd_time = parse_datetime_to_date_and_time(etd_date_str) if etd_date_str else (None, None)
+            
+            col_date_etd, col_time_etd = st.columns([2, 1])
+            with col_date_etd:
+                manual_etd_date = st.date_input("🚢 ETD", value=etd_date, key="pdf_etd_date")
+            with col_time_etd:
+                manual_etd_time = st.time_input("Hora", value=etd_time, key="pdf_etd_time")
+        
+        with col_eta:
+            eta_date, eta_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_CHEGADA")
+            if not eta_date:
+                eta_date_str = processed_data.get("api_data", {}).get("DATA_ESTIMATIVA_CHEGADA")
+                eta_date, eta_time = parse_datetime_to_date_and_time(eta_date_str) if eta_date_str else (None, None)
+            
+            col_date_eta, col_time_eta = st.columns([2, 1])
+            with col_date_eta:
+                manual_eta_date = st.date_input("🎯 ETA", value=eta_date, key="pdf_eta_date")
+            with col_time_eta:
+                manual_eta_time = st.time_input("Hora", value=eta_time, key="pdf_eta_time")
+        
+        # Segunda linha: ETB e ATB
+        col_etb, col_atb = st.columns(2)
+        
+        with col_etb:
+            etb_date, etb_time = get_api_date_value(processed_data, "DATA_ESTIMATIVA_ATRACACAO")
+            if not etb_date:
+                etb_date_str = processed_data.get("api_data", {}).get("DATA_ESTIMATIVA_ATRACACAO")
+                etb_date, etb_time = parse_datetime_to_date_and_time(etb_date_str) if etb_date_str else (None, None)
+            
+            col_date_etb, col_time_etb = st.columns([2, 1])
+            with col_date_etb:
+                manual_etb_date = st.date_input("🛳️ Estimativa Atracação (ETB)", value=etb_date, key="pdf_etb_date")
+            with col_time_etb:
+                manual_etb_time = st.time_input("Hora", value=etb_time, key="pdf_etb_time")
+        
+        with col_atb:
+            atb_date, atb_time = get_api_date_value(processed_data, "DATA_ATRACACAO")
+            if not atb_date:
+                atb_date_str = processed_data.get("api_data", {}).get("DATA_ATRACACAO")
+                atb_date, atb_time = parse_datetime_to_date_and_time(atb_date_str) if atb_date_str else (None, None)
+            
+            col_date_atb, col_time_atb = st.columns([2, 1])
+            with col_date_atb:
+                manual_atb_date = st.date_input("✅ Atracação (ATB)", value=atb_date, key="pdf_atb_date")
+            with col_time_atb:
+                manual_atb_time = st.time_input("Hora", value=atb_time, key="pdf_atb_time")
+        
+        # Chegada e Partida
+        st.markdown("#### 🎯 Chegada e Partida")
+        
+        col_atd, col_ata = st.columns(2)
+        
+        with col_atd:
+            atd_date, atd_time = get_api_date_value(processed_data, "DATA_PARTIDA")
+            if not atd_date:
+                atd_date_str = processed_data.get("api_data", {}).get("DATA_PARTIDA")
+                atd_date, atd_time = parse_datetime_to_date_and_time(atd_date_str) if atd_date_str else (None, None)
+            
+            col_date_atd, col_time_atd = st.columns([2, 1])
+            with col_date_atd:
+                manual_atd_date = st.date_input("📤 Partida (ATD)", value=atd_date, key="pdf_atd_date")
+            with col_time_atd:
+                manual_atd_time = st.time_input("Hora", value=atd_time, key="pdf_atd_time")
+        
+        with col_ata:
+            ata_date, ata_time = get_api_date_value(processed_data, "DATA_CHEGADA")
+            if not ata_date:
+                ata_date_str = processed_data.get("api_data", {}).get("DATA_CHEGADA")
+                ata_date, ata_time = parse_datetime_to_date_and_time(ata_date_str) if ata_date_str else (None, None)
+            
+            col_date_ata, col_time_ata = st.columns([2, 1])
+            with col_date_ata:
+                manual_ata_date = st.date_input("📥 Chegada (ATA)", value=ata_date, key="pdf_ata_date")
+            with col_time_ata:
+                manual_ata_time = st.time_input("Hora", value=ata_time, key="pdf_ata_time")
+        
+        st.markdown("---")
         
         # Botões de ação
         col1, col2, col_spacer_btn = st.columns([1, 1, 2])
@@ -3014,6 +3250,17 @@ def display_pdf_validation_interface(processed_data):
             cancelled = st.form_submit_button("❌ Cancelar", use_container_width=False)
         
         if submitted:
+            # Função helper para criar datetime a partir de date e time
+            from datetime import datetime
+            
+            def combine_date_time(date_val, time_val):
+                """Combina date e time em datetime, retorna None se algum for None"""
+                if date_val and time_val:
+                    return datetime.combine(date_val, time_val)
+                elif date_val:
+                    return datetime.combine(date_val, datetime.min.time())
+                return None
+            
             # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
             validated_data = {
                 "Farol Reference": processed_data["farol_reference"],
@@ -3030,13 +3277,18 @@ def display_pdf_validation_interface(processed_data):
                 "Final Destination": pod,
                 "Transhipment Port": transhipment_port,
                 "Port Terminal City": port_terminal_city,
-                # Preenchimentos padronizados esperados por insert_return_carrier_from_ui
-                # ETD e ETA removidos - responsabilidade da API ou preenchimento manual
-                # Definir como None para permitir pré-preenchimento automático
-                "Requested Deadline Start Date": None,  # ETD removido - permite pré-preenchimento
-                "Requested Deadline End Date": None,
-                "Required Arrival Date Expected": None,  # ETA removido - permite pré-preenchimento
-                "PDF Booking Emission Date": pdf_print_date
+                "PDF Booking Emission Date": pdf_print_date,
+                # Datas da API ou entrada manual
+                "B_DATA_DEADLINE": combine_date_time(manual_deadline_date, manual_deadline_time),
+                "B_DATA_DRAFT_DEADLINE": combine_date_time(manual_draft_date, manual_draft_time),
+                "B_DATA_ABERTURA_GATE": combine_date_time(manual_gate_date, manual_gate_time),
+                "B_DATA_ABERTURA_GATE_REEFER": combine_date_time(manual_reefer_date, manual_reefer_time),
+                "B_DATA_ESTIMATIVA_SAIDA_ETD": combine_date_time(manual_etd_date, manual_etd_time),
+                "B_DATA_ESTIMATIVA_CHEGADA_ETA": combine_date_time(manual_eta_date, manual_eta_time),
+                "B_DATA_ESTIMATIVA_ATRACACAO_ETB": combine_date_time(manual_etb_date, manual_etb_time),
+                "B_DATA_ATRACACAO_ATB": combine_date_time(manual_atb_date, manual_atb_time),
+                "B_DATA_PARTIDA_ATD": combine_date_time(manual_atd_date, manual_atd_time),
+                "B_DATA_CHEGADA_ATA": combine_date_time(manual_ata_date, manual_ata_time),
             }
 
             # Compatibilidade: alguns fluxos esperam a chave 'Terminal'
@@ -3126,7 +3378,18 @@ def save_pdf_booking_data(validated_data):
         if success:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
             st.info("📋 Status definido como: **Received from Carrier**")
-            st.info("ℹ️ **Voyage Monitoring:** Os dados de monitoramento serão coletados automaticamente durante a aprovação do registro.")
+            
+            # Verificar se temos dados de monitoramento da API
+            api_status = validated_data.get("api_status")
+            api_message = validated_data.get("api_message", "")
+            
+            if api_status:
+                st.success(f"✅ {api_message}")
+            elif api_message:
+                if "manual" in api_message.lower():
+                    st.info(f"ℹ️ {api_message}. Por favor, preencha os campos de data no formulário.")
+                else:
+                    st.warning(f"⚠️ {api_message}")
             
             # Salva também o PDF como anexo
             if pdf_file:
