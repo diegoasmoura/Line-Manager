@@ -1248,10 +1248,12 @@ def exibir_history():
     # Cria cópia do DataFrame (coluna Index será adicionada na função display_tab_content)
     df_display = df_show.copy()
     
-    # Separa os dados em duas abas baseado no status
+    # DataFrame unificado - todas as linhas juntas
+    df_unified = df_display.copy()
+    
+    # Remove splits informativos (exceto a referência atual) para contagem de rótulos
     df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
     
-    # Remove splits informativos da Request Timeline
     if not df_other_status.empty:
         # Filtrar linhas que são splits EXCETO a referência atual
         has_ref_col = "FAROL_REFERENCE" in df_other_status.columns
@@ -1269,21 +1271,22 @@ def exibir_history():
                 (~df_other_status["FAROL_REFERENCE"].astype(str).str.match(r'.*\.\d+$', na=False))
             ].copy()
     
-    df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
+    # Separar PDFs "Received from Carrier" da referência atual para aprovação
+    df_received_count = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
+    df_received_for_approval = pd.DataFrame()
 
-    # Na aba "Returns Awaiting Review", exibir apenas linhas do Farol Reference principal acessado (exato)
     try:
-        if not df_received_carrier.empty and "FAROL_REFERENCE" in df_received_carrier.columns and farol_reference is not None:
+        if not df_received_count.empty and "FAROL_REFERENCE" in df_received_count.columns and farol_reference is not None:
             fr_sel = str(farol_reference).strip().upper()
-            df_received_carrier = df_received_carrier[
-                df_received_carrier["FAROL_REFERENCE"].astype(str).str.upper() == fr_sel
+            df_received_for_approval = df_received_count[
+                df_received_count["FAROL_REFERENCE"].astype(str).str.upper() == fr_sel
             ].copy()
     except Exception:
         pass
     
-    # Rótulos das "abas"
-    other_label = f"📋 Request Timeline ({len(df_other_status)} records)"
-    received_label = f"📨 Returns Awaiting Review ({len(df_received_carrier)} records)"
+    # Rótulos das abas
+    unified_label = f"📋 Request Timeline ({len(df_unified)} records)"
+    received_label = f"📨 Returns Awaiting Review ({len(df_received_for_approval)} records)"
     
     # Busca dados de monitoramento relacionados aos navios desta referência
     df_voyage_monitoring = get_voyage_monitoring_for_reference(farol_reference)
@@ -1329,38 +1332,30 @@ def exibir_history():
     active_tab_key = f"history_active_tab_{farol_reference}"
     last_active_tab_key = f"history_last_active_tab_{farol_reference}"
     if active_tab_key not in st.session_state:
-        st.session_state[active_tab_key] = other_label
-        st.session_state[last_active_tab_key] = other_label
+        st.session_state[active_tab_key] = unified_label
+        st.session_state[last_active_tab_key] = unified_label
 
     active_tab = st.segmented_control(
         "",
-        options=[other_label, received_label, voyages_label, audit_label],
+        options=[unified_label, voyages_label, audit_label],
         key=active_tab_key
     )
 
     # Se detectarmos troca de aba, limpamos as seleções das outras abas
     prev_tab = st.session_state.get(last_active_tab_key)
     if prev_tab != active_tab:
-        if active_tab == other_label:
-            # Limpamos seleção da aba "Returns Awaiting Review"
-            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
-        elif active_tab == received_label:
-            # Limpamos seleção da aba "Request Timeline"
-            if f"history_other_status_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_other_status_editor_{farol_reference}"]
+        if active_tab == unified_label:
+            # Ao entrar na aba unificada, limpar qualquer seleção pendente
+            if f"pdf_approval_select_{farol_reference}" in st.session_state:
+                del st.session_state[f"pdf_approval_select_{farol_reference}"]
         elif active_tab == audit_label:
-            # Limpamos seleções de ambas as abas quando entrar na Audit Trail
-            if f"history_other_status_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_other_status_editor_{farol_reference}"]
-            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
+            # Limpamos seleção quando entrar na Audit Trail
+            if f"pdf_approval_select_{farol_reference}" in st.session_state:
+                del st.session_state[f"pdf_approval_select_{farol_reference}"]
         else:  # voyages_label
-            # Limpamos seleções de ambas as abas
-            if f"history_other_status_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_other_status_editor_{farol_reference}"]
-            if f"history_received_carrier_editor_{farol_reference}" in st.session_state:
-                del st.session_state[f"history_received_carrier_editor_{farol_reference}"]
+            # Limpamos seleção ao entrar na aba Voyages
+            if f"pdf_approval_select_{farol_reference}" in st.session_state:
+                del st.session_state[f"pdf_approval_select_{farol_reference}"]
         # Ao trocar de aba, recolhe a seção de anexos para manter a tela limpa
         st.session_state["history_show_attachments"] = False
         st.session_state[last_active_tab_key] = active_tab
@@ -1533,40 +1528,30 @@ def exibir_history():
         df_processed.rename(columns=rename_map, inplace=True)
         
         # Tratamento robusto para valores nulos (None, NaN, NaT)
-        print("🔍 DEBUG: Iniciando tratamento de valores nulos...")
         
         for col in df_processed.columns:
-            print(f"🔍 DEBUG: Processando coluna '{col}' - Tipo: {df_processed[col].dtype}")
             
             # Verifica valores únicos antes do tratamento
             unique_before = df_processed[col].unique()
-            print(f"🔍 DEBUG: Valores únicos ANTES: {unique_before[:5]}...")  # Mostra apenas os primeiros 5
             
             if df_processed[col].dtype == 'datetime64[ns]':
-                print(f"🔍 DEBUG: Coluna de data detectada - aplicando tratamento específico")
                 # Para colunas de data: converte NaT para string vazia diretamente
                 df_processed[col] = df_processed[col].astype(str).replace('NaT', '')
             else:
-                print(f"🔍 DEBUG: Coluna não-datetime - aplicando fillna('')")
                 # Para outras colunas: substitui valores nulos por string vazia
                 df_processed[col] = df_processed[col].fillna('')
             
             # Verifica valores únicos depois do tratamento
             unique_after = df_processed[col].unique()
-            print(f"🔍 DEBUG: Valores únicos DEPOIS: {unique_after[:5]}...")  # Mostra apenas os primeiros 5
-            print(f"🔍 DEBUG: Tipo final: {df_processed[col].dtype}")
             print("---")
         
         # Debug: verifica valores de data após tratamento
-        print("🔍 DEBUG: Verificando colunas de data após tratamento...")
         for col in df_processed.columns:
             if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
                 unique_vals = df_processed[col].unique()
-                print(f"🔍 DEBUG: Coluna '{col}' - Valores únicos: {unique_vals[:3]}...")
         
         # Aplica formatação amigável para Linked Reference
         if "Linked Reference" in df_processed.columns:
-            print("🔍 DEBUG: Aplicando formatação amigável para Linked Reference...")
             df_processed["Linked Reference"] = df_processed.apply(
                 lambda row: format_linked_reference_display(
                     row.get("Linked Reference"), 
@@ -1574,7 +1559,6 @@ def exibir_history():
                 ), 
                 axis=1
             )
-            print("🔍 DEBUG: Formatação do Linked Reference aplicada com sucesso!")
         
         # Campo "Status" removido - usando apenas "Farol Status" para exibição
         
@@ -1854,34 +1838,25 @@ def exibir_history():
         df_styled = df_processed.copy()
         
         # Aplica o mesmo tratamento de valores nulos na cópia
-        print("🔍 DEBUG: Aplicando tratamento de valores nulos na cópia para estilização...")
         for col in df_styled.columns:
             if df_styled[col].dtype == 'datetime64[ns]':
-                print(f"🔍 DEBUG: Tratando coluna de data '{col}' - Tipo: {df_styled[col].dtype}")
-                print(f"🔍 DEBUG: Valores únicos ANTES: {df_styled[col].unique()[:3]}")
                 
                 # Para colunas de data: converte NaT para string vazia diretamente
                 df_styled[col] = df_styled[col].astype(str).replace('NaT', '')
                 
-                print(f"🔍 DEBUG: Valores únicos DEPOIS: {df_styled[col].unique()[:3]}")
-                print(f"🔍 DEBUG: Tipo final: {df_styled[col].dtype}")
             else:
                 # Para outras colunas: substitui valores nulos por string vazia
                 df_styled[col] = df_styled[col].fillna('')
         
         # Debug: verifica se o tratamento foi aplicado corretamente
-        print("🔍 DEBUG: Verificando tratamento na cópia após estilização...")
         for col in df_styled.columns:
             if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
                 unique_vals = df_styled[col].unique()
-                print(f"🔍 DEBUG: Coluna '{col}' - Valores únicos: {unique_vals[:3]}...")
         
         # Debug: verifica valores nulos após tratamento
-        print("🔍 DEBUG: Verificando valores nulos após tratamento na cópia...")
         for col in df_styled.columns:
             if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
                 unique_vals = df_styled[col].unique()
-                print(f"🔍 DEBUG: Coluna '{col}' - Valores únicos: {unique_vals[:3]}...")
         
         # Função para aplicar estilo baseado nas alterações detectadas e layout zebra
         def highlight_changes_and_zebra(row):
@@ -1912,38 +1887,35 @@ def exibir_history():
         
         return styled_df
 
-    # Conteúdo da "aba" Pedidos da Empresa
-    df_other_processed = None
-    if active_tab == other_label:
-        df_other_processed = display_tab_content(df_other_status, "Pedidos da Empresa")
-    edited_df_other = None
-    if df_other_processed is not None and active_tab == other_label:
+    # Conteúdo da aba unificada "Request Timeline"
+    df_unified_processed = None
+    if active_tab == unified_label:
+        df_unified_processed = display_tab_content(df_unified, "Request Timeline")
+    edited_df_unified = None
+    if df_unified_processed is not None and active_tab == unified_label:
         # Gera configuração dinâmica baseada no conteúdo (Status visível)
-        column_config = generate_dynamic_column_config(df_other_processed, hide_status=False)
+        column_config = generate_dynamic_column_config(df_unified_processed, hide_status=False)
         # Detectar e destacar alterações em linhas "New Adjustment"
         # Inverte o DataFrame para que a ordem visual corresponda ao índice
-        df_other_processed_reversed = df_other_processed.iloc[::-1].reset_index(drop=True)
-        changes = detect_changes_for_new_adjustment(df_other_processed_reversed)
+        df_unified_processed_reversed = df_unified_processed.iloc[::-1].reset_index(drop=True)
+        changes = detect_changes_for_new_adjustment(df_unified_processed_reversed)
         
         # Detecção de alterações (sem debug visual)
         
         # Aplicar estilização usando Pandas Styler
         if changes:
-            styled_df = apply_highlight_styling(df_other_processed_reversed, changes)
+            styled_df = apply_highlight_styling(df_unified_processed_reversed, changes)
         else:
             # Se não há alterações, usar DataFrame normal
-            styled_df = df_other_processed_reversed
+            styled_df = df_unified_processed_reversed
         
         # Aplica tratamento de valores nulos no DataFrame final antes da exibição
-        print("🔍 DEBUG: Aplicando tratamento final de valores nulos...")
         if hasattr(styled_df, 'data'):
             # Se é um Styler, trata o DataFrame subjacente
             df_to_check = styled_df.data.copy()
-            print(f"🔍 DEBUG: Tratando DataFrame subjacente do Styler - Shape: {df_to_check.shape}")
         else:
             # Se é um DataFrame normal
             df_to_check = styled_df.copy()
-            print(f"🔍 DEBUG: Tratando DataFrame normal - Shape: {df_to_check.shape}")
         
         # Aplica tratamento de valores nulos no DataFrame final
         for col in df_to_check.columns:
@@ -1955,11 +1927,9 @@ def exibir_history():
                 df_to_check[col] = df_to_check[col].fillna('')
         
         # Debug: verifica colunas de data após tratamento final
-        print("🔍 DEBUG: Verificando colunas de data após tratamento final...")
         for col in df_to_check.columns:
             if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
                 unique_vals = df_to_check[col].unique()
-                print(f"🔍 DEBUG: Coluna de data '{col}' - Valores únicos: {unique_vals[:3]}...")
         
         # Atualiza o styled_df com o DataFrame tratado
         if hasattr(styled_df, 'data'):
@@ -1984,46 +1954,168 @@ def exibir_history():
             use_container_width=True,
             hide_index=True,
             column_config=column_config,
-            key=f"history_other_status_{farol_reference}"
+            key=f"history_unified_{farol_reference}"
         )
         
         # Para compatibilidade com o resto do código, usar o DataFrame original
-        edited_df_other = df_other_processed
+        edited_df_unified = df_unified_processed
         
         # Informações sobre a timeline
-        st.info("ℹ️ **Request Timeline:** Visualize o histórico de alterações. Use a aba '📨 Returns Awaiting Review' para aprovar retornos de armadores.")
+        st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use a seção abaixo para aprovar retornos de armadores.")
 
-    # Conteúdo da "aba" Retornos do Armador
-    df_received_processed = None
-    if active_tab == received_label:
-        df_received_processed = display_tab_content(df_received_carrier, "Retornos do Armador")
-    edited_df_received = None
-    if df_received_processed is not None and active_tab == received_label:
-        # Remove colunas ETD/ETA específicas desta aba
-        columns_to_remove = [
-            "Draft Deadline", "Deadline", "ETD", 
-            "ETA", "Abertura Gate",
-            "Estimativa Atracação (ETB)", "Atracação (ATB)",
-            "Partida (ATD)", "Chegada (ATA)"
-        ]
-        df_for_display = df_received_processed.drop(
-            columns=[col for col in columns_to_remove if col in df_received_processed.columns],
-            errors='ignore'
+    # Seção de aprovação para PDFs "Received from Carrier" (abaixo da tabela unificada)
+    # Usaremos o DataFrame ORIGINAL (antes da reversão) para buscar o Index correto
+    df_for_approval = df_unified_processed.copy() if df_unified_processed is not None else None
+    
+    if active_tab == unified_label and not df_received_for_approval.empty and df_for_approval is not None:
+        st.markdown("---")
+        st.markdown("### ⚡ Aprovar PDF do Armador")
+        
+        # Criar opções para o selectbox
+        approval_options = ["Selecione um PDF para aprovar..."]
+        approval_mapping = {}  # Dict para mapear opção -> dados da linha
+        
+        for idx, row in df_received_for_approval.iterrows():
+            inserted_date = row.get('ROW_INSERTED_DATE')
+            if inserted_date:
+                brazil_time = convert_utc_to_brazil_time(inserted_date)
+                if brazil_time and hasattr(brazil_time, 'strftime'):
+                    date_str = brazil_time.strftime('%d/%m/%Y %H:%M')
+                else:
+                    date_str = str(inserted_date)[:16] if inserted_date else 'N/A'
+            else:
+                date_str = 'N/A'
+            
+            # Buscar Index da linha no df_for_approval baseado no idx
+            # O idx do iterrows() do df_received_for_approval corresponde ao índice original
+            # no df_for_approval
+            if df_for_approval is not None and idx in df_for_approval.index:
+                line_index = df_for_approval.loc[idx, 'Index']
+            else:
+                line_index = idx
+            
+            # Formato: Index | Data e hora
+            option_text = f"Index {line_index} | {date_str}"
+            approval_options.append(option_text)
+            approval_mapping[option_text] = row
+        
+        # Selectbox para escolher PDF
+        selected_pdf = st.selectbox(
+            "Selecione o PDF recebido do armador:",
+            options=approval_options,
+            key=f"pdf_approval_select_{farol_reference}"
         )
         
-        # Gera configuração dinâmica baseada no conteúdo (Status e Linked Reference ocultos)
-        column_config = generate_dynamic_column_config(df_for_display, hide_status=True, hide_linked_reference=True)
-        edited_df_received = st.data_editor(
-            df_for_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config=column_config,
-            disabled=df_for_display.columns.drop(["Index"]),
-            key=f"history_received_carrier_editor_{farol_reference}"
-        )
-        
-        # Informações sobre retornos do armador
-        st.info("ℹ️ **Returns Awaiting Review:** Aprove ou rejeite retornos de armadores.")
+        # Se selecionou um PDF, mostrar botões de aprovação
+        if selected_pdf != "Selecione um PDF para aprovar...":
+            selected_row = approval_mapping[selected_pdf]
+            adjustment_id = selected_row['ADJUSTMENT_ID']
+            
+            # Obter status atual
+            selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("B_BOOKING_STATUS", "")
+            
+            st.markdown("#### 🔄 Selecione a Ação:")
+            
+            # Layout dos botões (mesmo do código atual)
+            col1, col2 = st.columns([2, 3])
+            
+            with col1:
+                farol_status = selected_row.get("B_BOOKING_STATUS", "")
+                disable_approved = farol_status == "Booking Approved"
+                disable_rejected = farol_status == "Booking Rejected"
+                disable_cancelled = farol_status == "Booking Cancelled"
+                disable_adjustment = farol_status == "Adjustment Requested"
+                
+                subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
+                
+                with subcol1:
+                    if st.button("Booking Approved", key=f"status_approved_unified_{farol_reference}", type="secondary", disabled=disable_approved):
+                        st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
+                        # Armazenar selected_row no session_state para uso posterior
+                        st.session_state[f"selected_row_for_approval_{farol_reference}"] = selected_row
+                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                        
+                        # Lógica de validação de voyage monitoring
+                        with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
+                            from database import validate_and_collect_voyage_monitoring
+                            conn = get_database_connection()
+                            vessel_data = conn.execute(text("""
+                                SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
+                                FROM LogTransp.F_CON_RETURN_CARRIERS 
+                                WHERE ADJUSTMENT_ID = :adj_id
+                            """), {"adj_id": adjustment_id}).mappings().fetchone()
+                            conn.close()
+                            
+                            if vessel_data:
+                                vessel_name = vessel_data.get("b_vessel_name")
+                                voyage_code = vessel_data.get("b_voyage_code") or ""
+                                terminal = vessel_data.get("b_terminal") or ""
+                                
+                                if vessel_name and terminal:
+                                    voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
+                                    
+                                    if voyage_validation_result.get("requires_manual"):
+                                        st.session_state["voyage_manual_entry_required"] = {
+                                            "adjustment_id": adjustment_id, "vessel_name": vessel_name,
+                                            "voyage_code": voyage_code, "terminal": terminal,
+                                            "message": voyage_validation_result.get("message", ""),
+                                            "error_type": voyage_validation_result.get("error_type", "unknown"),
+                                            "pending_approval": True
+                                        }
+                                    elif voyage_validation_result.get("success"):
+                                        try:
+                                            from database import upsert_terminal_monitorings_from_dataframe
+                                            api_data = voyage_validation_result.get("data", {})
+                                            if api_data:
+                                                monitoring_data = {
+                                                    "NAVIO": vessel_name,
+                                                    "VIAGEM": voyage_code,
+                                                    "TERMINAL": terminal,
+                                                    "CNPJ_TERMINAL": api_data.get("cnpj_terminal", ""),
+                                                    "AGENCIA": api_data.get("agencia", ""),
+                                                    **api_data
+                                                }
+                                                df_monitoring = pd.DataFrame([monitoring_data])
+                                                upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
+                                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": "✅ Dados de Voyage Monitoring salvos"}
+                                        except Exception as e:
+                                            st.error(f"❌ Erro ao salvar dados da API: {str(e)}")
+                                    else:
+                                        st.error(voyage_validation_result.get("message", ""))
+                        st.rerun()
+                
+                with subcol2:
+                    if st.button("Booking Rejected", key=f"status_rejected_unified_{farol_reference}", type="secondary", disabled=disable_rejected):
+                        st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
+                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                        result = update_record_status(adjustment_id, "Booking Rejected")
+                        if result:
+                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status atualizado para 'Booking Rejected'."}
+                            st.cache_data.clear()
+                            st.rerun()
+                
+                with subcol3:
+                    if st.button("Booking Cancelled", key=f"status_cancelled_unified_{farol_reference}", type="secondary", disabled=disable_cancelled):
+                        st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
+                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                        result = update_record_status(adjustment_id, "Booking Cancelled")
+                        if result:
+                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status atualizado para 'Booking Cancelled'."}
+                            st.cache_data.clear()
+                            st.rerun()
+                
+                with subcol4:
+                    if st.button("Adjustment Requested", key=f"status_adjustment_unified_{farol_reference}", type="secondary", disabled=disable_adjustment):
+                        st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
+                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                        result = update_record_status(adjustment_id, "Adjustment Requested")
+                        if result:
+                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status atualizado para 'Adjustment Requested'."}
+                            st.cache_data.clear()
+                            st.rerun()
+            
+            # Manter seções de voyage manual e seleção de referência da implementação atual
+            # (será adicionada nas próximas etapas se necessário)
 
     # Conteúdo da aba "Histórico de Viagens" 
     if active_tab == voyages_label:
@@ -2357,17 +2449,14 @@ def exibir_history():
     if active_tab == audit_label:
         display_audit_trail_tab(farol_reference)
 
-    # Determina qual DataFrame usar baseado na aba ativa
-    if edited_df_other is not None and not edited_df_other.empty:
-        selected = pd.DataFrame()  # Sem seleção - apenas visualização
-    elif edited_df_received is not None and not edited_df_received.empty:
-        selected = pd.DataFrame()  # Sem seleção - apenas visualização
-    else:
-        selected = pd.DataFrame()
+    # Verificar se há PDF selecionado no selectbox
+    selected_pdf_option = st.session_state.get(f"pdf_approval_select_{farol_reference}")
+    has_pdf_selected = selected_pdf_option and selected_pdf_option != "Selecione um PDF para aprovar..."
     
     # Limpa status pendente quando a seleção muda
-    if len(selected) == 1:
-        current_adjustment_id = selected.iloc[0]["ADJUSTMENT_ID"]
+    if has_pdf_selected:
+        # Obter adjustment_id do PDF selecionado
+        current_adjustment_id = st.session_state.get(f"adjustment_id_for_approval_{farol_reference}")
         last_adjustment_id = st.session_state.get(f"last_selected_adjustment_id_{farol_reference}")
         
         if last_adjustment_id is not None and last_adjustment_id != current_adjustment_id:
@@ -2449,657 +2538,20 @@ def exibir_history():
             st.error(f"❌ Erro inesperado ao aplicar alteração: {str(e)}")
     
     
-    # Interface de botões de status para linha selecionada
-    # REGRA: Botões só aparecem na aba "Returns Awaiting Review" 
-    if len(selected) == 1 and active_tab == received_label:
-        st.markdown("---")
+    # Seção antiga de botões removida - agora integrada na seção do selectbox acima
+    # Toda a lógica foi movida para dentro da seção do selectbox na aba unificada
 
-        # Obtém informações da linha selecionada
-        selected_row = selected.iloc[0]
-        farol_ref = selected_row.get("Farol Reference")
-        adjustment_id = selected_row["ADJUSTMENT_ID"]
-        
-        # Obtém o status da linha selecionada na tabela F_CON_RETURN_CARRIERS (prioriza leitura por UUID)
-        selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("Farol Status", "")
-        
-        # Botões de status com layout elegante
-        st.markdown("#### 🔄 Select New Status:")
-        
-        # Botões de status alinhados à esquerda
-        col1, col2 = st.columns([2, 3])
-        
-        with col1:
-            # Determina quais botões desabilitar baseado no Farol Status atual
-            farol_status = selected_row.get("Farol Status", "")
-            disable_approved = farol_status == "Booking Approved"
-            disable_rejected = farol_status == "Booking Rejected"
-            disable_cancelled = farol_status == "Booking Cancelled"
-            disable_adjustment = farol_status == "Adjustment Requested"
-            
-            # Botões de status com espaçamento reduzido
-            subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
-            
-            with subcol1:
-                if st.button("Booking Approved", 
-                            key=f"status_booking_approved_{farol_reference}",
-                            type="secondary",
-                            disabled=disable_approved):
-                    # Define o status pendente para acionar a seção de referência relacionada
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Approved"
-                    
-                    # Lógica de validação movida para dentro do botão
-                    with st.spinner("🔍 Validando dados de Voyage Monitoring..."):
-                        from database import validate_and_collect_voyage_monitoring
-                        conn = get_database_connection()
-                        vessel_data = conn.execute(text("""
-                            SELECT B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL 
-                            FROM LogTransp.F_CON_RETURN_CARRIERS 
-                            WHERE ADJUSTMENT_ID = :adj_id
-                        """), {"adj_id": adjustment_id}).mappings().fetchone()
-                        conn.close()
-                        
-                        if vessel_data:
-                            vessel_name = vessel_data.get("b_vessel_name")
-                            voyage_code = vessel_data.get("b_voyage_code") or ""
-                            terminal = vessel_data.get("b_terminal") or ""
-                            
-                            if vessel_name and terminal:
-                                print("[HISTORY REFACTORED] Chamando validate_and_collect_voyage_monitoring...")
-                                voyage_validation_result = validate_and_collect_voyage_monitoring(vessel_name, voyage_code, terminal, save_to_db=False)
-                                print(f"[HISTORY REFACTORED] Resultado recebido: {voyage_validation_result}")
-                                
-                                if voyage_validation_result.get("requires_manual"):
-                                    st.session_state["voyage_manual_entry_required"] = {
-                                        "adjustment_id": adjustment_id, "vessel_name": vessel_name,
-                                        "voyage_code": voyage_code, "terminal": terminal,
-                                        "message": voyage_validation_result.get("message", ""),
-                                        "error_type": voyage_validation_result.get("error_type", "unknown"),
-                                        "pending_approval": True
-                                    }
-                                elif voyage_validation_result.get("success"):
-                                    # Se a API retornou sucesso, salvar os dados da API
-                                    try:
-                                        from database import upsert_terminal_monitorings_from_dataframe
-                                        import pandas as pd
-                                        
-                                        # Obter dados da API que foram coletados
-                                        api_data = voyage_validation_result.get("data", {})
-                                        if api_data:
-                                            monitoring_data = {
-                                                "NAVIO": vessel_name,
-                                                "VIAGEM": voyage_code,
-                                                "TERMINAL": terminal,
-                                                "CNPJ_TERMINAL": api_data.get("cnpj_terminal", ""),
-                                                "AGENCIA": api_data.get("agencia", ""),
-                                                **api_data
-                                            }
-                                            
-                                            df_monitoring = pd.DataFrame([monitoring_data])
-                                            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
-                                            
-                                            if processed_count > 0:
-                                                msg = (f"🟢 **Dados de Voyage Monitoring encontrados e salvos da API**\n\n"
-                                                       f"Foram encontrados e salvos dados de monitoramento na API\n"
-                                                       f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
-                                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
-                                            else:
-                                                msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                                       f"Foram encontrados dados de monitoramento na API\n"
-                                                       f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
-                                                st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
-                                        else:
-                                            msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                                   f"Foram encontrados dados de monitoramento na API\n"
-                                                   f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
-                                            st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
-                                    except Exception as e:
-                                        st.error(f"❌ Erro ao salvar dados da API: {str(e)}")
-                                        msg = (f"🟢 **Dados de Voyage Monitoring encontrados na API**\n\n"
-                                               f"Foram encontrados dados de monitoramento na API\n"
-                                               f"🚢 {vessel_name} | {voyage_code} | {terminal}.")
-                                        st.session_state["voyage_success_notice"] = {"adjustment_id": adjustment_id, "message": msg}
-                                else:
-                                    st.error(voyage_validation_result.get("message", ""))
-                    st.rerun()
-            
-            with subcol2:
-                if st.button("Booking Rejected", 
-                            key=f"status_booking_rejected_{farol_reference}",
-                            type="secondary",
-                            disabled=disable_rejected):
-                    progress_bar = st.progress(0, text="🔄 Processando rejeição...")
-                    progress_bar.progress(50, text="📝 Atualizando status...")
-                    progress_bar.progress(100, text="✅ Rejeição processada!")
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
-                    st.rerun()
-
-            with subcol3:
-                if st.button("Booking Cancelled", 
-                            key=f"status_booking_cancelled_{farol_reference}",
-                            type="secondary",
-                            disabled=disable_cancelled):
-                    progress_bar = st.progress(0, text="🔄 Processando cancelamento...")
-                    progress_bar.progress(50, text="📝 Atualizando status...")
-                    progress_bar.progress(100, text="✅ Cancelamento processado!")
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
-                    st.rerun()
-            
-            with subcol4:
-                if st.button("Adjustment Requested", 
-                            key=f"status_adjustment_requested_{farol_reference}",
-                            type="secondary",
-                            disabled=disable_adjustment):
-                    progress_bar = st.progress(0, text="🔄 Processando solicitação de ajuste...")
-                    progress_bar.progress(50, text="📝 Atualizando status...")
-                    progress_bar.progress(100, text="✅ Solicitação processada!")
-                    st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
-                    st.rerun()
-        
-            
-        # Verificar se é necessário cadastro manual de voyage monitoring
-        voyage_manual_required = st.session_state.get("voyage_manual_entry_required")
-        voyage_success_notice = st.session_state.get("voyage_success_notice")
-        # Exibe o formulário manual SOMENTE quando foi explicitamente disparado pelo clique em "Booking Approved"
-        # (flag pending_approval = True) e pertence à mesma linha selecionada
-        if (
-            voyage_manual_required
-            and voyage_manual_required.get("adjustment_id") == adjustment_id
-            and bool(voyage_manual_required.get("pending_approval", False))
-        ):
-            st.markdown("---")
-            
-            vessel_name = voyage_manual_required.get("vessel_name", "")
-            voyage_code = voyage_manual_required.get("voyage_code", "")
-            terminal = voyage_manual_required.get("terminal", "")
-            
-            # Determinar tipo de alerta baseado no tipo de erro
-            error_type = voyage_manual_required.get("error_type", "unknown")
-            message = voyage_manual_required.get("message", "")
-            
-            # Exibir alerta apropriado baseado no tipo de erro
-            if error_type == "authentication_failed":
-                st.error(message)
-            elif error_type == "connection_failed":
-                st.warning(message)
-            elif error_type == "terminal_not_found":
-                st.info(message)
-            elif error_type == "voyage_not_found":
-                st.warning(message)
-            elif error_type == "no_valid_dates":
-                st.info(message)
-            elif error_type == "data_format_error":
-                st.warning(message)
-            else:
-                # Fallback para mensagem genérica
-                st.warning(f"⚠️ Cadastro Manual de Voyage Monitoring Necessário\n\n{message}")
-            
-            
-            # Formulário similar ao voyage_monitoring.py
-            # Exibir erros persistentes (salvamento e aprovação), se houver
-            _ms_err = st.session_state.get("manual_save_error")
-            if _ms_err and _ms_err.get("adjustment_id") == adjustment_id:
-                st.error(_ms_err.get("message", "❌ Erro ao salvar dados manuais."))
-            _approval_err = st.session_state.get("approval_error")
-            if _approval_err:
-                st.error(_approval_err)
-            with st.form(f"voyage_manual_form_{adjustment_id}"):
-                # Título do formulário com ícone baseado no tipo de erro
-                if error_type == "authentication_failed":
-                    st.subheader("🔐 Cadastrar Dados de Monitoramento Manualmente")
-                    st.caption("⚠️ **Falha de Autenticação:** Inserção manual necessária devido a credenciais inválidas")
-                elif error_type == "connection_failed":
-                    st.subheader("🌐 Cadastrar Dados de Monitoramento Manualmente") 
-                    st.caption("⚠️ **Conexão Falhou:** Inserção manual necessária devido a problemas de rede")
-                elif error_type == "voyage_not_found":
-                    st.subheader("🔍 Cadastrar Dados de Monitoramento Manualmente")
-                    st.caption("💡 **Voyage Não Encontrada:** Complete os dados abaixo com as informações disponíveis")
-                else:
-                    st.subheader("📋 Cadastrar Dados de Monitoramento Manualmente")
-                
-                # Função auxiliar para converter datetime de forma segura (reutilizada do voyage_monitoring.py)
-                def safe_datetime_to_date(dt_value):
-                    if dt_value is not None and str(dt_value) != 'NaT' and hasattr(dt_value, 'date'):
-                        try:
-                            return dt_value.date()
-                        except:
-                            return None
-                    return None
-                
-                def safe_datetime_to_time(dt_value):
-                    if dt_value is not None and str(dt_value) != 'NaT' and hasattr(dt_value, 'time'):
-                        try:
-                            return dt_value.time()
-                        except:
-                            return None
-                    return None
-                
-                # Datas importantes
-                st.markdown("#### Datas Importantes")
-                
-                # Primeira linha: Data Deadline e Data Draft Deadline
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    col_deadline_date, col_deadline_time = st.columns([2, 1])
-                    with col_deadline_date:
-                        manual_deadline_date = st.date_input("⏳ Deadline", value=None, key=f"manual_deadline_date_{adjustment_id}", help="Data limite para entrega de documentos")
-                    with col_deadline_time:
-                        manual_deadline_time = st.time_input("Hora", value=None, key=f"manual_deadline_time_{adjustment_id}", help="Hora limite para entrega de documentos")
-                
-                with col2:
-                    col_draft_date, col_draft_time = st.columns([2, 1])
-                    with col_draft_date:
-                        manual_draft_date = st.date_input("📝 Draft Deadline", value=None, key=f"manual_draft_date_{adjustment_id}", help="Data limite para entrega do draft")
-                    with col_draft_time:
-                        manual_draft_time = st.time_input("Hora", value=None, key=f"manual_draft_time_{adjustment_id}", help="Hora limite para entrega do draft")
-                
-                # Segunda linha: Data Abertura Gate e Data Abertura Gate Reefer
-                col4, col5 = st.columns(2)
-                
-                with col4:
-                    col_gate_date, col_gate_time = st.columns([2, 1])
-                    with col_gate_date:
-                        manual_gate_date = st.date_input("🚪 Abertura Gate", value=None, key=f"manual_gate_date_{adjustment_id}", help="Data de abertura do gate para recebimento de cargas")
-                    with col_gate_time:
-                        manual_gate_time = st.time_input("Hora", value=None, key=f"manual_gate_time_{adjustment_id}", help="Hora de abertura do gate para recebimento de cargas")
-                
-                with col5:
-                    col_reefer_date, col_reefer_time = st.columns([2, 1])
-                    with col_reefer_date:
-                        manual_reefer_date = st.date_input("🧊 Abertura Gate Reefer", value=None, key=f"manual_reefer_date_{adjustment_id}", help="Data de abertura do gate para cargas refrigeradas")
-                    with col_reefer_time:
-                        manual_reefer_time = st.time_input("Hora", value=None, key=f"manual_reefer_time_{adjustment_id}", help="Hora de abertura do gate para cargas refrigeradas")
-                
-                # Datas de navegação
-                st.markdown("#### Datas de Navegação")
-                
-                # Primeira linha: ETD e ETA
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    col_etd_date, col_etd_time = st.columns([2, 1])
-                    with col_etd_date:
-                        manual_etd_date = st.date_input("🚢 ETD", value=None, key=f"manual_etd_date_{adjustment_id}", help="Data estimada de saída do porto")
-                    with col_etd_time:
-                        manual_etd_time = st.time_input("Hora", value=None, key=f"manual_etd_time_{adjustment_id}", help="Hora estimada de saída do porto")
-                
-                with col2:
-                    col_eta_date, col_eta_time = st.columns([2, 1])
-                    with col_eta_date:
-                        manual_eta_date = st.date_input("🎯 ETA", value=None, key=f"manual_eta_date_{adjustment_id}", help="Data estimada de chegada ao porto")
-                    with col_eta_time:
-                        manual_eta_time = st.time_input("Hora", value=None, key=f"manual_eta_time_{adjustment_id}", help="Hora estimada de chegada ao porto")
-                
-                # Segunda linha: ETB e ATB
-                col4, col5 = st.columns(2)
-                
-                with col4:
-                    col_etb_date, col_etb_time = st.columns([2, 1])
-                    with col_etb_date:
-                        manual_etb_date = st.date_input("🛳️ Estimativa Atracação (ETB)", value=None, key=f"manual_etb_date_{adjustment_id}", help="Data estimada de atracação no cais")
-                    with col_etb_time:
-                        manual_etb_time = st.time_input("Hora", value=None, key=f"manual_etb_time_{adjustment_id}", help="Hora estimada de atracação no cais")
-                
-                with col5:
-                    col_atb_date, col_atb_time = st.columns([2, 1])
-                    with col_atb_date:
-                        manual_atb_date = st.date_input("✅ Atracação (ATB)", value=None, key=f"manual_atb_date_{adjustment_id}", help="Data real de atracação no cais")
-                    with col_atb_time:
-                        manual_atb_time = st.time_input("Hora", value=None, key=f"manual_atb_time_{adjustment_id}", help="Hora real de atracação no cais")
-                
-                # Chegada e Partida
-                st.markdown("#### Chegada e Partida")
-                
-                # Layout com 2 colunas
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    col_atd_date, col_atd_time = st.columns([2, 1])
-                    with col_atd_date:
-                        manual_atd_date = st.date_input("📤 Partida (ATD)", value=None, key=f"manual_atd_date_{adjustment_id}", help="Data real de partida do porto")
-                    with col_atd_time:
-                        manual_atd_time = st.time_input("Hora", value=None, key=f"manual_atd_time_{adjustment_id}", help="Hora real de partida do porto")
-                
-                with col2:
-                    col_ata_date, col_ata_time = st.columns([2, 1])
-                    with col_ata_date:
-                        manual_ata_date = st.date_input("📥 Chegada (ATA)", value=None, key=f"manual_ata_date_{adjustment_id}", help="Data real de chegada ao porto")
-                    with col_ata_time:
-                        manual_ata_time = st.time_input("Hora", value=None, key=f"manual_ata_time_{adjustment_id}", help="Hora real de chegada ao porto")
-                
-
-                # Botões do formulário
-                st.markdown("---")
-                
-                col_confirm, col_cancel = st.columns([1, 1])
-                
-                with col_confirm:
-                    confirm_manual_clicked = st.form_submit_button("✅ Save Changes", type="primary")
-                
-                with col_cancel:
-                    cancel_manual_clicked = st.form_submit_button("❌ Discard Changes")
-                
-                if confirm_manual_clicked:
-                    # Preparar dados para inserção
-                    from datetime import datetime
-                    
-                    monitoring_data = {
-                        "NAVIO": vessel_name,
-                        "VIAGEM": voyage_code,
-                        "TERMINAL": terminal,
-                        "AGENCIA": "",  # Pode ser deixado vazio para entrada manual
-                        "CNPJ_TERMINAL": "",  # Pode ser resolvido posteriormente
-                        "DATA_ATUALIZACAO": datetime.now(),  # Timestamp do salvamento para entradas manuais
-                    }
-                    
-                    # Adicionar datas se foram informadas
-                    if manual_deadline_date and manual_deadline_time:
-                        monitoring_data["DATA_DEADLINE"] = datetime.combine(manual_deadline_date, manual_deadline_time)
-                    
-                    if manual_draft_date and manual_draft_time:
-                        monitoring_data["DATA_DRAFT_DEADLINE"] = datetime.combine(manual_draft_date, manual_draft_time)
-                    
-                    if manual_gate_date and manual_gate_time:
-                        monitoring_data["DATA_ABERTURA_GATE"] = datetime.combine(manual_gate_date, manual_gate_time)
-                    
-                    if manual_reefer_date and manual_reefer_time:
-                        monitoring_data["DATA_ABERTURA_GATE_REEFER"] = datetime.combine(manual_reefer_date, manual_reefer_time)
-                    
-                    if manual_etd_date and manual_etd_time:
-                        monitoring_data["DATA_ESTIMATIVA_SAIDA"] = datetime.combine(manual_etd_date, manual_etd_time)
-                    
-                    if manual_eta_date and manual_eta_time:
-                        monitoring_data["DATA_ESTIMATIVA_CHEGADA"] = datetime.combine(manual_eta_date, manual_eta_time)
-                    
-                    if manual_etb_date and manual_etb_time:
-                        monitoring_data["DATA_ESTIMATIVA_ATRACACAO"] = datetime.combine(manual_etb_date, manual_etb_time)
-                    
-                    if manual_atb_date and manual_atb_time:
-                        monitoring_data["DATA_ATRACACAO"] = datetime.combine(manual_atb_date, manual_atb_time)
-                    
-                    if manual_atd_date and manual_atd_time:
-                        monitoring_data["DATA_PARTIDA"] = datetime.combine(manual_atd_date, manual_atd_time)
-                    
-                    if manual_ata_date and manual_ata_time:
-                        monitoring_data["DATA_CHEGADA"] = datetime.combine(manual_ata_date, manual_ata_time)
-                    
-                    # Salvar no banco usando a função existente
-                    try:
-                        from database import upsert_terminal_monitorings_from_dataframe
-                        df_monitoring = pd.DataFrame([monitoring_data])
-                        processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='MANUAL')
-                        
-                        if processed_count > 0:
-                            st.success("✅ Dados de monitoramento salvos com sucesso!")
-                            if "manual_save_error" in st.session_state:
-                                del st.session_state["manual_save_error"]
-                            
-                            # Limpar apenas o flag de entrada manual
-                            # MANTER pending_status_change para exibir seção de referência
-                            if "voyage_manual_entry_required" in st.session_state:
-                                del st.session_state["voyage_manual_entry_required"]
-                            
-                            st.cache_data.clear()
-                            st.rerun()  # Recarregar para mostrar seção de referência fora do form
-                        else:
-                            st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": "❌ Erro ao salvar dados de monitoramento"}
-                            st.error("❌ Erro ao salvar dados de monitoramento")
-                    except Exception as e:
-                        st.session_state["manual_save_error"] = {"adjustment_id": adjustment_id, "message": f"❌ Erro ao salvar: {str(e)}"}
-                        st.error(f"❌ Erro ao salvar: {str(e)}")
-                
-                elif cancel_manual_clicked:
-                    # Cancelar entrada manual e limpar estado
-                    st.info("❌ Entrada manual cancelada.")
-                    
-                    # Limpar o flag de entrada manual e o status pendente
-                    if "voyage_manual_entry_required" in st.session_state:
-                        del st.session_state["voyage_manual_entry_required"]
-                    if f"pending_status_change_{farol_reference}" in st.session_state:
-                        del st.session_state[f"pending_status_change_{farol_reference}"]
-                    
-                    # Limpar cache e recarregar
-                    st.cache_data.clear()
-                    st.rerun()  # Atualizar interface após cancelamento
-                
-        
-            # Seleção de Referência movida para o final da seção (sempre visível após as mensagens)
-
-        # Exibe aviso de sucesso (mesma posição) quando a API encontrou dados, mas antes de confirmar aprovação
-        if voyage_success_notice and voyage_success_notice.get("adjustment_id") == adjustment_id:
-            st.markdown("---")
-            st.success(voyage_success_notice.get("message", ""))
-            # Mensagem persiste até aprovação ou cancelamento para manter visibilidade durante seleção de referência
-
-        # --- Seleção de Referência (SEMPRE após as mensagens, antes da confirmação) ---
-        related_reference = None  # Inicializa a variável
-        pending_status = st.session_state.get(f"pending_status_change_{farol_reference}")
-        voyage_manual_required = st.session_state.get("voyage_manual_entry_required")
-        
-        # A seção de referência relacionada aparece se um 'Booking Approved' está pendente
-        show_reference_selection = (
-            selected_row_status == "Received from Carrier" and 
-            pending_status == "Booking Approved"
-        )
-        
-        # Renderizar seção de seleção de referência se necessário
-        # Adicionado: não mostrar se o formulário manual estiver ativo para evitar duplicidade
-        if show_reference_selection and not (voyage_manual_required and voyage_manual_required.get("adjustment_id") == adjustment_id):
-
-            def _is_empty_local(value):
-                try:
-                    if value is None: return True
-                    if isinstance(value, str):
-                        v = value.strip()
-                        return v == '' or v.upper() == 'NULL'
-                    import pandas as _pd
-                    return _pd.isna(value)
-                except Exception:
-                    return False
-
-            st.markdown("---")
-            st.markdown("#### 🔗 Referência Relacionada")
-            st.markdown("Selecione a linha relacionada da aba 'Other Status' ou 'New Adjustment':")
-            
-            # Buscar referências disponíveis
-            try:
-                available_refs = get_available_references_for_relation(farol_ref)
-            except Exception:
-                available_refs = []
-
-            ref_options = ["Selecione uma referência..."]
-            if available_refs:
-                filtered = []
-                for ref in available_refs:
-                    p_status = str(ref.get('P_STATUS', '') or '').strip()
-                    b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                    linked = ref.get('LINKED_REFERENCE')
-                    if (b_status == 'Booking Requested' and _is_empty_local(linked)) or (b_status == 'Adjustment Requested' and _is_empty_local(linked)):
-                        filtered.append(ref)
-
-                def sort_by_date(ref):
-                    try:
-                        date_val = ref.get('ROW_INSERTED_DATE')
-                        dt = pd.to_datetime(date_val, errors='coerce')
-                        if pd.isna(dt):
-                            return (pd.Timestamp('1900-01-01').date(), 0)
-                        return (dt.date(), -int(getattr(dt, 'value', 0)))
-                    except Exception:
-                        return (pd.Timestamp('1900-01-01').date(), 0)
-
-                filtered = sorted(filtered, key=sort_by_date)
-
-                for ref in filtered:
-                    inserted_date = ref.get('ROW_INSERTED_DATE')
-                    if inserted_date:
-                        brazil_time = convert_utc_to_brazil_time(inserted_date)
-                        if brazil_time and hasattr(brazil_time, 'strftime'):
-                            date_str = brazil_time.strftime('%d/%m/%Y %H:%M')
-                        else:
-                            date_str_raw = str(brazil_time) if brazil_time else ''
-                    else:
-                        date_str_raw = ''
-                        if len(date_str_raw) >= 16:
-                            try:
-                                parts = date_str_raw[:16].replace(' ', 'T').split('T')
-                                if len(parts) == 2:
-                                    date_part = parts[0].split('-')
-                                    time_part = parts[1][:5]
-                                    if len(date_part) == 3:
-                                        date_str = f"{date_part[2]}/{date_part[1]}/{date_part[0]} {time_part}"
-                                    else:
-                                        date_str = date_str_raw[:16]
-                                else:
-                                    date_str = date_str_raw[:16]
-                            except:
-                                date_str = date_str_raw[:16] if len(date_str_raw) >= 16 else 'N/A'
-                        else:
-                            date_str = 'N/A'
-
-                    p_status = str(ref.get('P_STATUS', '') or '').strip()
-                    b_status = str(ref.get('B_BOOKING_STATUS', '') or '').strip()
-                    linked = ref.get('LINKED_REFERENCE')
-
-                    if p_status.lower() == 'adjusts cargill':
-                        status_display = 'Cargill (Adjusts)'
-                    elif b_status == 'Booking Requested' and _is_empty_local(linked):
-                        status_display = 'Cargill Booking Request'
-                    else:
-                        status_display = b_status or p_status or 'Status'
-
-                    option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
-                    ref_options.append(option_text)
-
-            ref_options.append("🆕 New Adjustment")
-
-            selected_ref_key = f"related_ref_{adjustment_id}"
-            selected_ref = st.selectbox(
-                "Selecione uma referência...",
-                options=ref_options,
-                key=selected_ref_key
-            )
-            
-            # Lógica de confirmação lendo diretamente do session_state para maior robustez
-            selected_value = st.session_state.get(selected_ref_key)
-
-            if selected_value and selected_value != "Selecione uma referência...":
-                if selected_value == "🆕 New Adjustment":
-                    st.info("🆕 **New Adjustment selecionado:** Este é um ajuste do carrier sem referência prévia da empresa.")
-                    
-                    st.markdown("#### 📋 Justificativas do Armador - New Adjustment")
-                    
-                    # Usar as listas de UDC específicas para Carrier
-                    reason = st.selectbox(
-                        "Booking Adjustment Request Reason",
-                        options=[""] + Booking_adj_reason_car,
-                        key=f"new_adj_reason_{adjustment_id}"
-                    )
-                    
-                    if len(Booking_adj_responsibility_car) == 1:
-                        responsibility = st.text_input(
-                            "Booking Adjustment Responsibility",
-                            value=Booking_adj_responsibility_car[0],
-                            disabled=True,
-                            key=f"new_adj_resp_{adjustment_id}"
-                        )
-                    else:
-                        responsibility = st.selectbox(
-                            "Booking Adjustment Responsibility",
-                            options=[""] + Booking_adj_responsibility_car,
-                            key=f"new_adj_resp_{adjustment_id}"
-                        )
-
-                    comment = st.text_area(
-                        "Comentários",
-                        key=f"new_adj_comment_{adjustment_id}"
-                    )
-                else:
-                    st.info(f"📋 **Referência selecionada:** {selected_value}")
-            
-            st.markdown("---")
-            st.warning("**Confirmar alteração para: Booking Approved**")
-
-            # A validação para habilitar o botão agora usa o valor lido diretamente do estado da sessão
-            can_confirm = selected_value and selected_value != "Selecione uma referência..."
-            
-            # Botões de confirmação
-            col_confirm, col_cancel = st.columns([1, 1])
-            
-            with col_confirm:
-                if st.button("✅ Save Changes", key=f"confirm_approval_{adjustment_id}", type="primary", disabled=not can_confirm):
-                    justification = {}
-                    related_reference = ""
-
-                    # Lógica para coletar dados dependendo da seleção
-                    if selected_value == "🆕 New Adjustment":
-                        related_reference = "New Adjustment"
-                        
-                        # Coleta dados do formulário de justificativa
-                        reason_val = st.session_state.get(f"new_adj_reason_{adjustment_id}")
-                        comment_val = st.session_state.get(f"new_adj_comment_{adjustment_id}")
-                        
-                        # Trata o campo de responsabilidade (pode ser desabilitado)
-                        if len(Booking_adj_responsibility_car) == 1:
-                            resp_val = Booking_adj_responsibility_car[0]
-                        else:
-                            resp_val = st.session_state.get(f"new_adj_resp_{adjustment_id}")
-
-                        # Validação dos campos obrigatórios para New Adjustment
-                        if not reason_val:
-                            st.error("❌ Para 'New Adjustment', o campo 'Booking Adjustment Request Reason' é obrigatório.")
-                            st.stop()
-                        
-                        justification = {
-                            "area": "Booking",  # Área padrão para este fluxo
-                            "request_reason": reason_val,
-                            "adjustments_owner": resp_val,
-                            "comments": comment_val
-                        }
-                    else:
-                        # Fluxo normal para referências existentes
-                        related_reference = selected_value.split(" | ")[0]
-                        justification = {} # Justificativa não necessária aqui
-
-                    # Executar aprovação com os dados corretos
-                    try:
-                        result = approve_carrier_return(adjustment_id, related_reference, justification)
-                        if result:
-                            st.success("✅ Aprovação concluída com sucesso!")
-                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
-                            st.session_state.pop(f"pending_status_change_{farol_reference}", None)
-                            st.session_state.pop("voyage_success_notice", None)
-                            st.cache_data.clear()
-                            st.rerun()  # Mantido apenas este para atualizar a interface
-                        else:
-                            error_msg = st.session_state.get("approval_error", "❌ Falha ao aprovar. Verifique os logs para mais detalhes.")
-                            st.error(error_msg)
-                    except Exception as e:
-                        st.error(f"❌ Erro crítico durante a aprovação: {str(e)}")
-            
-            with col_cancel:
-                if st.button("❌ Cancelar", key=f"cancel_approval_{adjustment_id}"):
-                    # Limpar estados
-                    if f"pending_status_change_{farol_reference}" in st.session_state:
-                        del st.session_state[f"pending_status_change_{farol_reference}"]
-                    if "voyage_success_notice" in st.session_state:
-                        del st.session_state["voyage_success_notice"]
-                    st.cache_data.clear()
-                    # st.rerun()  # Removido para evitar piscada
-
-
-
-    else:
-        # Mensagem somente para abas de tabela (não exibir na "Voyage Timeline")
-        if active_tab != voyages_label:
-            st.markdown("---")
-            if active_tab == received_label:
-                # Aba "Returns Awaiting Review" - onde botões de ação são permitidos
-                st.markdown("💡 **Dica:** Marque o checkbox de uma linha para ver as opções de status disponíveis (Booking Approved, Rejected, Cancelled) e use 'View Attachments' para adicionar novos arquivos.")
-            else:
-                # Aba "Request Timeline" - apenas visualização e orientação
-                st.markdown("💡 **Dica:** Esta aba é para visualização do histórico de pedidos. Para aprovar retornos de armadores, use a aba '📨 Returns Awaiting Review'. Use 'View Attachments' para gerenciar arquivos.")
+    # Mensagens de dica para o usuário
+    if active_tab == unified_label:
+        st.markdown("💡 **Dica:** Use o selectbox acima para escolher um PDF do armador e aprová-lo. Use 'View Attachments' para gerenciar arquivos.")
     
-    # Função para aplicar mudanças de status (versão antiga removida; definida acima)
+    # Atualizar seção de Export CSV para usar apenas o DataFrame unificado
+    if edited_df_unified is not None and not edited_df_unified.empty:
+        combined_df = edited_df_unified
+    else:
+        combined_df = pd.DataFrame()
+
+    # Seção de botões de ação (View Attachments, Export, Back)
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -3109,17 +2561,7 @@ def exibir_history():
             st.session_state["history_show_attachments"] = not view_open
             st.rerun()
     with col2:
-        # Export CSV - combina dados de ambas as abas
-        if edited_df_other is not None and edited_df_received is not None:
-            # Combina ambos os DataFrames
-            combined_df = pd.concat([edited_df_other, edited_df_received], ignore_index=True)
-        elif edited_df_other is not None:
-            combined_df = edited_df_other
-        elif edited_df_received is not None:
-            combined_df = edited_df_received
-        else:
-            combined_df = pd.DataFrame()
-            
+        # Export CSV
         if not combined_df.empty:
             st.download_button("⬇️ Export CSV", data=combined_df.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
         else:
@@ -3142,6 +2584,8 @@ def display_audit_trail_tab(farol_reference):
     import pandas as pd
     import pytz
     from sqlalchemy import text as _text_audit_tab
+    from database import get_database_connection
+    
     st.markdown("### 🔍 Audit Trail - Histórico de Mudanças")
     st.markdown(f"**Referência:** `{farol_reference}`")
     st.markdown("---")

@@ -3863,6 +3863,17 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - **Múltiplas Aprovações:** Removida a restrição que impedia aprovar um registro múltiplas vezes, permitindo a re-sincronização de dados quando necessário.
   - **Correções de Bugs:** Resolvidos múltiplos erros (`KeyError`, `TypeError`, `NotSupportedError`, `ImportError`) que surgiram durante a implementação, garantindo que o fluxo de seleção e aprovação funcione de forma estável e confiável.
 
+### 📌 v3.4
+- **History (Return Carriers History) - Reestruturação da Interface:**
+  - **Unificação de abas:** Removida a aba separada "Returns Awaiting Review"; funcionalidade integrada diretamente na aba "Request Timeline"
+  - **Exibição unificada:** Todas as linhas de histórico agora exibidas em uma única tabela com cores e destaques preservados
+  - **Novo mecanismo de aprovação:** Substituído `st.data_editor` por `st.dataframe` (para preservar cores) + `selectbox` para seleção de PDFs a aprovar
+  - **Selectbox aprimorado:** Exibe "Index | Data/Hora" para identificar rapidamente o PDF do carrier (ex.: "Index 2 | 24/10/2025 17:35")
+  - **Botões de ação:** Mantidos todos os 4 status possíveis (Approved, Rejected, Cancelled, Adjustment Requested)
+  - **Preservação de funcionalidades:** Voyage monitoring validation, manual data entry e audit trail permanecem intactos
+  - **Index correto:** Cálculo do Index agora busca diretamente no DataFrame original (antes da reversão visual) para corresponder exatamente à coluna Index exibida na tabela
+  - **Cores preservadas:** Destaques amarelos para linhas "New Adjustment" mantidos com `st.dataframe` + Pandas Styler
+
 ### 📌 v3.3
 - Sales (New Sales Record): adicionados os campos "Shipment Period Start Date" e "Shipment Period End Date" no formulário manual e no upload em massa; mapeados para `S_SHIPMENT_PERIOD_START_DATE` e `S_SHIPMENT_PERIOD_END_DATE`.
 - Booking (New Booking): agora exibe (somente leitura) as datas "Required Arrival Date", "Shipment Period Start Date" e "Shipment Period End Date"; todas as datas de visualização foram padronizadas para formato somente data (YYYY-MM-DD) quando aplicável.
