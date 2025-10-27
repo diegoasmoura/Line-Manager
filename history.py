@@ -1966,7 +1966,10 @@ def exibir_history():
         edited_df_unified = df_unified_processed
         
         # Informações sobre a timeline
-        st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use o selectbox na seção abaixo para selecionar e aprovar PDFs recebidos dos armadores.")
+        if not df_received_for_approval.empty:
+            st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use o selectbox na seção abaixo para selecionar e aprovar PDFs recebidos dos armadores.")
+        else:
+            st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações da referência.")
 
     # Seção de aprovação para PDFs "Received from Carrier" (abaixo da tabela unificada)
     # Usaremos o DataFrame ORIGINAL (antes da reversão) para buscar o Index correto
