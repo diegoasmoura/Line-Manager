@@ -1890,7 +1890,7 @@ def exibir_history():
             
             # Layout zebra - linhas pares mais claras, ímpares mais escuras
             if row_idx % 2 == 0:
-                base_bg = 'background-color: #F1F3F4;'  # Cinza mais escuro (5% mais escuro)
+                base_bg = 'background-color: #F8F9FA;'  # Cinza muito claro
             else:
                 base_bg = 'background-color: #FFFFFF;'  # Branco
             
@@ -1927,12 +1927,8 @@ def exibir_history():
         
         # Detecção de alterações (sem debug visual)
         
-        # Aplicar estilização usando Pandas Styler
-        if changes:
-            styled_df = apply_highlight_styling(df_unified_processed_reversed, changes)
-        else:
-            # Se não há alterações, usar DataFrame normal
-            styled_df = df_unified_processed_reversed
+        # Aplicar estilização usando Pandas Styler (sempre com layout zebra)
+        styled_df = apply_highlight_styling(df_unified_processed_reversed, changes)
         
         # Aplica tratamento de valores nulos no DataFrame final antes da exibição
         if hasattr(styled_df, 'data'):
