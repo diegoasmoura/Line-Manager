@@ -2062,6 +2062,9 @@ def exibir_history():
                     
                     with subcol1:
                         if st.button("Booking Approved", key=f"status_approved_unified_{farol_reference}", type="secondary", disabled=disable_approved):
+                            confirm_status_key = f"confirm_status_change_{farol_reference}"
+                            if confirm_status_key in st.session_state:
+                                del st.session_state[confirm_status_key]
                             st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
                             st.session_state[f"selected_row_for_approval_{farol_reference}"] = selected_row
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
