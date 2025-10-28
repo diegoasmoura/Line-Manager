@@ -88,7 +88,7 @@ def get_referenced_line_data(linked_ref):
         try:
             conn = get_database_connection()
             query = text("""
-                SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, B_BOOKING_STATUS
+                SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, FAROL_STATUS
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE ID = :line_id
             """)
@@ -253,7 +253,7 @@ def get_voyage_monitoring_for_reference(farol_reference):
                 AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
                 AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
                 AND r.FAROL_REFERENCE = :farol_ref
-                AND r.B_BOOKING_STATUS = 'Booking Approved'
+                AND r.FAROL_STATUS = 'Booking Approved'
             )
             WHERE UPPER(m.NAVIO) IN ({placeholders})
             ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
@@ -312,9 +312,9 @@ def get_available_references_for_relation(farol_reference=None):
         if farol_reference:
             # Lista somente a própria referência (exata), na aba Other Status
             query = text("""
-                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                SELECT ID, FAROL_REFERENCE, FAROL_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE B_BOOKING_STATUS != 'Received from Carrier'
+                WHERE FAROL_STATUS != 'Received from Carrier'
                   AND UPPER(FAROL_REFERENCE) = UPPER(:farol_reference)
                 ORDER BY ROW_INSERTED_DATE ASC
             """)
@@ -323,9 +323,9 @@ def get_available_references_for_relation(farol_reference=None):
         else:
             # Comportamento legado: somente originais (não-split) de todas as referências
             query = text("""
-                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                SELECT ID, FAROL_REFERENCE, FAROL_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE B_BOOKING_STATUS != 'Received from Carrier'
+                WHERE FAROL_STATUS != 'Received from Carrier'
                   AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
                   AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
                 ORDER BY ROW_INSERTED_DATE ASC
@@ -1208,7 +1208,7 @@ def exibir_history():
     display_cols = [
         "ROW_INSERTED_DATE",
         "FAROL_REFERENCE",
-        "B_BOOKING_STATUS",
+        "FAROL_STATUS",
         "B_BOOKING_REFERENCE",
         "B_VESSEL_NAME",
         "B_VOYAGE_CARRIER",
@@ -1277,7 +1277,7 @@ def exibir_history():
     df_unified = df_display.copy()
     
     # Remove splits informativos (exceto a referência atual) para contagem de rótulos
-    df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
+    df_other_status = df_display[df_display["FAROL_STATUS"] != "Received from Carrier"].copy()
     
     if not df_other_status.empty:
         # Filtrar linhas que são splits EXCETO a referência atual
@@ -1297,7 +1297,7 @@ def exibir_history():
             ].copy()
     
     # Separar PDFs "Received from Carrier" da referência atual para aprovação
-    df_received_count = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
+    df_received_count = df_display[df_display["FAROL_STATUS"] == "Received from Carrier"].copy()
     df_received_for_approval = pd.DataFrame()
 
     try:
@@ -1493,7 +1493,7 @@ def exibir_history():
             "B_BOOKING_REFERENCE": "Booking",
             "ADJUSTMENT_ID": "ADJUSTMENT_ID",
             "LINKED_REFERENCE": "Linked Reference",
-            "B_BOOKING_STATUS": "Farol Status",  # Mantém Farol Status
+            "FAROL_STATUS": "Farol Status",  # Mantém Farol Status
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
             "P_PDF_NAME": "PDF Name",

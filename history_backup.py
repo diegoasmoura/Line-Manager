@@ -764,7 +764,7 @@ def exibir_history():
         "ID",  # Adiciona ID para exibição
         "FAROL_REFERENCE",
         "Linked_Reference",  # Adiciona Linked_Reference após Farol Reference
-        "B_BOOKING_STATUS",
+        "FAROL_STATUS",
         "S_SPLITTED_BOOKING_REFERENCE",
         "S_PLACE_OF_RECEIPT",
         "S_QUANTITY_OF_CONTAINERS",
@@ -798,8 +798,8 @@ def exibir_history():
     df_display.insert(0, "Selecionar", False)
     
     # Separa os dados em duas abas baseado no status
-    df_other_status = df_display[df_display["B_BOOKING_STATUS"] != "Received from Carrier"].copy()
-    df_received_carrier = df_display[df_display["B_BOOKING_STATUS"] == "Received from Carrier"].copy()
+    df_other_status = df_display[df_display["FAROL_STATUS"] != "Received from Carrier"].copy()
+    df_received_carrier = df_display[df_display["FAROL_STATUS"] == "Received from Carrier"].copy()
     
     # Cria as abas com informações sobre o processo
     tab1, tab2 = st.tabs([
@@ -851,7 +851,7 @@ def exibir_history():
         "FAROL_REFERENCE": "Farol Reference",
             "ADJUSTMENT_ID": "Adjustment ID",  # Campo oculto
             "Linked_Reference": "Linked Reference",  # Campo para referência relacionada
-        "B_BOOKING_STATUS": "Farol Status",
+        "FAROL_STATUS": "Farol Status",
         "ROW_INSERTED_DATE": "Inserted Date",
         "USER_INSERT": "Inserted By",
         # Remover prefixos B_/P_ dos rótulos solicitados
@@ -1055,9 +1055,9 @@ def exibir_history():
         try:
             conn = get_database_connection()
             query = text("""
-                SELECT ID, FAROL_REFERENCE, B_BOOKING_STATUS, ROW_INSERTED_DATE, Linked_Reference
+                SELECT ID, FAROL_REFERENCE, FAROL_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE B_BOOKING_STATUS != 'Received from Carrier'
+                WHERE FAROL_STATUS != 'Received from Carrier'
                 ORDER BY ROW_INSERTED_DATE DESC
             """)
             result = conn.execute(query).mappings().fetchall()
@@ -1084,7 +1084,7 @@ def exibir_history():
                             SELECT ADJUSTMENT_ID
                               FROM LogTransp.F_CON_RETURN_CARRIERS
                              WHERE FAROL_REFERENCE = :farol_reference
-                               AND B_BOOKING_STATUS = :status_atual
+                               AND FAROL_STATUS = :status_atual
                           ORDER BY ROW_INSERTED_DATE DESC
                           FETCH FIRST 1 ROWS ONLY
                         """)
@@ -1112,7 +1112,7 @@ def exibir_history():
                     related_exists = conn.execute(text("""
                         SELECT COUNT(*) FROM LogTransp.F_CON_RETURN_CARRIERS 
                         WHERE ID = :related_id 
-                        AND B_BOOKING_STATUS != 'Received from Carrier'
+                        AND FAROL_STATUS != 'Received from Carrier'
                     """), {"related_id": related_reference}).scalar()
                     
                     if related_exists > 0:
@@ -1162,7 +1162,7 @@ def exibir_history():
 
             res_rc = conn.execute(text("""
                 UPDATE LogTransp.F_CON_RETURN_CARRIERS
-                   SET B_BOOKING_STATUS = :new_status,
+                   SET FAROL_STATUS = :new_status,
                        USER_UPDATE = :user_update,
                        DATE_UPDATE = SYSDATE
                  WHERE ADJUSTMENT_ID = :adjustment_id
@@ -1340,7 +1340,7 @@ def exibir_history():
                             
                             for ref in available_refs:
                                 # Formata a opção com ID, Farol Reference e Status
-                                label = f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['B_BOOKING_STATUS']}"
+                                label = f"ID: {ref['ID']} | {ref['FAROL_REFERENCE']} | {ref['FAROL_STATUS']}"
                                 options.append(ref['ID'])  # Valor é o ID
                                 option_labels.append(label)
                             
@@ -1361,7 +1361,7 @@ def exibir_history():
                             if related_reference and related_reference != "":
                                 selected_ref = next((r for r in available_refs if r['ID'] == related_reference), None)
                                 if selected_ref:
-                                    st.info(f"📋 **Linha selecionada:** ID {selected_ref['ID']} | {selected_ref['FAROL_REFERENCE']} | {selected_ref['B_BOOKING_STATUS']}")
+                                    st.info(f"📋 **Linha selecionada:** ID {selected_ref['ID']} | {selected_ref['FAROL_REFERENCE']} | {selected_ref['FAROL_STATUS']}")
                         else:
                             st.warning("⚠️ Nenhuma linha encontrada na aba 'Other Status' para relacionar.")
                             related_reference = st.text_input(

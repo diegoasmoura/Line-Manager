@@ -3213,7 +3213,7 @@ def save_pdf_booking_data(validated_data):
                    AND NVL(B_VOYAGE_CODE,'') = NVL(:voyage,'')
                    AND NVL(B_VESSEL_NAME,'') = NVL(:vessel,'')
                    AND NVL(PDF_BOOKING_EMISSION_DATE,'') = NVL(:pdf_date,'')
-                   AND B_BOOKING_STATUS NOT IN ('Attachment Deleted', 'Booking Rejected', 'Cancelled', 'Adjustment Requested')
+                   AND FAROL_STATUS NOT IN ('Attachment Deleted', 'Booking Rejected', 'Cancelled', 'Adjustment Requested')
                 """
             )
             dup_params = {

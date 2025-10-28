@@ -58,7 +58,7 @@ def get_column_mapping():
         "b_creation_of_booking": "Booking Registered Date",
         "b_booking_reference": "Booking Reference",
         "b_transaction_number": "Transaction Number",
-        "b_booking_status": "Booking Status",
+        "farol_status": "Booking Status",
         "b_farol_status" : "Farol Status",
 
         "b_booking_owner": "Booking Owner",
@@ -506,7 +506,7 @@ def get_alias_to_database_column_mapping():
         "b_creation_of_booking": "B_CREATION_OF_BOOKING",
         "b_booking_reference": "B_BOOKING_REFERENCE",
         "b_transaction_number": "B_TRANSACTION_NUMBER",
-        "b_booking_status": "B_BOOKING_STATUS",
+        "farol_status": "FAROL_STATUS",
         "b_booking_owner": "USER_LOGIN_BOOKING_CREATED",
         "b_voyage_carrier": "B_VOYAGE_CARRIER",
         "b_freight_forwarder": "B_FREIGHT_FORWARDER",

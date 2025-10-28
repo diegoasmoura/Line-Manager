@@ -74,7 +74,7 @@ def get_farol_references_details(vessel_name, voyage_code, terminal):
             query = text("""
                 WITH ranked_references AS (
                     SELECT 
-                        r.FAROL_REFERENCE, r.B_BOOKING_REFERENCE, r.B_BOOKING_STATUS, 
+                        r.FAROL_REFERENCE, r.B_BOOKING_REFERENCE, r.FAROL_STATUS, 
                         r.P_STATUS, r.B_VESSEL_NAME, r.B_VOYAGE_CODE, r.B_TERMINAL,
                         r.B_DATA_ESTIMATIVA_SAIDA_ETD, r.B_DATA_ESTIMATIVA_CHEGADA_ETA, r.ROW_INSERTED_DATE,
                         s.S_CREATION_OF_SHIPMENT, s.B_CREATION_OF_BOOKING, s.B_BOOKING_REQUEST_DATE,
@@ -87,7 +87,7 @@ def get_farol_references_details(vessel_name, voyage_code, terminal):
                     AND r.FAROL_REFERENCE IS NOT NULL
                 )
                 SELECT
-                    FAROL_REFERENCE, B_BOOKING_REFERENCE, B_BOOKING_STATUS, 
+                    FAROL_REFERENCE, B_BOOKING_REFERENCE, FAROL_STATUS, 
                     P_STATUS, B_VESSEL_NAME, B_VOYAGE_CODE, B_TERMINAL,
                     B_DATA_ESTIMATIVA_SAIDA_ETD, B_DATA_ESTIMATIVA_CHEGADA_ETA, ROW_INSERTED_DATE,
                     S_CREATION_OF_SHIPMENT, B_CREATION_OF_BOOKING, B_BOOKING_REQUEST_DATE
@@ -304,7 +304,7 @@ def exibir_atualizacao_manual():
 
                     rename_map = {
                         'farol_reference': 'Farol Reference', 'b_booking_reference': 'Booking Ref',
-                        'b_booking_status': 'Booking Status', 'p_status': 'P Status',
+                        'farol_status': 'Booking Status', 'p_status': 'P Status',
                         'row_inserted_date': 'Latest Update', 's_creation_of_shipment': 'Shipment Requested Date',
                         'b_creation_of_booking': 'Booking Registered Date', 'b_booking_request_date': 'Booking Requested Date',
                         'b_data_estimativa_saida_etd': 'ETD', 'b_data_estimativa_chegada_eta': 'ETA'

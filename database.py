@@ -200,7 +200,7 @@ def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
         # 2. Prepare the dictionary for the new record
         record_data = {
             "FAROL_REFERENCE": farol_ref,
-            "B_BOOKING_STATUS": "Adjustment Requested",
+            "FAROL_STATUS": "Adjustment Requested",
             "P_STATUS": "Manual Adjustment Request",
             "COMMENTS": f"Status changed manually from 'New Adjustment' to 'Adjustment Requested' by {user_id}",
             "USER_INSERT": user_id,
@@ -352,7 +352,7 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                             B_BOOKING_REFERENCE,
                             ADJUSTMENT_ID,
                             Linked_Reference,
-                            B_BOOKING_STATUS,
+                            FAROL_STATUS,
                             P_STATUS,
                             P_PDF_NAME,
                             S_SPLITTED_BOOKING_REFERENCE,
@@ -430,7 +430,7 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 B_BOOKING_REFERENCE,
                 ADJUSTMENT_ID,
                 Linked_Reference,
-                B_BOOKING_STATUS,
+                FAROL_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
                 S_SPLITTED_BOOKING_REFERENCE,
@@ -594,7 +594,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
         B_TRANSACTION_NUMBER                 AS b_transaction_number,
-        B_BOOKING_STATUS                     AS b_booking_status,
+        FAROL_STATUS                     AS b_booking_status,
         USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
@@ -764,7 +764,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
         B_TRANSACTION_NUMBER                 AS b_transaction_number,
-        B_BOOKING_STATUS                     AS b_booking_status,
+        FAROL_STATUS                     AS b_booking_status,
         USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
@@ -966,7 +966,7 @@ def get_booking_record_by_reference(farol_reference: str) -> pd.DataFrame:
         B_CREATION_OF_BOOKING                AS b_creation_of_booking,
         B_BOOKING_REFERENCE                  AS b_booking_reference,
         B_TRANSACTION_NUMBER                 AS b_transaction_number,
-        B_BOOKING_STATUS                     AS b_booking_status,
+        FAROL_STATUS                     AS b_booking_status,
         USER_LOGIN_BOOKING_CREATED           AS b_booking_owner,
         B_VOYAGE_CARRIER                     AS b_voyage_carrier,
         B_FREIGHT_FORWARDER                  AS b_freight_forwarder,
@@ -1558,7 +1558,7 @@ def get_booking_data_by_farol_reference(farol_reference): #Utilizada no arquivo 
     try:
         query = """
         SELECT 
-            B_BOOKING_STATUS      AS b_booking_status,
+            FAROL_STATUS      AS b_booking_status,
             B_VOYAGE_CARRIER      AS b_voyage_carrier,
             B_FREIGHT_FORWARDER   AS b_freight_forwarder,
             B_BOOKING_REQUEST_DATE AS b_booking_request_date,
@@ -1741,7 +1741,7 @@ def update_booking_data_by_farol_reference(farol_reference, values):#Utilizada n
             conn.execute(
                 text(query),
                 {
-                    "farol_status": "Booking Requested", #values.get("b_booking_status", "Booking Requested")
+                    "farol_status": "Booking Requested",
                     "b_creation_of_booking": datetime.now(),
                     "b_voyage_carrier": values["b_voyage_carrier"],
                     "b_freight_forwarder": values["b_freight_forwarder"],
@@ -1780,7 +1780,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
             """
             SELECT 
                 FAROL_REFERENCE,
-                FAROL_STATUS AS B_BOOKING_STATUS,
+                FAROL_STATUS AS FAROL_STATUS,
                 CASE 
                     WHEN FAROL_STATUS = 'New Request' THEN 'Shipment Requested'
                     ELSE 'Booking Requested'
@@ -1858,7 +1858,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         #         """
         #         UPDATE LogTransp.F_CON_RETURN_CARRIERS
         #         SET 
-        #             B_BOOKING_STATUS = :B_BOOKING_STATUS,
+        #             FAROL_STATUS = :FAROL_STATUS,
         #             P_STATUS = :P_STATUS,
         #             P_PDF_NAME = :P_PDF_NAME,
         #             S_SPLITTED_BOOKING_REFERENCE = :S_SPLITTED_BOOKING_REFERENCE,
@@ -1892,7 +1892,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                             """
                             INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
                                 FAROL_REFERENCE,
-                                B_BOOKING_STATUS,
+                                FAROL_STATUS,
                                 P_STATUS,
                                 P_PDF_NAME,
                                 S_SPLITTED_BOOKING_REFERENCE,
@@ -1919,7 +1919,7 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                                 ROW_INSERTED_DATE
                             ) VALUES (
                                 :FAROL_REFERENCE,
-                                :B_BOOKING_STATUS,
+                                :FAROL_STATUS,
                                 :P_STATUS,
                                 :P_PDF_NAME,
                                 :S_SPLITTED_BOOKING_REFERENCE,
@@ -1997,13 +1997,16 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
 
         rd = {k.upper(): v for k, v in dict(row).items()}
         # Determina status a ser gravado
-        b_status = status_override if status_override else rd.get("FAROL_STATUS") or "Adjustment Requested"
+        farol_status = status_override if status_override else rd.get("FAROL_STATUS") or "Adjustment Requested"
+        db_data = {k: v for k, v in rd.items() if k not in ('ID', 'FAROL_STATUS')}
+        db_data["FAROL_REFERENCE"] = farol_reference
+        db_data["FAROL_STATUS"] = farol_status
 
         insert_sql = text(
             """
                         INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
                             FAROL_REFERENCE,
-                            B_BOOKING_STATUS,
+                            FAROL_STATUS,
                             P_STATUS,
                             P_PDF_NAME,
                             S_SPLITTED_BOOKING_REFERENCE,
@@ -2030,7 +2033,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                             ROW_INSERTED_DATE
                         ) VALUES (
                             :FAROL_REFERENCE,
-                            :B_BOOKING_STATUS,
+                            :FAROL_STATUS,
                             :P_STATUS,
                             :P_PDF_NAME,
                             :S_SPLITTED_BOOKING_REFERENCE,
@@ -2060,7 +2063,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
 
         params = {
             "FAROL_REFERENCE": rd.get("FAROL_REFERENCE"),
-            "B_BOOKING_STATUS": b_status,
+            "FAROL_STATUS": farol_status,
             # Snapshot oriundo do carrier - P_STATUS baseado no status real
             "P_STATUS": "Shipment Requested" if b_status == "New Request" else "Booking Requested",
             "P_PDF_NAME": None,
@@ -2255,7 +2258,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                     db_data[date_field] = date_value
 
         # Campos obrigatórios e padrões
-        db_data["B_BOOKING_STATUS"] = status_override or "Adjustment Requested"
+        db_data["FAROL_STATUS"] = status_override or "Adjustment Requested"
         db_data["USER_INSERT"] = user_insert
         db_data["ADJUSTMENT_ID"] = str(uuid.uuid4())
         
@@ -2746,7 +2749,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         update_params.update(elox_update_values)
 
         set_clauses = [f"{col} = :{col}" for col in elox_update_values.keys()]
-        set_clauses.append("B_BOOKING_STATUS = 'Booking Approved'")
+        set_clauses.append("FAROL_STATUS = 'Booking Approved'")
         set_clauses.append("USER_UPDATE = :user_update")
         set_clauses.append("DATE_UPDATE = SYSDATE")
 
@@ -2975,7 +2978,7 @@ def get_last_date_values_from_carriers(farol_reference: str) -> dict:
                 S_REQUESTED_DEADLINE_END_DATE,
                 S_REQUIRED_ARRIVAL_DATE_EXPECTED,
                 ROW_INSERTED_DATE,
-                B_BOOKING_STATUS,
+                FAROL_STATUS,
                 ADJUSTMENT_ID
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE UPPER(FAROL_REFERENCE) = UPPER(:farol_ref)
@@ -3221,7 +3224,7 @@ def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
     try:
         update_query = text("""
             UPDATE LogTransp.F_CON_RETURN_CARRIERS
-            SET B_BOOKING_STATUS = :new_status,
+            SET FAROL_STATUS = :new_status,
                 USER_UPDATE = :user_update,
                 DATE_UPDATE = SYSDATE
             WHERE ADJUSTMENT_ID = :adjustment_id
@@ -3278,7 +3281,7 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.Da
                 B_BOOKING_REFERENCE,
                 ADJUSTMENT_ID,
                 Linked_Reference,
-                B_BOOKING_STATUS,
+                FAROL_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
                 S_SPLITTED_BOOKING_REFERENCE,
@@ -3327,12 +3330,12 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.Da
             conn.close()
 
 def get_return_carrier_status_by_adjustment_id(adjustment_id: str):
-    """Retorna o B_BOOKING_STATUS da F_CON_RETURN_CARRIERS para o ADJUSTMENT_ID dado."""
+    """Retorna o FAROL_STATUS da F_CON_RETURN_CARRIERS para o ADJUSTMENT_ID dado."""
     conn = get_database_connection()
     try:
         query = text(
             """
-            SELECT B_BOOKING_STATUS
+            SELECT FAROL_STATUS
             FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE ADJUSTMENT_ID = :adjustment_id
             """
@@ -3604,7 +3607,7 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
         # 2. Update the status in F_CON_RETURN_CARRIERS
         update_return_query = text("""
             UPDATE LogTransp.F_CON_RETURN_CARRIERS
-            SET B_BOOKING_STATUS = :new_status, USER_UPDATE = 'System', DATE_UPDATE = SYSDATE
+            SET FAROL_STATUS = :new_status, USER_UPDATE = 'System', DATE_UPDATE = SYSDATE
             WHERE ADJUSTMENT_ID = :adj_id
         """)
         conn.execute(update_return_query, {"new_status": new_status, "adj_id": adjustment_id})

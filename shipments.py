@@ -1549,7 +1549,7 @@ def exibir_shipments():
             sql = text(f"""
                 SELECT farol_reference, COUNT(*) as count
                 FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE UPPER(B_BOOKING_STATUS) = UPPER(:status)
+                WHERE UPPER(FAROL_STATUS) = UPPER(:status)
                 AND farol_reference IN ({placeholders})
                 GROUP BY farol_reference
             """)
@@ -1618,7 +1618,7 @@ def exibir_shipments():
             params.update({"status": "Received from Carrier"})
             sql_rc = text(
                 f"SELECT COUNT(*) AS c FROM LogTransp.F_CON_RETURN_CARRIERS \n"
-                f"WHERE UPPER(B_BOOKING_STATUS) = UPPER(:status) AND farol_reference IN ({placeholders})"
+                f"WHERE UPPER(FAROL_STATUS) = UPPER(:status) AND farol_reference IN ({placeholders})"
             )
             res = conn.execute(sql_rc, params).fetchone()
             conn.close()
