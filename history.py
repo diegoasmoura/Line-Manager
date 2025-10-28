@@ -2072,18 +2072,24 @@ def exibir_history():
                     
                     with subcol2:
                         if st.button("Booking Rejected", key=f"status_rejected_unified_{farol_reference}", type="secondary", disabled=disable_rejected):
+                            if f"approval_step_{farol_reference}" in st.session_state:
+                                del st.session_state[f"approval_step_{farol_reference}"]
                             st.session_state[f"confirm_status_change_{farol_reference}"] = "Booking Rejected"
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
                             st.rerun()
                     
                     with subcol3:
                         if st.button("Booking Cancelled", key=f"status_cancelled_unified_{farol_reference}", type="secondary", disabled=disable_cancelled):
+                            if f"approval_step_{farol_reference}" in st.session_state:
+                                del st.session_state[f"approval_step_{farol_reference}"]
                             st.session_state[f"confirm_status_change_{farol_reference}"] = "Booking Cancelled"
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
                             st.rerun()
                     
                     with subcol4:
                         if st.button("Adjustment Requested", key=f"status_adjustment_unified_{farol_reference}", type="secondary", disabled=disable_adjustment):
+                            if f"approval_step_{farol_reference}" in st.session_state:
+                                del st.session_state[f"approval_step_{farol_reference}"]
                             st.session_state[f"confirm_status_change_{farol_reference}"] = "Adjustment Requested"
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
                             st.rerun()
