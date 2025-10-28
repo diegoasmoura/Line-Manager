@@ -2128,15 +2128,15 @@ def exibir_history():
                     "Select one of the options below:",
                     ("An adjustment request made by our company.", "A new/external adjustment initiated by the carrier itself."),
                     key=f"adjustment_type_{farol_reference}",
-                        label_visibility="collapsed"
-                    )
+                    label_visibility="collapsed"
+                )
 
-                    if st.button("Continue", key=f"continue_adjustment_type_{farol_reference}"):
-                        if adjustment_type == "An adjustment request made by our company.":
-                            st.session_state[f"approval_step_{farol_reference}"] = "select_internal_reference"
-                        else: # "A new/external adjustment initiated by the carrier itself."
-                            st.session_state[f"approval_step_{farol_reference}"] = "external_adjustment_form"
-                        st.rerun()
+                if st.button("Continue", key=f"continue_adjustment_type_{farol_reference}"):
+                    if adjustment_type == "An adjustment request made by our company.":
+                        st.session_state[f"approval_step_{farol_reference}"] = "select_internal_reference"
+                    else: # "A new/external adjustment initiated by the carrier itself."
+                        st.session_state[f"approval_step_{farol_reference}"] = "external_adjustment_form"
+                    st.rerun()
 
                 if approval_step == "select_internal_reference":
                     st.markdown("<h4 style='text-align: left;'>Related Reference</h4>", unsafe_allow_html=True)
