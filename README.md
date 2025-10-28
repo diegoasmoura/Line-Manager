@@ -3414,6 +3414,14 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.23 - Correção do Mapeamento de Campos da API Ellox (Outubro 2025)
+- **🔧 Mapeamento de Campos Corrigido**: Corrigido mapeamento dos campos de data da API Ellox para usar nomes corretos das colunas (minúsculas) na tabela `F_CON_RETURN_CARRIERS`
+- **📊 Campos de Data Salvos**: Agora todos os 9 campos de data da API são corretamente salvos: `b_data_deadline`, `b_data_draft_deadline`, `b_data_abertura_gate`, `b_data_estimativa_saida_etd`, `b_data_estimativa_chegada_eta`, `b_data_estimativa_atracacao_etb`, `b_data_atracacao_atb`, `b_data_partida_atd`, `b_data_chegada_ata`
+- **🔄 Fluxo de Cache-First**: Implementado sistema que consulta cache do banco antes de chamar API externa, com fallback automático quando API retorna `null`
+- **🛠️ Correção de Indentação**: Corrigidos erros de indentação em `database.py` na função `validate_and_collect_voyage_monitoring`
+- **📋 Request Timeline Atualizada**: Dados da API agora aparecem corretamente na aba Request Timeline após processamento de PDF
+- **⚡ Performance Melhorada**: Sistema usa dados do cache local quando disponível, reduzindo chamadas desnecessárias à API externa
+
 ### 📌 v3.9.18 - Melhorias no Sistema de Teste de Conexão (Janeiro 2025)
 - **🔧 Teste de Conexão Inteligente**: Implementado sistema dinâmico que detecta automaticamente se deve usar proxy ou conexão direta
 - **📡 Mensagens Contextuais**: Spinner agora mostra mensagens específicas ("Testando conexão via proxy..." ou "Testando conexão direta...")
@@ -4468,11 +4476,11 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.9.11*
+*Sistema de Gerenciamento de Embarques - Versão 3.9.23*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~17.000+ linhas Python (atualizado v3.9.11)
+- **Linhas de Código**: ~17.000+ linhas Python (atualizado v3.9.23)
 - **Módulos**: 15+ módulos especializados  
 - **Arquivos Ellox**: 4 arquivos especializados para integração API
 - **Carriers Suportados**: 8 carriers principais
@@ -4480,17 +4488,18 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 - **Funcionalidades**: 55+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.11)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.11)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.11)
-- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.11)
-- **Audit Trail**: ✅ Sistema inteligente implementado (v3.9.11)
-- **Sessão Persistente**: ✅ Sistema híbrido robusto (v3.9.11)
-- **UX Padronizada**: ✅ Mensagens e feedback uniformes (v3.9.11)
-- **Sincronização Automática**: ✅ Sistema de background ativo (v3.9.11)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.23)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.23)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.23)
+- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.23)
+- **Audit Trail**: ✅ Sistema inteligente implementado (v3.9.23)
+- **Sessão Persistente**: ✅ Sistema híbrido robusto (v3.9.23)
+- **UX Padronizada**: ✅ Mensagens e feedback uniformes (v3.9.23)
+- **Sincronização Automática**: ✅ Sistema de background ativo (v3.9.23)
 - **Permissões LogTransp**: ✅ Erro ORA-01031 resolvido (v3.9.10)
-- **Interface Audit Trail**: ✅ Colunas otimizadas e contagem de registros (v3.9.11)
-- **Correções de Bugs**: ✅ KeyError 'Tabela' e outros erros resolvidos (v3.9.11)
+- **Interface Audit Trail**: ✅ Colunas otimizadas e contagem de registros (v3.9.23)
+- **Correções de Bugs**: ✅ KeyError 'Tabela' e outros erros resolvidos (v3.9.23)
+- **API Ellox Mapping**: ✅ Campos de data mapeados corretamente (v3.9.23)
 
 ## 🔧 Correções e Melhorias Recentes v3.9.11
 
