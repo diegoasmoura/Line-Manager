@@ -2871,6 +2871,9 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             if val is not None and not (isinstance(val, str) and val.strip() == ""):
                 main_update_fields["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] = val
 
+        # Atualizar FAROL_STATUS na tabela principal
+        main_update_fields['FAROL_STATUS'] = 'Booking Approved'
+        
         main_set_clause = ", ".join([f"{field} = :{field}" for field in main_update_fields.keys() if field != 'farol_reference'])
         main_update_query = text(f"UPDATE LogTransp.F_CON_SALES_BOOKING_DATA SET {main_set_clause} WHERE FAROL_REFERENCE = :farol_reference")
         conn.execute(main_update_query, main_update_fields)
