@@ -240,7 +240,7 @@ O fluxo de aprovação de um retorno de armador (PDF) foi redesenhado para ofere
 
 **Novo Fluxo de Aprovação (v4.0+)**
 
-1.  **Seleção do Retorno**: Na aba "Request Timeline", o usuário seleciona o PDF que deseja avaliar na seção "⚡ Avaliar Retorno do Armador".
+1.  **Seleção do Retorno**: Na aba "Request Timeline", o usuário seleciona o PDF que deseja avaliar na seção "⚡ Evaluate Carrier Return".
 2.  **Ação de Aprovar**: O usuário clica no botão "Booking Approved".
 3.  **Seleção do Tipo de Ajuste**: O sistema exibe a seção "Adjustment Type", onde o usuário deve classificar o retorno do armador:
     *   **An adjustment request made by our company**: Para retornos que são uma resposta a um pedido de ajuste interno.
@@ -257,9 +257,10 @@ O fluxo de aprovação de um retorno de armador (PDF) foi redesenhado para ofere
         *   O usuário preenche os campos de justificativa (motivo, responsabilidade, comentários).
         *   Ao clicar em "Confirm Approval", o sistema cria um novo registro de ajuste e aprova o booking.
 
-5.  **Conclusão**: Em ambos os cenários, o status do booking é atualizado para "Booking Approved" e o histórico é registrado.
+5.  **Voltar**: Em cada etapa do novo fluxo, um botão "Back" foi adicionado para permitir que o usuário retorne à seleção anterior.
+6.  **Conclusão**: Em ambos os cenários, o status do booking é atualizado para "Booking Approved" e o histórico é registrado.
 
-Este novo fluxo garante que cada aprovação de PDF seja corretamente contextualizada, melhorando a rastreabilidade e a precisão dos dados.
+Este novo fluxo garante que cada aprovação de PDF seja corretamente contextualizada, melhorando a rastreabilidade e a precisão dos dados. A interface foi aprimorada com um container que agrupa as ações, separadores visuais e alinhamento à esquerda para uma experiência de usuário mais limpa.
 
 #### 🎯 **Resultado Final**
 

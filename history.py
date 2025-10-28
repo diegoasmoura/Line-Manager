@@ -1,3 +1,4 @@
+# Test comment
 import streamlit as st
 import pandas as pd
 from database import (
@@ -1993,11 +1994,11 @@ def exibir_history():
     
     if active_tab == unified_label and not df_received_for_approval.empty and df_for_approval is not None:
         st.markdown("---")
-        st.markdown("### ⚡ Avaliar Retorno do Armador")
+        st.markdown("### ⚡ Evaluate Carrier Return")
         
-        # Criar opções para o selectbox
-        approval_options = ["Selecione um PDF para aprovar..."]
-        approval_mapping = {}  # Dict para mapear opção -> dados da linha
+        # Create options for the selectbox
+        approval_options = ["Select a PDF to approve..."]
+        approval_mapping = {}  # Dict to map option -> row data
         
         for idx, row in df_received_for_approval.iterrows():
             inserted_date = row.get('ROW_INSERTED_DATE')
@@ -2010,186 +2011,199 @@ def exibir_history():
             else:
                 date_str = 'N/A'
             
-            # Buscar Index da linha no df_for_approval baseado no idx
-            # O idx do iterrows() do df_received_for_approval corresponde ao índice original
-            # no df_for_approval
+            # Get the line Index from df_for_approval based on idx
             if df_for_approval is not None and idx in df_for_approval.index:
                 line_index = df_for_approval.loc[idx, 'Index']
             else:
                 line_index = idx
             
-            # Formato: Index | Data e hora
+            # Format: Index | Date and time
             option_text = f"Index {line_index} | {date_str}"
             approval_options.append(option_text)
             approval_mapping[option_text] = row
         
-        # Selectbox para escolher PDF
         selected_pdf = st.selectbox(
-            "Selecione o retorno do armador para avaliar:",
+            "Select the carrier return to evaluate:",
             options=approval_options,
             key=f"pdf_approval_select_{farol_reference}"
         )
+
+        # If the selected PDF changes, reset the approval step
+        last_pdf_key = f"last_selected_pdf_{farol_reference}"
+        if last_pdf_key not in st.session_state:
+            st.session_state[last_pdf_key] = selected_pdf
+
+        if st.session_state[last_pdf_key] != selected_pdf:
+            if f"approval_step_{farol_reference}" in st.session_state:
+                del st.session_state[f"approval_step_{farol_reference}"]
+            st.session_state[last_pdf_key] = selected_pdf
         
-        # Se selecionou um PDF, mostrar botões de aprovação
-        if selected_pdf != "Selecione um PDF para aprovar...":
-            selected_row = approval_mapping[selected_pdf]
-            adjustment_id = selected_row['ADJUSTMENT_ID']
-            
-            # Obter status atual
-            selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("B_BOOKING_STATUS", "")
-            
-            st.markdown("#### 🔄 Selecione a Ação:")
-            
-            # Layout dos botões (mesmo do código atual)
-            col1, col2 = st.columns([2, 3])
-            
-            with col1:
-                farol_status = selected_row.get("B_BOOKING_STATUS", "")
-                disable_approved = farol_status == "Booking Approved"
-                disable_rejected = farol_status == "Booking Rejected"
-                disable_cancelled = farol_status == "Booking Cancelled"
-                disable_adjustment = farol_status == "Adjustment Requested"
+        # If a PDF is selected, show approval buttons
+        if selected_pdf != "Select a PDF to approve...":
+            with st.container(border=True):
+                selected_row = approval_mapping[selected_pdf]
+                adjustment_id = selected_row['ADJUSTMENT_ID']
                 
-                subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
+                # Get current status
+                selected_row_status = get_return_carrier_status_by_adjustment_id(adjustment_id) or selected_row.get("B_BOOKING_STATUS", "")
                 
-                with subcol1:
-                    if st.button("Booking Approved", key=f"status_approved_unified_{farol_reference}", type="secondary", disabled=disable_approved):
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
-                        st.session_state[f"selected_row_for_approval_{farol_reference}"] = selected_row
-                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                        st.rerun()
-
-                with subcol2:
-                    if st.button("Booking Rejected", key=f"status_rejected_unified_{farol_reference}", type="secondary", disabled=disable_rejected):
-                        st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
-                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                        result = update_record_status(adjustment_id, "Booking Rejected")
-                        if result:
-                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status atualizado para 'Booking Rejected'."}
-                            st.cache_data.clear()
-                            st.rerun()
+                st.markdown("<h4 style='text-align: left;'>🔄 Select Action:</h4>", unsafe_allow_html=True)
                 
-                with subcol3:
-                    if st.button("Booking Cancelled", key=f"status_cancelled_unified_{farol_reference}", type="secondary", disabled=disable_cancelled):
-                        st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
-                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                        result = update_record_status(adjustment_id, "Booking Cancelled")
-                        if result:
-                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status atualizado para 'Booking Cancelled'."}
-                            st.cache_data.clear()
-                            st.rerun()
+                # Button layout
+                col1, col2 = st.columns([2, 3])
                 
-                with subcol4:
-                    if st.button("Adjustment Requested", key=f"status_adjustment_unified_{farol_reference}", type="secondary", disabled=disable_adjustment):
-                        st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
-                        st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                        result = update_record_status(adjustment_id, "Adjustment Requested")
-                        if result:
-                            st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status atualizado para 'Adjustment Requested'."}
-                            st.cache_data.clear()
-                            st.rerun()
-
-            approval_step = st.session_state.get(f"approval_step_{farol_reference}")
-
-            if approval_step == "select_adjustment_type":
-                st.markdown("#### Adjustment Type")
-                st.markdown("This carrier return, documented in the PDF, refers to:")
-                adjustment_type = st.radio(
-                    "Select one of the options below:",
-                    ("An adjustment request made by our company.", "A new/external adjustment initiated by the carrier itself."),
-                    key=f"adjustment_type_{farol_reference}",
-                    label_visibility="collapsed"
-                )
-
-                if st.button("Continue", key=f"continue_adjustment_type_{farol_reference}"):
-                    if adjustment_type == "An adjustment request made by our company.":
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_internal_reference"
-                    else: # "A new/external adjustment initiated by the carrier itself."
-                        st.session_state[f"approval_step_{farol_reference}"] = "external_adjustment_form"
-                    st.rerun()
-
-            if approval_step == "select_internal_reference":
-                st.markdown("#### Related Reference")
-                # Get available references for relation
-                available_refs = get_available_references_for_relation(farol_reference)
-                ref_options = ["Select a reference..."]
-                if available_refs:
-                    for ref in available_refs:
-                        p_status = str(ref.get('P_STATUS', '') or '').strip()
-                        b_status = str(ref.get('FAROL_STATUS', '') or '').strip()
-                        linked = ref.get('LINKED_REFERENCE')
-                        
-                        # Check if the reference is valid for selection
-                        if (b_status == 'Booking Requested' and (linked is None or str(linked).strip() == '')) or \
-                           (b_status == 'Adjustment Requested' and (linked is None or str(linked).strip() == '')):
-                            
-                            inserted_date = ref.get('ROW_INSERTED_DATE')
-                            brazil_time = convert_utc_to_brazil_time(inserted_date) if inserted_date else None
-                            date_str = brazil_time.strftime('%d/%m/%Y %H:%M') if brazil_time else 'N/A'
-                            
-                            status_display = ref.get('FAROL_STATUS', 'Status')
-                            option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
-                            ref_options.append(option_text)
-
-                selected_ref = st.selectbox("Select the internal reference:", options=ref_options, key=f"internal_ref_select_{farol_reference}")
-
-                col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
-                        if selected_ref != "Select a reference...":
-                            related_reference = selected_ref.split(" | ")[0]
-                            # Call approval function
-                            result = approve_carrier_return(adjustment_id, related_reference, {})
+                    farol_status = selected_row.get("B_BOOKING_STATUS", "")
+                    disable_approved = farol_status == "Booking Approved"
+                    disable_rejected = farol_status == "Booking Rejected"
+                    disable_cancelled = farol_status == "Booking Cancelled"
+                    disable_adjustment = farol_status == "Adjustment Requested"
+                    
+                    subcol1, subcol2, subcol3, subcol4 = st.columns([1, 1, 1, 1], gap="small")
+                    
+                    with subcol1:
+                        if st.button("Booking Approved", key=f"status_approved_unified_{farol_reference}", type="secondary", disabled=disable_approved):
+                            st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
+                            st.session_state[f"selected_row_for_approval_{farol_reference}"] = selected_row
+                            st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                            st.rerun()
+                    
+                    with subcol2:
+                        if st.button("Booking Rejected", key=f"status_rejected_unified_{farol_reference}", type="secondary", disabled=disable_rejected):
+                            st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
+                            st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                            result = update_record_status(adjustment_id, "Booking Rejected")
                             if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
-                                st.session_state.pop(f"approval_step_{farol_reference}", None)
+                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status updated to 'Booking Rejected'."}
                                 st.cache_data.clear()
                                 st.rerun()
-                            else:
-                                st.error("❌ Failed to approve.")
-                        else:
-                            st.warning("Please select a reference.")
-                with col2:
-                    if st.button("Back", key=f"back_to_adjustment_type_{farol_reference}"):
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
+                    
+                    with subcol3:
+                        if st.button("Booking Cancelled", key=f"status_cancelled_unified_{farol_reference}", type="secondary", disabled=disable_cancelled):
+                            st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
+                            st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                            result = update_record_status(adjustment_id, "Booking Cancelled")
+                            if result:
+                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status updated to 'Booking Cancelled'."}
+                                st.cache_data.clear()
+                                st.rerun()
+                    
+                    with subcol4:
+                        if st.button("Adjustment Requested", key=f"status_adjustment_unified_{farol_reference}", type="secondary", disabled=disable_adjustment):
+                            st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
+                            st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
+                            result = update_record_status(adjustment_id, "Adjustment Requested")
+                            if result:
+                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status updated to 'Adjustment Requested'."}
+                                st.cache_data.clear()
+                                st.rerun()
+                
+                approval_step = st.session_state.get(f"approval_step_{farol_reference}")
+
+                if approval_step:
+                    st.write("")
+                    st.markdown("---")
+                    st.write("")
+
+                if approval_step == "select_adjustment_type":
+                    st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
+                    st.markdown("<p style='text-align: left;'>This carrier return, documented in the PDF, refers to:</p>", unsafe_allow_html=True)
+                    adjustment_type = st.radio(
+                        "Select one of the options below:",
+                        ("An adjustment request made by our company.", "A new/external adjustment initiated by the carrier itself."),
+                        key=f"adjustment_type_{farol_reference}",
+                        label_visibility="collapsed"
+                    )
+
+                    if st.button("Continue", key=f"continue_adjustment_type_{farol_reference}"):
+                        if adjustment_type == "An adjustment request made by our company.":
+                            st.session_state[f"approval_step_{farol_reference}"] = "select_internal_reference"
+                        else: # "A new/external adjustment initiated by the carrier itself."
+                            st.session_state[f"approval_step_{farol_reference}"] = "external_adjustment_form"
                         st.rerun()
 
-            if approval_step == "external_adjustment_form":
-                st.markdown("#### New External Adjustment")
-                with st.form(key=f"external_adjustment_form_{farol_reference}"):
-                    st.info("This is a carrier adjustment without a prior request from the company.")
-                    reason = st.selectbox("Booking Adjustment Request Reason", options=[""] + Booking_adj_reason_car)
-                    responsibility = st.selectbox("Booking Adjustment Responsibility", options=[""] + Booking_adj_responsibility_car)
-                    comment = st.text_area("Comments")
-                    
+                if approval_step == "select_internal_reference":
+                    st.markdown("<h4 style='text-align: left;'>Related Reference</h4>", unsafe_allow_html=True)
+                    # Get available references for relation
+                    available_refs = get_available_references_for_relation(farol_reference)
+                    ref_options = ["Select a reference..."]
+                    if available_refs:
+                        for ref in available_refs:
+                            p_status = str(ref.get('P_STATUS', '') or '').strip()
+                            b_status = str(ref.get('FAROL_STATUS', '') or '').strip()
+                            linked = ref.get('LINKED_REFERENCE')
+                            
+                            # Check if the reference is valid for selection
+                            if (b_status == 'Booking Requested' and (linked is None or str(linked).strip() == '')) or \
+                               (b_status == 'Adjustment Requested' and (linked is None or str(linked).strip() == '')):
+                                
+                                inserted_date = ref.get('ROW_INSERTED_DATE')
+                                brazil_time = convert_utc_to_brazil_time(inserted_date) if inserted_date else None
+                                date_str = brazil_time.strftime('%d/%m/%Y %H:%M') if brazil_time else 'N/A'
+                                
+                                status_display = ref.get('FAROL_STATUS', 'Status')
+                                option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
+                                ref_options.append(option_text)
+
+                    selected_ref = st.selectbox("Select the internal reference:", options=ref_options, key=f"internal_ref_select_{farol_reference}")
+
                     col1, col2 = st.columns(2)
                     with col1:
-                        submitted = st.form_submit_button("Confirm Approval")
-                    with col2:
-                        back_clicked = st.form_submit_button("Back")
-
-                    if back_clicked:
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
-                        st.rerun()
-
-                    if submitted:
-                        if not reason:
-                            st.error("The 'Booking Adjustment Request Reason' field is mandatory.")
-                        else:
-                            justification = {
-                                "area": "Booking",
-                                "request_reason": reason,
-                                "adjustments_owner": responsibility,
-                                "comments": comment
-                            }
-                            result = approve_carrier_return(adjustment_id, "New Adjustment", justification)
-                            if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ External adjustment approval completed successfully!"}
-                                st.session_state.pop(f"approval_step_{farol_reference}", None)
-                                st.cache_data.clear()
-                                st.rerun()
+                        if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
+                            if selected_ref != "Select a reference...":
+                                related_reference = selected_ref.split(" | ")[0]
+                                # Call approval function
+                                result = approve_carrier_return(adjustment_id, related_reference, {})
+                                if result:
+                                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
+                                    st.session_state.pop(f"approval_step_{farol_reference}", None)
+                                    st.cache_data.clear()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to approve.")
                             else:
-                                st.error("❌ Failed to approve the external adjustment.")
+                                st.warning("Please select a reference.")
+                    with col2:
+                        if st.button("Back", key=f"back_to_adjustment_type_{farol_reference}"):
+                            st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
+                            st.rerun()
+
+                if approval_step == "external_adjustment_form":
+                    st.markdown("<h4 style='text-align: left;'>New External Adjustment</h4>", unsafe_allow_html=True)
+                    with st.form(key=f"external_adjustment_form_{farol_reference}"):
+                        st.info("This is a carrier adjustment without a prior request from the company.")
+                        reason = st.selectbox("Booking Adjustment Request Reason", options=[""] + Booking_adj_reason_car)
+                        responsibility = st.selectbox("Booking Adjustment Responsibility", options=[""] + Booking_adj_responsibility_car)
+                        comment = st.text_area("Comments")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            submitted = st.form_submit_button("Confirm Approval")
+                        with col2:
+                            back_clicked = st.form_submit_button("Back")
+
+                        if back_clicked:
+                            st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
+                            st.rerun()
+
+                        if submitted:
+                            if not reason:
+                                st.error("The 'Booking Adjustment Request Reason' field is mandatory.")
+                            else:
+                                justification = {
+                                    "area": "Booking",
+                                    "request_reason": reason,
+                                    "adjustments_owner": responsibility,
+                                    "comments": comment
+                                }
+                                result = approve_carrier_return(adjustment_id, "New Adjustment", justification)
+                                if result:
+                                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ External adjustment approval completed successfully!"}
+                                    st.session_state.pop(f"approval_step_{farol_reference}", None)
+                                    st.cache_data.clear()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to approve the external adjustment.")
             
             # Manter seções de voyage manual e seleção de referência da implementação atual
             # (será adicionada nas próximas etapas se necessário)
