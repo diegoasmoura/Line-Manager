@@ -1890,9 +1890,9 @@ def exibir_history():
             
             # Layout zebra - linhas pares mais claras, ímpares mais escuras
             if row_idx % 2 == 0:
-                base_bg = 'background-color: #F8F9FA;'  # Cinza muito claro
+                base_bg = 'background-color: #E8E8E8;'  # Cinza médio (linhas pares)
             else:
-                base_bg = 'background-color: #FFFFFF;'  # Branco
+                base_bg = 'background-color: #FFFFFF;'  # Branco (linhas ímpares)
             
             # Aplica cor de fundo base para toda a linha
             for i in range(len(styles)):
