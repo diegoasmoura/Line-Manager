@@ -15,7 +15,7 @@ import streamlit as st
 import pandas as pd
 import re
 from datetime import datetime
-from database import get_database_connection, insert_return_carrier_from_ui, upsert_terminal_monitorings_from_dataframe
+from database import get_database_connection, insert_return_carrier_from_ui, upsert_terminal_monitorings_from_dataframe, validate_and_collect_voyage_monitoring
 from sqlalchemy import text
 import uuid
 import os
