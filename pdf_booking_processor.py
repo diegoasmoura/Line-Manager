@@ -2914,6 +2914,11 @@ def display_pdf_validation_interface(processed_data):
             st.session_state[f"api_dates_{farol_reference}"] = api_result
             st.session_state[f"api_consulted_{farol_reference}"] = True
             
+            # Atualizar processed_data para que as mensagens sejam exibidas corretamente
+            processed_data["api_status"] = api_result["success"]
+            processed_data["api_message"] = api_result["message"]
+            processed_data["api_error_type"] = api_result.get("error_type")
+            
             # Exibir mensagens e forçar rerun para atualizar o formulário
             if api_result["success"]:
                 st.success(api_result["message"])
