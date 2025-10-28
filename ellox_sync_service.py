@@ -14,8 +14,8 @@ from ellox_sync_functions import (
     log_sync_execution,
     get_sync_config
 )
-from ellox_api import get_voyage_monitoring_data
-from database import get_database_connection
+
+from database import get_database_connection, validate_and_collect_voyage_monitoring
 from sqlalchemy import text
 
 # Configurar logging
@@ -60,8 +60,8 @@ def get_current_voyage_data(vessel: str, voyage: str, terminal: str) -> Optional
         }).fetchone()
         
         if result:
-            # Converte para dicionário
-            return dict(result._mapping)
+            # Converte para dicionário e garante chaves em maiúsculas
+            return {k.upper(): v for k, v in dict(result._mapping).items()}
         return None
     finally:
         conn.close()
@@ -83,97 +83,29 @@ def detect_changes(current_data: Dict, new_data: Dict) -> Tuple[int, List[str]]:
     
     changes = []
     fields_to_compare = [
-        'B_ETA', 'B_ETD', 'B_ATA', 'B_ATD', 'B_DATA_CHEGADA_DESTINO_ATA',
-        'B_DATA_SAIDA_DESTINO_ATD', 'B_STATUS', 'B_VESSEL_NAME', 'B_VOYAGE_CODE',
-        'B_TERMINAL', 'B_CARRIER', 'B_ORIGIN', 'B_DESTINATION', 'B_CARGO_TYPE',
-        'B_QUANTITY', 'B_UNIT', 'B_DEADLINE', 'B_COMMENTS'
+        'NAVIO', 'VIAGEM', 'TERMINAL', 'AGENCIA',
+        'DATA_DEADLINE', 'DATA_DRAFT_DEADLINE', 'DATA_ABERTURA_GATE',
+        'DATA_ABERTURA_GATE_REEFER', 'DATA_ESTIMATIVA_SAIDA',
+        'DATA_ESTIMATIVA_CHEGADA', 'DATA_CHEGADA', 'DATA_ESTIMATIVA_ATRACACAO',
+        'DATA_ATRACACAO', 'DATA_PARTIDA', 'DATA_ATUALIZACAO'
     ]
     
     for field in fields_to_compare:
-        current_value = current_data.get(field)
-        new_value = new_data.get(field)
+        # Acessar chaves em minúsculas, como retornado por .mappings().fetchone() ou dict(result._mapping)
+        current_value = current_data.get(field.lower())
+        new_value = new_data.get(field.lower())
         
-        # Normaliza valores para comparação
-        if current_value is None and new_value is None:
-            continue
-        if current_value is None or new_value is None:
-            changes.append(field)
-            continue
+        # Normaliza valores para comparação (incluindo tratamento de datetime)
+        current_normalized = str(current_value).strip() if current_value is not None else ''
+        new_normalized = str(new_value).strip() if new_value is not None else ''
         
-        # Converte para string para comparação
-        current_str = str(current_value).strip()
-        new_str = str(new_value).strip()
-        
-        if current_str != new_str:
+        if current_normalized != new_normalized:
             changes.append(field)
     
     return len(changes), changes
 
 
-def save_monitoring_update(voyage_data: Dict, data_source: str = 'API') -> bool:
-    """
-    Salva dados de monitoramento atualizados no banco.
-    
-    Args:
-        voyage_data (dict): Dados da viagem para salvar
-        data_source (str): Fonte dos dados ('API' ou 'MANUAL')
-    
-    Returns:
-        bool: True se salvou com sucesso
-    """
-    conn = get_database_connection()
-    try:
-        # Prepara dados para inserção
-        insert_data = {
-            'NAVIO': voyage_data.get('B_VESSEL_NAME'),
-            'VIAGEM': voyage_data.get('B_VOYAGE_CODE'),
-            'TERMINAL': voyage_data.get('B_TERMINAL'),
-            'B_ETA': voyage_data.get('B_ETA'),
-            'B_ETD': voyage_data.get('B_ETD'),
-            'B_ATA': voyage_data.get('B_ATA'),
-            'B_ATD': voyage_data.get('B_ATD'),
-            'B_DATA_CHEGADA_DESTINO_ATA': voyage_data.get('B_DATA_CHEGADA_DESTINO_ATA'),
-            'B_DATA_SAIDA_DESTINO_ATD': voyage_data.get('B_DATA_SAIDA_DESTINO_ATD'),
-            'B_STATUS': voyage_data.get('B_STATUS'),
-            'B_CARRIER': voyage_data.get('B_CARRIER'),
-            'B_ORIGIN': voyage_data.get('B_ORIGIN'),
-            'B_DESTINATION': voyage_data.get('B_DESTINATION'),
-            'B_CARGO_TYPE': voyage_data.get('B_CARGO_TYPE'),
-            'B_QUANTITY': voyage_data.get('B_QUANTITY'),
-            'B_UNIT': voyage_data.get('B_UNIT'),
-            'B_DEADLINE': voyage_data.get('B_DEADLINE'),
-            'B_COMMENTS': voyage_data.get('B_COMMENTS'),
-            'DATA_SOURCE': data_source,
-            'CREATED_AT': datetime.now(),
-            'UPDATED_AT': datetime.now(),
-            'CREATED_BY': 'SYSTEM_SYNC'
-        }
-        
-        # Remove valores None
-        insert_data = {k: v for k, v in insert_data.items() if v is not None}
-        
-        # Monta query de inserção
-        columns = list(insert_data.keys())
-        values = [f":{col}" for col in columns]
-        
-        query = text(f"""
-            INSERT INTO LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
-            ({', '.join(columns)})
-            VALUES ({', '.join(values)})
-        """)
-        
-        conn.execute(query, insert_data)
-        conn.commit()
-        
-        logger.info(f"Dados salvos para {voyage_data.get('B_VESSEL_NAME')} - {voyage_data.get('B_VOYAGE_CODE')}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Erro ao salvar dados: {str(e)}")
-        conn.rollback()
-        return False
-    finally:
-        conn.close()
+
 
 
 def sync_single_voyage(vessel: str, voyage: str, terminal: str) -> Dict:
@@ -206,22 +138,31 @@ def sync_single_voyage(vessel: str, voyage: str, terminal: str) -> Dict:
         # 1. Busca dados atuais
         current_data = get_current_voyage_data(vessel, voyage, terminal)
         
-        # 2. Consulta API Ellox
-        try:
-            api_data = get_voyage_monitoring_data(vessel, voyage, terminal)
-        except Exception as e:
+        # 2. Consulta API Ellox usando a função centralizada
+        api_result = validate_and_collect_voyage_monitoring(
+            vessel_name=vessel,
+            voyage_code=voyage,
+            terminal=terminal,
+            save_to_db=True # A sincronização automática sempre salva no DB
+        )
+
+        if not api_result["success"]:
             result['status'] = 'API_ERROR'
-            result['error_message'] = f"Erro na API Ellox: {str(e)}"
-            logger.error(f"Erro na API para {vessel}-{voyage}: {str(e)}")
+            result['error_message'] = api_result["message"]
+            logger.error(f"Erro na API para {vessel}-{voyage}: {api_result["message"]}")
             return result
         
-        if not api_data:
+        # Se a API retornou sucesso, mas sem dados (ex: voyage encontrada, mas sem monitoramento ativo)
+        if not api_result["data"]:
             result['status'] = 'NO_DATA'
-            result['error_message'] = "Nenhum dado retornado pela API"
-            logger.warning(f"Nenhum dado da API para {vessel}-{voyage}")
+            result['error_message'] = api_result["message"]
+            logger.warning(f"Nenhum dado de monitoramento ativo retornado pela API para {vessel}-{voyage}: {api_result["message"]}")
             return result
+        
+        api_data = api_result["data"] # Os dados detalhados vêm aqui
         
         # 3. Detecta mudanças
+        # api_data já contém os dados da API (ou do cache local) no formato esperado
         changes_count, fields_changed = detect_changes(current_data, api_data)
         result['changes_detected'] = changes_count
         result['fields_changed'] = fields_changed
@@ -230,14 +171,9 @@ def sync_single_voyage(vessel: str, voyage: str, terminal: str) -> Dict:
             result['status'] = 'NO_CHANGES'
             logger.info(f"Nenhuma mudança para {vessel}-{voyage}")
         else:
-            # 4. Salva dados atualizados
-            if save_monitoring_update(api_data, 'API'):
-                result['status'] = 'SUCCESS'
-                logger.info(f"Sincronização bem-sucedida para {vessel}-{voyage}: {changes_count} mudanças")
-            else:
-                result['status'] = 'SAVE_ERROR'
-                result['error_message'] = "Erro ao salvar dados no banco"
-                logger.error(f"Erro ao salvar dados para {vessel}-{voyage}")
+            # Se houve mudanças, validate_and_collect_voyage_monitoring já salvou os dados
+            result['status'] = 'SUCCESS'
+            logger.info(f"Sincronização bem-sucedida para {vessel}-{voyage}: {changes_count} mudanças")
         
     except Exception as e:
         result['status'] = 'ERROR'
