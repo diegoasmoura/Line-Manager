@@ -2347,7 +2347,7 @@ def standardize_terminal_name(terminal_name):
 def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=""):
     """
     Coleta dados de monitoramento da viagem usando a API Ellox Terminal.
-    Primeiro solicita o monitoramento, depois visualiza os dados.
+    Reutiliza a lógica centralizada em database.validate_and_collect_voyage_monitoring.
     
     Args:
         vessel_name: Nome do navio
@@ -2355,182 +2355,26 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
         voyage_code: Código da viagem (opcional)
     """
     try:
-        import requests
-        import json
-        import pandas as pd
-        from database import get_database_connection, upsert_terminal_monitorings_from_dataframe
-        from sqlalchemy import text
-        
-        # Função para autenticar na API Ellox
-        def authenticate_ellox():
-            EMAIL = "diego_moura@cargill.com"
-            SENHA = "Cargill@25"
-            
-            url_auth = "https://apidtz.comexia.digital/api/auth"
-            payload_auth = {"email": EMAIL, "senha": SENHA}
-            
-            resp_auth = requests.post(
-                url_auth, 
-                json=payload_auth, 
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if resp_auth.status_code != 200:
-                return None
-            
-            data_auth = resp_auth.json()
-            token = data_auth.get("access_token") or data_auth.get("token")
-            if not token:
-                raise ValueError("Token de autenticação ausente na resposta")
-            return token
-        
-        # Função para solicitar monitoramento
-        def solicitar_monitoramento(token, cnpj_terminal, vessel_name, voyage_code):
-            url = "https://apidtz.comexia.digital/api/monitor/navio"
-            payload = {
-                "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
-                "lista": [
-                    {
-                        "cnpj_terminal": cnpj_terminal,
-                        "nome_navio": vessel_name,
-                        "viagem_navio": voyage_code or ""
-                    }
-                ]
-            }
-            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-            resp = requests.post(url, headers=headers, json=payload)
-            
-            if resp.status_code >= 400:
-                body_text = (resp.text or "").lower()
-                if "already exist" in body_text or "already tracked" in body_text:
-                    return "already_exists"
-                return None
-            return "ok"
-        
-        # Função para visualizar monitoramentos
-        def visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code):
-            url = "https://apidtz.comexia.digital/api/terminalmonitorings"
-            payload = {
-                "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
-                "cnpj_terminal": cnpj_terminal,
-                "nome_navio": vessel_name,
-                "viagem_navio": voyage_code or ""
-            }
-            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-            resp = requests.post(url, headers=headers, json=payload)
-            
-            if resp.status_code >= 400:
-                return pd.DataFrame()
-            
-            data = resp.json() if resp.content else []
-            return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame()
-        
-        # Mapeamento de terminais para CNPJs (expandido)
-        terminal_cnpj_map = {
-            "BTP": "04.887.625/0001-78",
-            "BRASIL TERMINAL PORTUARIO": "04.887.625/0001-78", 
-            "BRASIL TERMINAL PORTUARIO SA": "04.887.625/0001-78",
-            "BRASIL TERMINAL PORTUARIO S/A": "04.887.625/0001-78",
-            "SANTOS BRASIL": "02.762.121/0001-04",  # Atualizado conforme teste.ipynb
-            "SANTOS BRASIL S.A.": "02.762.121/0001-04",
-            "SANTOS BRASIL SA": "02.762.121/0001-04",
-            "TECON SANTOS": "03.518.221/0001-06",
-            "COSCO": "02.762.121/0001-04"  # Default: Santos Brasil (conforme teste)
-        }
-        
-        # Buscar CNPJ do terminal
-        cnpj_terminal = "02.762.121/0001-04"  # Default: Santos Brasil (conforme teste.ipynb)
-        
-        # Normalizar nome do terminal para busca
-        terminal_normalized = (port_terminal_city or "").upper().strip()
-        
-        for terminal_key, cnpj in terminal_cnpj_map.items():
-            if terminal_key in terminal_normalized:
-                cnpj_terminal = cnpj
-                break
+        # Chamar a função robusta de database.py
+        api_result = validate_and_collect_voyage_monitoring(
+            vessel_name=vessel_name,
+            voyage_code=voyage_code,
+            terminal=port_terminal_city,
+            save_to_db=True # Sempre salvar, pois esta função é chamada para atualizar o histórico
+        )
 
-        # Caso especial: Embraport (DP World Santos)
-        # Alguns PDFs trazem "Embraport Empresa Brasileira"; na API é reconhecido como DPW/DP WORLD
-        if "EMBRAPORT" in terminal_normalized or "EMPRESA BRASILEIRA" in terminal_normalized:
-            try:
-                conn = get_database_connection()
-                query = text("""
-                    SELECT CNPJ, NOME
-                    FROM LogTransp.F_ELLOX_TERMINALS
-                    WHERE UPPER(NOME) LIKE '%DPW%'
-                       OR UPPER(NOME) LIKE '%DP WORLD%'
-                       OR UPPER(NOME) LIKE '%EMBRAPORT%'
-                    FETCH FIRST 1 ROWS ONLY
-                """)
-                res = conn.execute(query).mappings().fetchone()
-                conn.close()
-                if res and res.get("cnpj"):
-                    cnpj_terminal = res["cnpj"]
-            except Exception:
-                # mantém fallback se não encontrar
-                pass
-        
-        # Buscar na base local se não encontrou
-        if cnpj_terminal == "02.762.121/0001-04" and "SANTOS BRASIL" not in terminal_normalized:
-            try:
-                conn = get_database_connection()
-                query = text("""
-                    SELECT DISTINCT CNPJ, NOME
-                    FROM LogTransp.F_ELLOX_TERMINALS
-                    WHERE UPPER(NOME) LIKE UPPER(:terminal_name)
-                    FETCH FIRST 1 ROWS ONLY
-                """)
-                result = conn.execute(query, {
-                    "terminal_name": f"%{port_terminal_city}%"
-                }).mappings().fetchone()
-                
-                if result:
-                    cnpj_terminal = result["cnpj"]
-                
-                conn.close()
-            except:
-                pass  # Usar default
-        
-        # 1) Autenticar na API
-        token = authenticate_ellox()
-        if not token:
-            st.warning("⚠️ Erro na autenticação com API Ellox")
-            return
-        
-        # 2) Solicitar monitoramento (mesmo se já existir)
-        status_solicitacao = solicitar_monitoramento(token, cnpj_terminal, vessel_name, voyage_code)
-        
-        if status_solicitacao in ("ok", "already_exists"):
-            if status_solicitacao == "already_exists":
-                st.info(f"ℹ️ Navio **{vessel_name}** já está sendo monitorado. Coletando dados...")
-            else:
-                st.info(f"✅ Monitoramento solicitado para **{vessel_name}**")
-            
-            # 3) Visualizar monitoramentos
-            df_monitoring = visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code)
-            
-            if not df_monitoring.empty:
-                # Salvar no Oracle (LogTransp.F_ELLOX_TERMINAL_MONITORINGS)
-                try:
-                    processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
-                    if processed_count > 0:
-                        st.success(f"✅ {processed_count} registros de monitoramento coletados via API Ellox!")
-                        st.info(f"🚢 Navio: **{vessel_name}** | 🏗️ Terminal: **{cnpj_terminal}**")
-                    else:
-                        st.info("ℹ️ Nenhum novo registro de monitoramento encontrado (dados já existem)")
-                except Exception as e:
-                    st.warning(f"⚠️ Erro ao salvar monitoramentos no Oracle: {str(e)}")
-            else:
-                st.info(f"ℹ️ Nenhum dado de monitoramento encontrado para **{vessel_name}** no terminal {cnpj_terminal}")
-                st.info("💡 O navio pode não estar na base Ellox ainda ou usar nome diferente na agência")
+        if api_result["success"]:
+            # A função validate_and_collect_voyage_monitoring já exibe mensagens de sucesso/informação
+            # Não é necessário st.success aqui novamente, mas podemos logar para o console.
+            print(f"[collect_voyage_monitoring_data] Sucesso: {api_result['message']}")
         else:
-            st.warning("⚠️ Não foi possível solicitar o monitoramento. Verifique os dados do navio.")
-            
+            # validate_and_collect_voyage_monitoring já exibe mensagens de warning/error
+            print(f"[collect_voyage_monitoring_data] Falha: {api_result['message']}")
+
     except Exception as e:
-        # Log do erro para debug, mas não quebra o fluxo principal
-        st.warning(f"⚠️ Erro na coleta de monitoramento: {str(e)}")
+        st.warning(f"⚠️ Erro na coleta de monitoramento (top-level): {str(e)}")
         import traceback
-        print(f"collect_voyage_monitoring_data error: {traceback.format_exc()}")
+        print(f"collect_voyage_monitoring_data error (top-level): {traceback.format_exc()}")
 
 @st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
 def load_ships_from_database():
@@ -3057,254 +2901,26 @@ def display_pdf_validation_interface(processed_data):
             voyage_val = voyage
             terminal_val = port_terminal_city
             
-            # Plano Passo 1: Verificar cache no banco de dados primeiro
-            try:
-                from database import get_database_connection
-                from sqlalchemy import text
-                conn = get_database_connection()
-                existing_query = text("""
-                    SELECT *
-                    FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
-                    WHERE UPPER(NAVIO) = UPPER(:vessel_name)
-                    AND UPPER(VIAGEM) = UPPER(:voyage_code)
-                    AND UPPER(TERMINAL) = UPPER(:terminal)
-                    AND (DATA_DEADLINE IS NOT NULL OR DATA_ESTIMATIVA_SAIDA IS NOT NULL OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL OR DATA_ABERTURA_GATE IS NOT NULL)
-                    ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
-                    FETCH FIRST 1 ROW ONLY
-                """)
-                existing_data = conn.execute(existing_query, {
-                    "vessel_name": vessel_name_val,
-                    "voyage_code": voyage_val,
-                    "terminal": terminal_val
-                }).mappings().fetchone()
-                conn.close()
-
-                if existing_data:
-                    st.info("✅ Dados de monitoramento encontrados no cache do banco de dados.")
-                    existing_dict = dict(existing_data)
-                    
-                    # Mapear campos do banco (que retorna em lowercase) para uppercase
-                    field_mapping = {
-                        "data_deadline": "DATA_DEADLINE",
-                        "data_draft_deadline": "DATA_DRAFT_DEADLINE",
-                        "data_abertura_gate": "DATA_ABERTURA_GATE",
-                        "data_abertura_gate_reefer": "DATA_ABERTURA_GATE_REEFER",
-                        "data_estimativa_saida": "DATA_ESTIMATIVA_SAIDA",
-                        "data_estimativa_chegada": "DATA_ESTIMATIVA_CHEGADA",
-                        "data_estimativa_atracacao": "DATA_ESTIMATIVA_ATRACACAO",
-                        "data_atracacao": "DATA_ATRACACAO",
-                        "data_partida": "DATA_PARTIDA",
-                        "data_chegada": "DATA_CHEGADA"
-                    }
-                    
-                    # Converter para uppercase e aplicar mapeamento
-                    api_data = {}
-                    for key, value in existing_dict.items():
-                        # Se for um campo de data (em lowercase), converter para uppercase
-                        if key.lower() in field_mapping:
-                            mapped_key = field_mapping[key.lower()]
-                            api_data[mapped_key] = value
-                        elif key.upper() in ["DATA_DEADLINE", "DATA_DRAFT_DEADLINE", "DATA_ABERTURA_GATE", 
-                                            "DATA_ABERTURA_GATE_REEFER", "DATA_ESTIMATIVA_SAIDA",
-                                            "DATA_ESTIMATIVA_CHEGADA", "DATA_ESTIMATIVA_ATRACACAO",
-                                            "DATA_ATRACACAO", "DATA_PARTIDA", "DATA_CHEGADA"]:
-                            # Já está em uppercase, usar diretamente
-                            api_data[key.upper()] = value
-                    
-                    api_result = {
-                        "success": True,
-                        "data": api_data,
-                        "message": f"✅ Dados obtidos do cache do banco de dados ({len(api_data)} campos)"
-                    }
-                    st.session_state[f"api_dates_{farol_reference}"] = api_result
-                    st.session_state[f"api_consulted_{farol_reference}"] = True
-                    st.rerun()
-                    return # Exit the function after rerun
-
-            except Exception as e:
-                st.warning(f"⚠️ Erro ao verificar cache no banco de dados: {str(e)}")
-
-            # Consultar API Ellox diretamente (se não encontrou no cache)
-            try:
-                import requests
-                import pandas as pd
-                import json
-                from datetime import datetime
-                from database import get_database_connection, upsert_terminal_monitorings_from_dataframe
-                from sqlalchemy import text
-                
-                # Função para autenticar na API Ellox
-                def authenticate_ellox():
-                    EMAIL = "diego_moura@cargill.com"
-                    SENHA = "Cargill@25"
-                    url_auth = "https://apidtz.comexia.digital/api/auth"
-                    payload_auth = {"email": EMAIL, "senha": SENHA}
-                    resp_auth = requests.post(url_auth, json=payload_auth, headers={"Content-Type": "application/json"})
-                    
-                    if resp_auth.status_code != 200:
-                        return None
-                    
-                    data_auth = resp_auth.json()
-                    token = data_auth.get("access_token") or data_auth.get("token")
-                    if not token:
-                        return None
-                    return token
-                
-                def solicitar_monitoramento(token, cnpj_terminal, vessel_name, voyage_code):
-                    url = "https://apidtz.comexia.digital/api/monitor/navio"
-                    payload = {
-                        "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
-                        "lista": [
-                            {
-                                "cnpj_terminal": cnpj_terminal,
-                                "nome_navio": vessel_name,
-                                "viagem_navio": voyage_code or ""
-                            }
-                        ]
-                    }
-                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-                    resp = requests.post(url, headers=headers, json=payload)
-                    
-                    if resp.status_code >= 400:
-                        body_text = (resp.text or "").lower()
-                        if "already exist" in body_text or "already tracked" in body_text:
-                            return "already_exists"
-                        return None
-                    return "ok"
-                
-                # Função para visualizar monitoramentos
-                def visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code):
-                    url = "https://apidtz.comexia.digital/api/terminalmonitorings"
-                    payload = {
-                        "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
-                        "cnpj_terminal": cnpj_terminal,
-                        "nome_navio": vessel_name,
-                        "viagem_navio": voyage_code or ""
-                    }
-                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-                    resp = requests.post(url, headers=headers, json=payload)
-                    
-                    if resp.status_code >= 400:
-                        return pd.DataFrame()
-                    
-                    data = resp.json() if resp.content else []
-                    return pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame()
-                
-                # Buscar CNPJ do terminal
-                terminal_cnpj_map = {
-                    "BTP": "04.887.625/0001-78",
-                    "BRASIL TERMINAL PORTUARIO": "04.887.625/0001-78", 
-                    "BRASIL TERMINAL PORTUARIO SA": "04.887.625/0001-78",
-                    "BRASIL TERMINAL PORTUARIO S/A": "04.887.625/0001-78",
-                    "SANTOS BRASIL": "02.762.121/0001-04",
-                    "SANTOS BRASIL S.A.": "02.762.121/0001-04",
-                    "SANTOS BRASIL SA": "02.762.121/0001-04",
-                    "TECON SANTOS": "03.518.221/0001-06",
-                    "COSCO": "02.762.121/0001-04",
-                    "DPW": "80.790.597/0001-70",
-                    "DP WORLD": "80.790.597/0001-70",
-                    "EMBRAPORT": "80.790.597/0001-70"
-                }
-                
-                cnpj_terminal = "02.762.121/0001-04"  # Default
-                terminal_normalized = (terminal_val or "").upper().strip()
-                
-                for terminal_key, cnpj in terminal_cnpj_map.items():
-                    if terminal_key in terminal_normalized:
-                        cnpj_terminal = cnpj
-                        break
-                
-                # Buscar no banco se não encontrou no mapeamento
-                if cnpj_terminal == "02.762.121/0001-04" and "SANTOS BRASIL" not in terminal_normalized:
-                    try:
-                        conn = get_database_connection()
-                        query = text("""
-                            SELECT DISTINCT CNPJ, NOME
-                            FROM LogTransp.F_ELLOX_TERMINALS
-                            WHERE UPPER(NOME) LIKE '%' || UPPER(:terminal) || '%'
-                            FETCH FIRST 1 ROWS ONLY
-                        """)
-                        res = conn.execute(query, {"terminal": terminal_val}).mappings().fetchone()
-                        conn.close()
-                        if res and res.get("cnpj"):
-                            cnpj_terminal = res["cnpj"]
-                    except Exception:
-                        pass
-                
-                with st.spinner("🔄 Consultando API Ellox..."):
-                    # 1. Autenticar
-                    token = authenticate_ellox()
-                    if not token:
-                        st.error("❌ Erro ao autenticar na API Ellox")
-                        return
-                    
-                    # 2. Solicitar monitoramento
-                    status_solicitacao = solicitar_monitoramento(token, cnpj_terminal, vessel_name_val, voyage_val)
-                    if status_solicitacao not in ("ok", "already_exists"):
-                        st.error("❌ Erro ao solicitar monitoramento na API Ellox")
-                        return
-
-                    # 3. Buscar dados
-                    df_monitoring = visualizar_monitoramentos(token, cnpj_terminal, vessel_name_val, voyage_val)
-                    
-                    if not df_monitoring.empty:
-                        # Salvar no Oracle
-                        try:
-                            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
-                            if processed_count > 0:
-                                st.success(f"✅ {processed_count} registros de monitoramento salvos/atualizados no banco de dados.")
-                        except Exception as e:
-                            st.warning(f"⚠️ Erro ao salvar monitoramentos no Oracle: {str(e)}")
-
-                    if df_monitoring.empty:
-                        st.warning("⚠️ Nenhum dado de monitoramento encontrado para essa combinação")
-                        return
-                    
-                    # 3. Converter DataFrame para dict e mostrar debug
-                    api_data_raw = df_monitoring.iloc[0].to_dict() if len(df_monitoring) > 0 else {}
-                    
-                    # 4. Mapear campos do DataFrame para os nomes esperados pelo formulário
-                    # A API pode retornar em lowercase ou com nomes diferentes
-                    field_mapping = {
-                        "data_deadline": "DATA_DEADLINE",
-                        "data_draft_deadline": "DATA_DRAFT_DEADLINE",
-                        "data_abertura_gate": "DATA_ABERTURA_GATE",
-                        "data_abertura_gate_reefer": "DATA_ABERTURA_GATE_REEFER",
-                        "data_estimativa_saida": "DATA_ESTIMATIVA_SAIDA",
-                        "data_estimativa_chegada": "DATA_ESTIMATIVA_CHEGADA",
-                        "data_estimativa_atracacao": "DATA_ESTIMATIVA_ATRACACAO",
-                        "data_atracacao": "DATA_ATRACACAO",
-                        "data_partida": "DATA_PARTIDA",
-                        "data_chegada": "DATA_CHEGADA"
-                    }
-                    
-                    # Converter para uppercase e aplicar mapeamento
-                    api_data = {}
-                    for key, value in api_data_raw.items():
-                        key_upper = key.upper()
-                        # Tentar mapear o campo
-                        mapped_key = field_mapping.get(key_upper, key_upper)
-                        # Se o campo for de data, incluir
-                        if "DATA_" in mapped_key or mapped_key in field_mapping.values():
-                            api_data[mapped_key] = value
-                    
-                    # 5. Armazenar no session_state no formato esperado
-                    api_result = {
-                        "success": True,
-                        "data": api_data,
-                        "message": f"✅ Dados obtidos da API Ellox ({len(api_data)} campos)"
-                    }
-                    
-                    st.session_state[f"api_dates_{farol_reference}"] = api_result
-                    st.session_state[f"api_consulted_{farol_reference}"] = True
-                    
-                    st.success(f"✅ Datas obtidas com sucesso! {len(api_data)} campos extraídos")
-                    st.rerun()  # Force rerun to refresh form with API data
-                    
-            except Exception as e:
-                st.error(f"❌ Erro ao consultar API: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+            with st.spinner("🔄 Consultando API Ellox e verificando cache..."):
+                # Chamar a função robusta de database.py
+                api_result = validate_and_collect_voyage_monitoring(
+                    vessel_name=vessel_name_val,
+                    voyage_code=voyage_val,
+                    terminal=terminal_val,
+                    save_to_db=True # Salvar no DB, pois é uma ação iniciada pelo usuário
+                )
+            
+            # Armazenar o resultado no session_state
+            st.session_state[f"api_dates_{farol_reference}"] = api_result
+            st.session_state[f"api_consulted_{farol_reference}"] = True
+            
+            # Exibir mensagens e forçar rerun para atualizar o formulário
+            if api_result["success"]:
+                st.success(api_result["message"])
+            else:
+                st.error(api_result["message"])
+            
+            st.rerun()
         
         st.markdown("---")
         st.markdown("#### 📅 Datas Importantes")

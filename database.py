@@ -2363,7 +2363,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         if existing_count > 0:
             # Buscar os dados existentes do banco
             data_query = text("""
-                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS 
+                SELECT * FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
                 WHERE UPPER(NAVIO) = UPPER(:vessel_name)
                 AND UPPER(VIAGEM) = UPPER(:voyage_code)
                 AND UPPER(TERMINAL) = UPPER(:terminal)
@@ -2371,14 +2371,13 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 FETCH FIRST 1 ROW ONLY
             """)
             
-            conn = get_database_connection()
+            # Use the existing 'conn' object
             result = conn.execute(data_query, {
                 "vessel_name": vessel_name,
                 "voyage_code": voyage_code,
                 "terminal": terminal
             }).mappings().fetchone()
-        conn.close()
-        
+            
             # Convert result to dict with column names
             if result:
                 existing_data = dict(result)
@@ -2398,7 +2397,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 for field in existing_data.keys():
                     if field.upper() in expected_date_fields_upper:
                         api_data[field] = existing_data[field]
-                
+                        
                 return {
                     "success": True,
                     "data": api_data,
@@ -2406,12 +2405,12 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                     "requires_manual": False
                 }
             else:
-            return {
-                "success": True,
-                "data": None,
-                "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
-                "requires_manual": False
-            }
+                return {
+                    "success": True,
+                    "data": None,
+                    "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
+                    "requires_manual": False
+                }
         
         # 2. Tentar obter dados da API Ellox
         api_client = get_default_api_client()
