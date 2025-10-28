@@ -1,4 +1,3 @@
-# Test comment
 import streamlit as st
 import pandas as pd
 from database import (
@@ -2070,40 +2069,50 @@ def exibir_history():
                     
                     with subcol2:
                         if st.button("Booking Rejected", key=f"status_rejected_unified_{farol_reference}", type="secondary", disabled=disable_rejected):
-                            st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Rejected"
+                            st.session_state[f"confirm_status_change_{farol_reference}"] = "Booking Rejected"
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                            result = update_record_status(adjustment_id, "Booking Rejected")
-                            if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status updated to 'Booking Rejected'."}
-                                st.cache_data.clear()
-                                st.rerun()
+                            st.rerun()
                     
                     with subcol3:
                         if st.button("Booking Cancelled", key=f"status_cancelled_unified_{farol_reference}", type="secondary", disabled=disable_cancelled):
-                            st.session_state[f"pending_status_change_{farol_reference}"] = "Booking Cancelled"
+                            st.session_state[f"confirm_status_change_{farol_reference}"] = "Booking Cancelled"
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                            result = update_record_status(adjustment_id, "Booking Cancelled")
-                            if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status updated to 'Booking Cancelled'."}
-                                st.cache_data.clear()
-                                st.rerun()
+                            st.rerun()
                     
                     with subcol4:
                         if st.button("Adjustment Requested", key=f"status_adjustment_unified_{farol_reference}", type="secondary", disabled=disable_adjustment):
-                            st.session_state[f"pending_status_change_{farol_reference}"] = "Adjustment Requested"
+                            st.session_state[f"confirm_status_change_{farol_reference}"] = "Adjustment Requested"
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
-                            result = update_record_status(adjustment_id, "Adjustment Requested")
-                            if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Status updated to 'Adjustment Requested'."}
-                                st.cache_data.clear()
-                                st.rerun()
-                
-                approval_step = st.session_state.get(f"approval_step_{farol_reference}")
+                            st.rerun()
 
-                if approval_step:
-                    st.write("")
-                    st.markdown("---")
-                    st.write("")
+            confirm_status_key = f"confirm_status_change_{farol_reference}"
+            if confirm_status_key in st.session_state:
+                new_status = st.session_state[confirm_status_key]
+                st.warning(f"Are you sure you want to change the status to '{new_status}'?")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Confirm", key=f"confirm_status_change_yes_{farol_reference}"):
+                        adjustment_id = st.session_state[f"adjustment_id_for_approval_{farol_reference}"]
+                        result = update_record_status(adjustment_id, new_status)
+                        if result:
+                            st.session_state["history_flash"] = {"type": "success", "msg": f"✅ Status updated to '{new_status}'."}
+                            del st.session_state[confirm_status_key]
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to update status.")
+                with col2:
+                    if st.button("Cancel", key=f"confirm_status_change_no_{farol_reference}"):
+                        del st.session_state[confirm_status_key]
+                        st.rerun()
+
+            approval_step = st.session_state.get(f"approval_step_{farol_reference}")
+
+            if approval_step:
+                st.write("")
+                st.markdown("---")
+                st.write("")
 
                 if approval_step == "select_adjustment_type":
                     st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
