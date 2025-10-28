@@ -234,45 +234,32 @@ graph TD
 - **Solução**: Remoção de `st.rerun()` desnecessários; mensagens de `st.session_state` agora persistem; ordem de exibição ajustada para que spinners apareçam antes das mensagens de sucesso; mensagens de salvamento agora aparecem abaixo dos quadros expansíveis.
 - **Status**: ✅ **Resolvido**
 
-#### 📊 **Fluxo de Aprovação Corrigido**
+#### 📊 **Fluxo de Aprovação de Booking**
 
-**Cenário 1: PDF com Dados da API** ✅
-```
-1. Usuário clica "Booking Approved"
-   ↓
-2. Sistema valida API (encontra dados)
-   ↓
-3. Sistema salva dados da API em F_ELLOX_TERMINAL_MONITORINGS ✅
-   ↓
-4. Exibe mensagem "Dados encontrados e salvos da API" ✅
-   ↓
-5. Usuário clica "Confirmar Aprovação"
-   ↓
-6. Sistema vincula ELLOX_MONITORING_ID na F_CON_RETURN_CARRIERS ✅
-   ↓
-7. ✅ Aprovação concluída com ambas as tabelas preenchidas
-```
+O fluxo de aprovação de um retorno de armador (PDF) foi redesenhado para oferecer maior controle e clareza ao usuário.
 
-**Cenário 2: PDF sem Dados da API (Manual)** ✅
-```
-1. Usuário clica "Booking Approved"
-   ↓
-2. Sistema valida API (não encontra)
-   ↓
-3. Exibe formulário manual ✅
-   ↓
-4. Usuário preenche dados manualmente
-   ↓
-5. Usuário clica "Confirmar Aprovação"
-   ↓
-6. Sistema salva dados manuais em F_ELLOX_TERMINAL_MONITORINGS ✅
-   ↓
-7. Sistema vincula ELLOX_MONITORING_ID na F_CON_RETURN_CARRIERS ✅
-   ↓
-8. Formulário desaparece automaticamente ✅
-   ↓
-9. ✅ Aprovação concluída com ambas as tabelas preenchidas
-```
+**Novo Fluxo de Aprovação (v4.0+)**
+
+1.  **Seleção do Retorno**: Na aba "Request Timeline", o usuário seleciona o PDF que deseja avaliar na seção "⚡ Avaliar Retorno do Armador".
+2.  **Ação de Aprovar**: O usuário clica no botão "Booking Approved".
+3.  **Seleção do Tipo de Ajuste**: O sistema exibe a seção "Adjustment Type", onde o usuário deve classificar o retorno do armador:
+    *   **An adjustment request made by our company**: Para retornos que são uma resposta a um pedido de ajuste interno.
+    *   **A new/external adjustment initiated by the carrier itself**: Para ajustes que partiram do próprio armador, sem uma solicitação interna prévia.
+4.  **Continuação do Fluxo**: Após clicar em "Continue", o sistema segue um de dois caminhos:
+
+    *   **Cenário 1: Ajuste Interno**
+        *   A seção "Related Reference" é exibida.
+        *   O usuário seleciona a qual solicitação de ajuste interna o PDF se refere.
+        *   Ao clicar em "Confirm Approval", o sistema vincula os registros e aprova o booking.
+
+    *   **Cenário 2: Ajuste Externo**
+        *   O formulário "New External Adjustment" é exibido.
+        *   O usuário preenche os campos de justificativa (motivo, responsabilidade, comentários).
+        *   Ao clicar em "Confirm Approval", o sistema cria um novo registro de ajuste e aprova o booking.
+
+5.  **Conclusão**: Em ambos os cenários, o status do booking é atualizado para "Booking Approved" e o histórico é registrado.
+
+Este novo fluxo garante que cada aprovação de PDF seja corretamente contextualizada, melhorando a rastreabilidade e a precisão dos dados.
 
 #### 🎯 **Resultado Final**
 
