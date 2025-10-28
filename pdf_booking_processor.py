@@ -3081,7 +3081,36 @@ def display_pdf_validation_interface(processed_data):
 
                 if existing_data:
                     st.info("✅ Dados de monitoramento encontrados no cache do banco de dados.")
-                    api_data = dict(existing_data)
+                    existing_dict = dict(existing_data)
+                    
+                    # Mapear campos do banco (que retorna em lowercase) para uppercase
+                    field_mapping = {
+                        "data_deadline": "DATA_DEADLINE",
+                        "data_draft_deadline": "DATA_DRAFT_DEADLINE",
+                        "data_abertura_gate": "DATA_ABERTURA_GATE",
+                        "data_abertura_gate_reefer": "DATA_ABERTURA_GATE_REEFER",
+                        "data_estimativa_saida": "DATA_ESTIMATIVA_SAIDA",
+                        "data_estimativa_chegada": "DATA_ESTIMATIVA_CHEGADA",
+                        "data_estimativa_atracacao": "DATA_ESTIMATIVA_ATRACACAO",
+                        "data_atracacao": "DATA_ATRACACAO",
+                        "data_partida": "DATA_PARTIDA",
+                        "data_chegada": "DATA_CHEGADA"
+                    }
+                    
+                    # Converter para uppercase e aplicar mapeamento
+                    api_data = {}
+                    for key, value in existing_dict.items():
+                        # Se for um campo de data (em lowercase), converter para uppercase
+                        if key.lower() in field_mapping:
+                            mapped_key = field_mapping[key.lower()]
+                            api_data[mapped_key] = value
+                        elif key.upper() in ["DATA_DEADLINE", "DATA_DRAFT_DEADLINE", "DATA_ABERTURA_GATE", 
+                                            "DATA_ABERTURA_GATE_REEFER", "DATA_ESTIMATIVA_SAIDA",
+                                            "DATA_ESTIMATIVA_CHEGADA", "DATA_ESTIMATIVA_ATRACACAO",
+                                            "DATA_ATRACACAO", "DATA_PARTIDA", "DATA_CHEGADA"]:
+                            # Já está em uppercase, usar diretamente
+                            api_data[key.upper()] = value
+                    
                     api_result = {
                         "success": True,
                         "data": api_data,
@@ -3293,17 +3322,22 @@ def display_pdf_validation_interface(processed_data):
                 api_result = st.session_state[api_dates_key]
                 if api_result.get("success") and api_result.get("data"):
                     api_data = api_result["data"]
+                    # Buscar tanto em uppercase quanto em lowercase (banco pode retornar lowercase)
+                    date_val = None
                     if field_name in api_data:
                         date_val = api_data[field_name]
-                        if date_val and not pd.isna(date_val):
-                            try:
-                                if isinstance(date_val, str):
-                                    # Tentar converter string para datetime
-                                    date_val = pd.to_datetime(date_val)
-                                if hasattr(date_val, 'date'):
-                                    return date_val.date(), date_val.time()
-                            except:
-                                pass
+                    elif field_name.lower() in api_data:
+                        date_val = api_data[field_name.lower()]
+                    
+                    if date_val and not pd.isna(date_val):
+                        try:
+                            if isinstance(date_val, str):
+                                # Tentar converter string para datetime
+                                date_val = pd.to_datetime(date_val)
+                            if hasattr(date_val, 'date'):
+                                return date_val.date(), date_val.time()
+                        except:
+                            pass
             
             # Fallback: verificar processed_data
             if processed_data is None:

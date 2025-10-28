@@ -2377,8 +2377,8 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 "voyage_code": voyage_code,
                 "terminal": terminal
             }).mappings().fetchone()
-            conn.close()
-            
+        conn.close()
+        
             # Convert result to dict with column names
             if result:
                 existing_data = dict(result)
@@ -2406,12 +2406,12 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                     "requires_manual": False
                 }
             else:
-                return {
-                    "success": True,
-                    "data": None,
-                    "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
-                    "requires_manual": False
-                }
+            return {
+                "success": True,
+                "data": None,
+                "message": f"✅ Dados de monitoramento já existem para {vessel_name} - {voyage_code} - {terminal}",
+                "requires_manual": False
+            }
         
         # 2. Tentar obter dados da API Ellox
         api_client = get_default_api_client()
