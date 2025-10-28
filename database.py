@@ -3690,3 +3690,59 @@ def update_record_status(adjustment_id: str, new_status: str) -> bool:
         if 'conn' in locals() and not conn.closed:
             conn.close()
 
+def update_farol_status_main_table(farol_reference: str, new_status: str, user_insert: str = "System") -> bool:
+    """
+    Atualiza o Farol Status na tabela F_CON_SALES_BOOKING_DATA.
+    Usado quando um PDF é processado ou status muda em F_CON_RETURN_CARRIERS.
+    
+    Args:
+        farol_reference: Referência Farol
+        new_status: Novo status a ser aplicado
+        user_insert: Usuário que fez a alteração
+    
+    Returns:
+        bool: True se atualizado com sucesso
+    """
+    conn = get_database_connection()
+    try:
+        with conn.begin():
+            # Buscar status atual para auditoria
+            old_status_query = text("""
+                SELECT FAROL_STATUS 
+                FROM LogTransp.F_CON_SALES_BOOKING_DATA 
+                WHERE FAROL_REFERENCE = :farol_ref
+            """)
+            old_status = conn.execute(old_status_query, {"farol_ref": farol_reference}).scalar()
+            
+            # Atualizar status
+            update_query = text("""
+                UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                SET FAROL_STATUS = :new_status,
+                    DATE_UPDATE = SYSDATE
+                WHERE FAROL_REFERENCE = :farol_ref
+            """)
+            conn.execute(update_query, {"new_status": new_status, "farol_ref": farol_reference})
+            
+            # Registrar em auditoria apenas se houve mudança
+            if old_status and old_status != new_status:
+                audit_query = text("""
+                    INSERT INTO LogTransp.F_CON_CHANGE_LOG 
+                    (FAROL_REFERENCE, TABLE_NAME, COLUMN_NAME, OLD_VALUE, NEW_VALUE, 
+                     CHANGE_TYPE, USER_LOGIN, CHANGE_SOURCE)
+                    VALUES (:farol_ref, 'F_CON_SALES_BOOKING_DATA', 'FAROL_STATUS', 
+                           :old_status, :new_status, 'UPDATE', :user, 'PDF_PROCESSOR')
+                """)
+                conn.execute(audit_query, {
+                    "farol_ref": farol_reference,
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "user": user_insert
+                })
+            
+            return True
+    except Exception as e:
+        print(f"Erro ao atualizar Farol Status: {e}")
+        return False
+    finally:
+        conn.close()
+

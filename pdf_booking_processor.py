@@ -3286,6 +3286,20 @@ def save_pdf_booking_data(validated_data):
                     st.warning(f"⚠️ Erro ao salvar PDF como anexo: {str(e)}")
                     st.info("💡 Os dados foram salvos na tabela, mas o PDF não foi adicionado à lista de anexos.")
             
+            # Atualizar Farol Status na tabela principal
+            try:
+                from database import update_farol_status_main_table
+                update_success = update_farol_status_main_table(
+                    farol_reference=farol_reference,
+                    new_status="Received from Carrier",
+                    user_insert="PDF_PROCESSOR"
+                )
+                if update_success:
+                    st.info("ℹ️ Farol Status atualizado na tabela principal")
+            except Exception as e:
+                # Não bloqueia o salvamento se houver erro na atualização
+                st.warning(f"⚠️ PDF salvo, mas não foi possível atualizar Farol Status: {str(e)}")
+            
             return True
         else:
             st.error("❌ Erro ao salvar dados do PDF")

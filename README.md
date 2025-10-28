@@ -3414,6 +3414,34 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.24 - Atualização Automática de Status para Automação via Bot (Outubro 2025)
+- **🔄 Sincronização Automática de Status**: Implementado sistema que atualiza automaticamente o Farol Status na tabela `F_CON_SALES_BOOKING_DATA` quando um PDF é processado com status "Received from Carrier"
+- **📊 Visibilidade na Grade Principal**: Analistas agora veem imediatamente na grade principal (`shipments.py`) quando um PDF foi recebido do carrier, facilitando a identificação de bookings que precisam de aprovação
+- **🤖 Preparação para Automação**: Sistema preparado para integração com bot que processará PDFs automaticamente, seguindo o mesmo fluxo do processamento manual
+- **✨ Função `update_farol_status_main_table()`**: Nova função em `database.py` que atualiza a tabela principal com auditoria completa
+- **🔗 Integração com `save_pdf_booking_data()`**: Função de salvamento de PDF agora chama automaticamente a atualização de status após sucesso
+- **📝 Auditoria Completa**: Todas as mudanças de status são registradas em `F_CON_CHANGE_LOG` com origem "PDF_PROCESSOR"
+- **🛡️ Tratamento de Erros Robusto**: Sistema não bloqueia salvamento se houver erro na atualização de status (degraça graciosa)
+- **🎯 Boas Práticas**: Solução segue o mesmo padrão do fluxo de aprovação existente em `history.py`, garantindo consistência
+
+**Arquivos Modificados:**
+- `database.py` (linha 3693): Nova função `update_farol_status_main_table()`
+- `pdf_booking_processor.py` (linha 3289): Chamada para atualização de status após salvamento
+- `shipments.py`: Visualização do status atualizado na grade principal (já funcionando)
+
+**Fluxo de Trabalho:**
+1. PDF é processado e salvo em `F_CON_RETURN_CARRIERS` com status "Received from Carrier"
+2. `F_CON_SALES_BOOKING_DATA` é automaticamente atualizado para "Received from Carrier"
+3. Analistas veem na grade principal que PDF foi recebido
+4. Analistas aprovam via `history.py` (que já atualiza ambas as tabelas)
+5. Bot futuro seguirá exatamente o mesmo fluxo de forma transparente
+
+**Preparação para Bot:**
+- Bot poderá processar PDFs automaticamente
+- Bot chamará as mesmas funções já utilizadas pelo usuário manual
+- Todas as mudanças de status serão automaticamente sincronizadas
+- Auditoria completa manterá rastreabilidade de todas as ações
+
 ### 📌 v3.9.23 - Correção do Mapeamento de Campos da API Ellox (Outubro 2025)
 - **🔧 Mapeamento de Campos Corrigido**: Corrigido mapeamento dos campos de data da API Ellox para usar nomes corretos das colunas (minúsculas) na tabela `F_CON_RETURN_CARRIERS`
 - **📊 Campos de Data Salvos**: Agora todos os 9 campos de data da API são corretamente salvos: `b_data_deadline`, `b_data_draft_deadline`, `b_data_abertura_gate`, `b_data_estimativa_saida_etd`, `b_data_estimativa_chegada_eta`, `b_data_estimativa_atracacao_etb`, `b_data_atracacao_atb`, `b_data_partida_atd`, `b_data_chegada_ata`
@@ -4476,11 +4504,11 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Desenvolvido com ❤️ pela equipe Farol**
 
-*Sistema de Gerenciamento de Embarques - Versão 3.9.23*
+*Sistema de Gerenciamento de Embarques - Versão 3.9.24*
 
 ### 📊 Estatísticas do Sistema
 
-- **Linhas de Código**: ~17.000+ linhas Python (atualizado v3.9.23)
+- **Linhas de Código**: ~17.000+ linhas Python (atualizado v3.9.24)
 - **Módulos**: 15+ módulos especializados  
 - **Arquivos Ellox**: 4 arquivos especializados para integração API
 - **Carriers Suportados**: 8 carriers principais
@@ -4488,18 +4516,19 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 - **Funcionalidades**: 55+ funcionalidades ativas
 - **Performance**: < 1s resposta média
 - **Uptime**: 99.9% disponibilidade
-- **Estabilidade**: ✅ Sem erros de importação (v3.9.23)
-- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.23)
-- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.23)
-- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.23)
-- **Audit Trail**: ✅ Sistema inteligente implementado (v3.9.23)
-- **Sessão Persistente**: ✅ Sistema híbrido robusto (v3.9.23)
-- **UX Padronizada**: ✅ Mensagens e feedback uniformes (v3.9.23)
-- **Sincronização Automática**: ✅ Sistema de background ativo (v3.9.23)
+- **Estabilidade**: ✅ Sem erros de importação (v3.9.24)
+- **Voyage Monitoring**: ✅ Dados corretos salvos e exibidos (v3.9.24)
+- **Booking Management**: ✅ Exibição de horas corrigida (v3.9.24)
+- **Sistema Ellox**: ✅ Integridade de dados corrigida (v3.9.24)
+- **Audit Trail**: ✅ Sistema inteligente implementado (v3.9.24)
+- **Sessão Persistente**: ✅ Sistema híbrido robusto (v3.9.24)
+- **UX Padronizada**: ✅ Mensagens e feedback uniformes (v3.9.24)
+- **Sincronização Automática**: ✅ Sistema de background ativo (v3.9.24)
 - **Permissões LogTransp**: ✅ Erro ORA-01031 resolvido (v3.9.10)
-- **Interface Audit Trail**: ✅ Colunas otimizadas e contagem de registros (v3.9.23)
-- **Correções de Bugs**: ✅ KeyError 'Tabela' e outros erros resolvidos (v3.9.23)
-- **API Ellox Mapping**: ✅ Campos de data mapeados corretamente (v3.9.23)
+- **Interface Audit Trail**: ✅ Colunas otimizadas e contagem de registros (v3.9.24)
+- **Correções de Bugs**: ✅ KeyError 'Tabela' e outros erros resolvidos (v3.9.24)
+- **API Ellox Mapping**: ✅ Campos de data mapeados corretamente (v3.9.24)
+- **Sincronização de Status**: ✅ Atualização automática preparada para Bot (v3.9.24)
 
 ## 🔧 Correções e Melhorias Recentes v3.9.11
 
