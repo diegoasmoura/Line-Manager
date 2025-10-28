@@ -1568,12 +1568,8 @@ def exibir_history():
             
             # Verifica valores únicos depois do tratamento
             unique_after = df_processed[col].unique()
-            print("---")
         
-        # Debug: verifica valores de data após tratamento
-        for col in df_processed.columns:
-            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
-                unique_vals = df_processed[col].unique()
+
         
         # Aplica formatação amigável para Linked Reference
         if "Linked Reference" in df_processed.columns:
@@ -1873,15 +1869,7 @@ def exibir_history():
                 # Para outras colunas: substitui valores nulos por string vazia
                 df_styled[col] = df_styled[col].fillna('')
         
-        # Debug: verifica se o tratamento foi aplicado corretamente
-        for col in df_styled.columns:
-            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
-                unique_vals = df_styled[col].unique()
-        
-        # Debug: verifica valores nulos após tratamento
-        for col in df_styled.columns:
-            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
-                unique_vals = df_styled[col].unique()
+
         
         # Função para aplicar estilo baseado nas alterações detectadas e layout zebra
         def highlight_changes_and_zebra(row):
@@ -1947,10 +1935,7 @@ def exibir_history():
                 # Para outras colunas: substitui valores nulos por string vazia
                 df_to_check[col] = df_to_check[col].fillna('')
         
-        # Debug: verifica colunas de data após tratamento final
-        for col in df_to_check.columns:
-            if 'Date' in col or 'Deadline' in col or 'ETD' in col or 'ETA' in col:
-                unique_vals = df_to_check[col].unique()
+
         
         # Atualiza o styled_df com o DataFrame tratado
         if hasattr(styled_df, 'data'):
