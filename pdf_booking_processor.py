@@ -2671,37 +2671,7 @@ def display_pdf_validation_interface(processed_data):
     """
     # Interface de validação dos dados extraídos do PDF
     
-    # Exibir mensagem de status da API antes do formulário
-    api_status = processed_data.get("api_status")
-    api_message = processed_data.get("api_message", "")
-    api_error_type = processed_data.get("api_error_type")
-    
-    if api_message:
-        # Determinar tipo de mensagem baseado no error_type e status
-        if api_status and api_error_type is None:
-            # Dados encontrados na API
-            st.success(api_message)
-        elif api_error_type == "voyage_not_found":
-            # Voyage não encontrada
-            st.warning(api_message)
-        elif api_error_type == "connection_failed" or "indisponível" in api_message.lower():
-            # API indisponível
-            st.warning(api_message)
-        elif api_error_type == "authentication_failed":
-            # Falha de autenticação
-            st.error(api_message)
-        elif api_error_type == "terminal_not_found":
-            # Terminal não encontrado
-            st.info(api_message)
-        elif api_error_type == "no_valid_dates" or api_error_type == "data_format_error":
-            # Dados inválidos
-            st.warning(api_message)
-        else:
-            # Mensagem genérica (requer manual)
-            if "manual" in api_message.lower():
-                st.info(api_message)
-            else:
-                st.warning(api_message)
+
     
     # Armazenar dados no session_state quando necessário
     farol_reference = processed_data.get("farol_reference")
@@ -2894,6 +2864,38 @@ def display_pdf_validation_interface(processed_data):
         st.markdown("#### 🔍 Consulta de Datas via API")
         
         consult_api = st.form_submit_button("🔍 Consultar API para Datas", use_container_width=True)
+        
+        # Exibir mensagem de status da API aqui, após o botão
+        api_status = processed_data.get("api_status")
+        api_message = processed_data.get("api_message", "")
+        api_error_type = processed_data.get("api_error_type")
+        
+        if api_message:
+            # Determinar tipo de mensagem baseado no error_type e status
+            if api_status and api_error_type is None:
+                # Dados encontrados na API
+                st.success(api_message)
+            elif api_error_type == "voyage_not_found":
+                # Voyage não encontrada
+                st.warning(api_message)
+            elif api_error_type == "connection_failed" or "indisponível" in api_message.lower():
+                # API indisponível
+                st.warning(api_message)
+            elif api_error_type == "authentication_failed":
+                # Falha de autenticação
+                st.error(api_message)
+            elif api_error_type == "terminal_not_found":
+                # Terminal não encontrado
+                st.info(api_message)
+            elif api_error_type == "no_valid_dates" or api_error_type == "data_format_error":
+                # Dados inválidos
+                st.warning(api_message)
+            else:
+                # Mensagem genérica (requer manual)
+                if "manual" in api_message.lower():
+                    st.info(api_message)
+                else:
+                    st.warning(api_message)
         
         if consult_api:
             # Usar valores do formulário atual
