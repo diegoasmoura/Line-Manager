@@ -2118,11 +2118,9 @@ def exibir_history():
 
             approval_step = st.session_state.get(f"approval_step_{farol_reference}")
 
-            if approval_step:
-                st.write("")
-                st.markdown("---")
-                st.write("")
-
+                            if approval_step:
+                                st.write("")
+                                st.write("")
                 if approval_step == "select_adjustment_type":
                     st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
                     st.markdown("<p style='text-align: left;'>This carrier return, documented in the PDF, refers to:</p>", unsafe_allow_html=True)
