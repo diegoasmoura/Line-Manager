@@ -1051,6 +1051,11 @@ def exibir_history():
     st.markdown("<br>", unsafe_allow_html=True)
 
     farol_reference = st.session_state.get("selected_reference")
+    
+    # Initialize approval_step in session_state if not present
+    if f"approval_step_{farol_reference}" not in st.session_state:
+        st.session_state[f"approval_step_{farol_reference}"] = None
+
     if not farol_reference:
         st.info("Selecione uma linha em Shipments para visualizar o Ticket Journey.")
         col = st.columns(1)[0]
@@ -2101,13 +2106,12 @@ def exibir_history():
                         del st.session_state[confirm_status_key]
                         st.rerun()
 
-            approval_step = st.session_state.get(f"approval_step_{farol_reference}")
+
 
             if approval_step:
                 st.write("")
                 st.write("")
-            if approval_step == "select_adjustment_type":
-                st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
+                            if st.session_state.get(f"approval_step_{farol_reference}") == "select_adjustment_type":                st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
                 st.markdown("<p style='text-align: left;'>This carrier return, documented in the PDF, refers to:</p>", unsafe_allow_html=True)
                 adjustment_type = st.radio(
                     "Select one of the options below:",
@@ -2123,7 +2127,7 @@ def exibir_history():
                         st.session_state[f"approval_step_{farol_reference}"] = "external_adjustment_form"
                     st.rerun()
 
-                if approval_step == "select_internal_reference":
+                elif st.session_state.get(f"approval_step_{farol_reference}") == "select_internal_reference":
                     st.markdown("<h4 style='text-align: left;'>Related Reference</h4>", unsafe_allow_html=True)
                     # Get available references for relation
                     available_refs = get_available_references_for_relation(farol_reference)
@@ -2169,7 +2173,7 @@ def exibir_history():
                             st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
                             st.rerun()
 
-                if approval_step == "external_adjustment_form":
+                elif st.session_state.get(f"approval_step_{farol_reference}") == "external_adjustment_form":
                     st.markdown("<h4 style='text-align: left;'>New External Adjustment</h4>", unsafe_allow_html=True)
                     with st.form(key=f"external_adjustment_form_{farol_reference}"):
                         st.info("This is a carrier adjustment without a prior request from the company.")
