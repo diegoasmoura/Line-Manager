@@ -2401,7 +2401,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 return {
                     "success": True,
                     "data": api_data,
-                    "message": f"✅ Dados de monitoramento encontrados no banco ({len(api_data)} campos)",
+                    "message": f"🟢 Dados de Voyage Monitoring encontrados no banco para 🚢 {vessel_name} | {voyage_code} | {terminal}",
                     "requires_manual": False
                 }
             else:
@@ -2586,7 +2586,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             return {
                 "success": True,
                 "data": api_data,
-                "message": f"✅ Dados de monitoramento encontrados na API ({len(api_data)} campos)",
+                "message": f"🟢 Dados de Voyage Monitoring encontrados na API para 🚢 {vessel_name} | {voyage_code} | {terminal}",
                 "requires_manual": False,
                 "cnpj_terminal": cnpj_terminal,
                 "agencia": payload.get("agencia", "")
@@ -2610,7 +2610,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 return {
                     "success": True,
                     "data": api_data,
-                    "message": f"✅ Dados de monitoramento coletados da API e salvos ({len(api_data)} campos)",
+                    "message": f"🟢 Dados de Voyage Monitoring encontrados e salvos da API para 🚢 {vessel_name} | {voyage_code} | {terminal}",
                     "requires_manual": False
                 }
             else:
