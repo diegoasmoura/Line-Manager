@@ -1231,21 +1231,20 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 
 ### 📄 `pdf_booking_processor.py`
 **Processamento inteligente de PDFs**
-- Extração automática de dados (exceto ETD/ETA)
-- Validação e correção de informações
-- Interface de confirmação simplificada
-- Integração com sistema de anexos
-- Dropdowns alimentados pelo banco (navios/terminais) via `F_ELLOX_SHIPS` e `F_ELLOX_TERMINALS`
-- "Nome do Navio": busca case-insensitive e normalização, evitando duplicatas entre valor extraído do PDF e valor do banco
-- Normalização de `port_terminal_city` com mapeamento para padrão Ellox (`standardize_terminal_name`)
-- Limpeza de nomes de portos removendo parênteses e conteúdos após vírgula
-- `voyage` normalizado removendo espaços internos (ex.: "002 E" → "002E")
-- `Voyage do Navio`: campo de texto com sugestões via API exibidas como dica
-- Cache de listas com `@st.cache_data(ttl=300)` para refletir atualizações
-- Removida a validação "navio pertence ao carrier"
-- **ETD/ETA removidos**: Datas não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual
-- Coleta automática de monitoramento ao validar o PDF (Ellox): agora a função `collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code)`
-   1) autentica, 2) solicita monitoramento (`POST /api/monitor/navio`, tolera "already exist"), 3) visualiza (`POST /api/terminalmonitorings`), 4) salva na `F_ELLOX_TERMINAL_MONITORINGS`
+- **Extração automática de dados** imediatamente após o upload do PDF.
+- Validação e correção de informações.
+- Interface de confirmação simplificada.
+- Integração com sistema de anexos.
+- Dropdowns alimentados pelo banco (navios/terminais) via `F_ELLOX_SHIPS` e `F_ELLOX_TERMINALS`.
+- "Nome do Navio": busca case-insensitive e normalização, evitando duplicatas entre valor extraído do PDF e valor do banco.
+- Normalização de `port_terminal_city` com mapeamento para padrão Ellox (`standardize_terminal_name`).
+- Limpeza de nomes de portos removendo parênteses e conteúdos após vírgula.
+- `voyage` normalizado removendo espaços internos (ex.: "002 E" → "002E").
+- `Voyage do Navio`: campo de texto com sugestões via API exibidas como dica.
+- Cache de listas com `@st.cache_data(ttl=300)` para refletir atualizações.
+- Removida a validação "navio pertence ao carrier".
+- **ETD/ETA removidos**: Datas não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual.
+- **Coleta de Monitoramento Ellox Centralizada**: A coleta de monitoramento da API Ellox é agora realizada de forma consistente através da função `database.validate_and_collect_voyage_monitoring(vessel_name, port_terminal_city, voyage_code)`, que gerencia a autenticação, a verificação de cache local e o salvamento na `F_ELLOX_TERMINAL_MONITORINGS`.
 
 #### 📎 Attachment Management (PDF Booking) — Passo a passo
 
@@ -1254,9 +1253,9 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
    - Tamanho máximo por arquivo: 200 MB
 
 2. **Extração Automática**
-   - O sistema tenta extrair: Booking Reference, Quantity, Vessel Name, Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal, PDF Print Date
-   - Nomes de terminais são normalizados para padrão Ellox
-   - **Datas ETD/ETA**: Não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual
+   - O sistema extrai automaticamente: Booking Reference, Quantity, Vessel Name, Carrier, Voyage Code, POL, POD, Transhipment Port, Port Terminal, PDF Print Date imediatamente após o upload do PDF.
+   - Nomes de terminais são normalizados para padrão Ellox.
+   - **Datas ETD/ETA**: Não são mais extraídas automaticamente - responsabilidade da API Ellox ou preenchimento manual.
 
 3. **Validação e Ajustes**
    - Revise os campos extraídos na tela de validação
@@ -1268,13 +1267,13 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
    - O campo `PDF Booking Emission Date` é ajustado automaticamente para caber no banco (sem segundos: YYYY-MM-DD HH:MM)
 
 5. **Persistência**
-   - A função `insert_return_carrier_from_ui` insere um registro em `F_CON_RETURN_CARRIERS` com status `Received from Carrier`
-   - **Campos ETD/ETA**: Não são mais preenchidos automaticamente - responsabilidade da API Ellox ou preenchimento manual
-   - Em seguida, é iniciada a coleta de monitoramento Ellox da viagem
+   - A função `insert_return_carrier_from_ui` insere um registro em `F_CON_RETURN_CARRIERS` com status `Received from Carrier`.
+   - **Campos ETD/ETA**: Não são mais preenchidos automaticamente - responsabilidade da API Ellox ou preenchimento manual.
+   - Em seguida, a função `database.validate_and_collect_voyage_monitoring` é chamada para coletar e persistir os dados de monitoramento da viagem, se necessário.
 
 6. **Monitoramento da Viagem**
-   - O sistema autentica e consulta/solicita monitoramento
-   - Os dados retornados são salvos em `F_ELLOX_TERMINAL_MONITORINGS`
+   - O sistema utiliza `database.validate_and_collect_voyage_monitoring` para verificar o cache local e, se necessário, consultar a API Ellox.
+   - Os dados retornados são salvos em `F_ELLOX_TERMINAL_MONITORINGS`.
 
 7. **Auditoria e Histórico**
    - O registro fica disponível na aba de histórico, inclusive para fluxo de aprovação
@@ -2048,11 +2047,11 @@ GET /api/voyages?ship=NOME&terminal=CNPJ
 Retorna viagens disponíveis para um navio e terminal. Útil para sugerir voyages quando não há correspondência exata.
 
 #### Monitoramento
-- Solicitar (Terminal): `POST /api/monitor/navio`
-- Visualizar (Terminal): `POST /api/terminalmonitorings`
-- Solicitar (ShipOwner): `POST /api/monitor/shipowner`
-- Visualizar (ShipOwner): `POST /api/shipownermonitorings`
-Observação: alguns CNPJs de clientes só são aceitos se estiverem na base interna de `companies` da Ellox. Utilize a verificação prévia via `check_company_exists`.
+- O sistema utiliza a função centralizada `database.validate_and_collect_voyage_monitoring` para gerenciar o monitoramento de viagens.
+- Esta função primeiro verifica o cache local (`F_ELLOX_TERMINAL_MONITORINGS`) e, se os dados não existirem ou estiverem desatualizados, interage com os seguintes endpoints da API Ellox:
+  - Solicitar (Terminal): `POST /api/monitor/navio`
+  - Visualizar (Terminal): `POST /api/terminalmonitorings`
+- Observação: alguns CNPJs de clientes só são aceitos se estiverem na base interna de `companies` da Ellox. Utilize a verificação prévia via `check_company_exists`.
 
 ## 🔄 Sistema de Sincronização Automática Ellox
 
