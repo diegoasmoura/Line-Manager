@@ -1148,24 +1148,20 @@ def fetch_shipments_data_sales():
  
            
 ### Obtendo os dados da UDC
-@st.cache_data(ttl=300)  # Reduzir TTL para 5 minutos para debug
+@st.cache_data(ttl=300)  # Cache por 5 minutos para reduzir queries repetidas
 def load_df_udc():
-    """Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado."""
-    conn = None
- 
+    """
+    Executa a consulta SQL, aplica o mapeamento de colunas e retorna um DataFrame formatado.
+    Cacheado com Streamlit (@st.cache_data) para evitar queries repetidas.
+    """
     # Consulta SQL
     query = '''
     SELECT *
     FROM LogTransp.F_CON_Global_Variables'''
  
-    try:
-        conn = get_database_connection()
+    with get_database_connection() as conn:
         df = pd.read_sql_query(text(query), conn)
- 
         return df
-    finally:
-        if conn:
-            conn.close()
  
  
  
