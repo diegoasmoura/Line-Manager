@@ -2342,6 +2342,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         dict: {"success": bool, "data": dict/None, "message": str, "requires_manual": bool}
     """
     try:
+        st.info(f"DEBUG: validate_and_collect_voyage_monitoring - vessel_name: {vessel_name}, voyage_code: {voyage_code}, terminal: {terminal}, save_to_db: {save_to_db}")
         from ellox_api import get_default_api_client
         import pandas as pd
         
@@ -2362,6 +2363,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             "voyage_code": voyage_code, 
             "terminal": terminal
         }).scalar()
+        st.info(f"DEBUG: existing_count para {vessel_name}-{voyage_code}-{terminal}: {existing_count}")
         
         if existing_count > 0:
             # Buscar os dados existentes do banco
@@ -2408,6 +2410,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                     "requires_manual": False
                 }
             else:
+                st.info(f"DEBUG: Nenhum registro encontrado no banco para {vessel_name}-{voyage_code}-{terminal}, prosseguindo para API.")
                 return {
                     "success": True,
                     "data": None,
@@ -2417,6 +2420,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         
         # 2. Tentar obter dados da API Ellox
         api_client = get_default_api_client()
+        st.info(f"DEBUG: Tentando obter dados da API Ellox para {vessel_name}-{voyage_code}-{terminal}")
         
         # Verificar autenticação primeiro
         if not api_client.authenticated:
@@ -2441,6 +2445,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         
         # 3. Resolver CNPJ do terminal (com normalização)
         cnpj_terminal = None
+        st.info(f"DEBUG: Resolvendo CNPJ para terminal: {terminal}")
         
         # Aplicar normalização de terminal (como no pdf_booking_processor.py)
         terminal_normalized = terminal.upper().strip()
@@ -2462,21 +2467,25 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
                 conn.close()
                 if res and res.get("cnpj"):
                     cnpj_terminal = res["cnpj"]
+                    st.info(f"DEBUG: CNPJ do terminal resolvido via cache: {cnpj_terminal}")
             except Exception:
                 # mantém fallback se não encontrar
                 pass
         
         # Se não encontrou via normalização, buscar na API
         if not cnpj_terminal:
+            st.info(f"DEBUG: CNPJ do terminal não resolvido via cache, buscando na API Ellox.")
             terms_resp = api_client._make_api_request("/api/terminals")
             if terms_resp.get("success"):
                 for term in terms_resp.get("data", []):
                     nome_term = term.get("nome") or term.get("name") or ""
                     if str(nome_term).strip().upper() == str(terminal).strip().upper() or str(terminal).strip().upper() in str(nome_term).strip().upper():
                         cnpj_terminal = term.get("cnpj")
+                        st.info(f"DEBUG: CNPJ do terminal resolvido via API: {cnpj_terminal}")
                         break
         
         if not cnpj_terminal:
+            st.info(f"DEBUG: CNPJ do terminal não encontrado para {terminal}")
             return {
                 "success": False,
                 "data": None,
@@ -2487,7 +2496,9 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         
         # 4. Buscar dados de monitoramento
         cnpj_client = "60.498.706/0001-57"  # CNPJ Cargill padrão
+        st.info(f"DEBUG: Buscando dados de monitoramento na API para navio: {vessel_name}, viagem: {voyage_code}, terminal: {terminal}, CNPJ Terminal: {cnpj_terminal}")
         mon_resp = api_client.view_vessel_monitoring(cnpj_client, cnpj_terminal, vessel_name, voyage_code)
+        st.info(f"DEBUG: Resposta da API Ellox: {mon_resp.get("success")}")
         
         # Verificar se a consulta foi bem-sucedida
         if not mon_resp.get("success"):
@@ -2586,6 +2597,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
         
         # 7. Salvar dados no banco (apenas se solicitado)
         if not save_to_db:
+            st.info(f"DEBUG: save_to_db é False, não salvando no DB.")
             return {
                 "success": True,
                 "data": api_data,
@@ -2596,6 +2608,7 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             }
 
         try:
+            st.info(f"DEBUG: save_to_db é True, preparando para salvar no DB.")
             monitoring_data = {
                 "NAVIO": vessel_name,
                 "VIAGEM": voyage_code,
@@ -2607,7 +2620,9 @@ def validate_and_collect_voyage_monitoring(vessel_name: str, voyage_code: str, t
             
             # Usar a função existente para salvar
             df_monitoring = pd.DataFrame([monitoring_data])
+            st.info(f"DEBUG: Chamando upsert_terminal_monitorings_from_dataframe com {len(df_monitoring)} linhas.")
             processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
+            st.info(f"DEBUG: upsert_terminal_monitorings_from_dataframe processou {processed_count} linhas.")
             
             if processed_count > 0:
                 return {

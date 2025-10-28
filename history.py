@@ -253,7 +253,7 @@ def get_voyage_monitoring_for_reference(farol_reference):
                 AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
                 AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
                 AND r.FAROL_REFERENCE = :farol_ref
-                AND r.FAROL_STATUS = 'Booking Approved'
+                AND r.FAROL_STATUS IN ('Booking Approved', 'Received from Carrier')
             )
             WHERE UPPER(m.NAVIO) IN ({placeholders})
             ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
