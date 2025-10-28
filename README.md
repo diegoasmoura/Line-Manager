@@ -673,7 +673,7 @@ A tela principal oferece uma visão completa de todos os embarques:
    - Farol Status (lista)
    - Booking Status (lista)
    - Booking (texto)
-   Esses filtros são aplicados antes da paginação, garantindo que resultados em páginas seguintes também sejam encontrados. Suporte a variações de colunas: `B_BOOKING_STATUS`, `B_BOOKING_REFERENCE`, `_BOOKING_REFERENCE`.
+   Esses filtros são aplicados antes da paginação, garantindo que resultados em páginas seguintes também sejam encontrados. Suporte a variações de colunas: `FAROL_STATUS`, `B_BOOKING_REFERENCE`, `_BOOKING_REFERENCE`.
 2. **Filtros Avançados (expander)**: Filtros adicionais por múltiplas colunas. Quando ativos, o sistema busca todos os registros, aplica os filtros e só então pagina no cliente (não limita à página atual).
 3. **Edição em Linha**: Clique nas células para editar informações diretamente
    - Farol Status: editável novamente via dropdown com ícones (width: medium)
@@ -996,12 +996,11 @@ def insert_return_carrier_from_ui(ui_data, ...):
             # Buscar último registro da mesma Farol Reference (independentemente do status)
             prefill_query = text("""
                 SELECT 
-                    S_REQUESTED_DEADLINE_START_DATE, 
-                    S_REQUESTED_DEADLINE_END_DATE, 
-                    S_REQUIRED_ARRIVAL_DATE_EXPECTED,
-                    B_BOOKING_STATUS, ROW_INSERTED_DATE
-                FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE FAROL_REFERENCE = :farol_ref 
+                                        S_REQUESTED_DEADLINE_START_DATE,
+                                        S_REQUESTED_DEADLINE_END_DATE,
+                                        S_REQUIRED_ARRIVAL_DATE_EXPECTED,
+                                        FAROL_STATUS, ROW_INSERTED_DATE
+                                    FROM LogTransp.F_CON_RETURN_CARRIERS                WHERE FAROL_REFERENCE = :farol_ref 
                 AND (S_REQUESTED_DEADLINE_START_DATE IS NOT NULL
                      OR S_REQUESTED_DEADLINE_END_DATE IS NOT NULL
                      OR S_REQUIRED_ARRIVAL_DATE_EXPECTED IS NOT NULL)
@@ -1651,7 +1650,7 @@ Histórico de retornos e alterações
 - ID (PK)
 - FAROL_REFERENCE
 - ADJUSTMENT_ID
-- B_BOOKING_STATUS
+- FAROL_STATUS
 - LINKED_REFERENCE
 - AREA
 - REQUEST_REASON
@@ -1823,7 +1822,7 @@ O sistema agora inclui três novas colunas para monitoramento avançado de booki
 **Implementação Técnica**:
 - **Função `get_referenced_line_data()`**: Busca dados da linha pelo ID no banco
 - **Função `format_linked_reference_display()`**: Formata exibição com contexto
-- **Consulta SQL**: `SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, B_BOOKING_STATUS`
+- **Consulta SQL**: `SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, FAROL_STATUS`
 - **Tratamento de Erros**: Fallback seguro se linha não for encontrada
 - **Formatação de Data**: Converte para formato `YYYY-MM-DD HH:MM:SS`
 
