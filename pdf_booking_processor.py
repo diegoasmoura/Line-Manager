@@ -3314,11 +3314,15 @@ def display_pdf_booking_section(farol_reference):
         st.code("pip install PyPDF2")
         return
     
+    # Inicializa o contador da chave do uploader se não existir
+    if f"pdf_uploader_key_counter_{farol_reference}" not in st.session_state:
+        st.session_state[f"pdf_uploader_key_counter_{farol_reference}"] = 0
+
     # Upload de PDF específico para booking
     uploaded_pdf = st.file_uploader(
         "📄 Selecione o PDF de Booking",
         type=['pdf'],
-        key=f"pdf_booking_{farol_reference}",
+        key=f"pdf_booking_{farol_reference}_{st.session_state[f"pdf_uploader_key_counter_{farol_reference}"]}",
         help="Selecione apenas PDFs de booking recebidos por e-mail"
     )
     
@@ -3327,19 +3331,18 @@ def display_pdf_booking_section(farol_reference):
         # Guarda o arquivo para uso posterior (salvar como anexo)
         st.session_state[f"booking_pdf_file_{farol_reference}"] = uploaded_pdf
         
-        # Botão para processar
-        if st.button("🔍 Processar PDF", key=f"process_pdf_{farol_reference}", type="primary"):
-            with st.spinner("Processando PDF... Extraindo dados..."):
-                # Lê o conteúdo do PDF
-                pdf_content = uploaded_pdf.read()
-                
-                # Processa o PDF
-                processed_data = process_pdf_booking(pdf_content, farol_reference)
-                
-                if processed_data:
-                    # Armazena os dados processados no session_state para validação
-                    st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
-                    st.rerun()
+        # Processa o PDF automaticamente
+        with st.spinner("Processando PDF... Extraindo dados..."):
+            # Lê o conteúdo do PDF
+            pdf_content = uploaded_pdf.read()
+            
+            # Processa o PDF
+            processed_data = process_pdf_booking(pdf_content, farol_reference)
+            
+            if processed_data:
+                # Armazena os dados processados no session_state para validação
+                st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
+                st.rerun()
     
     # Interface de validação se há dados processados
     processed_data_key = f"processed_pdf_data_{farol_reference}"
@@ -3352,12 +3355,20 @@ def display_pdf_booking_section(farol_reference):
         if validated_data == "CANCELLED":
             # Remove dados processados se cancelado
             del st.session_state[processed_data_key]
+            # Limpar o arquivo PDF carregado também e resetar o uploader
+            if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                del st.session_state[f"booking_pdf_file_{farol_reference}"]
+            st.session_state[f"pdf_uploader_key_counter_{farol_reference}"] += 1
             st.rerun()
         elif validated_data:
             # Salva os dados validados
             if save_pdf_booking_data(validated_data):
                 # Remove dados processados após salvar
                 del st.session_state[processed_data_key]
+                # Limpar o arquivo PDF carregado também e resetar o uploader
+                if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                    del st.session_state[f"booking_pdf_file_{farol_reference}"]
+                st.session_state[f"pdf_uploader_key_counter_{farol_reference}"] += 1
                 st.balloons()  # Celebração visual
                 st.rerun()
 
