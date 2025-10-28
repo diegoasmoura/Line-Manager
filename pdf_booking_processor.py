@@ -3057,13 +3057,51 @@ def display_pdf_validation_interface(processed_data):
             voyage_val = voyage
             terminal_val = port_terminal_city
             
-            # Consultar API Ellox diretamente
+            # Plano Passo 1: Verificar cache no banco de dados primeiro
+            try:
+                from database import get_database_connection
+                from sqlalchemy import text
+                conn = get_database_connection()
+                existing_query = text("""
+                    SELECT *
+                    FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS
+                    WHERE UPPER(NAVIO) = UPPER(:vessel_name)
+                    AND UPPER(VIAGEM) = UPPER(:voyage_code)
+                    AND UPPER(TERMINAL) = UPPER(:terminal)
+                    AND (DATA_DEADLINE IS NOT NULL OR DATA_ESTIMATIVA_SAIDA IS NOT NULL OR DATA_ESTIMATIVA_CHEGADA IS NOT NULL OR DATA_ABERTURA_GATE IS NOT NULL)
+                    ORDER BY NVL(DATA_ATUALIZACAO, ROW_INSERTED_DATE) DESC
+                    FETCH FIRST 1 ROW ONLY
+                """)
+                existing_data = conn.execute(existing_query, {
+                    "vessel_name": vessel_name_val,
+                    "voyage_code": voyage_val,
+                    "terminal": terminal_val
+                }).mappings().fetchone()
+                conn.close()
+
+                if existing_data:
+                    st.info("✅ Dados de monitoramento encontrados no cache do banco de dados.")
+                    api_data = dict(existing_data)
+                    api_result = {
+                        "success": True,
+                        "data": api_data,
+                        "message": f"✅ Dados obtidos do cache do banco de dados ({len(api_data)} campos)"
+                    }
+                    st.session_state[f"api_dates_{farol_reference}"] = api_result
+                    st.session_state[f"api_consulted_{farol_reference}"] = True
+                    st.rerun()
+                    return # Exit the function after rerun
+
+            except Exception as e:
+                st.warning(f"⚠️ Erro ao verificar cache no banco de dados: {str(e)}")
+
+            # Consultar API Ellox diretamente (se não encontrou no cache)
             try:
                 import requests
                 import pandas as pd
                 import json
                 from datetime import datetime
-                from database import get_database_connection
+                from database import get_database_connection, upsert_terminal_monitorings_from_dataframe
                 from sqlalchemy import text
                 
                 # Função para autenticar na API Ellox
@@ -3082,6 +3120,28 @@ def display_pdf_validation_interface(processed_data):
                     if not token:
                         return None
                     return token
+                
+                def solicitar_monitoramento(token, cnpj_terminal, vessel_name, voyage_code):
+                    url = "https://apidtz.comexia.digital/api/monitor/navio"
+                    payload = {
+                        "cnpj": "60.498.706/0001-57",  # CNPJ Cargill
+                        "lista": [
+                            {
+                                "cnpj_terminal": cnpj_terminal,
+                                "nome_navio": vessel_name,
+                                "viagem_navio": voyage_code or ""
+                            }
+                        ]
+                    }
+                    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+                    resp = requests.post(url, headers=headers, json=payload)
+                    
+                    if resp.status_code >= 400:
+                        body_text = (resp.text or "").lower()
+                        if "already exist" in body_text or "already tracked" in body_text:
+                            return "already_exists"
+                        return None
+                    return "ok"
                 
                 # Função para visualizar monitoramentos
                 def visualizar_monitoramentos(token, cnpj_terminal, vessel_name, voyage_code):
@@ -3149,9 +3209,24 @@ def display_pdf_validation_interface(processed_data):
                         st.error("❌ Erro ao autenticar na API Ellox")
                         return
                     
-                    # 2. Buscar dados
+                    # 2. Solicitar monitoramento
+                    status_solicitacao = solicitar_monitoramento(token, cnpj_terminal, vessel_name_val, voyage_val)
+                    if status_solicitacao not in ("ok", "already_exists"):
+                        st.error("❌ Erro ao solicitar monitoramento na API Ellox")
+                        return
+
+                    # 3. Buscar dados
                     df_monitoring = visualizar_monitoramentos(token, cnpj_terminal, vessel_name_val, voyage_val)
                     
+                    if not df_monitoring.empty:
+                        # Salvar no Oracle
+                        try:
+                            processed_count = upsert_terminal_monitorings_from_dataframe(df_monitoring, data_source='API')
+                            if processed_count > 0:
+                                st.success(f"✅ {processed_count} registros de monitoramento salvos/atualizados no banco de dados.")
+                        except Exception as e:
+                            st.warning(f"⚠️ Erro ao salvar monitoramentos no Oracle: {str(e)}")
+
                     if df_monitoring.empty:
                         st.warning("⚠️ Nenhum dado de monitoramento encontrado para essa combinação")
                         return
@@ -3195,6 +3270,7 @@ def display_pdf_validation_interface(processed_data):
                     st.session_state[f"api_consulted_{farol_reference}"] = True
                     
                     st.success(f"✅ Datas obtidas com sucesso! {len(api_data)} campos extraídos")
+                    st.rerun()  # Force rerun to refresh form with API data
                     
             except Exception as e:
                 st.error(f"❌ Erro ao consultar API: {str(e)}")
