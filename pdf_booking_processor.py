@@ -2707,12 +2707,20 @@ def display_pdf_validation_interface(processed_data):
         # Segunda linha: Nome do Navio, Carrier/Armador e Voyage
         col3, col4, col5 = st.columns(3)
         with col4:
+            # Adicionar opção vazia para permitir validação
+            carriers_list = ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL", "OTHER"]
+            carriers_with_empty = [""] + carriers_list
+            
+            # Determinar índice inicial
+            carrier_index = 0  # Por padrão, começa com a opção vazia
+            if processed_data["carrier"] != "GENERIC":
+                if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"]:
+                    carrier_index = carriers_list.index(processed_data["carrier"]) + 1  # +1 por causa da opção vazia
+            
             carrier = st.selectbox(
                 "**:green[Voyage Carrier]***",
-                ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL", "OTHER"],
-                index=0 if processed_data["carrier"] == "GENERIC" else 
-                      ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(processed_data["carrier"]) 
-                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 8,
+                options=carriers_with_empty,
+                index=carrier_index,
                 help="Armador da viagem (obrigatório)"
             )
         with col3:
@@ -2720,9 +2728,12 @@ def display_pdf_validation_interface(processed_data):
             ships_data = load_ships_from_database()
             ship_names = [ship[0] for ship in ships_data]
             
+            # Adicionar opção vazia no início para permitir validação
+            ships_with_empty = [""] + ship_names
+            
             # Encontrar índice do navio extraído
             extracted_vessel = processed_data.get("vessel_name", "")
-            vessel_index = 0
+            vessel_index = 0  # Por padrão, começa com a opção vazia
             
             if extracted_vessel:
                 # Buscar correspondência case-insensitive
@@ -2730,17 +2741,17 @@ def display_pdf_validation_interface(processed_data):
                 ship_names_lower = [name.lower() for name in ship_names]
                 
                 if extracted_lower in ship_names_lower:
-                    # Encontrou correspondência case-insensitive, usar a versão do banco
-                    vessel_index = ship_names_lower.index(extracted_lower)
+                    # Encontrou correspondência case-insensitive, usar a versão do banco (+1 por causa da opção vazia)
+                    vessel_index = ship_names_lower.index(extracted_lower) + 1
                 else:
                     # Normalizar o nome extraído para Title Case antes de adicionar
                     normalized_vessel = extracted_vessel.title()
-                    ship_names.insert(0, normalized_vessel)
-                    vessel_index = 0
+                    ships_with_empty.insert(1, normalized_vessel)  # Inserir após a opção vazia
+                    vessel_index = 1
             
             vessel_name = st.selectbox(
                 "**:green[Vessel Name]***",
-                options=ship_names,
+                options=ships_with_empty,
                 index=vessel_index,
                 help="Selecione o navio da lista (obrigatório)"
             )
@@ -2777,19 +2788,24 @@ def display_pdf_validation_interface(processed_data):
             # Carregar terminais do banco de dados
             terminals_data = load_terminals_from_database()
             
+            # Adicionar opção vazia no início para permitir validação
+            terminals_with_empty = [""] + terminals_data
+            
             # Encontrar índice do terminal extraído
             extracted_terminal = processed_data.get("port_terminal_city", "")
-            terminal_index = 0
-            if extracted_terminal and extracted_terminal in terminals_data:
-                terminal_index = terminals_data.index(extracted_terminal)
-            elif extracted_terminal:
-                # Se não encontrar exato, adicionar como opção
-                terminals_data.insert(0, extracted_terminal)
-                terminal_index = 0
+            terminal_index = 0  # Por padrão, começa com a opção vazia
+            if extracted_terminal:
+                # Procurar o terminal na lista (ignorando a opção vazia)
+                if extracted_terminal in terminals_data:
+                    terminal_index = terminals_data.index(extracted_terminal) + 1  # +1 por causa da opção vazia
+                else:
+                    # Se não encontrar exato, adicionar como opção
+                    terminals_with_empty.insert(1, extracted_terminal)  # Inserir após a opção vazia
+                    terminal_index = 1
             
             port_terminal_city = st.selectbox(
                 "**:green[Port Terminal City]***",
-                options=terminals_data,
+                options=terminals_with_empty,
                 index=terminal_index,
                 help="Selecione o terminal da lista (obrigatório)"
             )
@@ -3112,41 +3128,49 @@ def display_pdf_validation_interface(processed_data):
         
         if submitted:
             # Validação de campos obrigatórios
-            validation_errors = []
+            missing_fields = []
             
-            if not booking_reference or not booking_reference.strip():
-                validation_errors.append("❌ **:green[Booking Reference]** é obrigatório")
+            # Função helper para verificar se campo está vazio
+            def is_empty(value):
+                """Verifica se um valor está vazio (None, string vazia, ou só espaços)"""
+                if value is None:
+                    return True
+                if isinstance(value, str):
+                    return not value.strip()
+                return False
+            
+            if is_empty(booking_reference):
+                missing_fields.append("Booking Reference")
             
             if not quantity or quantity < 1:
-                validation_errors.append("❌ **:green[Quantity of Containers]** deve ser maior que zero")
+                missing_fields.append("Quantity of Containers")
             
-            if not vessel_name or not str(vessel_name).strip():
-                validation_errors.append("❌ **:green[Vessel Name]** é obrigatório")
+            if is_empty(vessel_name):
+                missing_fields.append("Vessel Name")
             
-            if not carrier or carrier == "" or carrier == "OTHER":
-                validation_errors.append("❌ **:green[Voyage Carrier]** é obrigatório (não pode ser OTHER vazio)")
+            # Carrier deve estar preenchido e não pode ser "OTHER" ou vazio
+            if is_empty(carrier) or carrier == "OTHER" or carrier == "":
+                missing_fields.append("Voyage Carrier")
             
-            if not voyage or not voyage.strip():
-                validation_errors.append("❌ **:green[Voyage Code]** é obrigatório")
+            if is_empty(voyage):
+                missing_fields.append("Voyage Code")
             
-            if not pol or not pol.strip():
-                validation_errors.append("❌ **:green[Port of Loading POL]** é obrigatório")
+            if is_empty(pol):
+                missing_fields.append("Port of Loading POL")
             
-            if not pod or not pod.strip():
-                validation_errors.append("❌ **:green[Port of Delivery POD]** é obrigatório")
+            if is_empty(pod):
+                missing_fields.append("Port of Delivery POD")
             
-            if not port_terminal_city or not str(port_terminal_city).strip():
-                validation_errors.append("❌ **:green[Port Terminal City]** é obrigatório")
+            if is_empty(port_terminal_city):
+                missing_fields.append("Port Terminal City")
             
-            if not pdf_print_date or not pdf_print_date.strip():
-                validation_errors.append("❌ **:green[PDF Print Date]** é obrigatório")
+            if is_empty(pdf_print_date):
+                missing_fields.append("PDF Print Date")
             
             # Se houver erros de validação, exibir e impedir o salvamento
-            if validation_errors:
-                st.error("⚠️ **Campos obrigatórios não preenchidos:**")
-                for error in validation_errors:
-                    st.error(error)
-                st.info("📋 Por favor, preencha todos os campos obrigatórios (marcados com *) antes de salvar.")
+            if missing_fields:
+                fields_list = ", ".join([f"**:green[{field}]**" for field in missing_fields])
+                st.info(f"⚠️ Por favor, preencha todos os campos obrigatórios (marcados com *) antes de salvar. Campos pendentes: {fields_list}")
                 return None  # Impede o salvamento
             
             # Função helper para criar datetime a partir de date e time
