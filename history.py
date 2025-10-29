@@ -246,17 +246,26 @@ def get_voyage_monitoring_for_reference(farol_reference):
         # Só mostra registros que tenham vinculação com registros APROVADOS
         placeholders = ", ".join([f":vessel_{i}" for i in range(len(vessel_names))])
         monitoring_query = text(f"""
-            SELECT DISTINCT m.DATA_SOURCE, m.*, r.ROW_INSERTED_DATE as APROVACAO_DATE
-            FROM LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
-            INNER JOIN LogTransp.F_CON_RETURN_CARRIERS r ON (
-                UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME)
-                AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
-                AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
-                AND r.FAROL_REFERENCE = :farol_ref
-                AND r.FAROL_STATUS IN ('Booking Approved', 'Received from Carrier')
+            WITH ranked_monitoring AS (
+                SELECT
+                    m.*,
+                    r.ROW_INSERTED_DATE as APROVACAO_DATE,
+                    ROW_NUMBER() OVER(PARTITION BY m.ID ORDER BY r.ROW_INSERTED_DATE DESC) as rn
+                FROM
+                    LogTransp.F_ELLOX_TERMINAL_MONITORINGS m
+                INNER JOIN
+                    LogTransp.F_CON_RETURN_CARRIERS r ON UPPER(m.NAVIO) = UPPER(r.B_VESSEL_NAME)
+                                                    AND UPPER(m.VIAGEM) = UPPER(r.B_VOYAGE_CODE)
+                                                    AND UPPER(m.TERMINAL) = UPPER(r.B_TERMINAL)
+                WHERE
+                    r.FAROL_REFERENCE = :farol_ref
+                    AND r.FAROL_STATUS IN ('Booking Approved', 'Received from Carrier')
+                    AND UPPER(m.NAVIO) IN ({placeholders})
             )
-            WHERE UPPER(m.NAVIO) IN ({placeholders})
-            ORDER BY NVL(m.DATA_ATUALIZACAO, m.ROW_INSERTED_DATE) DESC
+            SELECT *
+            FROM ranked_monitoring
+            WHERE rn = 1
+            ORDER BY NVL(DATA_ATUALIZACAO, APROVACAO_DATE) DESC
         """)
         
         # Prepara parâmetros com nomes em maiúsculas para busca
