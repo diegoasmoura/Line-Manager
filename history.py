@@ -879,6 +879,7 @@ def display_attachments_section(farol_reference):
                         st.session_state[expander_key] = False
                         
                         st.balloons()  # Celebração visual
+                        st.cache_data.clear() # Clear cache to ensure data refresh
                         st.rerun()
 
     # Lista de Anexos Existentes

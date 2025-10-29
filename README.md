@@ -3403,6 +3403,22 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
 
 ## 🆕 Atualizações Recentes
 
+### 📌 v3.9.25 - Correção Crítica de Salvamento de Dados de PDF (Outubro 2025)
+- **🐛 Bug Crítico Resolvido**: Dados de PDF não estavam sendo salvos corretamente na tabela `F_CON_RETURN_CARRIERS` após validação.
+- **🎯 Causa Raiz Identificada**:
+    1.  Erro `ORA-00957: duplicate column name` na instrução `INSERT` devido a mapeamentos redundantes de campos de data em `insert_return_carrier_from_ui` (`database.py`).
+    2.  Erro lógico em `save_pdf_booking_data` (`pdf_booking_processor.py`) que interpretava incorretamente o retorno da função de inserção, exibindo uma mensagem de sucesso mesmo quando a operação falhava.
+- **✅ Correções Implementadas**:
+    1.  **`database.py`**: Removidos os mapeamentos duplicados de campos de data (`B_DATA_DEADLINE`, `B_DATA_ESTIMATIVA_SAIDA_ETD`, `B_DATA_ESTIMATIVA_CHEGADA_ETA`, `B_DATA_ABERTURA_GATE`) da variável `field_mapping` na função `insert_return_carrier_from_ui`. Isso garante que a instrução `INSERT` seja gerada sem nomes de coluna duplicados.
+    2.  **`pdf_booking_processor.py`**: A lógica de verificação de sucesso na função `save_pdf_booking_data` foi ajustada para `if success[0]:`, garantindo que a mensagem de sucesso seja exibida apenas quando a inserção no banco de dados for realmente bem-sucedida.
+- **🔄 Funcionamento Corrigido**:
+    - Os dados extraídos de PDFs agora são salvos corretamente na tabela `F_CON_RETURN_CARRIERS`.
+    - A interface reflete o status real da operação de salvamento, exibindo mensagens de erro quando a inserção falha.
+    - A "Voyage Timeline" e "Audit Trail" agora devem ser populadas corretamente com os dados recém-salvos.
+- **Arquivos Modificados**:
+    - `database.py`
+    - `pdf_booking_processor.py`
+
 ### 📌 v3.9.24 - Atualização Automática de Status para Automação via Bot (Outubro 2025)
 - **🔄 Sincronização Automática de Status**: Implementado sistema que atualiza automaticamente o Farol Status na tabela `F_CON_SALES_BOOKING_DATA` quando um PDF é processado com status "Received from Carrier"
 - **📊 Visibilidade na Grade Principal**: Analistas agora veem imediatamente na grade principal (`shipments.py`) quando um PDF foi recebido do carrier, facilitando a identificação de bookings que precisam de aprovação

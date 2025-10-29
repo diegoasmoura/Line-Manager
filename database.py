@@ -2147,16 +2147,6 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Required Arrival Date": "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
             "PDF Booking Emission Date": "PDF_BOOKING_EMISSION_DATE",
             "PDF Name": "P_PDF_NAME",
-            # Campos de datas da API Ellox (nomes corretos das colunas em minúsculas)
-            "B_DATA_DEADLINE": "b_data_deadline",
-            "B_DATA_DRAFT_DEADLINE": "b_data_draft_deadline",
-            "B_DATA_ABERTURA_GATE": "b_data_abertura_gate",
-            "B_DATA_ESTIMATIVA_SAIDA_ETD": "b_data_estimativa_saida_etd",
-            "B_DATA_ESTIMATIVA_CHEGADA_ETA": "b_data_estimativa_chegada_eta",
-            "B_DATA_ESTIMATIVA_ATRACACAO_ETB": "b_data_estimativa_atracacao_etb",
-            "B_DATA_ATRACACAO_ATB": "b_data_atracacao_atb",
-            "B_DATA_PARTIDA_ATD": "b_data_partida_atd",
-            "B_DATA_CHEGADA_ATA": "b_data_chegada_ata",
         }
         
         # PRÉ-PREENCHIMENTO: Buscar datas da tabela principal F_CON_SALES_BOOKING_DATA

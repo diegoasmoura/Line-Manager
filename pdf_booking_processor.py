@@ -3249,7 +3249,7 @@ def save_pdf_booking_data(validated_data):
         success = insert_return_carrier_from_ui(validated_data, user_insert="PDF_PROCESSOR", status_override="Received from Carrier")
         st.info(f"DEBUG: insert_return_carrier_from_ui retornou: {success}")
         
-        if success:
+        if success[0]:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
             st.info("📋 Status definido como: **Received from Carrier**")
             
