@@ -2507,7 +2507,8 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             FROM LogTransp.F_CON_SALES_BOOKING_DATA
             WHERE FAROL_REFERENCE = :farol_reference
         """)
-        current_row = conn.execute(current_values_query, {"farol_reference": farol_reference}).fetchone()
+        # Usar mapeamento por nome para evitar erros de índice e depender menos da ordem das colunas
+        current_row = conn.execute(current_values_query, {"farol_reference": farol_reference}).mappings().fetchone()
         if current_row is None:
             raise Exception(f"Farol Reference {farol_reference} not found in F_CON_SALES_BOOKING_DATA.")
         
@@ -2554,8 +2555,8 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                 # Não adicionar ao update se:
                 # 1. PDF não tem valor (row[field] is None ou vazio)
                 # 2. Já existe valor manual no banco (current_row[field] is not None)
-                if current_row and field in current_row._fields:
-                    existing_value = getattr(current_row, field, None)
+                if current_row and field in current_row:
+                    existing_value = current_row.get(field, None)
                     if existing_value is not None:
                         # Preservar valor manual existente
                         main_update_fields[field] = existing_value
@@ -2574,31 +2575,31 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         # Auditoria para campos alterados na aprovação
         if current_row:
             current_values = {
-                "S_PLACE_OF_RECEIPT": current_row[0],
-                "S_QUANTITY_OF_CONTAINERS": current_row[1],
-                "S_PORT_OF_LOADING_POL": current_row[3],
-                "S_PORT_OF_DELIVERY_POD": current_row[4],
-                "S_FINAL_DESTINATION": current_row[5],
-                "B_BOOKING_REFERENCE": current_row[6],
-                "B_TRANSHIPMENT_PORT": current_row[7],
-                "B_TERMINAL": current_row[8],
-                "B_VESSEL_NAME": current_row[9],
-                "B_VOYAGE_CODE": current_row[10],
-                "B_VOYAGE_CARRIER": current_row[11],
-                "B_DATA_DRAFT_DEADLINE": current_row[12],
-                "B_DATA_DEADLINE": current_row[13],
-                "S_REQUESTED_DEADLINE_START_DATE": current_row[14],
-                "S_REQUESTED_DEADLINE_END_DATE": current_row[15],
-                "B_DATA_ESTIMATIVA_SAIDA_ETD": current_row[16],
-                "B_DATA_ESTIMATIVA_CHEGADA_ETA": current_row[17],
-                "B_DATA_ABERTURA_GATE": current_row[18],
-                "B_DATA_PARTIDA_ATD": current_row[19],
-                "B_DATA_CHEGADA_ATA": current_row[20],
-                "B_DATA_ESTIMATIVA_ATRACACAO_ETB": current_row[21],
-                "B_DATA_ATRACACAO_ATB": current_row[22],
-                "S_REQUIRED_ARRIVAL_DATE_EXPECTED": current_row[23],
-                "B_BOOKING_CONFIRMATION_DATE": current_row[24],
-                "FAROL_STATUS": current_row[25],
+                "S_PLACE_OF_RECEIPT": current_row.get("S_PLACE_OF_RECEIPT"),
+                "S_QUANTITY_OF_CONTAINERS": current_row.get("S_QUANTITY_OF_CONTAINERS"),
+                "S_PORT_OF_LOADING_POL": current_row.get("S_PORT_OF_LOADING_POL"),
+                "S_PORT_OF_DELIVERY_POD": current_row.get("S_PORT_OF_DELIVERY_POD"),
+                "S_FINAL_DESTINATION": current_row.get("S_FINAL_DESTINATION"),
+                "B_BOOKING_REFERENCE": current_row.get("B_BOOKING_REFERENCE"),
+                "B_TRANSHIPMENT_PORT": current_row.get("B_TRANSHIPMENT_PORT"),
+                "B_TERMINAL": current_row.get("B_TERMINAL"),
+                "B_VESSEL_NAME": current_row.get("B_VESSEL_NAME"),
+                "B_VOYAGE_CODE": current_row.get("B_VOYAGE_CODE"),
+                "B_VOYAGE_CARRIER": current_row.get("B_VOYAGE_CARRIER"),
+                "B_DATA_DRAFT_DEADLINE": current_row.get("B_DATA_DRAFT_DEADLINE"),
+                "B_DATA_DEADLINE": current_row.get("B_DATA_DEADLINE"),
+                "S_REQUESTED_DEADLINE_START_DATE": current_row.get("S_REQUESTED_DEADLINE_START_DATE"),
+                "S_REQUESTED_DEADLINE_END_DATE": current_row.get("S_REQUESTED_DEADLINE_END_DATE"),
+                "B_DATA_ESTIMATIVA_SAIDA_ETD": current_row.get("B_DATA_ESTIMATIVA_SAIDA_ETD"),
+                "B_DATA_ESTIMATIVA_CHEGADA_ETA": current_row.get("B_DATA_ESTIMATIVA_CHEGADA_ETA"),
+                "B_DATA_ABERTURA_GATE": current_row.get("B_DATA_ABERTURA_GATE"),
+                "B_DATA_PARTIDA_ATD": current_row.get("B_DATA_PARTIDA_ATD"),
+                "B_DATA_CHEGADA_ATA": current_row.get("B_DATA_CHEGADA_ATA"),
+                "B_DATA_ESTIMATIVA_ATRACACAO_ETB": current_row.get("B_DATA_ESTIMATIVA_ATRACACAO_ETB"),
+                "B_DATA_ATRACACAO_ATB": current_row.get("B_DATA_ATRACACAO_ATB"),
+                "S_REQUIRED_ARRIVAL_DATE_EXPECTED": current_row.get("S_REQUIRED_ARRIVAL_DATE_EXPECTED"),
+                "B_BOOKING_CONFIRMATION_DATE": current_row.get("B_BOOKING_CONFIRMATION_DATE"),
+                "FAROL_STATUS": current_row.get("FAROL_STATUS"),
             }
             
             # Auditar mudança de status

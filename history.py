@@ -1605,7 +1605,8 @@ def exibir_history():
         
         # A ordenação de colunas foi movida para a função display_tab_content para centralizar a lógica.
 
-                # Aplica a formatação de ícones no Farol Status        df_processed = process_farol_status_for_display(df_processed)
+        # Aplica a formatação de ícones no Farol Status
+        df_processed = process_farol_status_for_display(df_processed)
 
         return df_processed
 
