@@ -2337,7 +2337,35 @@ def exibir_history():
                 with col1:
                     if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
                         if selected_ref != "Select a reference...":
-                            related_reference = selected_ref.split(" | ")[0]
+                            # Montar formato: "Index X | Booking Requested | 29-10-2025"
+                            # 1. Extrair Index do carrier return selecionado
+                            selected_pdf = st.session_state.get(f"pdf_approval_select_{farol_reference}", "")
+                            index_part = ""
+                            if selected_pdf and "|" in selected_pdf:
+                                # selected_pdf formato: "Index 3 | 29/10/2025 14:59"
+                                pdf_parts = selected_pdf.split("|")
+                                if len(pdf_parts) > 0:
+                                    index_part = pdf_parts[0].strip()  # "Index 3"
+                            
+                            # 2. Extrair Status da referência interna
+                            status_part = ""
+                            date_part = ""
+                            if "|" in selected_ref:
+                                ref_parts = [p.strip() for p in selected_ref.split("|")]
+                                if len(ref_parts) >= 2:
+                                    status_part = ref_parts[1]  # "Booking Requested"
+                                if len(ref_parts) >= 3:
+                                    # Extrair data e formatar com hífen (remover hora se houver)
+                                    date_str = ref_parts[2]  # "29/10/2025 15:43" ou "29/10/2025"
+                                    date_part = date_str.split()[0].replace("/", "-")  # "29-10-2025"
+                            
+                            # 3. Montar related_reference no formato desejado
+                            if index_part and status_part and date_part:
+                                related_reference = f"{index_part} | {status_part} | {date_part}"
+                            else:
+                                # Fallback: usar selected_ref completo se não conseguir montar
+                                related_reference = selected_ref
+                            
                             # Call approval function
                             result = approve_carrier_return(adjustment_id, related_reference, {})
                             if result:

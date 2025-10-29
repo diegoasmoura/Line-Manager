@@ -2698,23 +2698,8 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             # Para aprovação de PDF/retorno do carrier, apenas atualizar Linked_Reference
             # Mantém as justificativas originais (se o registro veio de ajuste/split, elas permanecem)
             ref_str = str(related_reference) if related_reference is not None else ''
-            # Formatar para remover o Farol Reference e usar data com hífen
-            # Entrada típica: "FR_... | Booking Requested | 29/10/2025 15:43"
-            # Saída desejada: "Booking Requested | 29-10-2025 15:43"
-            try:
-                parts = [p.strip() for p in ref_str.split('|')]
-                if len(parts) >= 3:
-                    status_part = parts[1]
-                    date_part = parts[2].replace('/', '-')
-                    ref_str = f"{status_part} | {date_part}"
-                elif len(parts) == 2:
-                    # Caso raro sem data estruturada
-                    status_part = parts[1]
-                    ref_str = status_part
-            except Exception:
-                # Mantém ref_str original em caso de qualquer erro de parsing
-                pass
-            # Limitar para evitar overflow em colunas com tamanho restrito
+            # O formato já está montado corretamente em history.py no formato: "Index X | Booking Requested | 29-10-2025"
+            # Apenas limitar para evitar overflow em colunas com tamanho restrito
             if len(ref_str) > 100:
                 ref_str = ref_str[:100]
             update_params["linked_ref"] = ref_str
