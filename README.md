@@ -4812,6 +4812,28 @@ terminal_options = list_terminal_names() or []
 
 ## 📝 Changelog
 
+### [v3.2.2] - 2024-12-19
+
+#### 🎨 Novas Funcionalidades
+- **Destaque Visual para Retornos do Carrier**: Implementado sistema de destaque visual laranja claro para linhas de retornos do carrier
+  - Identificação híbrida: utiliza campo `PDF Booking Emission Date` preenchido OU status "📨 Received from Carrier"
+  - Comparação inteligente com linha anterior, destacando apenas campos que realmente mudaram
+  - Cores aplicadas: fundo `#FFE0B2` com borda `#FF9800` (laranja claro)
+  - Priorização: New Adjustment (amarelo) sobrescreve Carrier Return (laranja) em células conflitantes
+
+#### 🔧 Melhorias Técnicas
+- **Expansão da lista de campos editáveis**: Adicionados 9 campos de data à lista de comparação
+  - Deadline, Abertura Gate, ETD, ETA, Estimativa Atracação (ETB), Atracação (ATB), Partida (ATD), Estimada Transbordo (ETD), Chegada (ATA), Transbordo (ATD)
+- **Correção da ordem de comparação**: Resolvido problema onde comparações eram feitas com linha errada devido à inversão prematura do DataFrame
+  - Detecção agora é feita na ordem cronológica correta (mais antigo → mais recente)
+  - Ajuste de índices aplicado após inversão para exibição visual
+
+#### 📋 Detalhes Técnicos
+- **Arquivos modificados**: `history.py`
+- **Funções afetadas**: `detect_changes_for_carrier_return()`, `apply_highlight_styling_combined()`, `apply_highlight_styling()`
+- **Funções adicionadas**: `apply_highlight_styling_combined()`
+- **Impacto**: Melhora significativa na visualização de alterações em retornos do carrier, facilitando identificação de mudanças entre linhas
+
 ### [v3.2.1] - 2024-12-19
 
 #### 🐛 Correções de Bugs

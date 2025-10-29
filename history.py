@@ -1502,6 +1502,7 @@ def exibir_history():
             "ROW_INSERTED_DATE": "Inserted Date",
             "ADJUSTMENTS_OWNER": "Adjustments Owner",
             "P_PDF_NAME": "PDF Name",
+            "PDF_BOOKING_EMISSION_DATE": "PDF Booking Emission Date",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
             "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",
             "B_VOYAGE_CODE": "Voyage Code",
@@ -1793,7 +1794,17 @@ def exibir_history():
             "Requested Deadline Start",
             "Requested Deadline End",
             "Required Sail Date",
-            "Required Arrival Date"
+            "Required Arrival Date",
+            "Deadline",
+            "Abertura Gate",
+            "ETD",
+            "ETA",
+            "Estimativa Atracação (ETB)",
+            "Atracação (ATB)",
+            "Partida (ATD)",
+            "Estimada Transbordo (ETD)",
+            "Chegada (ATA)",
+            "Transbordo (ATD)",
         ]
         
         changes = {}
@@ -1846,13 +1857,172 @@ def exibir_history():
         
         return changes
 
-    def apply_highlight_styling(df_processed, changes_dict):
+    def detect_changes_for_carrier_return(df_processed):
+        """
+        Detecta alterações em linhas de retornos do carrier comparando com a linha anterior.
+        Identifica por: PDF Booking Emission Date preenchido OU status = "📨 Received from Carrier"
+        Retorna dicionário com pares (row_index, column_name) onde há diferença.
+        """
+        if df_processed is None or df_processed.empty:
+            return {}
+        
+        # Campos editáveis baseados em shipments_split.py (usando aliases corretos)
+        editable_fields = [
+            "Quantity of Containers",
+            "Port of Loading POL",
+            "Port of Delivery POD", 
+            "Place of Receipt",
+            "Final Destination",
+            "Transhipment Port",
+            "Port Terminal",
+            "Carrier",
+            "Voyage Code",
+            "Booking",
+            "Vessel Name",
+            "Requested Deadline Start",
+            "Requested Deadline End",
+            "Required Sail Date",
+            "Required Arrival Date",
+            "Deadline",
+            "Abertura Gate",
+            "ETD",
+            "ETA",
+            "Estimativa Atracação (ETB)",
+            "Atracação (ATB)",
+            "Partida (ATD)",
+            "Estimada Transbordo (ETD)",
+            "Chegada (ATA)",
+            "Transbordo (ATD)",
+        ]
+        
+        changes = {}
+        
+        # Percorre o DataFrame linha a linha
+        for idx in range(len(df_processed)):  # Começa do índice 0 (primeira linha)
+            current_row = df_processed.iloc[idx]
+            
+            # Se é a primeira linha, compara com a segunda linha (índice 1)
+            if idx == 0:
+                if len(df_processed) > 1:
+                    previous_row = df_processed.iloc[1]  # Compara com a segunda linha
+                else:
+                    continue
+            else:
+                previous_row = df_processed.iloc[idx - 1]
+            
+            # Verifica se a linha atual é um retorno de carrier usando estratégia híbrida
+            # 1. Verifica se PDF Booking Emission Date está preenchido
+            # Tenta ambos os nomes possíveis da coluna
+            pdf_date = current_row.get("PDF Booking Emission Date", None)
+            if pdf_date is None:
+                pdf_date = current_row.get("Pdf Booking Emission Date", None)
+            is_pdf_filled = pdf_date is not None and not pd.isna(pdf_date) and str(pdf_date).strip() != ""
+            
+            # 2. Verifica se status é "📨 Received from Carrier"
+            status = current_row.get("Farol Status", "")
+            if pd.isna(status) or status is None:
+                status = ""
+            else:
+                status = str(status)
+            is_received_status = status == "📨 Received from Carrier"
+            
+            # Identifica se é retorno de carrier (qualquer um dos critérios)
+            is_carrier_return = is_pdf_filled or is_received_status
+            
+            if is_carrier_return:
+                # Compara cada campo editável
+                for field in editable_fields:
+                    if field in df_processed.columns:
+                        current_val = current_row[field]
+                        previous_val = previous_row[field]
+                        
+                        # Normaliza valores para comparação
+                        def normalize_value(val):
+                            if pd.isna(val) or val is None or val == "":
+                                return None
+                            # Para datas, converte para string para comparação
+                            if hasattr(val, 'strftime'):
+                                return val.strftime('%Y-%m-%d %H:%M:%S') if hasattr(val, 'hour') else val.strftime('%Y-%m-%d')
+                            return str(val)
+                        
+                        current_normalized = normalize_value(current_val)
+                        previous_normalized = normalize_value(previous_val)
+                        
+                        # Se os valores normalizados são diferentes
+                        if current_normalized != previous_normalized:
+                            changes[(idx, field)] = {
+                                'current': current_val,
+                                'previous': previous_val
+                            }
+        
+        return changes
+
+    def apply_highlight_styling_combined(df_processed, combined_changes_dict):
+        """
+        Aplica estilização usando Pandas Styler com suporte para múltiplos tipos de destaque.
+        
+        Args:
+            df_processed: DataFrame processado
+            combined_changes_dict: Dicionário com pares (row_idx, col_name) -> {'highlight_blue': bool, 'value': ...}
+        
+        Returns:
+            DataFrame estilizado com Pandas Styler
+        """
+        if df_processed is None or df_processed.empty:
+            return df_processed
+        
+        # Cria uma cópia para não modificar o original
+        df_styled = df_processed.copy()
+        
+        # Aplica o mesmo tratamento de valores nulos na cópia
+        for col in df_styled.columns:
+            if df_styled[col].dtype == 'datetime64[ns]':
+                df_styled[col] = df_styled[col].astype(str).replace('NaT', '')
+            else:
+                df_styled[col] = df_styled[col].fillna('')
+        
+        # Função para aplicar estilo baseado nas alterações detectadas e layout zebra
+        def highlight_changes_and_zebra(row):
+            styles = [''] * len(row)
+            row_idx = row.name
+            
+            # Layout zebra - linhas pares mais claras, ímpares mais escuras
+            if row_idx % 2 == 0:
+                base_bg = 'background-color: #E8E8E8;'  # Cinza médio (linhas pares)
+            else:
+                base_bg = 'background-color: #FFFFFF;'  # Branco (linhas ímpares)
+            
+            # Aplica cor de fundo base para toda a linha
+            for i in range(len(styles)):
+                styles[i] = base_bg
+            
+            # Verifica se esta linha tem alterações e aplica destaque
+            for (change_row_idx, col_name), change_info in combined_changes_dict.items():
+                if change_row_idx == row_idx and col_name in df_styled.columns:
+                    col_idx = df_styled.columns.get_loc(col_name)
+                    # Aplica cor baseada no tipo de destaque
+                    if change_info.get('highlight_blue', False):
+                        # Cores laranja claro para retornos de carrier
+                        styles[col_idx] = 'background-color: #FFE0B2; border: 2px solid #FF9800;'
+                    else:
+                        # Cores amarelas para New Adjustment
+                        styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
+            
+            return styles
+        
+        # Aplica o estilo usando Pandas Styler
+        styled_df = df_styled.style.apply(highlight_changes_and_zebra, axis=1)
+        
+        return styled_df
+
+    def apply_highlight_styling(df_processed, changes_dict, highlight_blue=False):
         """
         Aplica estilização usando Pandas Styler para destacar células alteradas e layout zebra.
         
         Args:
             df_processed: DataFrame processado
             changes_dict: Dicionário com pares (row_idx, col_name) -> change_info
+            highlight_blue: Se True, aplica cores azuis. Se False, aplica cores amarelas (padrão).
         
         Returns:
             DataFrame estilizado com Pandas Styler
@@ -1896,7 +2066,12 @@ def exibir_history():
                 if change_row_idx == row_idx and col_name in df_styled.columns:
                     col_idx = df_styled.columns.get_loc(col_name)
                     # Destaque de alteração sobrescreve a cor zebra
-                    styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
+                    if highlight_blue:
+                        # Cores laranja claro para retornos de carrier
+                        styles[col_idx] = 'background-color: #FFE0B2; border: 2px solid #FF9800;'
+                    else:
+                        # Cores amarelas para New Adjustment
+                        styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
             
             return styles
         
@@ -1913,15 +2088,36 @@ def exibir_history():
     if df_unified_processed is not None and active_tab == unified_label:
         # Gera configuração dinâmica baseada no conteúdo (Status visível)
         column_config = generate_dynamic_column_config(df_unified_processed, hide_status=False)
-        # Detectar e destacar alterações em linhas "New Adjustment"
-        # Inverte o DataFrame para que a ordem visual corresponda ao índice
+        # Detectar e destacar alterações em linhas "New Adjustment" e "Carrier Return"
+        # NÃO inverte o DataFrame aqui - mantém ordem cronológica para comparação correta
+        changes_new_adj = detect_changes_for_new_adjustment(df_unified_processed)
+        changes_carrier = detect_changes_for_carrier_return(df_unified_processed)
+        
+        # Inverte o DataFrame para exibição (mais recente primeiro visualmente)
         df_unified_processed_reversed = df_unified_processed.iloc[::-1].reset_index(drop=True)
-        changes = detect_changes_for_new_adjustment(df_unified_processed_reversed)
         
-        # Detecção de alterações (sem debug visual)
+        # Ajustar os índices dos dicionários de mudanças para corresponder ao DataFrame invertido
+        def adjust_indices(changes_dict, original_len):
+            adjusted = {}
+            for (idx, field), value in changes_dict.items():
+                new_idx = original_len - 1 - idx  # Inverte o índice
+                adjusted[(new_idx, field)] = value
+            return adjusted
         
-        # Aplicar estilização usando Pandas Styler (sempre com layout zebra)
-        styled_df = apply_highlight_styling(df_unified_processed_reversed, changes)
+        changes_new_adj_adjusted = adjust_indices(changes_new_adj, len(df_unified_processed))
+        changes_carrier_adjusted = adjust_indices(changes_carrier, len(df_unified_processed))
+        
+        # Aplicar estilização combinada usando Pandas Styler (sempre com layout zebra)
+        # Prioridade: amarelo (New Adjustment) sobrescreve azul (Carrier Return)
+        # Combinar os dois dicionários: carrier em azul, new_adj em amarelo (substituindo conflitos)
+        combined_changes = {}
+        for key, value in changes_carrier_adjusted.items():
+            combined_changes[key] = {'highlight_blue': True, 'value': value}
+        for key, value in changes_new_adj_adjusted.items():
+            combined_changes[key] = {'highlight_blue': False, 'value': value}
+        
+        # Aplicar estilização única com ambos os destaques no DataFrame invertido
+        styled_df = apply_highlight_styling_combined(df_unified_processed_reversed, combined_changes)
         
         # Aplica tratamento de valores nulos no DataFrame final antes da exibição
         if hasattr(styled_df, 'data'):
