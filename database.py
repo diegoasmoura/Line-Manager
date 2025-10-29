@@ -186,7 +186,7 @@ def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
                 B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_CONFIRMACAO_EMBARQUE,
                 B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, B_DATA_CHEGADA_ATA,
                 B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA,
-                B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB, S_SPLITTED_BOOKING_REFERENCE,
+                B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
                 B_TRANSHIPMENT_PORT
             FROM LogTransp.F_CON_SALES_BOOKING_DATA
             WHERE FAROL_REFERENCE = :farol_ref
@@ -355,7 +355,6 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                             FAROL_STATUS,
                             P_STATUS,
                             P_PDF_NAME,
-                            S_SPLITTED_BOOKING_REFERENCE,
                             S_PLACE_OF_RECEIPT,
                             S_QUANTITY_OF_CONTAINERS,
                             S_PORT_OF_LOADING_POL,
@@ -433,7 +432,6 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
                 FAROL_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
                 S_PLACE_OF_RECEIPT,
                 S_QUANTITY_OF_CONTAINERS,
                 S_PORT_OF_LOADING_POL,
@@ -500,7 +498,6 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         S_INCOTERM                         AS s_incoterm,
         S_SKU                              AS s_sku,
         S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
-        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
         S_VOLUME_IN_TONS                   AS s_volume_in_tons,
         S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
         S_CONTAINER_TYPE                   AS s_container_type,
@@ -551,7 +548,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         # Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         desired_cols_sales = [
             # Identificação
-            "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
+            "Sales Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             # Capacidade
             "Sales Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -737,7 +734,6 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         S_INCOTERM                         AS s_incoterm,
         S_SKU                              AS s_sku,
         S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
-        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
         S_VOLUME_IN_TONS                   AS s_volume_in_tons,
         S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
         S_CONTAINER_TYPE                   AS s_container_type,
@@ -875,7 +871,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             # 9. INFORMAÇÕES DE SALES
             "Sales Order Reference", "data_sales_order", "Business", "Customer", "Incoterm", "DTHC", "Afloat", 
             "VIP PNL Risk", "PNL Destination", "data_allocation", "data_producer_nomination", "data_lc_received", 
-            "Sales Owner", "Splitted Booking Reference", "Comments Sales",
+            "Sales Owner", "Comments Sales",
             
             # 10. INFORMAÇÕES DE BOOKING
             "Booking Status", "Booking Reference", "Booking Owner", "Bogey Sale Price USD", "Freight PNL", "Comments Booking"
@@ -918,7 +914,6 @@ def get_sales_record_by_reference(farol_reference: str) -> pd.DataFrame:
         S_INCOTERM                         AS s_incoterm,
         S_SKU                              AS s_sku,
         S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
-        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
         S_VOLUME_IN_TONS                   AS s_volume_in_tons,
         S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
         S_CONTAINER_TYPE                   AS s_container_type,
@@ -1107,7 +1102,6 @@ def fetch_shipments_data_sales():
         S_INCOTERM                         AS s_incoterm,
         S_SKU                              AS s_sku,
         S_PLANT_OF_ORIGIN                  AS s_plant_of_origin,
-        S_SPLITTED_BOOKING_REFERENCE       AS s_splitted_booking_reference,
         S_VOLUME_IN_TONS                   AS s_volume_in_tons,
         S_QUANTITY_OF_CONTAINERS           AS s_quantity_of_containers,
         S_CONTAINER_TYPE                   AS s_container_type,
@@ -1202,7 +1196,6 @@ def add_sales_record(form_values):
             "s_sku": "S_SKU",
             "s_plant_of_origin": "S_PLANT_OF_ORIGIN",
             "s_type_of_shipment": "S_TYPE_OF_SHIPMENT",
-            "s_splitted_booking_reference": "S_SPLITTED_BOOKING_REFERENCE",
             "s_volume_in_tons": "S_VOLUME_IN_TONS",
             "s_quantity_of_containers": "S_QUANTITY_OF_CONTAINERS",
             "s_container_type": "S_CONTAINER_TYPE",
@@ -1381,9 +1374,6 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
             unified_copy.at[0, "s_creation_of_shipment"] = datetime.now()
         if "s_type_of_shipment" in unified_copy.columns:
             unified_copy.at[0, "s_type_of_shipment"] = "Split"
-        # Preenche referência da linha base usada para o split
-        if "s_splitted_booking_reference" in unified_copy.columns:
-            unified_copy.at[0, "s_splitted_booking_reference"] = farol_ref_original
         
         # Define o Farol Status como "New Adjustment" para os splits
         if "FAROL_STATUS" in unified_copy.columns:
@@ -1406,10 +1396,6 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
             if col not in ['l_id']:  # Remove coluna l_id
                 loading_dict[col] = loading_copy.iloc[0][col]
 
-        # Garantia extra: define explicitamente o campo de referência do split
-        # para evitar qualquer perda durante o mapeamento
-        unified_dict["S_SPLITTED_BOOKING_REFERENCE"] = farol_ref_original
- 
         insert_sales = []  # não usamos mais, mantido para compatibilidade do fluxo
         insert_booking = []
         insert_unified.append(unified_dict)
@@ -1784,7 +1770,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                     ELSE 'Booking Requested'
                 END AS P_STATUS,
                 NULL AS P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
                 S_PLACE_OF_RECEIPT,
                 S_QUANTITY_OF_CONTAINERS,
                 S_PORT_OF_LOADING_POL,
@@ -1813,12 +1798,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         row = conn.execute(fetch_sql, {"ref": farol_reference}).mappings().fetchone()
         if not row:
             return
-
-        # Verifica se já existe na tabela de retorno
-        exists = conn.execute(
-            text("SELECT COUNT(*) AS ct FROM LogTransp.F_CON_RETURN_CARRIERS WHERE FAROL_REFERENCE = :ref"),
-            {"ref": farol_reference},
-        ).fetchone()
 
         # Converte resultado para dicionário e normaliza chaves para MAIÚSCULAS
         row_dict = dict(row)
@@ -1849,43 +1828,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
 
         # SEMPRE insere um novo registro para manter o histórico completo
         # (comportamento alterado para suportar Request Timeline)
-        # Comentado: UPDATE removido para sempre inserir novo registro (Request Timeline)
-        # if exists and int(exists[0]) > 0:
-        #     # Atualiza
-        #     update_sql = text(
-        #         """
-        #         UPDATE LogTransp.F_CON_RETURN_CARRIERS
-        #         SET 
-        #             FAROL_STATUS = :FAROL_STATUS,
-        #             P_STATUS = :P_STATUS,
-        #             P_PDF_NAME = :P_PDF_NAME,
-        #             S_SPLITTED_BOOKING_REFERENCE = :S_SPLITTED_BOOKING_REFERENCE,
-        #             S_PLACE_OF_RECEIPT = :S_PLACE_OF_RECEIPT,
-        #             S_QUANTITY_OF_CONTAINERS = :S_QUANTITY_OF_CONTAINERS,
-        #             S_PORT_OF_LOADING_POL = :S_PORT_OF_LOADING_POL,
-        #             S_PORT_OF_DELIVERY_POD = :S_PORT_OF_DELIVERY_POD,
-        #             S_FINAL_DESTINATION = :S_FINAL_DESTINATION,
-        #             B_TRANSHIPMENT_PORT = :B_TRANSHIPMENT_PORT,
-        #             B_TERMINAL = :B_TERMINAL,
-        #             B_VESSEL_NAME = :B_VESSEL_NAME,
-        #             B_VOYAGE_CARRIER = :B_VOYAGE_CARRIER,
-        #             B_DATA_DRAFT_DEADLINE = :B_DATA_DRAFT_DEADLINE,
-        #             B_DATA_DEADLINE = :B_DATA_DEADLINE,
-        #             S_REQUESTED_DEADLINE_START_DATE = :S_REQUESTED_DEADLINE_START_DATE,
-        #             S_REQUESTED_DEADLINE_END_DATE = :S_REQUESTED_DEADLINE_END_DATE,
-        #             S_REQUIRED_ARRIVAL_DATE_EXPECTED = :S_REQUIRED_ARRIVAL_DATE_EXPECTED,
-        #             B_DATA_ESTIMATIVA_SAIDA_ETD = :B_DATA_ESTIMATIVA_SAIDA_ETD,
-        #             B_DATA_ESTIMATIVA_CHEGADA_ETA = :B_DATA_ESTIMATIVA_CHEGADA_ETA,
-        #             B_DATA_ABERTURA_GATE = :B_DATA_ABERTURA_GATE,
-        #             ELLOX_MONITORING_ID = :ELLOX_MONITORING_ID,
-        #             USER_UPDATE = :USER_INSERT,
-        #             DATE_UPDATE = SYSDATE
-        #         WHERE FAROL_REFERENCE = :FAROL_REFERENCE
-        #         """
-        #     )
-        #     conn.execute(update_sql, data)
-        # else:
-        #     # Insere
         insert_sql = text(
                             """
                             INSERT INTO LogTransp.F_CON_RETURN_CARRIERS (
@@ -1893,7 +1835,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                                 FAROL_STATUS,
                                 P_STATUS,
                                 P_PDF_NAME,
-                                S_SPLITTED_BOOKING_REFERENCE,
                                 S_PLACE_OF_RECEIPT,
                                 S_QUANTITY_OF_CONTAINERS,
                                 S_PORT_OF_LOADING_POL,
@@ -1920,7 +1861,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
                                 :FAROL_STATUS,
                                 :P_STATUS,
                                 :P_PDF_NAME,
-                                :S_SPLITTED_BOOKING_REFERENCE,
                                 :S_PLACE_OF_RECEIPT,
                                 :S_QUANTITY_OF_CONTAINERS,
                                 :S_PORT_OF_LOADING_POL,
@@ -1951,9 +1891,6 @@ def upsert_return_carrier_from_unified(farol_reference, user_insert=None):
         conn.commit()
     finally:
         conn.close()
-
-
-# Insere SEM verificar existência (snapshot) em F_CON_RETURN_CARRIERS baseado na unificada
 def insert_return_carrier_snapshot(farol_reference: str, status_override: str | None = None, user_insert: str | None = None):
     conn = get_database_connection()
     try:
@@ -1963,7 +1900,6 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             SELECT 
                 FAROL_REFERENCE,
                 FAROL_STATUS,
-                S_SPLITTED_BOOKING_REFERENCE,
                 S_PLACE_OF_RECEIPT,
                 S_QUANTITY_OF_CONTAINERS,
                 S_PORT_OF_LOADING_POL,
@@ -2007,7 +1943,6 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                             FAROL_STATUS,
                             P_STATUS,
                             P_PDF_NAME,
-                            S_SPLITTED_BOOKING_REFERENCE,
                             S_PLACE_OF_RECEIPT,
                             S_QUANTITY_OF_CONTAINERS,
                             S_PORT_OF_LOADING_POL,
@@ -2034,7 +1969,6 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
                             :FAROL_STATUS,
                             :P_STATUS,
                             :P_PDF_NAME,
-                            :S_SPLITTED_BOOKING_REFERENCE,
                             :S_PLACE_OF_RECEIPT,
                             :S_QUANTITY_OF_CONTAINERS,
                             :S_PORT_OF_LOADING_POL,
@@ -2065,7 +1999,6 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             # Snapshot oriundo do carrier - P_STATUS baseado no status real
             "P_STATUS": "Shipment Requested" if b_status == "New Request" else "Booking Requested",
             "P_PDF_NAME": None,
-            "S_SPLITTED_BOOKING_REFERENCE": rd.get("S_SPLITTED_BOOKING_REFERENCE"),
             "S_PLACE_OF_RECEIPT": rd.get("S_PLACE_OF_RECEIPT"),
             "S_QUANTITY_OF_CONTAINERS": rd.get("S_QUANTITY_OF_CONTAINERS"),
             "S_PORT_OF_LOADING_POL": rd.get("S_PORT_OF_LOADING_POL"),
@@ -2129,7 +2062,6 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Farol Reference": "FAROL_REFERENCE",
             "Booking": "B_BOOKING_REFERENCE",
             "Booking Reference": "B_BOOKING_REFERENCE", 
-            "Splitted Booking Reference": "S_SPLITTED_BOOKING_REFERENCE",
             "Carrier": "B_VOYAGE_CARRIER",
             "Voyage Carrier": "B_VOYAGE_CARRIER",
             "Voyage Code": "B_VOYAGE_CODE",
@@ -2227,13 +2159,6 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
                     else:
                         db_data[db_key] = value
                 else:
-                    if db_key == "S_SPLITTED_BOOKING_REFERENCE":
-                        try:
-                            val_str = str(value).strip()
-                            if not val_str or not val_str.startswith("FR_"):
-                                value = None
-                        except Exception:
-                            value = None
                     if db_key == "P_PDF_NAME" and isinstance(value, str):
                         value = value.strip()
                         if len(value) > 200:
@@ -2780,7 +2705,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         # 5. Prepare and execute the UPDATE on F_CON_SALES_BOOKING_DATA
         # Primeiro, buscar valores atuais para auditoria
         current_values_query = text("""
-            SELECT S_SPLITTED_BOOKING_REFERENCE, S_PLACE_OF_RECEIPT, S_QUANTITY_OF_CONTAINERS,
+            SELECT S_PLACE_OF_RECEIPT, S_QUANTITY_OF_CONTAINERS,
                    S_PORT_OF_LOADING_POL, S_PORT_OF_DELIVERY_POD, S_FINAL_DESTINATION,
                    B_BOOKING_REFERENCE, B_TRANSHIPMENT_PORT, B_TERMINAL, B_VESSEL_NAME,
                    B_VOYAGE_CODE, B_VOYAGE_CARRIER, B_DATA_DRAFT_DEADLINE, B_DATA_DEADLINE,
@@ -2795,7 +2720,7 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         
         main_update_fields = {"farol_reference": farol_reference, "FAROL_STATUS": "Booking Approved"}
         fields_to_propagate = [
-            "S_SPLITTED_BOOKING_REFERENCE", "S_PLACE_OF_RECEIPT", "S_QUANTITY_OF_CONTAINERS",
+            "S_PLACE_OF_RECEIPT", "S_QUANTITY_OF_CONTAINERS",
             "S_PORT_OF_LOADING_POL", "S_PORT_OF_DELIVERY_POD", "S_FINAL_DESTINATION",
             "B_BOOKING_REFERENCE", "B_TRANSHIPMENT_PORT", "B_TERMINAL", "B_VESSEL_NAME",
             "B_VOYAGE_CODE", "B_VOYAGE_CARRIER", "B_DATA_DRAFT_DEADLINE", "B_DATA_DEADLINE",
@@ -2859,9 +2784,8 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
         # Auditoria para campos alterados na aprovação
         if current_row:
             current_values = {
-                "S_SPLITTED_BOOKING_REFERENCE": current_row[0],
-                "S_PLACE_OF_RECEIPT": current_row[1],
-                "S_QUANTITY_OF_CONTAINERS": current_row[2],
+                "S_PLACE_OF_RECEIPT": current_row[0],
+                "S_QUANTITY_OF_CONTAINERS": current_row[1],
                 "S_PORT_OF_LOADING_POL": current_row[3],
                 "S_PORT_OF_DELIVERY_POD": current_row[4],
                 "S_FINAL_DESTINATION": current_row[5],
@@ -3286,7 +3210,6 @@ def get_return_carriers_by_adjustment_id(adjustment_id: str, conn=None) -> pd.Da
                 FAROL_STATUS,
                 P_STATUS,
                 P_PDF_NAME,
-                S_SPLITTED_BOOKING_REFERENCE,
                 S_PLACE_OF_RECEIPT,
                 S_QUANTITY_OF_CONTAINERS,
                 S_PORT_OF_LOADING_POL,

@@ -326,7 +326,6 @@ def get_available_references_for_relation(farol_reference=None):
                 SELECT ID, FAROL_REFERENCE, FAROL_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE FAROL_STATUS != 'Received from Carrier'
-                  AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
                   AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
                 ORDER BY ROW_INSERTED_DATE ASC
             """)
@@ -1245,7 +1244,6 @@ def exibir_history():
         "B_DATA_TRANSBORDO_ATD",
         "P_PDF_NAME",
         "PDF_BOOKING_EMISSION_DATE",
-        "S_SPLITTED_BOOKING_REFERENCE",
         "LINKED_REFERENCE",
         "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
         "B_DATA_ATRACACAO_ATB",
@@ -1511,7 +1509,6 @@ def exibir_history():
             "P_PDF_NAME": "PDF Name",
             "PDF_BOOKING_EMISSION_DATE": "PDF Booking Emission Date",
             "S_QUANTITY_OF_CONTAINERS": "Quantity of Containers",
-            "S_SPLITTED_BOOKING_REFERENCE": "Splitted Farol Reference",
             "B_VOYAGE_CODE": "Voyage Code",
             "B_VESSEL_NAME": "Vessel Name",
             "B_VOYAGE_CARRIER": "Carrier",
@@ -1598,38 +1595,7 @@ def exibir_history():
         
         # A ordenação de colunas foi movida para a função display_tab_content para centralizar a lógica.
 
-        # Deriva/Preenche a coluna "Splitted Farol Reference" quando a referência tem sufixo .n
-        try:
-            if "Splitted Farol Reference" not in df_processed.columns:
-                df_processed["Splitted Farol Reference"] = None
-            if "Farol Reference" in df_processed.columns:
-                refs_series = df_processed["Farol Reference"].astype(str)
-                has_suffix = refs_series.str.contains(r"\.\d+$", regex=True)
-
-                def _is_empty_split(val):
-                    if val is None:
-                        return True
-                    if isinstance(val, str):
-                        v = val.strip()
-                        return v == "" or v.upper() == "NULL"
-                    try:
-                        return pd.isna(val)
-                    except Exception:
-                        return False
-
-                mask_empty = df_processed["Splitted Farol Reference"].apply(_is_empty_split)
-                fill_mask = has_suffix & mask_empty
-                if fill_mask.any():
-                    df_processed.loc[fill_mask, "Splitted Farol Reference"] = df_processed.loc[fill_mask, "Farol Reference"]
-        except Exception:
-            pass
-        
-        
-
-
-        
-        # Aplica a formatação de ícones no Farol Status
-        df_processed = process_farol_status_for_display(df_processed)
+                # Aplica a formatação de ícones no Farol Status        df_processed = process_farol_status_for_display(df_processed)
 
         return df_processed
 
@@ -1755,7 +1721,6 @@ def exibir_history():
                 "Transbordo (ATD)",
                 "PDF Name",
                 "PDF Booking Emission Date",
-                "Splitted Farol Reference",
                 "Linked Reference",
             ]
             

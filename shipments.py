@@ -1800,9 +1800,6 @@ def exibir_shipments():
     # Ajusta nomes das colunas desabilitadas considerando renomeações para "Farol Reference"
     if rename_map:
         disabled_columns = [rename_map.get(col, col) for col in disabled_columns]
-    # Garante que Splitted Booking Reference esteja visível porém somente leitura
-    if "Splitted Booking Reference" not in disabled_columns:
-        disabled_columns.append("Splitted Booking Reference")
     # Garante que Carrier Returns e Carrier Returns Status sejam somente leitura
     if "Carrier Returns" not in disabled_columns:
         disabled_columns.append("Carrier Returns")
@@ -1816,9 +1813,6 @@ def exibir_shipments():
     df_udc = load_df_udc()
     column_config = drop_downs(df, df_udc)
     # Configuração explícita para exibir como texto somente leitura
-    column_config["Splitted Booking Reference"] = st.column_config.TextColumn(
-        "Splitted Farol Reference", width="medium", disabled=True
-    )
     # Configuração para Booking Reference (verifica ambos os nomes possíveis)
     if "Booking Reference" in df.columns:
         column_config["Booking Reference"] = st.column_config.TextColumn(

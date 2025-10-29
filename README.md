@@ -244,6 +244,17 @@ graph TD
     3.  A lógica para limpar o *flag* ao carregar um novo PDF foi reforçada, garantindo que a validação seja obrigatória para cada novo arquivo.
 - **Status**: ✅ **Resolvido**
 
+##### **Problema 8: Remoção da Coluna 'Splitted Farol Reference'**
+- **Sintoma**: A coluna 'Splitted Farol Reference' e sua lógica associada ainda estavam presentes no código, apesar de ter sido removida do banco de dados.
+- **Causa**: A coluna `S_SPLITTED_BOOKING_REFERENCE` foi removida do banco de dados, mas as referências a ela no código não foram totalmente eliminadas, causando inconsistências e potenciais erros.
+- **Solução**:
+    1.  Removida a coluna 'Splitted Farol Reference' da lista de colunas exibidas na aba "Request Timeline" em `history.py`.
+    2.  Removida a lógica de derivação e preenchimento da coluna 'Splitted Farol Reference' na função `process_dataframe` em `history.py`.
+    3.  Removida a coluna 'Splitted Farol Reference' da lista de ordenação desejada na função `display_tab_content` em `history.py`.
+    4.  Removidas todas as ocorrências de `S_SPLITTED_BOOKING_REFERENCE` e 'Splitted Farol Reference' dos arquivos `database.py`, `database_empresa.py` e `shipments_mapping.py`.
+    5.  Removida a configuração da coluna 'Splitted Farol Reference' em `shipments.py`.
+- **Status**: ✅ **Resolvido**
+
 #### 📊 **Fluxo de Aprovação de Booking**
 
 O fluxo de aprovação de um retorno de armador (PDF) foi redesenhado para oferecer maior controle e clareza ao usuário.
