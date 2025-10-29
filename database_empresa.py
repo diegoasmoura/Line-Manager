@@ -1916,6 +1916,7 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Booking": "B_BOOKING_REFERENCE",
             "Booking Reference": "B_BOOKING_REFERENCE", 
             "Splitted Booking Reference": "S_SPLITTED_BOOKING_REFERENCE",
+            "Carrier": "B_VOYAGE_CARRIER",
             "Voyage Carrier": "B_VOYAGE_CARRIER",
             "Voyage Code": "B_VOYAGE_CODE",
             "Vessel Name": "B_VESSEL_NAME",

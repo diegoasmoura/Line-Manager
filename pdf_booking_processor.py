@@ -2375,7 +2375,6 @@ def collect_voyage_monitoring_data(vessel_name, port_terminal_city, voyage_code=
         st.warning(f"⚠️ Erro na coleta de monitoramento (top-level): {str(e)}")
         import traceback
         print(f"collect_voyage_monitoring_data error (top-level): {traceback.format_exc()}")
-        st.info(f"DEBUG: collect_voyage_monitoring_data falhou com erro: {str(e)}")
 
 @st.cache_data(ttl=300)  # Cache com TTL de 5 minutos para permitir atualizações
 def load_ships_from_database():
@@ -3244,10 +3243,8 @@ def save_pdf_booking_data(validated_data):
             # Em caso de falha na checagem, prossegue sem bloquear
             pass
         # ====== Fim validação duplicidade ======
-        st.info(f"DEBUG: Chamando insert_return_carrier_from_ui com validated_data: {validated_data}")
         # Usa a função existente de inserção com status "Received from Carrier"
         success = insert_return_carrier_from_ui(validated_data, user_insert="PDF_PROCESSOR", status_override="Received from Carrier")
-        st.info(f"DEBUG: insert_return_carrier_from_ui retornou: {success}")
         
         if success[0]:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
