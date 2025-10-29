@@ -1170,6 +1170,7 @@ if has_ref_col and farol_reference:
 - **Status Exibido Inteligente (v3.9.4)**: Sistema gera status visuais baseados na origem dos registros com ícones descritivos (📋 Booking Request, 📄 PDF Document, 🛠️ Adjustment Request).
 
 #### 📅 Voyage Timeline
+- **Ordenação Cronológica**: Os cards de viagem são ordenados pela data de "Aprovado" (a data em que o registro foi vinculado na tabela de retornos), do mais recente para o mais antigo, garantindo que as viagens mais novas apareçam primeiro.
 - **Exibição do Histórico**: A tabela de histórico de monitoramento de uma viagem agora é exibida mesmo que haja apenas um registro. Anteriormente, a tabela só aparecia se houvesse mais de um registro.
 - **Expansível**: O histórico de cada viagem é apresentado dentro de um painel expansível (`expander`) para manter a interface limpa, mostrando o card principal com os dados mais recentes da viagem.
 - **Rastreamento de Origem**: Nova coluna "✍️ Origem" exibe se os dados foram coletados da API Ellox (`API`) ou preenchidos manualmente (`MANUAL`), posicionada na segunda coluna do resumo da viagem.

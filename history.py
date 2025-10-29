@@ -2467,14 +2467,20 @@ def exibir_history():
             df_monitoring_display = df_voyage_monitoring.copy()
 
             if not df_monitoring_display.empty:
+                # Assegura que 'aprovacao_date' é datetime para ordenação correta
+                df_monitoring_display['aprovacao_date'] = pd.to_datetime(df_monitoring_display.get('aprovacao_date'), errors='coerce')
+
                 # Agrupar por navio/viagem para identificar diferentes viagens
                 df_monitoring_display['navio_viagem'] = df_monitoring_display['navio'].astype(str) + " - " + df_monitoring_display['viagem'].astype(str)
-                
-                # Identificar viagens únicas
-                unique_voyages = df_monitoring_display['navio_viagem'].unique()
-                
-                # Para cada viagem única, mostrar o status atual
-                for i, voyage_key in enumerate(unique_voyages):
+
+                # Obter a data de aprovação mais recente para cada viagem
+                latest_approvals = df_monitoring_display.groupby('navio_viagem')['aprovacao_date'].max()
+
+                # Ordenar as viagens pela data de aprovação mais recente (do mais novo para o mais antigo)
+                unique_voyages_sorted = latest_approvals.sort_values(ascending=False).index.tolist()
+
+                # Para cada viagem única (já ordenada), mostrar o status atual
+                for i, voyage_key in enumerate(unique_voyages_sorted):
                     voyage_records = df_monitoring_display[df_monitoring_display['navio_viagem'] == voyage_key]
                     latest_record = voyage_records.iloc[0]  # Mais recente dessa viagem específica
                     
@@ -2782,7 +2788,7 @@ def exibir_history():
                                 st.dataframe(voyage_display, use_container_width=True, hide_index=True)
                         
                         # Separador visual entre viagens
-                        if i < len(unique_voyages) - 1:
+                        if i < len(unique_voyages_sorted) - 1:
                             st.markdown("---")
 
 
