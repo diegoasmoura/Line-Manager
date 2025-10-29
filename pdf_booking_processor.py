@@ -2685,9 +2685,9 @@ def display_pdf_validation_interface(processed_data):
         col1, col2 = st.columns(2)
         with col1:
             booking_reference = st.text_input(
-                "Booking Reference",
+                "**:green[Booking Reference]***",
                 value=processed_data.get("booking_reference", ""),
-                help="Referência do booking do armador"
+                help="Referência do booking do armador (obrigatório)"
             )
         with col2:
             _raw_qty = processed_data.get("quantity", 1)
@@ -2698,21 +2698,22 @@ def display_pdf_validation_interface(processed_data):
             if _qty < 1:
                 _qty = 1
             quantity = st.number_input(
-                "Quantity of Containers",
+                "**:green[Quantity of Containers]***",
                 min_value=1,
                 value=_qty,
-                help="Número de containers"
+                help="Número de containers (obrigatório)"
             )
         
         # Segunda linha: Nome do Navio, Carrier/Armador e Voyage
         col3, col4, col5 = st.columns(3)
         with col4:
             carrier = st.selectbox(
-                "Voyage Carrier",
+                "**:green[Voyage Carrier]***",
                 ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL", "OTHER"],
                 index=0 if processed_data["carrier"] == "GENERIC" else 
                       ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"].index(processed_data["carrier"]) 
-                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 8
+                      if processed_data["carrier"] in ["HAPAG-LLOYD", "MAERSK", "MSC", "CMA CGM", "COSCO", "EVERGREEN", "OOCL", "PIL"] else 8,
+                help="Armador da viagem (obrigatório)"
             )
         with col3:
             # Carregar navios do banco de dados
@@ -2738,31 +2739,31 @@ def display_pdf_validation_interface(processed_data):
                     vessel_index = 0
             
             vessel_name = st.selectbox(
-                "Vessel Name",
+                "**:green[Vessel Name]***",
                 options=ship_names,
                 index=vessel_index,
-                help="Selecione o navio da lista"
+                help="Selecione o navio da lista (obrigatório)"
             )
         with col5:
             voyage = st.text_input(
-                "Voyage Code",
+                "**:green[Voyage Code]***",
                 value=processed_data.get("voyage", ""),
-                help="Código da viagem"
+                help="Código da viagem (obrigatório)"
             )
         
         # Terceira linha: Porto de Origem (POL) e Porto de Destino (POD)
         col6, col7 = st.columns(2)
         with col6:
             pol = st.text_input(
-                "Port of Loading POL",
+                "**:green[Port of Loading POL]***",
                 value=processed_data.get("pol", ""),
-                help="Port of Loading"
+                help="Port of Loading (obrigatório)"
             )
         with col7:
             pod = st.text_input(
-                "Port of Delivery POD",
+                "**:green[Port of Delivery POD]***",
                 value=processed_data.get("pod", ""),
-                help="Port of Discharge"
+                help="Port of Discharge (obrigatório)"
             )
         # Linha adicional: Transhipment Port e Port Terminal City
         col6b, col7b = st.columns(2)
@@ -2787,10 +2788,10 @@ def display_pdf_validation_interface(processed_data):
                 terminal_index = 0
             
             port_terminal_city = st.selectbox(
-                "Port Terminal City",
+                "**:green[Port Terminal City]***",
                 options=terminals_data,
                 index=terminal_index,
-                help="Selecione o terminal da lista ou digite para buscar"
+                help="Selecione o terminal da lista (obrigatório)"
             )
         
         # Converte datas do formato DD/MM/YYYY para datetime
@@ -2854,9 +2855,9 @@ def display_pdf_validation_interface(processed_data):
         col10, col_spacer = st.columns([1, 1])
         with col10:
             pdf_print_date = st.text_input(
-                "PDF Print Date",
+                "**:green[PDF Print Date]***",
                 value=processed_data.get("pdf_print_date", ""),
-                help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC)"
+                help="Data e hora de emissão do PDF (formato: 2024-09-06 18:23 UTC) - obrigatório"
             )
         
         # Botão para consultar API (dentro do formulário, mas será executado condicionalmente)
@@ -3110,6 +3111,44 @@ def display_pdf_validation_interface(processed_data):
             cancelled = st.form_submit_button("❌ Cancelar", use_container_width=False)
         
         if submitted:
+            # Validação de campos obrigatórios
+            validation_errors = []
+            
+            if not booking_reference or not booking_reference.strip():
+                validation_errors.append("❌ **:green[Booking Reference]** é obrigatório")
+            
+            if not quantity or quantity < 1:
+                validation_errors.append("❌ **:green[Quantity of Containers]** deve ser maior que zero")
+            
+            if not vessel_name or not str(vessel_name).strip():
+                validation_errors.append("❌ **:green[Vessel Name]** é obrigatório")
+            
+            if not carrier or carrier == "" or carrier == "OTHER":
+                validation_errors.append("❌ **:green[Voyage Carrier]** é obrigatório (não pode ser OTHER vazio)")
+            
+            if not voyage or not voyage.strip():
+                validation_errors.append("❌ **:green[Voyage Code]** é obrigatório")
+            
+            if not pol or not pol.strip():
+                validation_errors.append("❌ **:green[Port of Loading POL]** é obrigatório")
+            
+            if not pod or not pod.strip():
+                validation_errors.append("❌ **:green[Port of Delivery POD]** é obrigatório")
+            
+            if not port_terminal_city or not str(port_terminal_city).strip():
+                validation_errors.append("❌ **:green[Port Terminal City]** é obrigatório")
+            
+            if not pdf_print_date or not pdf_print_date.strip():
+                validation_errors.append("❌ **:green[PDF Print Date]** é obrigatório")
+            
+            # Se houver erros de validação, exibir e impedir o salvamento
+            if validation_errors:
+                st.error("⚠️ **Campos obrigatórios não preenchidos:**")
+                for error in validation_errors:
+                    st.error(error)
+                st.info("📋 Por favor, preencha todos os campos obrigatórios (marcados com *) antes de salvar.")
+                return None  # Impede o salvamento
+            
             # Função helper para criar datetime a partir de date e time
             from datetime import datetime
             
@@ -3122,16 +3161,16 @@ def display_pdf_validation_interface(processed_data):
                 return None
             
             # Usar dados do formulário atual (já estão nas variáveis definidas acima)
-            booking_ref = booking_reference
+            booking_ref = booking_reference.strip()
             qty = quantity
             carrier_name = carrier
-            voyage_code = voyage
-            vessel_name_val = vessel_name
-            pol_port = pol
-            pod_port = pod
-            trans_port = transhipment_port
-            terminal_city = port_terminal_city
-            pdf_date = pdf_print_date
+            voyage_code = voyage.strip()
+            vessel_name_val = str(vessel_name).strip()
+            pol_port = pol.strip()
+            pod_port = pod.strip()
+            trans_port = transhipment_port.strip() if transhipment_port else ""
+            terminal_city = str(port_terminal_city).strip()
+            pdf_date = pdf_print_date.strip()
             
             # Prepara dados validados com campos mapeados corretamente para insert_return_carrier_from_ui
             validated_data = {
@@ -3166,12 +3205,6 @@ def display_pdf_validation_interface(processed_data):
             # Compatibilidade: alguns fluxos esperam a chave 'Terminal'
             if terminal_city:
                 validated_data["Terminal"] = terminal_city
-            
-            # Debug simples para verificar se chegou aqui
-            st.info("🔍 Dados preparados para salvamento")
-            st.write("Farol Reference:", validated_data["Farol Reference"])
-            st.write("Voyage Carrier:", validated_data["Voyage Carrier"])
-            st.write("Quantity:", validated_data["Quantity of Containers"])
             
             return validated_data
         
