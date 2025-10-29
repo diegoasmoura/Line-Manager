@@ -235,6 +235,15 @@ graph TD
 - **Solução**: Remoção de `st.rerun()` desnecessários; mensagens de `st.session_state` agora persistem; ordem de exibição ajustada para que spinners apareçam antes das mensagens de sucesso; mensagens de salvamento agora aparecem abaixo dos quadros expansíveis.
 - **Status**: ✅ **Resolvido**
 
+##### **Problema 7: Validação de API no Formulário PDF**
+- **Sintoma**: Usuário conseguia salvar o formulário de validação de PDF sem antes consultar a API de monitoramento de viagens.
+- **Causa**: A verificação do *flag* `api_was_consulted` era feita de forma ineficaz, permitindo que o fluxo de salvamento continuasse. O uso de `return None` dentro de um formulário do Streamlit não interrompia a execução como esperado.
+- **Solução**:
+    1.  A verificação do *flag* foi movida para o início do bloco de submissão.
+    2.  `st.stop()` foi utilizado para interromper completamente a execução se a API não tiver sido consultada.
+    3.  A lógica para limpar o *flag* ao carregar um novo PDF foi reforçada, garantindo que a validação seja obrigatória para cada novo arquivo.
+- **Status**: ✅ **Resolvido**
+
 #### 📊 **Fluxo de Aprovação de Booking**
 
 O fluxo de aprovação de um retorno de armador (PDF) foi redesenhado para oferecer maior controle e clareza ao usuário.

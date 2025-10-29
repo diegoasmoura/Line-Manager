@@ -2676,8 +2676,15 @@ def display_pdf_validation_interface(processed_data):
     # Armazenar dados no session_state quando necessário
     farol_reference = processed_data.get("farol_reference")
     
+    # Garantir que o flag de API consultada seja resetado quando a interface é exibida
+    # Isso garante que sempre exige consulta para novos PDFs
+    api_consulted_key = f"api_consulted_{farol_reference}"
+    
+    # Garantir que o flag NÃO exista se não foi realmente consultado nesta sessão de validação
+    # Mas só resetar se for um novo PDF - não resetar se já foi consultado
+    
     # FORMULÁRIO ÚNICO: Dados extraídos do PDF + Datas
-    with st.form("pdf_validation_form"):
+    with st.form(key=f"pdf_validation_form_{farol_reference}"):
         # Layout mais compacto e organizado (padronizado com demais telas)
         st.markdown("**📋 Validação de Booking**")
         
@@ -2929,9 +2936,14 @@ def display_pdf_validation_interface(processed_data):
                     save_to_db=True # Salvar no DB, pois é uma ação iniciada pelo usuário
                 )
             
-            # Armazenar o resultado no session_state
+            # Armazenar o resultado no session_state - SETAR O FLAG ANTES DO RERUN
             st.session_state[f"api_dates_{farol_reference}"] = api_result
-            st.session_state[f"api_consulted_{farol_reference}"] = True
+            # IMPORTANTE: Setar o flag de forma explícita e garantida
+            # O api_consulted_key já foi definido no início da função
+            st.session_state[api_consulted_key] = True
+            
+            # Garantir que o valor foi realmente setado (debug)
+            # st.write(f"DEBUG: Flag setado: {st.session_state.get(api_consulted_key, 'NÃO ENCONTRADO')}")
             
             # Atualizar processed_data para que as mensagens sejam exibidas corretamente
             processed_data["api_status"] = api_result["success"]
@@ -2944,6 +2956,7 @@ def display_pdf_validation_interface(processed_data):
             else:
                 st.error(api_result["message"])
             
+            # Rerun após setar o flag
             st.rerun()
         
         st.markdown("---")
@@ -3127,6 +3140,16 @@ def display_pdf_validation_interface(processed_data):
             cancelled = st.form_submit_button("❌ Cancelar", use_container_width=False)
         
         if submitted:
+            # SOLUÇÃO 1: Verificação robusta com st.stop()
+            # Imediatamente verifica se a API foi consultada antes de qualquer outra lógica.
+            check_api_key = f"api_consulted_{farol_reference}"
+            api_was_consulted = st.session_state.get(check_api_key, False)
+
+            if not api_was_consulted:
+                st.warning("⚠️ **É necessário consultar a API antes de salvar.**")
+                st.info("🔍 Por favor, clique no botão **'🔍 Consultar API para Datas'** para buscar os dados de monitoramento antes de continuar.")
+                st.stop()  # Para a execução completamente, impedindo o salvamento.
+
             # Validação de campos obrigatórios
             missing_fields = []
             
@@ -3401,6 +3424,15 @@ def display_pdf_booking_section(farol_reference):
         # Guarda o arquivo para uso posterior (salvar como anexo)
         st.session_state[f"booking_pdf_file_{farol_reference}"] = uploaded_pdf
         
+        # Resetar flag de API consultada quando um novo PDF é carregado
+        api_consulted_key = f"api_consulted_{farol_reference}"
+        if api_consulted_key in st.session_state:
+            del st.session_state[api_consulted_key]
+        # Também limpar dados de API anteriores
+        api_dates_key = f"api_dates_{farol_reference}"
+        if api_dates_key in st.session_state:
+            del st.session_state[api_dates_key]
+        
         # Processa o PDF automaticamente
         with st.spinner("Processando PDF... Extraindo dados..."):
             # Lê o conteúdo do PDF
@@ -3412,6 +3444,13 @@ def display_pdf_booking_section(farol_reference):
             if processed_data:
                 # Armazena os dados processados no session_state para validação
                 st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
+                
+                # Garantir que o flag de API consultada seja resetado ao processar um novo PDF
+                # Isso força a consulta da API antes de salvar
+                new_api_consulted_key = f"api_consulted_{farol_reference}"
+                if new_api_consulted_key in st.session_state:
+                    del st.session_state[new_api_consulted_key]
+                
                 st.rerun()
     
     # Interface de validação se há dados processados

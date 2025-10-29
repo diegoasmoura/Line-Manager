@@ -797,8 +797,14 @@ def display_attachments_section(farol_reference):
                         if processed_data:
                             # Limpar dados de navegação/API do PDF anterior (se existir)
                             # Isso garante que ao trocar de PDF, os campos sejam resetados
-                            if f"api_dates_{farol_reference}" in st.session_state:
-                                del st.session_state[f"api_dates_{farol_reference}"]
+                            api_dates_key = f"api_dates_{farol_reference}"
+                            if api_dates_key in st.session_state:
+                                del st.session_state[api_dates_key]
+                            
+                            # Garantir que o flag de consulta da API seja resetado
+                            api_consulted_key = f"api_consulted_{farol_reference}"
+                            if api_consulted_key in st.session_state:
+                                del st.session_state[api_consulted_key]
                             
                             # Armazena os dados processados no session_state para validação
                             st.session_state[f"processed_pdf_data_{farol_reference}"] = processed_data
