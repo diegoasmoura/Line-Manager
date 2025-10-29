@@ -2508,6 +2508,8 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
             WHERE FAROL_REFERENCE = :farol_reference
         """)
         current_row = conn.execute(current_values_query, {"farol_reference": farol_reference}).fetchone()
+        if current_row is None:
+            raise Exception(f"Farol Reference {farol_reference} not found in F_CON_SALES_BOOKING_DATA.")
         
         main_update_fields = {"farol_reference": farol_reference, "FAROL_STATUS": "Booking Approved"}
         fields_to_propagate = [
