@@ -2545,24 +2545,33 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                     pass
             main_update_fields["B_BOOKING_CONFIRMATION_DATE"] = pdf_emission_date
         for field in fields_to_propagate:
-            if field in row and row[field] is not None:
-                val = _normalize_value(row[field])
-                if val is None:
-                    continue
-                if isinstance(val, str) and val.strip() == "":
-                    continue
-                main_update_fields[field] = val
-            elif field == "B_DATA_DRAFT_DEADLINE":
-                # Preservar Draft Deadline manual existente se PDF não tem valor
-                # Não adicionar ao update se:
-                # 1. PDF não tem valor (row[field] is None ou vazio)
-                # 2. Já existe valor manual no banco (current_row[field] is not None)
-                if current_row and field in current_row:
-                    existing_value = current_row.get(field, None)
-                    if existing_value is not None:
-                        # Preservar valor manual existente
-                        main_update_fields[field] = existing_value
-                # Se não há valor existente e PDF não tem valor, não adicionar ao update
+            if field == "B_DATA_DRAFT_DEADLINE":
+                # Lógica especial para preservar Draft Deadline manual
+                pdf_has_value = False
+                if field in row and row[field] is not None:
+                    val = _normalize_value(row[field])
+                    if val is not None and not (isinstance(val, str) and val.strip() == ""):
+                        # PDF tem valor válido - usar ele (prioridade)
+                        main_update_fields[field] = val
+                        pdf_has_value = True
+                
+                # Se PDF não tem valor válido, preservar valor manual existente
+                if not pdf_has_value:
+                    if current_row and field in current_row:
+                        existing_value = current_row.get(field, None)
+                        if existing_value is not None:
+                            # Preservar valor manual existente
+                            main_update_fields[field] = existing_value
+                    # Se não há valor existente e PDF não tem valor, não adicionar ao update
+            else:
+                # Para outros campos, comportamento normal
+                if field in row and row[field] is not None:
+                    val = _normalize_value(row[field])
+                    if val is None:
+                        continue
+                    if isinstance(val, str) and val.strip() == "":
+                        continue
+                    main_update_fields[field] = val
 
         # Mapeamento especial: S_REQUIRED_ARRIVAL_DATE_EXPECTED (carriers) -> S_REQUIRED_ARRIVAL_DATE_EXPECTED (principal)
         if "S_REQUIRED_ARRIVAL_DATE_EXPECTED" in row and row["S_REQUIRED_ARRIVAL_DATE_EXPECTED"] is not None:
