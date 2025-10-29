@@ -747,7 +747,17 @@ def display_attachments_section(farol_reference):
         # Mantém o expander aberto quando o checkbox é alterado
         if process_booking_pdf:
             st.session_state[expander_key] = True
-        
+        else:
+            # Se o checkbox for desmarcado, limpar os dados processados do PDF
+            processed_data_key = f"processed_pdf_data_{farol_reference}"
+            if processed_data_key in st.session_state:
+                del st.session_state[processed_data_key]
+            if f"booking_pdf_file_{farol_reference}" in st.session_state:
+                del st.session_state[f"booking_pdf_file_{farol_reference}"]
+            # Também resetar o uploader para que o arquivo não apareça selecionado
+            st.session_state[f"uploader_booking_{farol_reference}_{current_uploader_version}"] = None
+            st.rerun() # Força um rerun para limpar a interface
+
         if process_booking_pdf:
             # Upload específico para PDFs de Booking
             uploaded_file = st.file_uploader(
