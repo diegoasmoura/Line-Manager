@@ -2108,16 +2108,47 @@ def exibir_history():
 
 
 
-            if approval_step:
-                st.write("")
-                st.write("")
-                            if st.session_state.get(f"approval_step_{farol_reference}") == "select_adjustment_type":                st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
-                st.markdown("<p style='text-align: left;'>This carrier return, documented in the PDF, refers to:</p>", unsafe_allow_html=True)
-                adjustment_type = st.radio(
-                    "Select one of the options below:",
-                    ("An adjustment request made by our company.", "A new/external adjustment initiated by the carrier itself."),
-                    key=f"adjustment_type_{farol_reference}",
-                    label_visibility="collapsed"
+                        if approval_step:
+
+
+
+                            st.write("")
+
+
+
+                            st.write("")
+
+
+
+                        if st.session_state.get(f"approval_step_{farol_reference}") == "select_adjustment_type":
+
+
+
+                            st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
+
+
+
+                            st.markdown("<p style='text-align: left;'>This carrier return, documented in the PDF, refers to:</p>", unsafe_allow_html=True)
+
+
+
+                            adjustment_type = st.radio(
+
+
+
+                                "Select one of the options below:",
+
+
+
+                                ("An adjustment request made by our company.", "A new/external adjustment initiated by the carrier itself."),
+
+
+
+                                key=f"adjustment_type_{farol_reference}",
+
+
+
+                                label_visibility="collapsed"
                 )
 
                 if st.button("Continue", key=f"continue_adjustment_type_{farol_reference}"):
