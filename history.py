@@ -2377,7 +2377,34 @@ def exibir_history():
                 with st.form(key=f"external_adjustment_form_{farol_reference}"):
                     st.info("This is a carrier adjustment without a prior request from the company.")
                     reason = st.selectbox("Booking Adjustment Request Reason", options=[""] + Booking_adj_reason_car)
-                    responsibility = st.selectbox("Booking Adjustment Responsibility", options=[""] + Booking_adj_responsibility_car)
+                    
+                    # Para ajuste externo, sempre usar "Armador" e desabilitar
+                    responsibility_options = [""] + Booking_adj_responsibility_car
+                    # Tentar encontrar "Armador" na lista (case-insensitive)
+                    default_responsibility = "Armador"
+                    default_index = 0  # Se não encontrar, usa o primeiro (vazio)
+                    if "Armador" in responsibility_options:
+                        default_index = responsibility_options.index("Armador")
+                    else:
+                        # Buscar case-insensitive
+                        for i, opt in enumerate(responsibility_options):
+                            if str(opt).strip().upper() == "ARMADOR":
+                                default_index = i
+                                default_responsibility = opt
+                                break
+                    
+                    responsibility = st.selectbox(
+                        "Booking Adjustment Responsibility",
+                        options=responsibility_options,
+                        index=default_index,
+                        disabled=True,
+                        help="Responsabilidade fixa em 'Armador' para ajustes externos do armador"
+                    )
+                    
+                    # Garantir que sempre use "Armador" (ou o valor encontrado)
+                    if responsibility == "":
+                        responsibility = default_responsibility
+                    
                     comment = st.text_area("Comments")
                     
                     col1, col2 = st.columns(2)
