@@ -19,6 +19,7 @@ Sistema completo de gerenciamento de embarques marítimos com interface web intu
 - [Boas Práticas](#-boas-práticas---identificação-de-carriers)
 - [Boas Práticas - Coleta de Hora Atual](#-boas-práticas---coleta-de-hora-atual)
 - [Padronização de Campos](#-padronização-de-campos)
+- [Changelog](#-changelog)
 - [Contribuição](#-contribuição)
 - [Suporte](#-suporte)
 
@@ -4808,3 +4809,24 @@ terminal_options = list_terminal_names() or []
 - **Fonte Única**: Dados sempre atualizados da tabela oficial
 - **Experiência do Usuário**: Interface uniforme e intuitiva
 - **Manutenibilidade**: Configuração centralizada no `shipments_mapping.py`
+
+## 📝 Changelog
+
+### [v3.2.1] - 2024-12-19
+
+#### 🐛 Correções de Bugs
+- **Corrigido erro KeyError "Booking Status"**: Resolvido problema onde a coluna "Booking Status" não aparecia nos stages "Booking Management" e "General View"
+  - Adicionado campo `FAROL_STATUS AS farol_status` na query SQL da função `get_data_bookingData()`
+  - Adicionado campo `FAROL_STATUS AS farol_status` na query SQL da função `get_data_generalView()`
+  - Corrigido mapeamento de colunas para garantir que "Booking Status" seja exibida corretamente
+
+#### 🔧 Melhorias Técnicas
+- **Correção de indentação no History**: Corrigido problema na seção "Adjustment Type" que não aparecia ao clicar em "Booking Approved"
+  - Removido código desnecessário com variável `approval_step` indefinida
+  - Corrigida indentação do bloco de verificação do `approval_step` para fora do bloco `confirm_status_key`
+  - Garantido que a seção "Adjustment Type" seja exibida corretamente após clicar em "Booking Approved"
+
+#### 📋 Detalhes Técnicos
+- **Arquivos modificados**: `database.py`, `history.py`
+- **Funções afetadas**: `get_data_bookingData()`, `get_data_generalView()`, `exibir_history()`
+- **Impacto**: Correção de erros críticos que impediam o funcionamento correto dos stages Booking Management e General View
