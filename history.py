@@ -1795,8 +1795,10 @@ def exibir_history():
             "Requested Deadline End",
             "Required Sail Date",
             "Required Arrival Date",
+            "Draft Deadline",
             "Deadline",
             "Abertura Gate",
+            "Confirmação Embarque",
             "ETD",
             "ETA",
             "Estimativa Atracação (ETB)",
@@ -1883,8 +1885,10 @@ def exibir_history():
             "Requested Deadline End",
             "Required Sail Date",
             "Required Arrival Date",
+            "Draft Deadline",
             "Deadline",
             "Abertura Gate",
+            "Confirmação Embarque",
             "ETD",
             "ETA",
             "Estimativa Atracação (ETB)",
@@ -2005,8 +2009,8 @@ def exibir_history():
                         # Cores laranja claro para retornos de carrier
                         styles[col_idx] = 'background-color: #FFE0B2; border: 2px solid #FF9800;'
                     else:
-                        # Cores amarelas para New Adjustment
-                        styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
+                        # Cores verde claro para New Adjustment
+                        styles[col_idx] = 'background-color: #C8E6C9; border: 2px solid #4CAF50;'
             
             return styles
         
@@ -2070,8 +2074,8 @@ def exibir_history():
                         # Cores laranja claro para retornos de carrier
                         styles[col_idx] = 'background-color: #FFE0B2; border: 2px solid #FF9800;'
                     else:
-                        # Cores amarelas para New Adjustment
-                        styles[col_idx] = 'background-color: #FFF9C4; border: 2px solid #FFD54F;'
+                        # Cores verde claro para New Adjustment
+                        styles[col_idx] = 'background-color: #C8E6C9; border: 2px solid #4CAF50;'
             
             return styles
         
