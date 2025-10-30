@@ -1470,15 +1470,12 @@ def exibir_history():
                 config[col] = None
                 continue
             
-            # Larguras específicas para colunas específicas
-            # Identifica a última coluna (excluindo colunas ocultas)
-            visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Index", "Status"] and not (c == "Linked Reference" and hide_linked_reference)]
-            is_last_column = col == visible_columns[-1] if visible_columns else False
-            
-            if is_last_column:
-                width = None  # Largura automática para última coluna
-            else:
-                width = "medium"  # Todas as outras colunas são medium
+            # Lógica de largura explícita para corrigir o corte de texto
+            width = "medium"  # Largura padrão
+            if col in ['PDF Name', 'Linked Reference', 'Adjustments Owner']:
+                width = "large"
+            elif col in ['Index', 'Quantity of Containers']:
+                width = "small"
             
             # Determina o tipo de coluna baseado no nome
             if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate", "atd", "ata", "etb", "atb", "required", "arrival", "expected"]):
@@ -1486,7 +1483,12 @@ def exibir_history():
             elif col in ["Quantity of Containers"]:
                 config[col] = st.column_config.NumberColumn(col, width=width)
             else:
-                config[col] = st.column_config.TextColumn(col, width=width)
+                # Para a última coluna visível, deixamos a largura automática para preencher o espaço restante
+                visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Index", "Status"] and not (c == "Linked Reference" and hide_linked_reference)]
+                is_last_column = col == visible_columns[-1] if visible_columns else False
+                
+                final_width = None if is_last_column else width
+                config[col] = st.column_config.TextColumn(col, width=final_width)
                 
         return config
 
@@ -2140,23 +2142,22 @@ def exibir_history():
         else:
             styled_df = df_to_check
         
-        # Configuração básica da coluna Index
-        column_config = {
-            "Index": st.column_config.NumberColumn(
-                "Index", 
-                help="Índice da linha", 
-                width=50,  # Largura fixa em pixels
-                disabled=True,
-                format="%d"
-            )
-        }
+        # A configuração dinâmica já foi gerada acima.
+        # Agora, adicionamos a configuração específica para a coluna "Index" a ela.
+        column_config["Index"] = st.column_config.NumberColumn(
+            "Index", 
+            help="Índice da linha", 
+            width="small",  # Usar "small" para consistência com a lógica de generate_dynamic_column_config
+            disabled=True,
+            format="%d"
+        )
         
         # Usar st.dataframe com o DataFrame (estilizado ou normal)
         st.dataframe(
             styled_df,
             use_container_width=True,
             hide_index=True,
-            column_config=column_config,
+            column_config=column_config, # Agora 'column_config' contém todas as configurações
             key=f"history_unified_{farol_reference}"
         )
         
