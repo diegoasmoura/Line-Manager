@@ -23,8 +23,11 @@ import base64
 import mimetypes
 import uuid
 from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
-from history_components import display_attachments_section as display_attachments_section_component
-from history_helpers import format_linked_reference_display
+from history_components import (
+    display_attachments_section as display_attachments_section_component,
+    render_metrics_header
+)
+from history_helpers import format_linked_reference_display, convert_utc_to_brazil_time
 
 # Carrega dados da UDC para justificativas
 df_udc = load_df_udc()
@@ -103,34 +106,9 @@ def update_missing_linked_references():
 
 def exibir_history():
     import pandas as pd
-    import pytz
     from datetime import datetime
     
-    def convert_utc_to_brazil_time(utc_timestamp):
-        """Converte timestamp do banco para horário local do Brasil"""
-        if utc_timestamp is None:
-            return None
-        
-        try:
-            # Se já é timezone-aware, assumir que é UTC
-            if hasattr(utc_timestamp, 'tzinfo') and utc_timestamp.tzinfo is not None:
-                # Se tem timezone UTC, converter para Brasil
-                if str(utc_timestamp.tzinfo) == 'UTC' or str(utc_timestamp.tzinfo) == 'tzutc()':
-                    brazil_tz = pytz.timezone('America/Sao_Paulo')
-                    brazil_dt = utc_timestamp.astimezone(brazil_tz)
-                    return brazil_dt
-                else:
-                    # Se já tem outro timezone, retornar como está
-                    return utc_timestamp
-            else:
-                # Se é naive, assumir que JÁ ESTÁ no horário local do Brasil
-                # (o banco Oracle armazena no horário local)
-                brazil_tz = pytz.timezone('America/Sao_Paulo')
-                brazil_dt = brazil_tz.localize(utc_timestamp)
-                return brazil_dt
-            
-        except Exception:
-            return utc_timestamp  # Retorna original se houver erro
+    # convert_utc_to_brazil_time removido - agora importado de history_helpers.py
     
     st.header("📜 Return Carriers History")
 
@@ -234,83 +212,14 @@ def exibir_history():
         qty = 0
         ins = "-"
     
-    # Layout em uma linha com 5 colunas
-    col1, col2, col3, col4, col5 = st.columns(5, gap="small")
-    
-    with col1:
-        st.markdown(f"""
-        <div style="
-            background: white;
-            padding: 1rem;
-            border-radius: 12px;
-            border-left: 4px solid #00843D;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        ">
-            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL REFERENCE</div>
-            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{farol_reference}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div style="
-            background: white;
-            padding: 1rem;
-            border-radius: 12px;
-            border-left: 4px solid #3599B8;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        ">
-            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">FAROL STATUS</div>
-            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{main_status}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div style="
-            background: white;
-            padding: 1rem;
-            border-radius: 12px;
-            border-left: 4px solid #4AC5BB;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        ">
-            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">QUANTITY OF CONTAINERS</div>
-            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{qty}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-        <div style="
-            background: white;
-            padding: 1rem;
-            border-radius: 12px;
-            border-left: 4px solid #168980;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        ">
-            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">VOYAGE CARRIER</div>
-            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{voyage_carrier}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col5:
-        st.markdown(f"""
-        <div style="
-            background: white;
-            padding: 1rem;
-            border-radius: 12px;
-            border-left: 4px solid #28738A;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        ">
-            <div style="color: #03441F; font-size: 0.75rem; margin-bottom: 0.3rem; font-weight: 500;">INSERTED</div>
-            <div style="color: #001A33; font-size: 1rem; font-weight: 600;">{ins}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Renderiza cards de métricas usando componente
+    render_metrics_header(
+        farol_reference=farol_reference,
+        main_status=main_status,
+        qty=qty,
+        voyage_carrier=voyage_carrier,
+        inserted=ins
+    )
 
     st.markdown("---")
 
@@ -577,45 +486,7 @@ def exibir_history():
         if "voyage_success_notice" in st.session_state:
             del st.session_state["voyage_success_notice"]
 
-    # Função para aplicar mudanças de status (declarada antes do uso)
-    def apply_status_change(farol_ref, adjustment_id, new_status, selected_row_status=None, related_reference=None, area=None, reason=None, responsibility=None, comment=None):
-        try:
-            if new_status == "Booking Approved" and selected_row_status == "Received from Carrier":
-                # A validação de voyage monitoring agora é feita no botão "Booking Approved"
-                # Esta função só executa a aprovação final
-                
-                # Se chegou até aqui, prosseguir com aprovação normal
-                justification = {
-                    "area": area,
-                    "request_reason": reason,
-                    "adjustments_owner": responsibility,
-                    "comments": comment
-                }
-                result = approve_carrier_return(adjustment_id, related_reference, justification)
-                if result:
-                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval successful!"}
-                    st.cache_data.clear()
-                    st.rerun()
-                else:
-                    st.error("❌ Falha ao aprovar. Verifique os campos e tente novamente.")
-                return
-            elif new_status in ["Booking Rejected", "Booking Cancelled", "Adjustment Requested"]:
-                result = update_record_status(adjustment_id, new_status)
-                if result:
-                    st.session_state["history_flash"] = {"type": "success", "msg": f"✅ Status atualizado para '{new_status}'."}
-                    st.cache_data.clear()
-                    st.rerun()
-                else:
-                    st.error("❌ Não foi possível atualizar o status.")
-                return
-            else:
-                st.warning(f"Status change to '{new_status}' is not handled by this logic yet.")
-        except Exception as e:
-            st.error(f"❌ Erro inesperado ao aplicar alteração: {str(e)}")
-    
-    
-    # Seção antiga de botões removida - agora integrada na seção do selectbox acima
-    # Toda a lógica foi movida para dentro da seção do selectbox na aba unificada
+    # apply_status_change removida - lógica de aprovação migrada para render_approval_panel_component em history_components.py
 
     # Atualizar seção de Export CSV para usar apenas o DataFrame unificado
     if edited_df_unified is not None and not edited_df_unified.empty:
