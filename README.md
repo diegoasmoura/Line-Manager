@@ -4131,6 +4131,29 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.9 - Janeiro 2025 - Filtro Exato de Referência na Request Timeline**
+
+**🐛 Correção de Bug:**
+
+#### **Problema Resolvido: Splits Aparecendo na Request Timeline da Referência Principal**
+- ✅ **Filtro exato**: Removida a condição `LIKE` que incluía splits automaticamente na query `get_return_carriers_by_farol`
+- ✅ **Isolamento de referências**: Cada referência (principal ou split) agora tem sua própria Request Timeline isolada
+- ✅ **Comportamento esperado**: Quando selecionado `FR_25.10_0001`, mostra apenas registros com essa referência exata, não inclui `FR_25.10_0001.1`
+
+**📁 Arquivos Modificados:**
+- `database.py`: 
+  - Removida condição `OR UPPER(FAROL_REFERENCE) LIKE UPPER(:ref || '.%')` da query SQL
+  - Agora usa apenas comparação exata: `WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)`
+- `database_empresa.py`: 
+  - Mesma correção aplicada para manter consistência
+
+**🔍 Detalhes Técnicos:**
+- **Antes**: Query incluía referência exata E todos os splits (ex: `FR_25.10_0001` incluía `FR_25.10_0001.1`, `FR_25.10_0001.2`, etc.)
+- **Agora**: Query retorna apenas registros com a referência exata selecionada
+- Cada split (`FR_25.10_0001.1`, `FR_25.10_0001.2`) terá sua própria Request Timeline independente quando selecionado
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.8 - Janeiro 2025 - Correção de Compatibilidade com Formatos Antigos de LINKED_REFERENCE**
 
 **🐛 Correção de Bug:**

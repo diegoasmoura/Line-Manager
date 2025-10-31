@@ -392,8 +392,8 @@ def get_return_carriers_by_farol(farol_reference: str) -> pd.DataFrame:
                             ADJUSTMENTS_OWNER,
                             COMMENTS,
                             ELLOX_MONITORING_ID
-                        FROM LogTransp.F_CON_RETURN_CARRIERS            WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
-               OR UPPER(FAROL_REFERENCE) LIKE UPPER(:ref || '.%')
+                        FROM LogTransp.F_CON_RETURN_CARRIERS
+            WHERE UPPER(FAROL_REFERENCE) = UPPER(:ref)
             ORDER BY ROW_INSERTED_DATE DESC
             """
         )
