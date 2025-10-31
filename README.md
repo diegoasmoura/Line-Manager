@@ -4131,6 +4131,29 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.10 - Janeiro 2025 - Campos Desabilitados no Formulário de Booking**
+
+**🎯 Melhoria de UX:**
+
+#### **Campos Somente Leitura no Formulário New Booking**
+- ✅ **DTHC**: Campo agora é somente leitura (desabilitado) no formulário de criação de booking
+- ✅ **Requested Shipment Week**: Campo agora é somente leitura (desabilitado) no formulário de criação de booking
+- ✅ **Quantity of Containers**: Campo agora é somente leitura (desabilitado) no formulário de criação de booking
+- ✅ **Consistência**: Esses campos continuam visíveis e exibem os valores corretos, mas não podem ser editados diretamente no formulário
+
+**📁 Arquivos Modificados:**
+- `booking_new.py`: 
+  - Adicionado `disabled=True` ao campo `st.selectbox("DTHC", ...)`
+  - Adicionado `disabled=True` ao campo `st.number_input("Requested Shipment Week", ...)`
+  - Adicionado `disabled=True` ao campo `st.number_input("Quantity of Containers", ...)`
+
+**🔍 Detalhes Técnicos:**
+- Os campos continuam sendo lidos dos dados de Sales (vindos de `booking_data`)
+- Os valores são exibidos corretamente no formulário, mas não podem ser alterados
+- Isso garante consistência de dados, evitando que esses campos sejam modificados incorretamente durante a criação de booking
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.9 - Janeiro 2025 - Filtro Exato de Referência na Request Timeline**
 
 **🐛 Correção de Bug:**

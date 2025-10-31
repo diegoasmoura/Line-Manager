@@ -126,14 +126,14 @@ def show_booking_management_form():
             current_dthc = booking_data.get("dthc", "") or ""
             dthc_with_blank = [""] + dthc_options
             selected_dthc_index = dthc_with_blank.index(current_dthc) if current_dthc in dthc_with_blank else 0
-            values["s_dthc_prepaid"] = st.selectbox("DTHC", dthc_with_blank, index=selected_dthc_index)
+            values["s_dthc_prepaid"] = st.selectbox("DTHC", dthc_with_blank, index=selected_dthc_index, disabled=True)
         with col_week:
             current_week = booking_data.get("requested_shipment_week", "") or ""
             try:
                 week_value = int(current_week) if current_week else 1
             except (ValueError, TypeError):
                 week_value = 1
-            values["s_requested_shipment_week"] = st.number_input("Requested Shipment Week", min_value=1, max_value=53, step=1, value=week_value)
+            values["s_requested_shipment_week"] = st.number_input("Requested Shipment Week", min_value=1, max_value=53, step=1, value=week_value, disabled=True)
         # A terceira coluna fica vazia para manter o alinhamento
 
         # Segunda linha: Quantity, Cut off Start, Cut off End
@@ -144,7 +144,7 @@ def show_booking_management_form():
                 qty_value = int(current_qty) if current_qty else 0
             except (ValueError, TypeError):
                 qty_value = 0
-            values["s_quantity_of_containers"] = st.number_input("Quantity of Containers", min_value=0, step=1, value=qty_value)
+            values["s_quantity_of_containers"] = st.number_input("Quantity of Containers", min_value=0, step=1, value=qty_value, disabled=True)
         with col2:
             st.text_input("Requested Deadline Start Date", value=format_date_only(booking_data.get("requested_cut_off_start_date", "")), disabled=True)
         with col3:
