@@ -1574,7 +1574,7 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                             confirm_status_key = f"confirm_status_change_{farol_reference}"
                             if confirm_status_key in st.session_state:
                                 del st.session_state[confirm_status_key]
-                            st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
+                            st.session_state[f"approval_step_{farol_reference}"] = "select_internal_reference"
                             st.session_state[f"selected_row_for_approval_{farol_reference}"] = selected_row
                             st.session_state[f"adjustment_id_for_approval_{farol_reference}"] = adjustment_id
                             st.rerun()
@@ -1626,25 +1626,7 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                         st.rerun()
 
             # Verificação do approval_step para exibir seções de aprovação
-            if st.session_state.get(f"approval_step_{farol_reference}") == "select_adjustment_type":
-                st.markdown("<h4 style='text-align: left;'>Adjustment Type</h4>", unsafe_allow_html=True)
-                st.markdown("<p style='text-align: left;'>This carrier return, documented in the PDF, refers to:</p>", unsafe_allow_html=True)
-                
-                adjustment_type = st.radio(
-                    "Select one of the options below:",
-                    ("An adjustment request made by our company.", "A new/external adjustment initiated by the carrier itself."),
-                    key=f"adjustment_type_{farol_reference}",
-                    label_visibility="collapsed"
-                )
-
-                if st.button("Continue", key=f"continue_adjustment_type_{farol_reference}"):
-                    if adjustment_type == "An adjustment request made by our company.":
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_internal_reference"
-                    else: # "A new/external adjustment initiated by the carrier itself."
-                        st.session_state[f"approval_step_{farol_reference}"] = "external_adjustment_form"
-                    st.rerun()
-
-            elif st.session_state.get(f"approval_step_{farol_reference}") == "select_internal_reference":
+            if st.session_state.get(f"approval_step_{farol_reference}") == "select_internal_reference":
                 st.markdown("<h4 style='text-align: left;'>Related Reference</h4>", unsafe_allow_html=True)
                 
                 # Get available references for relation
@@ -1733,101 +1715,17 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                         "comments": comment if comment else ""
                     }
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
-                        if selected_ref != "Select a reference...":
-                            # Tratar opção especial "Changed by Carrier"
-                            if selected_ref == "🆕 Changed by Carrier":
-                                # Validar campos obrigatórios
-                                if not justification.get("request_reason"):
-                                    st.error("The 'Adjustment Request Reason' field is mandatory for New Adjustment.")
-                                else:
-                                    related_reference = "New Adjustment"
-                                    # Call approval function com justification
-                                    result = approve_carrier_return(adjustment_id, related_reference, justification)
-                                    if result:
-                                        st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
-                                        st.session_state.pop(f"approval_step_{farol_reference}", None)
-                                        st.cache_data.clear()
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ Failed to approve.")
+                if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
+                    if selected_ref != "Select a reference...":
+                        # Tratar opção especial "Changed by Carrier"
+                        if selected_ref == "🆕 Changed by Carrier":
+                            # Validar campos obrigatórios
+                            if not justification.get("request_reason"):
+                                st.error("The 'Adjustment Request Reason' field is mandatory for New Adjustment.")
                             else:
-                                # Montar formato: "Index X | 29-10-2025"
-                                # 1. Extrair Index do carrier return selecionado
-                                selected_pdf = st.session_state.get(f"pdf_approval_select_{farol_reference}", "")
-                                index_part = ""
-                                if selected_pdf and "|" in selected_pdf:
-                                    # selected_pdf formato: "Index 3 | 29/10/2025 14:59"
-                                    pdf_parts = selected_pdf.split("|")
-                                    if len(pdf_parts) > 0:
-                                        index_part = pdf_parts[0].strip()  # "Index 3"
-                                
-                                # 2. Extrair ID da referência interna selecionada
-                                ref_id = None
-                                if "|" in selected_ref:
-                                    # Recuperar available_refs do session_state
-                                    available_refs_for_id = st.session_state.get(f"available_refs_{farol_reference}", [])
-                                    
-                                    # Buscar o registro correspondente em available_refs para obter o ID
-                                    ref_parts = [p.strip() for p in selected_ref.split("|")]
-                                    farol_ref_part = ref_parts[0] if len(ref_parts) > 0 else ""
-                                    
-                                    # Encontrar o registro correspondente em available_refs
-                                    for ref in available_refs_for_id:
-                                        if ref.get('FAROL_REFERENCE') == farol_ref_part:
-                                            ref_id = ref.get('ID')
-                                            break
-                                
-                                # 3. Extrair data e hora da referência interna (pode estar na posição 2 ou 3 dependendo do formato)
-                                date_time_part = ""
-                                if "|" in selected_ref:
-                                    ref_parts = [p.strip() for p in selected_ref.split("|")]
-                                    # A data pode estar na última posição ou na terceira
-                                    if len(ref_parts) >= 3:
-                                        # Extrair data e hora completa
-                                        date_str = ref_parts[2]  # "31/10/2025 00:43" ou "31/10/2025"
-                                        # Formatar data e hora: "DD-MM-YYYY HH:MM"
-                                        if " " in date_str:
-                                            date_only, time_only = date_str.split(" ", 1)
-                                            date_formatted = date_only.replace("/", "-")
-                                            # Pegar apenas HH:MM da hora
-                                            time_formatted = time_only.split(":")[:2]
-                                            if len(time_formatted) == 2:
-                                                date_time_part = f"{date_formatted} {time_formatted[0]}:{time_formatted[1]}"
-                                            else:
-                                                date_time_part = date_formatted
-                                        else:
-                                            date_time_part = date_str.replace("/", "-")
-                                    elif len(ref_parts) >= 2:
-                                        # Se não houver terceira parte, tenta a segunda
-                                        date_str = ref_parts[1]
-                                        # Verifica se é uma data (contém / ou -)
-                                        if "/" in date_str or "-" in date_str:
-                                            if " " in date_str:
-                                                date_only, time_only = date_str.split(" ", 1)
-                                                date_formatted = date_only.replace("/", "-")
-                                                time_formatted = time_only.split(":")[:2]
-                                                if len(time_formatted) == 2:
-                                                    date_time_part = f"{date_formatted} {time_formatted[0]}:{time_formatted[1]}"
-                                                else:
-                                                    date_time_part = date_formatted
-                                            else:
-                                                date_time_part = date_str.replace("/", "-")
-                                
-                                # 4. Montar related_reference no formato: "ID | Index X | DD-MM-YYYY HH:MM"
-                                # Se tiver ID, incluir no formato para facilitar verificação
-                                if ref_id and index_part and date_time_part:
-                                    related_reference = f"ID{ref_id} | {index_part} | {date_time_part}"
-                                elif index_part and date_time_part:
-                                    related_reference = f"{index_part} | {date_time_part}"
-                                else:
-                                    # Fallback: usar selected_ref completo se não conseguir montar
-                                    related_reference = selected_ref
-                                
-                                # Call approval function sem justification (apenas para referências vinculadas)
-                                result = approve_carrier_return(adjustment_id, related_reference, {})
+                                related_reference = "New Adjustment"
+                                # Call approval function com justification
+                                result = approve_carrier_return(adjustment_id, related_reference, justification)
                                 if result:
                                     st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
                                     st.session_state.pop(f"approval_step_{farol_reference}", None)
@@ -1836,74 +1734,87 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                                 else:
                                     st.error("❌ Failed to approve.")
                         else:
-                            st.warning("Please select a reference.")
-                with col2:
-                    if st.button("Back", key=f"back_to_adjustment_type_{farol_reference}"):
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
-                        st.rerun()
-
-            elif st.session_state.get(f"approval_step_{farol_reference}") == "external_adjustment_form":
-                st.markdown("<h4 style='text-align: left;'>New External Adjustment</h4>", unsafe_allow_html=True)
-                with st.form(key=f"external_adjustment_form_{farol_reference}"):
-                    st.info("This is a carrier adjustment without a prior request from the company.")
-                    reason = st.selectbox("Adjustment Request Reason", options=[""] + Booking_adj_reason_car)
-                    
-                    # Para ajuste externo, sempre usar "Armador" e desabilitar
-                    responsibility_options = [""] + Booking_adj_responsibility_car
-                    # Tentar encontrar "Armador" na lista (case-insensitive)
-                    default_responsibility = "Armador"
-                    default_index = 0  # Se não encontrar, usa o primeiro (vazio)
-                    if "Armador" in responsibility_options:
-                        default_index = responsibility_options.index("Armador")
-                    else:
-                        # Buscar case-insensitive
-                        for i, opt in enumerate(responsibility_options):
-                            if str(opt).strip().upper() == "ARMADOR":
-                                default_index = i
-                                default_responsibility = opt
-                                break
-                    
-                    responsibility = st.selectbox(
-                        "Adjustment Responsibility",
-                        options=responsibility_options,
-                        index=default_index,
-                        disabled=True,
-                        help="Responsabilidade fixa em 'Armador' para ajustes externos do armador"
-                    )
-                    
-                    # Garantir que sempre use "Armador" (ou o valor encontrado)
-                    if responsibility == "":
-                        responsibility = default_responsibility
-                    
-                    comment = st.text_area("Comments")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        submitted = st.form_submit_button("Confirm Approval")
-                    with col2:
-                        back_clicked = st.form_submit_button("Back")
-
-                    if back_clicked:
-                        st.session_state[f"approval_step_{farol_reference}"] = "select_adjustment_type"
-                        st.rerun()
-
-                    if submitted:
-                        if not reason:
-                            st.error("The 'Adjustment Request Reason' field is mandatory.")
-                        else:
-                            justification = {
-                                "area": "Booking",
-                                "request_reason": reason,
-                                "adjustments_owner": responsibility,
-                                "comments": comment
-                            }
-                            result = approve_carrier_return(adjustment_id, "New Adjustment", justification)
+                            # Montar formato: "Index X | 29-10-2025"
+                            # 1. Extrair Index do carrier return selecionado
+                            selected_pdf = st.session_state.get(f"pdf_approval_select_{farol_reference}", "")
+                            index_part = ""
+                            if selected_pdf and "|" in selected_pdf:
+                                # selected_pdf formato: "Index 3 | 29/10/2025 14:59"
+                                pdf_parts = selected_pdf.split("|")
+                                if len(pdf_parts) > 0:
+                                    index_part = pdf_parts[0].strip()  # "Index 3"
+                            
+                            # 2. Extrair ID da referência interna selecionada
+                            ref_id = None
+                            if "|" in selected_ref:
+                                # Recuperar available_refs do session_state
+                                available_refs_for_id = st.session_state.get(f"available_refs_{farol_reference}", [])
+                                
+                                # Buscar o registro correspondente em available_refs para obter o ID
+                                ref_parts = [p.strip() for p in selected_ref.split("|")]
+                                farol_ref_part = ref_parts[0] if len(ref_parts) > 0 else ""
+                                
+                                # Encontrar o registro correspondente em available_refs
+                                for ref in available_refs_for_id:
+                                    if ref.get('FAROL_REFERENCE') == farol_ref_part:
+                                        ref_id = ref.get('ID')
+                                        break
+                            
+                            # 3. Extrair data e hora da referência interna (pode estar na posição 2 ou 3 dependendo do formato)
+                            date_time_part = ""
+                            if "|" in selected_ref:
+                                ref_parts = [p.strip() for p in selected_ref.split("|")]
+                                # A data pode estar na última posição ou na terceira
+                                if len(ref_parts) >= 3:
+                                    # Extrair data e hora completa
+                                    date_str = ref_parts[2]  # "31/10/2025 00:43" ou "31/10/2025"
+                                    # Formatar data e hora: "DD-MM-YYYY HH:MM"
+                                    if " " in date_str:
+                                        date_only, time_only = date_str.split(" ", 1)
+                                        date_formatted = date_only.replace("/", "-")
+                                        # Pegar apenas HH:MM da hora
+                                        time_formatted = time_only.split(":")[:2]
+                                        if len(time_formatted) == 2:
+                                            date_time_part = f"{date_formatted} {time_formatted[0]}:{time_formatted[1]}"
+                                        else:
+                                            date_time_part = date_formatted
+                                    else:
+                                        date_time_part = date_str.replace("/", "-")
+                                elif len(ref_parts) >= 2:
+                                    # Se não houver terceira parte, tenta a segunda
+                                    date_str = ref_parts[1]
+                                    # Verifica se é uma data (contém / ou -)
+                                    if "/" in date_str or "-" in date_str:
+                                        if " " in date_str:
+                                            date_only, time_only = date_str.split(" ", 1)
+                                            date_formatted = date_only.replace("/", "-")
+                                            time_formatted = time_only.split(":")[:2]
+                                            if len(time_formatted) == 2:
+                                                date_time_part = f"{date_formatted} {time_formatted[0]}:{time_formatted[1]}"
+                                            else:
+                                                date_time_part = date_formatted
+                                        else:
+                                            date_time_part = date_str.replace("/", "-")
+                            
+                            # 4. Montar related_reference no formato: "ID | Index X | DD-MM-YYYY HH:MM"
+                            # Se tiver ID, incluir no formato para facilitar verificação
+                            if ref_id and index_part and date_time_part:
+                                related_reference = f"ID{ref_id} | {index_part} | {date_time_part}"
+                            elif index_part and date_time_part:
+                                related_reference = f"{index_part} | {date_time_part}"
+                            else:
+                                # Fallback: usar selected_ref completo se não conseguir montar
+                                related_reference = selected_ref
+                            
+                            # Call approval function sem justification (apenas para referências vinculadas)
+                            result = approve_carrier_return(adjustment_id, related_reference, {})
                             if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ External adjustment approval completed successfully!"}
+                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
                                 st.session_state.pop(f"approval_step_{farol_reference}", None)
                                 st.cache_data.clear()
                                 st.rerun()
                             else:
-                                st.error("❌ Failed to approve the external adjustment.")
-
+                                st.error("❌ Failed to approve.")
+                    else:
+                        st.warning("Please select a reference.")
 

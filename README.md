@@ -4207,6 +4207,31 @@ Todos os PRs passam por revisão técnica focando em:
 
 **✅ Status**: Implementado e testado
 
+### 🔧 **v4.2.5 - Janeiro 2025 - Simplificação do Fluxo de Aprovação**
+
+**🎯 Melhoria:**
+
+#### **Remoção da Etapa "Adjustment Type"**
+- ✅ **Fluxo simplificado**: Removida a etapa intermediária de seleção "Adjustment Type" do processo de aprovação
+- ✅ **Acesso direto**: O botão "Booking Approved" agora vai direto para o selectbox "Related Reference"
+- ✅ **Redução de cliques**: O usuário não precisa mais escolher entre "An adjustment request made by our company" e "A new/external adjustment initiated by the carrier itself"
+- ✅ **Cobertura completa**: O selectbox "Related Reference" já contém a opção "🆕 Changed by Carrier" que cobre o caso de ajustes externos
+
+**📁 Arquivos Modificados:**
+- `history_components.py`: 
+  - Modificado botão "Booking Approved" para ir direto para `"select_internal_reference"` em vez de `"select_adjustment_type"`
+  - Removido completamente o bloco `"select_adjustment_type"` (etapa intermediária)
+  - Removido completamente o bloco `"external_adjustment_form"` (não é mais necessário)
+  - Removido botão "Back" que voltava para a etapa removida
+
+**🔍 Detalhes Técnicos:**
+- O fluxo agora é mais direto: "Booking Approved" → "Related Reference" → Aprovação
+- Quando "🆕 Changed by Carrier" é selecionado, o formulário de justificativa aparece inline dentro de "select_internal_reference"
+- Quando outra referência é selecionada (Booking Requested ou New Adjustment), a aprovação ocorre diretamente
+- O código do formulário "external_adjustment_form" foi removido pois sua funcionalidade já está coberta pelo formulário inline de "Changed by Carrier"
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.1 - Janeiro 2025 - Colunas de Justificativa na Request Timeline**
 
 **🎯 Nova Funcionalidade:**
