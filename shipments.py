@@ -1517,7 +1517,6 @@ def exibir_shipments():
 
     # --- FIM DA LÓGICA DE PAGINAÇÃO ---
 
-
     # Padroniza o rótulo exibido para a referência Farol
     rename_map = {}
     if "Sales Farol Reference" in df.columns:

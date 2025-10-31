@@ -4138,8 +4138,9 @@ Todos os PRs passam por revisão técnica focando em:
 #### **Problema Resolvido: Farol Status Aparecendo em Branco na Primeira Etapa**
 - ✅ **Tratamento de NULL no SQL**: Adicionado `COALESCE(FAROL_STATUS, 'New Request')` nas queries SQL de `get_data_salesData` e `fetch_shipments_data_sales`
 - ✅ **Fallback em Python**: Melhorado `get_display_from_status` para tratar None/NaN/valores vazios retornando "📦 New Request" como padrão
+- ✅ **Correção no SelectboxColumn**: Garantido que "📦 New Request" esteja sempre nas opções do dropdown de Farol Status em `drop_downs()`
 - ✅ **Comportamento esperado**: Na primeira etapa (Sales Data), quando `FAROL_STATUS` está NULL no banco, exibe "📦 New Request" em vez de célula vazia
-- ✅ **Proteção dupla**: Correção aplicada tanto na camada SQL (na origem dos dados) quanto na camada Python (processamento de exibição)
+- ✅ **Proteção tripla**: Correção aplicada em três camadas - SQL (origem dos dados), Python (processamento), e UI (opções do dropdown)
 
 **📁 Arquivos Modificados:**
 - `database.py`: 
@@ -4149,11 +4150,14 @@ Todos os PRs passam por revisão técnica focando em:
   - Adicionado `COALESCE(FAROL_STATUS, 'New Request')` em `get_data_salesData` (linha ~489)
 - `shipments_mapping.py`: 
   - Melhorado `get_display_from_status` para tratar None/NaN retornando "📦 New Request" formatado (linha ~619-623)
+  - Adicionada verificação em `drop_downs()` para garantir que "📦 New Request" esteja sempre nas opções do SelectboxColumn de Farol Status (linha ~361-375)
 
 **🔍 Detalhes Técnicos:**
 - **Problema original**: Registros com `FAROL_STATUS = NULL` no banco apareciam com célula vazia na tabela de Shipments
+- **Causa raiz identificada**: O `SelectboxColumn` do Streamlit só exibe valores que estão na lista de opções do dropdown. Se "📦 New Request" não estivesse nas opções (por não estar no UDC), o valor não era exibido
 - **Solução SQL**: `COALESCE` garante que sempre haja um valor (mesmo que seja o padrão 'New Request')
 - **Solução Python**: Função `get_display_from_status` agora trata edge cases (None, NaN, string vazia) e retorna status padrão formatado com ícone
+- **Solução UI**: Verificação em `drop_downs()` garante que "📦 New Request" esteja sempre presente nas opções do dropdown, mesmo que não esteja na tabela UDC
 - **Justificativa**: "New Request" é o status inicial apropriado para registros criados sem status definido na primeira etapa
 
 **✅ Status**: Implementado e testado

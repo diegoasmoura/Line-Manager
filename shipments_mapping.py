@@ -359,9 +359,14 @@ def drop_downs(data_show, df_udc):
             if col == "Port of Loading POL":
                 required_field = False
             if col == "Farol Status":
+                # Garantir que "📦 New Request" está nas opções do dropdown
+                # Isso evita que valores NULL (convertidos para "📦 New Request") apareçam em branco
+                farol_options = dropdown_options[col].copy()
+                if "📦 New Request" not in farol_options:
+                    farol_options.insert(0, "📦 New Request")
                 column_config[col] = st.column_config.SelectboxColumn(
                     label=display_name,
-                    options=dropdown_options[col],
+                    options=farol_options,
                     required=required_field,
                     width="medium"
                 )
