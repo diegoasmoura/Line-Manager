@@ -618,8 +618,9 @@ def get_icon_only(status: str) -> str:
 
 def get_display_from_status(status: str) -> str:
     """Adiciona o ícone a uma string de status limpa."""
-    if not isinstance(status, str) or not status:
-        return status
+    # Tratar None, NaN, ou valores vazios: usar "New Request" como padrão
+    if not isinstance(status, str) or not status or (isinstance(status, float) and pd.isna(status)):
+        return "📦 New Request"
     icon = get_icon_only(status)
     # Evita adicionar ícone se já tiver um
     if not status.startswith(icon):

@@ -4131,6 +4131,33 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.11 - Janeiro 2025 - Correção de Farol Status em Branco quando NULL**
+
+**🐛 Correção de Bug:**
+
+#### **Problema Resolvido: Farol Status Aparecendo em Branco na Primeira Etapa**
+- ✅ **Tratamento de NULL no SQL**: Adicionado `COALESCE(FAROL_STATUS, 'New Request')` nas queries SQL de `get_data_salesData` e `fetch_shipments_data_sales`
+- ✅ **Fallback em Python**: Melhorado `get_display_from_status` para tratar None/NaN/valores vazios retornando "📦 New Request" como padrão
+- ✅ **Comportamento esperado**: Na primeira etapa (Sales Data), quando `FAROL_STATUS` está NULL no banco, exibe "📦 New Request" em vez de célula vazia
+- ✅ **Proteção dupla**: Correção aplicada tanto na camada SQL (na origem dos dados) quanto na camada Python (processamento de exibição)
+
+**📁 Arquivos Modificados:**
+- `database.py`: 
+  - Adicionado `COALESCE(FAROL_STATUS, 'New Request')` em `get_data_salesData` (linha ~584)
+  - Adicionado `COALESCE(FAROL_STATUS, 'New Request')` em `fetch_shipments_data_sales` (linha ~1189)
+- `database_empresa.py`: 
+  - Adicionado `COALESCE(FAROL_STATUS, 'New Request')` em `get_data_salesData` (linha ~489)
+- `shipments_mapping.py`: 
+  - Melhorado `get_display_from_status` para tratar None/NaN retornando "📦 New Request" formatado (linha ~619-623)
+
+**🔍 Detalhes Técnicos:**
+- **Problema original**: Registros com `FAROL_STATUS = NULL` no banco apareciam com célula vazia na tabela de Shipments
+- **Solução SQL**: `COALESCE` garante que sempre haja um valor (mesmo que seja o padrão 'New Request')
+- **Solução Python**: Função `get_display_from_status` agora trata edge cases (None, NaN, string vazia) e retorna status padrão formatado com ícone
+- **Justificativa**: "New Request" é o status inicial apropriado para registros criados sem status definido na primeira etapa
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.10 - Janeiro 2025 - Campos Desabilitados no Formulário de Booking**
 
 **🎯 Melhoria de UX:**

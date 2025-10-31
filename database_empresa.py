@@ -486,7 +486,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25):
     query = f'''
     SELECT 
         FAROL_REFERENCE                    AS s_farol_reference,
-        FAROL_STATUS                       AS s_farol_status,
+        COALESCE(FAROL_STATUS, 'New Request') AS s_farol_status,
         S_SHIPMENT_STATUS                  AS s_shipment_status,
         S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
         S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
