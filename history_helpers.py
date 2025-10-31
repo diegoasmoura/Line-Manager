@@ -206,3 +206,95 @@ def apply_highlight_styling(styler, changes_dict):
                 styles[col_idx] += f' background-color: {color}; border: 1px solid #FFD54F;'
         return styles
     return styler.apply(highlight_cells, axis=1)
+
+def prepare_main_data_for_display(main_data, df_fallback):
+    """
+    Prepara dados principais para exibição nos cards de métricas.
+    
+    Args:
+        main_data: Dicionário com dados da tabela principal (F_CON_SALES_BOOKING_DATA)
+        df_fallback: DataFrame como fallback se main_data não tiver dados
+    
+    Returns:
+        tuple: (voyage_carrier, qty, ins)
+    """
+    from datetime import datetime
+    
+    if main_data:
+        voyage_carrier = str(main_data.get("b_voyage_carrier", "-"))
+        
+        qty = main_data.get("s_quantity_of_containers", 0)
+        try:
+            qty = int(qty) if qty is not None and not pd.isna(qty) else 0
+        except (ValueError, TypeError):
+            qty = 0
+        
+        ins = main_data.get("row_inserted_date", "-")
+        try:
+            if isinstance(ins, datetime):
+                ins = ins.strftime('%Y-%m-%d %H:%M:%S')
+            elif isinstance(ins, (int, float)):
+                ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            pass
+    else:
+        # Fallback para valores do último registro se a tabela principal não tiver dados
+        voyage_carrier = str(df_fallback.iloc[0].get("B_VOYAGE_CARRIER", "-")) if not df_fallback.empty else "-"
+        qty = 0
+        ins = "-"
+    
+    return voyage_carrier, qty, ins
+
+def clear_history_session_state_on_selection_change(farol_reference, current_adjustment_id, last_adjustment_id):
+    """
+    Limpa estados do session_state quando a seleção de PDF muda.
+    
+    Args:
+        farol_reference: Referência Farol atual
+        current_adjustment_id: ID do ajuste atualmente selecionado
+        last_adjustment_id: ID do último ajuste selecionado
+    """
+    if last_adjustment_id is not None and last_adjustment_id != current_adjustment_id:
+        # Seleção mudou, limpa status pendente
+        if f"pending_status_change_{farol_reference}" in st.session_state:
+            del st.session_state[f"pending_status_change_{farol_reference}"]
+        # Limpa qualquer gatilho/flag de formulário manual pendente ao trocar a seleção
+        if "voyage_manual_entry_required" in st.session_state:
+            del st.session_state["voyage_manual_entry_required"]
+        # Limpa aviso de sucesso da API
+        if "voyage_success_notice" in st.session_state:
+            del st.session_state["voyage_success_notice"]
+        # Limpa erros de aprovação ou salvamento manual de ações anteriores
+        if "approval_error" in st.session_state:
+            del st.session_state["approval_error"]
+        if "manual_save_error" in st.session_state:
+            del st.session_state["manual_save_error"]
+        # Limpa possíveis triggers por ajuste anterior
+        for k in list(st.session_state.keys()):
+            if str(k).startswith("manual_related_ref_value_") or str(k).startswith("manual_trigger_"):
+                try:
+                    del st.session_state[k]
+                except Exception:
+                    pass
+        if "pending_status_change" in st.session_state:
+            del st.session_state["pending_status_change"]
+        # Ao mudar a seleção, recolhe a seção de anexos
+        st.session_state["history_show_attachments"] = False
+
+def clear_history_session_state_when_no_selection(farol_reference):
+    """
+    Limpa estados do session_state quando nenhum PDF está selecionado.
+    
+    Args:
+        farol_reference: Referência Farol atual
+    """
+    if f"pending_status_change_{farol_reference}" in st.session_state:
+        del st.session_state[f"pending_status_change_{farol_reference}"]
+    if "pending_status_change" in st.session_state:
+        del st.session_state["pending_status_change"]
+    if f"last_selected_adjustment_id_{farol_reference}" in st.session_state:
+        del st.session_state[f"last_selected_adjustment_id_{farol_reference}"]
+    if "voyage_manual_entry_required" in st.session_state:
+        del st.session_state["voyage_manual_entry_required"]
+    if "voyage_success_notice" in st.session_state:
+        del st.session_state["voyage_success_notice"]

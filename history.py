@@ -27,7 +27,11 @@ from history_components import (
     display_attachments_section as display_attachments_section_component,
     render_metrics_header
 )
-from history_helpers import format_linked_reference_display, convert_utc_to_brazil_time
+from history_helpers import (
+    format_linked_reference_display, convert_utc_to_brazil_time,
+    prepare_main_data_for_display, clear_history_session_state_on_selection_change,
+    clear_history_session_state_when_no_selection
+)
 
 # Carrega dados da UDC para justificativas
 df_udc = load_df_udc()
@@ -182,35 +186,8 @@ def exibir_history():
     
     # Informações organizadas em cards elegantes - consultadas da tabela principal
     main_status = get_current_status_from_main_table(farol_reference) or "-"
-    
-    # Busca dados da tabela principal F_CON_SALES_BOOKING_DATA em vez do último registro
     main_data = history_get_main_table_data(farol_reference)
-    
-    if main_data:
-        # Dados da tabela principal - usando as chaves corretas (minúsculas)
-        voyage_carrier = str(main_data.get("b_voyage_carrier", "-"))
-        
-        qty = main_data.get("s_quantity_of_containers", 0)
-        try:
-            qty = int(qty) if qty is not None and not pd.isna(qty) else 0
-        except (ValueError, TypeError):
-            qty = 0
-        
-        ins = main_data.get("row_inserted_date", "-")
-        try:
-            # Se já é datetime object, formata diretamente
-            if isinstance(ins, datetime):
-                ins = ins.strftime('%Y-%m-%d %H:%M:%S')
-            # Se for epoch ms para datetime legível, se for numérico
-            elif isinstance(ins, (int, float)):
-                ins = datetime.fromtimestamp(ins/1000.0).strftime('%Y-%m-%d %H:%M:%S')
-        except Exception:
-            pass
-    else:
-        # Fallback para valores do último registro se a tabela principal não tiver dados
-        voyage_carrier = str(df.iloc[0].get("B_VOYAGE_CARRIER", "-")) if not df.empty else "-"
-        qty = 0
-        ins = "-"
+    voyage_carrier, qty, ins = prepare_main_data_for_display(main_data, df)
     
     # Renderiza cards de métricas usando componente
     render_metrics_header(
@@ -440,51 +417,15 @@ def exibir_history():
     
     # Limpa status pendente quando a seleção muda
     if has_pdf_selected:
-        # Obter adjustment_id do PDF selecionado
         current_adjustment_id = st.session_state.get(f"adjustment_id_for_approval_{farol_reference}")
         last_adjustment_id = st.session_state.get(f"last_selected_adjustment_id_{farol_reference}")
         
-        if last_adjustment_id is not None and last_adjustment_id != current_adjustment_id:
-            # Seleção mudou, limpa status pendente
-            if f"pending_status_change_{farol_reference}" in st.session_state:
-                del st.session_state[f"pending_status_change_{farol_reference}"]
-            # Limpa qualquer gatilho/flag de formulário manual pendente ao trocar a seleção
-            if "voyage_manual_entry_required" in st.session_state:
-                del st.session_state["voyage_manual_entry_required"]
-            # Limpa aviso de sucesso da API
-            if "voyage_success_notice" in st.session_state:
-                del st.session_state["voyage_success_notice"]
-            # Limpa erros de aprovação ou salvamento manual de ações anteriores
-            if "approval_error" in st.session_state:
-                del st.session_state["approval_error"]
-            if "manual_save_error" in st.session_state:
-                del st.session_state["manual_save_error"]
-            # Limpa possíveis triggers por ajuste anterior
-            for k in list(st.session_state.keys()):
-                if str(k).startswith("manual_related_ref_value_") or str(k).startswith("manual_trigger_"):
-                    try:
-                        del st.session_state[k]
-                    except Exception:
-                        pass
-            if "pending_status_change" in st.session_state:
-                del st.session_state["pending_status_change"]
-            # Ao mudar a seleção, recolhe a seção de anexos
-            st.session_state["history_show_attachments"] = False
+        clear_history_session_state_on_selection_change(farol_reference, current_adjustment_id, last_adjustment_id)
         
         # Atualiza o ID da seleção atual
         st.session_state[f"last_selected_adjustment_id_{farol_reference}"] = current_adjustment_id
     else:
-        # Nenhuma linha selecionada, limpa status e avisos/flags
-        if f"pending_status_change_{farol_reference}" in st.session_state:
-            del st.session_state[f"pending_status_change_{farol_reference}"]
-        if "pending_status_change" in st.session_state:
-            del st.session_state["pending_status_change"]
-        if f"last_selected_adjustment_id_{farol_reference}" in st.session_state:
-            del st.session_state[f"last_selected_adjustment_id_{farol_reference}"]
-        if "voyage_manual_entry_required" in st.session_state:
-            del st.session_state["voyage_manual_entry_required"]
-        if "voyage_success_notice" in st.session_state:
-            del st.session_state["voyage_success_notice"]
+        clear_history_session_state_when_no_selection(farol_reference)
 
     # apply_status_change removida - lógica de aprovação migrada para render_approval_panel_component em history_components.py
 
