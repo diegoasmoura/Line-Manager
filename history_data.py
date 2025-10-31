@@ -214,12 +214,12 @@ def get_available_references_for_relation(farol_reference=None):
             query = text("""
                 SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, r.P_STATUS, r.ROW_INSERTED_DATE, r.Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS r
-                WHERE r.FAROL_STATUS IN ('Booking Requested', 'New Adjustment')
+                WHERE UPPER(TRIM(r.FAROL_STATUS)) IN ('BOOKING REQUESTED', 'NEW ADJUSTMENT')
                   AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM LogTransp.F_CON_RETURN_CARRIERS linked
-                      WHERE (linked.FAROL_STATUS = 'Received from Carrier' OR linked.FAROL_STATUS = 'Booking Approved')
+                      WHERE (UPPER(TRIM(linked.FAROL_STATUS)) = 'RECEIVED FROM CARRIER' OR UPPER(TRIM(linked.FAROL_STATUS)) = 'BOOKING APPROVED')
                         AND UPPER(linked.FAROL_REFERENCE) = UPPER(:farol_reference)
                         AND linked.LINKED_REFERENCE IS NOT NULL
                         AND linked.LINKED_REFERENCE != 'New Adjustment'

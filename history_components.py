@@ -1671,8 +1671,10 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                         
                         # Check if the reference is valid for selection
                         # Aceita Booking Requested ou New Adjustment sem Linked Reference
-                        is_booking_requested = (b_status == 'Booking Requested')
-                        is_new_adjustment = (b_status == 'New Adjustment')
+                        # Comparação case-insensitive para lidar com diferenças de case no banco de dados
+                        b_status_upper = b_status.upper()
+                        is_booking_requested = (b_status_upper == 'BOOKING REQUESTED')
+                        is_new_adjustment = (b_status_upper == 'NEW ADJUSTMENT')
                         has_no_linked = (linked is None or str(linked).strip() == '')
                         
                         if (is_booking_requested and has_no_linked) or \

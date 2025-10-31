@@ -4131,6 +4131,38 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.7 - Janeiro 2025 - Correção de Busca Case-Insensitive para New Adjustment**
+
+**🐛 Correção de Bug:**
+
+#### **Problema Resolvido: New Adjustment Não Aparecendo no Servidor**
+- ✅ **Query case-insensitive**: A query SQL agora usa `UPPER(TRIM())` para normalizar comparações de `FAROL_STATUS`
+- ✅ **Tratamento de espaços**: Adicionado `TRIM()` para remover espaços extras antes/depois do status
+- ✅ **Comparação no Python**: Adicionada normalização case-insensitive também na lógica Python
+- ✅ **Robustez**: Sistema agora funciona corretamente mesmo quando o banco de dados tem diferenças de case ou espaços extras
+
+**🔍 Problema Original:**
+- No servidor da empresa, registros "New Adjustment" não apareciam no selectbox "Related Reference"
+- Na máquina local funcionava corretamente
+- Causa identificada: diferenças de case no campo `FAROL_STATUS` no banco de dados (ex: "NEW ADJUSTMENT" vs "New Adjustment")
+
+**📁 Arquivos Modificados:**
+- `history_data.py`: 
+  - Query SQL atualizada para usar `UPPER(TRIM(r.FAROL_STATUS))` na linha 217
+  - Condição NOT EXISTS atualizada para usar `UPPER(TRIM(linked.FAROL_STATUS))` na linha 222
+  - Comparações agora são case-insensitive e tratam espaços extras
+- `history_components.py`: 
+  - Comparações de status normalizadas com `.upper()` antes da verificação (linhas 1675-1677)
+  - Garante que mesmo valores retornados do banco com case diferente sejam tratados corretamente
+
+**🔍 Detalhes Técnicos:**
+- **Query SQL**: `UPPER(TRIM(r.FAROL_STATUS)) IN ('BOOKING REQUESTED', 'NEW ADJUSTMENT')` garante correspondência independente de case
+- **Python**: `b_status.upper() == 'NEW ADJUSTMENT'` para comparação consistente
+- **Prevenção de duplicidade**: A lógica NOT EXISTS também foi atualizada para ser case-insensitive
+- **Compatibilidade**: Mudanças são retrocompatíveis - não afetam funcionamento em ambientes onde já funcionava
+
+**✅ Status**: Implementado e pronto para teste no servidor
+
 ### 🔧 **v4.2.6 - Janeiro 2025 - Automação de Preenchimento de Booking Adjustment Responsibility**
 
 **🎯 Nova Funcionalidade:**
