@@ -203,12 +203,54 @@ def get_voyage_monitoring_for_reference(farol_reference):
 
 def get_available_references_for_relation(farol_reference=None):
     """Busca referências na aba 'Other Status' para relacionamento."""
+    # DEBUG: Log inicial
+    print(f"[DEBUG] get_available_references_for_relation chamada com farol_reference: {farol_reference}")
+    
     try:
         from database import get_database_connection
+        import streamlit as st
+        
         conn = get_database_connection()
+        print(f"[DEBUG] Conexão com banco estabelecida")
         
         if farol_reference:
-            # Query para buscar referências disponíveis, excluindo as que já foram vinculadas
+            # DEBUG: Query simplificada para diagnóstico (sem NOT EXISTS)
+            simple_query = text("""
+                SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, r.P_STATUS, r.ROW_INSERTED_DATE, r.Linked_Reference
+                FROM LogTransp.F_CON_RETURN_CARRIERS r
+                WHERE UPPER(TRIM(r.FAROL_STATUS)) IN ('BOOKING REQUESTED', 'NEW ADJUSTMENT')
+                  AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
+                ORDER BY r.ROW_INSERTED_DATE ASC
+            """)
+            simple_params = {"farol_reference": farol_reference}
+            
+            print(f"[DEBUG] Executando query simplificada (sem NOT EXISTS) para diagnóstico...")
+            simple_result = conn.execute(simple_query, simple_params).mappings().fetchall()
+            print(f"[DEBUG] Query simplificada retornou {len(simple_result)} registros")
+            
+            # Mostrar detalhes dos registros encontrados pela query simples
+            for idx, row in enumerate(simple_result):
+                row_dict = dict(row)
+                print(f"[DEBUG] Registro {idx}: ID={row_dict.get('ID')}, STATUS='{row_dict.get('FAROL_STATUS')}', LINKED_REF='{row_dict.get('Linked_Reference')}', DATE={row_dict.get('ROW_INSERTED_DATE')}")
+            
+            # Query para verificar registros que podem estar causando exclusão no NOT EXISTS
+            linked_check_query = text("""
+                SELECT linked.ID, linked.FAROL_STATUS, linked.LINKED_REFERENCE, linked.FAROL_REFERENCE
+                FROM LogTransp.F_CON_RETURN_CARRIERS linked
+                WHERE (UPPER(TRIM(linked.FAROL_STATUS)) = 'RECEIVED FROM CARRIER' OR UPPER(TRIM(linked.FAROL_STATUS)) = 'BOOKING APPROVED')
+                  AND UPPER(linked.FAROL_REFERENCE) = UPPER(:farol_reference)
+                  AND linked.LINKED_REFERENCE IS NOT NULL
+                  AND linked.LINKED_REFERENCE != 'New Adjustment'
+            """)
+            print(f"[DEBUG] Verificando registros que podem estar causando exclusão no NOT EXISTS...")
+            linked_check_result = conn.execute(linked_check_query, simple_params).mappings().fetchall()
+            print(f"[DEBUG] Encontrados {len(linked_check_result)} registros 'Received from Carrier'/'Booking Approved' com LINKED_REFERENCE")
+            
+            for idx, row in enumerate(linked_check_result):
+                row_dict = dict(row)
+                print(f"[DEBUG] Registro vinculado {idx}: ID={row_dict.get('ID')}, STATUS='{row_dict.get('FAROL_STATUS')}', LINKED_REF='{row_dict.get('LINKED_REFERENCE')}'")
+            
+            # Query principal para buscar referências disponíveis, excluindo as que já foram vinculadas
             # Exclui registros cuja data de inserção (formatada como DD-MM-YYYY) já aparece em algum 
             # LINKED_REFERENCE de registros "Received from Carrier" ou "Booking Approved" da mesma referência
             query = text("""
@@ -241,7 +283,25 @@ def get_available_references_for_relation(farol_reference=None):
             """)
             params = {"farol_reference": farol_reference}
             
+            print(f"[DEBUG] Executando query principal com NOT EXISTS...")
             result = conn.execute(query, params).mappings().fetchall()
+            print(f"[DEBUG] Query principal retornou {len(result)} registros após filtro NOT EXISTS")
+            
+            # Mostrar detalhes dos registros finais
+            for idx, row in enumerate(result):
+                row_dict = dict(row)
+                print(f"[DEBUG] Registro final {idx}: ID={row_dict.get('ID')}, STATUS='{row_dict.get('FAROL_STATUS')}', LINKED_REF='{row_dict.get('Linked_Reference')}'")
+            
+            conn.close()
+            print(f"[DEBUG] Conexão fechada")
+            
+            if result:
+                processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
+                print(f"[DEBUG] Retornando {len(processed)} registros processados")
+                return processed
+            else:
+                print(f"[DEBUG] Nenhum registro retornado - lista vazia")
+                return []
         else:
             # Comportamento legado: somente originais (não-split) de todas as referências
             query = text("""
@@ -253,17 +313,35 @@ def get_available_references_for_relation(farol_reference=None):
                 ORDER BY ROW_INSERTED_DATE ASC
             """)
             result = conn.execute(query).mappings().fetchall()
-        conn.close()
-        if result:
-            processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
-            return processed
-        else:
-            return []
+            conn.close()
+            print(f"[DEBUG] Conexão fechada (comportamento legado)")
+            
+            if result:
+                processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
+                print(f"[DEBUG] Retornando {len(processed)} registros processados (comportamento legado)")
+                return processed
+            else:
+                print(f"[DEBUG] Nenhum registro retornado - lista vazia (comportamento legado)")
+                return []
+                
     except Exception as e:
+        print(f"[DEBUG] ERRO em get_available_references_for_relation: {type(e).__name__}: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback completo:")
+        traceback.print_exc()
+        
+        # Tentar mostrar erro no Streamlit se disponível
+        try:
+            import streamlit as st
+            st.error(f"Erro ao buscar referências disponíveis: {str(e)}")
+        except:
+            pass
+        
         if 'conn' in locals():
             try:
                 if hasattr(conn, 'is_connected') and conn.is_connected():
                     conn.close()
+                    print(f"[DEBUG] Conexão fechada após erro")
             except:
                 pass
         return []

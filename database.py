@@ -2096,7 +2096,7 @@ def insert_return_carrier_snapshot(farol_reference: str, status_override: str | 
             "FAROL_REFERENCE": rd.get("FAROL_REFERENCE"),
             "FAROL_STATUS": farol_status,
             # Snapshot oriundo do carrier - P_STATUS baseado no status real
-            "P_STATUS": "Shipment Requested" if b_status == "New Request" else "Booking Requested",
+            "P_STATUS": "Shipment Requested" if farol_status == "New Request" else "Booking Requested",
             "P_PDF_NAME": None,
             "S_PLACE_OF_RECEIPT": rd.get("S_PLACE_OF_RECEIPT"),
             "S_QUANTITY_OF_CONTAINERS": rd.get("S_QUANTITY_OF_CONTAINERS"),
