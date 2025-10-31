@@ -4131,6 +4131,41 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.12 - Janeiro 2025 - Remoção de Valores "None" da Tabela de Shipments**
+
+**🎯 Melhoria de UX:**
+
+#### **Problema Resolvido: Valores "None" Aparecendo na Tabela**
+- ✅ **Nova função de limpeza**: Criada função `clean_none_values_from_dataframe()` para remover valores "None", "nan", "<NA>", "NaT" de colunas de texto
+- ✅ **Preservação de tipos**: Colunas numéricas e de data não são alteradas (preservadas)
+- ✅ **Aplicação abrangente**: Limpeza aplicada em todas as funções de carregamento de dados da tabela principal
+- ✅ **Comportamento esperado**: Valores "None" em colunas de texto agora aparecem como células vazias na tabela
+- ✅ **Aplicado em ambos os ambientes**: Correção aplicada em `database.py` e `database_empresa.py`
+
+**📁 Arquivos Modificados:**
+- `database.py`: 
+  - Criada função `clean_none_values_from_dataframe()` (linha ~38)
+  - Aplicada limpeza em `get_data_salesData` (linha ~701)
+  - Aplicada limpeza em `get_data_bookingData` (linha ~838)
+  - Aplicada limpeza em `get_data_generalView` (linha ~970)
+  - Aplicada limpeza em `fetch_shipments_data_sales` (linha ~1273)
+- `database_empresa.py`: 
+  - Criada função `clean_none_values_from_dataframe()` (linha ~38)
+  - Aplicada limpeza em `get_data_salesData` (linha ~600)
+  - Aplicada limpeza em `get_data_bookingData` (linha ~723)
+  - Aplicada limpeza em `get_data_generalView` (linha ~845)
+  - Aplicada limpeza em `fetch_shipments_data_sales` (linha ~1004)
+  - Aplicada limpeza em `get_data_loadingData` (linha ~942)
+
+**🔍 Detalhes Técnicos:**
+- **Problema original**: Valores NULL do banco convertidos para string resultavam em texto literal "None" aparecendo na tabela
+- **Solução**: Função limpa colunas de texto substituindo "None", "nan", "<NA>", "NaT" por strings vazias antes de exibir
+- **Preservação**: Colunas numéricas e de data/hora são preservadas (não alteradas) para manter integridade dos dados
+- **Aplicação**: Limpeza executada após processamento de status do Farol e antes de retornar os dados para exibição
+- **Cobertura**: Aplicado em todos os stages (Sales Data, Booking Management, General View) e em ambas as bases de dados
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.11 - Janeiro 2025 - Correção de Farol Status em Branco quando NULL**
 
 **🐛 Correção de Bug:**

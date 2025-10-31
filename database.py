@@ -35,6 +35,36 @@ def get_current_user_login() -> str:
 # Formato ISO para normalizar datas em texto
 ISO_FMT = "%Y-%m-%d %H:%M:%S"
 
+def clean_none_values_from_dataframe(df):
+    """
+    Remove valores "None", "nan", "<NA>", "NaT" de colunas de texto no DataFrame.
+    Preserva valores numéricos e datas.
+    
+    Args:
+        df: DataFrame do pandas
+        
+    Returns:
+        DataFrame com valores None substituídos por strings vazias em colunas de texto
+    """
+    if df.empty:
+        return df
+    
+    df_cleaned = df.copy()
+    
+    for col in df_cleaned.columns:
+        # Verificar se é coluna de data/hora
+        if pd.api.types.is_datetime64_any_dtype(df_cleaned[col]):
+            # Para colunas de data: converter None/NaT mas manter tipo datetime
+            continue  # Não alterar colunas de data, deixar como está
+        elif pd.api.types.is_numeric_dtype(df_cleaned[col]):
+            # Não alterar colunas numéricas
+            continue
+        else:
+            # Para colunas de texto/objeto: limpar valores None
+            df_cleaned[col] = df_cleaned[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '').replace('NaT', '')
+    
+    return df_cleaned
+
 def _normalize_value_for_log(value):
     """Converte diferentes tipos (None/NaT/datetime/number) para texto estável."""
     try:
@@ -666,6 +696,9 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
  
         # Adiciona ícones ao Farol Status para exibição
         df = process_farol_status_for_display(df)
+        
+        # Limpar valores "None", "nan", "<NA>" de colunas de texto
+        df = clean_none_values_from_dataframe(df)
 
         return df, total_records
     finally:
@@ -800,6 +833,9 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
  
         # Adiciona ícones ao Farol Status para exibição
         df = process_farol_status_for_display(df)
+        
+        # Limpar valores "None", "nan", "<NA>" de colunas de texto
+        df = clean_none_values_from_dataframe(df)
 
         return df, total_records
     finally:
@@ -932,6 +968,9 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
 
         # Processar o status do Farol para exibição com ícones
         df = process_farol_status_for_display(df)
+        
+        # Limpar valores "None", "nan", "<NA>" de colunas de texto
+        df = clean_none_values_from_dataframe(df)
 
         # Lista de colunas seguindo ordem específica solicitada pelo usuário
         combined_cols = [
@@ -1232,13 +1271,16 @@ def fetch_shipments_data_sales():
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
+        
+        # Limpar valores "None", "nan", "<NA>" de colunas de texto
+        df = clean_none_values_from_dataframe(df)
  
         return df
     finally:
         if conn:
             conn.close()
  
- 
+
            
 ### Obtendo os dados da UDC
 @st.cache_data(ttl=300)  # Cache por 5 minutos para reduzir queries repetidas
