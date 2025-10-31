@@ -724,9 +724,10 @@ def _generate_dynamic_column_config(df, hide_status=False, hide_linked_reference
         elif col in ['Index', 'Quantity of Containers']:
             width = "small"
         
-        if any(date_keyword in col.lower() for date_keyword in ["date", "deadline", "etd", "eta", "gate", "atd", "ata", "etb", "atb", "required", "arrival", "expected"]):
-            config[col] = st.column_config.DatetimeColumn(col, format="DD/MM/YYYY HH:mm", width=width)
-        elif col in ["Quantity of Containers"]:
+        # Todas as colunas (incluindo datas) são tratadas como TextColumn
+        # Isso evita problemas de conversão do Streamlit que exibem "None" em campos vazios
+        # Como a tabela é somente leitura, não há necessidade de DatetimeColumn
+        if col in ["Quantity of Containers"]:
             config[col] = st.column_config.NumberColumn(col, width=width)
         else:
             visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Index", "Status"] and not (c == "Linked Reference" and hide_linked_reference)]
@@ -790,9 +791,11 @@ def _process_dataframe(df_to_process, farol_reference):
     
     for col in df_processed.columns:
         if df_processed[col].dtype == 'datetime64[ns]':
-            df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '')
+            # Converter para string e tratar todos os casos possíveis
+            df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
         else:
-            df_processed[col] = df_processed[col].fillna('').replace('None', '')
+            # Tratar None, NaN, e outros valores nulos
+            df_processed[col] = df_processed[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '')
     
     if "Linked Reference" in df_processed.columns:
         df_processed["Linked Reference"] = df_processed.apply(
@@ -926,9 +929,11 @@ def _apply_highlight_styling_combined(df_processed, combined_changes_dict):
     
     for col in df_styled.columns:
         if df_styled[col].dtype == 'datetime64[ns]':
-            df_styled[col] = df_styled[col].astype(str).replace('NaT', '').replace('None', '')
+            # Converter para string e tratar todos os casos possíveis
+            df_styled[col] = df_styled[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
         else:
-            df_styled[col] = df_styled[col].fillna('').replace('None', '')
+            # Tratar None, NaN, e outros valores nulos
+            df_styled[col] = df_styled[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '')
     
     def highlight_changes_and_zebra(row):
         styles = [''] * len(row)
@@ -973,6 +978,7 @@ def _display_tab_content(df_tab, tab_name, farol_reference):
         "PDF Booking Emission Date"
     ]
     
+    # Converter colunas de data para datetime para ordenação (manter como datetime temporariamente)
     for col in date_cols:
         if col in df_processed.columns:
             df_processed[col] = pd.to_datetime(df_processed[col], errors='coerce')
@@ -1015,6 +1021,12 @@ def _display_tab_content(df_tab, tab_name, farol_reference):
         df_processed = reorder_columns(df_processed, desired_order)
     except Exception:
         pass
+    
+    # Converter datas para string após ordenação, substituindo NaT/None por string vazia
+    for col in date_cols:
+        if col in df_processed.columns:
+            df_processed[col] = df_processed[col].where(pd.notna(df_processed[col]), '')
+            df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
     
     df_processed.insert(0, "Index", range(len(df_processed)))
     return df_processed
@@ -1064,11 +1076,15 @@ def render_request_timeline(df_unified, farol_reference, df_received_for_approva
         else:
             df_to_check = styled_df.copy()
         
+        # Simplificar: todas as colunas (incluindo datas) são tratadas como texto
+        # Isso evita problemas de conversão do Streamlit que exibem "None" em campos vazios
         for col in df_to_check.columns:
             if df_to_check[col].dtype == 'datetime64[ns]':
-                df_to_check[col] = df_to_check[col].astype(str).replace('NaT', '').replace('None', '')
+                # Converter para string e tratar NaT/None
+                df_to_check[col] = df_to_check[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
             else:
-                df_to_check[col] = df_to_check[col].fillna('').replace('None', '')
+                # Para colunas não-datetime, tratar None explícito
+                df_to_check[col] = df_to_check[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '')
         
         if hasattr(styled_df, 'data'):
             styled_df.data = df_to_check

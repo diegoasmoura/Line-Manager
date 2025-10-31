@@ -119,9 +119,11 @@ def process_dataframe(df_to_process, farol_reference):
     # Tratamento de nulos e formatação
     for col in df_processed.columns:
         if pd.api.types.is_datetime64_any_dtype(df_processed[col]):
-            df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '')
+            # Converter para string e tratar todos os casos possíveis
+            df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
         else:
-            df_processed[col] = df_processed[col].fillna('').replace('None', '')
+            # Tratar None, NaN, e outros valores nulos
+            df_processed[col] = df_processed[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '')
 
     if "Linked Reference" in df_processed.columns:
         df_processed["Linked Reference"] = df_processed.apply(lambda row: format_linked_reference_display(row.get("Linked Reference"), row.get("Farol Reference")), axis=1)

@@ -3380,6 +3380,72 @@ carrier_cnpj = "33.592.510/0001-54"  # MAERSK/MSC/etc
    - **Verificação**: Testar split com alteração de datas e verificar se são salvas na tabela `F_CON_RETURN_CARRIERS`
    - **Status**: ✅ **RESOLVIDO** - Todas as colunas de data funcionam corretamente
 
+11. **❌ Campos de Data Vazios Mostrando "None" na Tela History (CRÍTICO - RESOLVIDO v3.3.1)**
+   - **Sintoma**: Na tela "Return Carriers History" (Request Timeline), campos de data vazios (como "Required Arrival Date", "Deadline") aparecem como texto "None" ao invés de ficarem em branco
+   - **Causa Raiz**: 
+     - O Streamlit `st.dataframe` com `column_config` usando `DatetimeColumn` tenta converter strings vazias `''` para datetime
+     - Quando encontra strings vazias em uma coluna configurada como `DatetimeColumn`, o Streamlit falha na conversão e exibe "None"
+     - Este comportamento ocorre mesmo quando os dados no DataFrame estão corretos (strings vazias `''`)
+   - **Erros Específicos**:
+     - Campos vazios exibindo literalmente "None" na interface
+     - Problema afeta todas as colunas de data (Deadline, Required Arrival Date, etc.)
+     - Acontece mesmo após tratamento adequado de `NaT` e valores nulos
+   - **✅ Solução Implementada**:
+     - **Abordagem Simplificada**: Como a tabela Request Timeline é somente leitura, todas as colunas de data são configuradas como `TextColumn` em vez de `DatetimeColumn`
+     - **Benefícios da Solução**:
+       - Elimina completamente o problema de "None" em campos vazios
+       - Código mais simples e fácil de manter
+       - Strings vazias `''` permanecem como strings vazias e são exibidas corretamente como campos vazios
+       - Datas válidas são exibidas como texto formatado (ex: "2024-09-27 18:00:00")
+     - **Arquivos Modificados**:
+       - `history_components.py`: Função `_generate_dynamic_column_config()` simplificada para usar `TextColumn` para todas as colunas de data
+       - `history_components.py`: Função `render_request_timeline()` simplificada removendo lógica complexa de conversão datetime
+   - **⚠️ IMPORTANTE - Como Evitar Este Problema no Futuro**:
+     - **REGRA 1**: Para tabelas somente leitura (`st.dataframe`), sempre use `TextColumn` para colunas de data, não `DatetimeColumn`
+     - **REGRA 2**: Use `DatetimeColumn` apenas quando:
+       - A tabela permite edição (`st.data_editor`)
+       - Há necessidade específica de validação/edição de datas pelo usuário
+     - **REGRA 3**: Ao processar DataFrames com datas:
+       - Converta `NaT`, `None`, `nan` e `<NA>` para strings vazias `''` ANTES de passar para o Streamlit
+       - Use `.astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')` após conversões
+     - **REGRA 4**: Nunca passe strings vazias `''` para colunas configuradas como `DatetimeColumn` - sempre converta para `pd.NaT` primeiro ou use `TextColumn`
+     - **Padrão de Código Recomendado**:
+       ```python
+       # ✅ CORRETO - Para tabelas somente leitura
+       def _generate_dynamic_column_config(df, hide_status=False, hide_linked_reference=False):
+           """Gera configuração de colunas - usa TextColumn para datas em tabelas somente leitura"""
+           config = {}
+           for col in df.columns:
+               # Todas as colunas (incluindo datas) são TextColumn
+               # Não usar DatetimeColumn em st.dataframe somente leitura
+               if col == "Quantity of Containers":
+                   config[col] = st.column_config.NumberColumn(col, width="small")
+               else:
+                   config[col] = st.column_config.TextColumn(col, width="medium")
+           return config
+       
+       # ❌ EVITAR - Não fazer isso para tabelas somente leitura
+       if is_date_column:
+           config[col] = st.column_config.DatetimeColumn(col, format="DD/MM/YYYY HH:mm")  # Causa "None" em campos vazios
+       ```
+     - **Quando Processar Datas para Exibição**:
+       ```python
+       # Processar colunas de data antes de exibir
+       for col in df_processed.columns:
+           if df_processed[col].dtype == 'datetime64[ns]':
+               # Converter para string e tratar todos os casos de nulos
+               df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
+           else:
+               # Para outras colunas também tratar valores nulos
+               df_processed[col] = df_processed[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '')
+       ```
+   - **Checklist de Verificação**:
+     - [ ] A tabela é somente leitura? → Use `TextColumn` para datas
+     - [ ] A tabela permite edição? → Considere `DatetimeColumn` com tratamento adequado de valores vazios
+     - [ ] Todos os valores nulos foram convertidos para strings vazias `''` antes de passar para Streamlit?
+     - [ ] Testou com dados que têm valores vazios para garantir que não aparecem "None"?
+   - **Status**: ✅ **RESOLVIDO** - Sistema agora exibe campos vazios corretamente como vazios
+
 #### Diagnóstico da API Ellox
 
 ```bash
@@ -3712,6 +3778,19 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - Outros tipos de solicitação continuam aparecendo como "⚙️ Other Request"
 - **📚 Documentação Atualizada**: Seção específica no README para evitar regressão futura
 - **⚠️ Impacto**: Correção de identificação visual que melhora a experiência do usuário no histórico
+
+### 📌 v3.3.1 - Correção de Campos Vazios Exibindo "None" na Tela History (Janeiro 2025)
+- **🐛 Problema Crítico Resolvido**: Campos de data vazios (Required Arrival Date, Deadline, etc.) apareciam como "None" na tela Return Carriers History
+- **🔍 Causa Raiz Identificada**: Streamlit `DatetimeColumn` tentava converter strings vazias `''` para datetime, resultando em exibição de "None"
+- **✅ Solução Implementada**:
+  - **Simplificação Estratégica**: Como a tabela Request Timeline é somente leitura, todas as colunas de data foram convertidas para `TextColumn`
+  - **Benefícios**: Elimina completamente o problema, código mais simples, strings vazias exibidas corretamente como vazias
+  - **Arquivos Modificados**:
+    - `history_components.py`: Simplificada função `_generate_dynamic_column_config()` para usar `TextColumn`
+    - `history_components.py`: Simplificada função `render_request_timeline()` removendo lógica complexa de datetime
+- **📚 Documentação Adicionada**: Seção detalhada no README explicando como evitar este problema no futuro com regras e padrões de código
+- **⚠️ Lição Aprendida**: Para tabelas somente leitura, sempre usar `TextColumn` para datas ao invés de `DatetimeColumn`
+- **🧪 Validação**: Testado com múltiplas referências incluindo campos completamente vazios e campos com valores mistos
 
 ### 📌 v3.9.7 - Padronização Crítica de Colunas de Data (Janeiro 2025)
 - **🔧 Padronização Completa**: Unificação das colunas `S_REQUIRED_ARRIVAL_DATE` e `S_REQUIRED_ARRIVAL_DATE_EXPECTED` em todo o sistema
