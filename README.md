@@ -4131,6 +4131,27 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.1 - Janeiro 2025 - Colunas de Justificativa na Request Timeline**
+
+**🎯 Nova Funcionalidade:**
+
+#### **Exibição de Colunas de Justificativa**
+- ✅ **Colunas adicionadas**: `Area`, `Request Reason` e `Comments` agora aparecem na tabela "Request Timeline"
+- ✅ **Posicionamento**: Colunas de justificativa (`Area`, `Request Reason`, `Adjustments Owner`, `Comments`) são exibidas no final da tabela
+- ✅ **Integração completa**: As colunas são retornadas do banco de dados, processadas e mapeadas corretamente para exibição
+- ✅ **Consistência**: Todas as quatro colunas de justificativa agora estão disponíveis na visualização do histórico
+
+**📁 Arquivos Modificados:**
+- `history_helpers.py`: Adicionadas `AREA`, `REQUEST_REASON` e `COMMENTS` à função `get_display_columns()`
+- `database.py`: Query já incluía essas colunas no SELECT (sem mudanças necessárias)
+
+**🔍 Detalhes Técnicos:**
+- As colunas estavam sendo retornadas do banco, mas eram removidas pelo filtro em `prepare_dataframe_for_display()`
+- Solução: Adição das colunas à lista de colunas permitidas em `get_display_columns()`
+- Mapeamento automático: `AREA` → "Area", `REQUEST_REASON` → "Request Reason", `COMMENTS` → "Comments"
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.0 - Janeiro 2025 - Sistema de Batch ID para Auditoria**
 
 **🎯 Nova Funcionalidade:**

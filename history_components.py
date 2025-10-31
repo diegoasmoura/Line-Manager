@@ -1017,6 +1017,8 @@ def _display_tab_content(df_tab, tab_name, farol_reference):
         "Estimativa Atracação (ETB)", "Atracação (ATB)", "Partida (ATD)",
         "Estimada Transbordo (ETD)", "Chegada (ATA)", "Transbordo (ATD)",
         "PDF Name", "PDF Booking Emission Date", "Linked Reference",
+        # Colunas de justificativa no final
+        "Area", "Request Reason", "Adjustments Owner", "Comments",
     ]
     
     def reorder_columns(df, ordered_list):
@@ -1027,7 +1029,7 @@ def _display_tab_content(df_tab, tab_name, farol_reference):
 
     try:
         df_processed = reorder_columns(df_processed, desired_order)
-    except Exception:
+    except Exception as e:
         pass
     
     # Converter datas para string após ordenação, substituindo NaT/None por string vazia

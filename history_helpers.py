@@ -341,7 +341,10 @@ def get_display_columns():
         "B_DATA_ATRACACAO_ATB",
         "B_DATA_PARTIDA_ATD",
         "B_DATA_CHEGADA_ATA",
+        "AREA",
+        "REQUEST_REASON",
         "ADJUSTMENTS_OWNER",
+        "COMMENTS",
     ]
 
 def prepare_dataframe_for_display(df, farol_reference):
