@@ -1650,9 +1650,6 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                 # Get available references for relation
                 available_refs = history_get_available_references_for_relation(farol_reference)
                 
-                # Debug: verificar o que foi retornado
-                st.info(f"🔍 DEBUG - available_refs recebido: tipo={type(available_refs)}, quantidade={len(available_refs) if available_refs else 0}")
-                
                 # Salvar available_refs no session_state para acesso posterior no botão
                 st.session_state[f"available_refs_{farol_reference}"] = available_refs
                 
@@ -1663,30 +1660,15 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                 
                 # Adicionar registros disponíveis (Booking Requested ou New Adjustment sem LINKED_REFERENCE)
                 if available_refs:
-                    st.info(f"🔍 DEBUG - Processando {len(available_refs)} referência(s):")
                     for idx, ref in enumerate(available_refs):
                         b_status = str(ref.get('FAROL_STATUS', '') or '').strip()
                         linked = ref.get('LINKED_REFERENCE')
-                        ref_id = ref.get('ID')
-                        farol_ref = ref.get('FAROL_REFERENCE', 'N/A')
-                        
-                        # Debug: mostrar informações do registro
-                        st.info(f"🔍 DEBUG - Registro {idx+1}: ID={ref_id}, "
-                               f"FAROL_REFERENCE='{farol_ref}', "
-                               f"FAROL_STATUS='{b_status}', "
-                               f"LINKED_REFERENCE={repr(linked)}")
                         
                         # Check if the reference is valid for selection
                         # Aceita Booking Requested ou New Adjustment sem Linked Reference
                         is_booking_requested = (b_status == 'Booking Requested')
                         is_new_adjustment = (b_status == 'New Adjustment')
                         has_no_linked = (linked is None or str(linked).strip() == '')
-                        
-                        # Debug: resultado das verificações
-                        st.info(f"🔍 DEBUG - Registro {idx+1} filtro: "
-                               f"is_booking={is_booking_requested}, "
-                               f"is_new_adjustment={is_new_adjustment}, "
-                               f"has_no_linked={has_no_linked}")
                         
                         if (is_booking_requested and has_no_linked) or \
                            (is_new_adjustment and has_no_linked):
@@ -1698,14 +1680,6 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                             status_display = ref.get('FAROL_STATUS', 'Status')
                             option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
                             ref_options.append(option_text)
-                            st.success(f"✅ DEBUG - Registro {idx+1} ADICIONADO às opções: {option_text}")
-                        else:
-                            st.warning(f"⚠️ DEBUG - Registro {idx+1} NÃO passou no filtro")
-                    
-                    # Debug: mostrar resultado final
-                    st.info(f"🔍 DEBUG - Total de opções no selectbox: {len(ref_options)} (incluindo 'Select a reference...' e 'Changed by Carrier')")
-                else:
-                    st.warning(f"🔍 DEBUG - Nenhuma referência retornada. Farol Reference: {farol_reference}")
 
                 selected_ref = st.selectbox("Select the internal reference:", options=ref_options, key=f"internal_ref_select_{farol_reference}")
 
