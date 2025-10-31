@@ -230,8 +230,28 @@ def get_available_references_for_relation(farol_reference=None):
             
             # Mostrar detalhes dos registros encontrados pela query simples
             for idx, row in enumerate(simple_result):
-                row_dict = dict(row)
-                print(f"[DEBUG] Registro {idx}: ID={row_dict.get('ID')}, STATUS='{row_dict.get('FAROL_STATUS')}', LINKED_REF='{row_dict.get('Linked_Reference')}', DATE={row_dict.get('ROW_INSERTED_DATE')}")
+                # Tentar diferentes formas de acessar os valores
+                try:
+                    # Forma 1: dict direto
+                    row_dict = dict(row)
+                    # Forma 2: tentar acessar por chaves maiúsculas
+                    row_keys = list(row_dict.keys())
+                    print(f"[DEBUG] Registro {idx} - Chaves disponíveis: {row_keys}")
+                    
+                    # Tentar acessar valores de diferentes formas
+                    id_val = row_dict.get('ID') or row_dict.get('id') or (row_dict.get(list(row_dict.keys())[0]) if row_dict else None)
+                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status') or row_dict.get(list(row_dict.keys())[1] if len(row_dict) > 1 else None)
+                    linked_val = row_dict.get('Linked_Reference') or row_dict.get('LINKED_REFERENCE') or row_dict.get('linked_reference')
+                    date_val = row_dict.get('ROW_INSERTED_DATE') or row_dict.get('row_inserted_date')
+                    
+                    print(f"[DEBUG] Registro {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}', DATE={date_val}")
+                    # Mostrar todos os valores do row para debug
+                    print(f"[DEBUG] Registro {idx} - Valores completos: {row_dict}")
+                except Exception as e:
+                    print(f"[DEBUG] Erro ao processar registro {idx}: {e}")
+                    print(f"[DEBUG] Tipo do objeto row: {type(row)}")
+                    if hasattr(row, '__dict__'):
+                        print(f"[DEBUG] __dict__: {row.__dict__}")
             
             # Query para verificar registros que podem estar causando exclusão no NOT EXISTS
             linked_check_query = text("""
@@ -247,8 +267,18 @@ def get_available_references_for_relation(farol_reference=None):
             print(f"[DEBUG] Encontrados {len(linked_check_result)} registros 'Received from Carrier'/'Booking Approved' com LINKED_REFERENCE")
             
             for idx, row in enumerate(linked_check_result):
-                row_dict = dict(row)
-                print(f"[DEBUG] Registro vinculado {idx}: ID={row_dict.get('ID')}, STATUS='{row_dict.get('FAROL_STATUS')}', LINKED_REF='{row_dict.get('LINKED_REFERENCE')}'")
+                try:
+                    row_dict = dict(row)
+                    row_keys = list(row_dict.keys())
+                    
+                    id_val = row_dict.get('ID') or row_dict.get('id')
+                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status')
+                    linked_val = row_dict.get('LINKED_REFERENCE') or row_dict.get('linked_reference')
+                    
+                    print(f"[DEBUG] Registro vinculado {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}'")
+                    print(f"[DEBUG] Registro vinculado {idx} - Valores completos: {row_dict}")
+                except Exception as e:
+                    print(f"[DEBUG] Erro ao processar registro vinculado {idx}: {e}")
             
             # Query principal para buscar referências disponíveis, excluindo as que já foram vinculadas
             # Exclui registros cuja data de inserção (formatada como DD-MM-YYYY) já aparece em algum 
@@ -266,16 +296,12 @@ def get_available_references_for_relation(farol_reference=None):
                         AND linked.LINKED_REFERENCE IS NOT NULL
                         AND linked.LINKED_REFERENCE != 'New Adjustment'
                         AND (
-                            -- Verificação por ID (mais precisa): se o LINKED_REFERENCE contém "ID{r.ID}"
+                            -- Verificação por ID (formato novo): se o LINKED_REFERENCE contém "ID{r.ID}"
                             linked.LINKED_REFERENCE LIKE '%ID' || CAST(r.ID AS VARCHAR2(50)) || '%'
                             OR
-                            -- Fallback: verificação por data+hora formatada (DD-MM-YYYY HH24:MI) para formatos antigos ou quando ID não está presente
+                            -- Verificação por data apenas (DD-MM-YYYY) - mais flexível para formato antigo sem ID
+                            -- Verifica apenas a data, ignorando diferenças de hora
                             (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
-                             AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%')
-                            OR
-                            -- Fallback adicional: verificação apenas por data (DD-MM-YYYY) se data+hora não encontrar
-                            (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
-                             AND linked.LINKED_REFERENCE NOT LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%'
                              AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') || '%')
                         )
                   )
@@ -289,8 +315,15 @@ def get_available_references_for_relation(farol_reference=None):
             
             # Mostrar detalhes dos registros finais
             for idx, row in enumerate(result):
-                row_dict = dict(row)
-                print(f"[DEBUG] Registro final {idx}: ID={row_dict.get('ID')}, STATUS='{row_dict.get('FAROL_STATUS')}', LINKED_REF='{row_dict.get('Linked_Reference')}'")
+                try:
+                    row_dict = dict(row)
+                    id_val = row_dict.get('ID') or row_dict.get('id')
+                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status')
+                    linked_val = row_dict.get('Linked_Reference') or row_dict.get('LINKED_REFERENCE') or row_dict.get('linked_reference')
+                    
+                    print(f"[DEBUG] Registro final {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}'")
+                except Exception as e:
+                    print(f"[DEBUG] Erro ao processar registro final {idx}: {e}")
             
             conn.close()
             print(f"[DEBUG] Conexão fechada")
