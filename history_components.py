@@ -1650,22 +1650,43 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                 # Get available references for relation
                 available_refs = history_get_available_references_for_relation(farol_reference)
                 
+                # Debug: verificar o que foi retornado
+                st.info(f"🔍 DEBUG - available_refs recebido: tipo={type(available_refs)}, quantidade={len(available_refs) if available_refs else 0}")
+                
+                # Salvar available_refs no session_state para acesso posterior no botão
+                st.session_state[f"available_refs_{farol_reference}"] = available_refs
+                
                 ref_options = ["Select a reference..."]
                 
-                # Adicionar opção especial "New Adjustment" sempre disponível
-                ref_options.append("🆕 New Adjustment")
+                # Adicionar opção especial "Changed by Carrier" sempre disponível
+                ref_options.append("🆕 Changed by Carrier")
                 
                 # Adicionar registros disponíveis (Booking Requested ou New Adjustment sem LINKED_REFERENCE)
                 if available_refs:
-                    for ref in available_refs:
+                    st.info(f"🔍 DEBUG - Processando {len(available_refs)} referência(s):")
+                    for idx, ref in enumerate(available_refs):
                         b_status = str(ref.get('FAROL_STATUS', '') or '').strip()
                         linked = ref.get('LINKED_REFERENCE')
+                        ref_id = ref.get('ID')
+                        farol_ref = ref.get('FAROL_REFERENCE', 'N/A')
+                        
+                        # Debug: mostrar informações do registro
+                        st.info(f"🔍 DEBUG - Registro {idx+1}: ID={ref_id}, "
+                               f"FAROL_REFERENCE='{farol_ref}', "
+                               f"FAROL_STATUS='{b_status}', "
+                               f"LINKED_REFERENCE={repr(linked)}")
                         
                         # Check if the reference is valid for selection
                         # Aceita Booking Requested ou New Adjustment sem Linked Reference
                         is_booking_requested = (b_status == 'Booking Requested')
                         is_new_adjustment = (b_status == 'New Adjustment')
                         has_no_linked = (linked is None or str(linked).strip() == '')
+                        
+                        # Debug: resultado das verificações
+                        st.info(f"🔍 DEBUG - Registro {idx+1} filtro: "
+                               f"is_booking={is_booking_requested}, "
+                               f"is_new_adjustment={is_new_adjustment}, "
+                               f"has_no_linked={has_no_linked}")
                         
                         if (is_booking_requested and has_no_linked) or \
                            (is_new_adjustment and has_no_linked):
@@ -1677,15 +1698,23 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                             status_display = ref.get('FAROL_STATUS', 'Status')
                             option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
                             ref_options.append(option_text)
+                            st.success(f"✅ DEBUG - Registro {idx+1} ADICIONADO às opções: {option_text}")
+                        else:
+                            st.warning(f"⚠️ DEBUG - Registro {idx+1} NÃO passou no filtro")
+                    
+                    # Debug: mostrar resultado final
+                    st.info(f"🔍 DEBUG - Total de opções no selectbox: {len(ref_options)} (incluindo 'Select a reference...' e 'Changed by Carrier')")
+                else:
+                    st.warning(f"🔍 DEBUG - Nenhuma referência retornada. Farol Reference: {farol_reference}")
 
                 selected_ref = st.selectbox("Select the internal reference:", options=ref_options, key=f"internal_ref_select_{farol_reference}")
 
-                # Formulário condicional para "New Adjustment"
+                # Formulário condicional para "Changed by Carrier"
                 justification = {}
-                if selected_ref == "🆕 New Adjustment":
+                if selected_ref == "🆕 Changed by Carrier":
                     st.markdown("#### New Adjustment Justification")
                     reason = st.selectbox(
-                        "Booking Adjustment Request Reason *", 
+                        "Adjustment Request Reason *", 
                         options=[""] + Booking_adj_reason_car,
                         key=f"new_adj_reason_{farol_reference}"
                     )
@@ -1705,7 +1734,7 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                                 break
                     
                     responsibility = st.selectbox(
-                        "Booking Adjustment Responsibility",
+                        "Adjustment Responsibility",
                         options=responsibility_options,
                         index=default_index,
                         disabled=True,
@@ -1734,11 +1763,11 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                 with col1:
                     if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
                         if selected_ref != "Select a reference...":
-                            # Tratar opção especial "New Adjustment"
-                            if selected_ref == "🆕 New Adjustment":
+                            # Tratar opção especial "Changed by Carrier"
+                            if selected_ref == "🆕 Changed by Carrier":
                                 # Validar campos obrigatórios
                                 if not justification.get("request_reason"):
-                                    st.error("The 'Booking Adjustment Request Reason' field is mandatory for New Adjustment.")
+                                    st.error("The 'Adjustment Request Reason' field is mandatory for New Adjustment.")
                                 else:
                                     related_reference = "New Adjustment"
                                     # Call approval function com justification
@@ -1761,25 +1790,64 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                                     if len(pdf_parts) > 0:
                                         index_part = pdf_parts[0].strip()  # "Index 3"
                                 
-                                # 2. Extrair data da referência interna (pode estar na posição 2 ou 3 dependendo do formato)
-                                date_part = ""
+                                # 2. Extrair ID da referência interna selecionada
+                                ref_id = None
+                                if "|" in selected_ref:
+                                    # Recuperar available_refs do session_state
+                                    available_refs_for_id = st.session_state.get(f"available_refs_{farol_reference}", [])
+                                    
+                                    # Buscar o registro correspondente em available_refs para obter o ID
+                                    ref_parts = [p.strip() for p in selected_ref.split("|")]
+                                    farol_ref_part = ref_parts[0] if len(ref_parts) > 0 else ""
+                                    
+                                    # Encontrar o registro correspondente em available_refs
+                                    for ref in available_refs_for_id:
+                                        if ref.get('FAROL_REFERENCE') == farol_ref_part:
+                                            ref_id = ref.get('ID')
+                                            break
+                                
+                                # 3. Extrair data e hora da referência interna (pode estar na posição 2 ou 3 dependendo do formato)
+                                date_time_part = ""
                                 if "|" in selected_ref:
                                     ref_parts = [p.strip() for p in selected_ref.split("|")]
                                     # A data pode estar na última posição ou na terceira
                                     if len(ref_parts) >= 3:
-                                        # Extrair data e formatar com hífen (remover hora se houver)
-                                        date_str = ref_parts[2]  # "29/10/2025 15:43" ou "29/10/2025"
-                                        date_part = date_str.split()[0].replace("/", "-")  # "29-10-2025"
+                                        # Extrair data e hora completa
+                                        date_str = ref_parts[2]  # "31/10/2025 00:43" ou "31/10/2025"
+                                        # Formatar data e hora: "DD-MM-YYYY HH:MM"
+                                        if " " in date_str:
+                                            date_only, time_only = date_str.split(" ", 1)
+                                            date_formatted = date_only.replace("/", "-")
+                                            # Pegar apenas HH:MM da hora
+                                            time_formatted = time_only.split(":")[:2]
+                                            if len(time_formatted) == 2:
+                                                date_time_part = f"{date_formatted} {time_formatted[0]}:{time_formatted[1]}"
+                                            else:
+                                                date_time_part = date_formatted
+                                        else:
+                                            date_time_part = date_str.replace("/", "-")
                                     elif len(ref_parts) >= 2:
                                         # Se não houver terceira parte, tenta a segunda
                                         date_str = ref_parts[1]
                                         # Verifica se é uma data (contém / ou -)
                                         if "/" in date_str or "-" in date_str:
-                                            date_part = date_str.split()[0].replace("/", "-")
+                                            if " " in date_str:
+                                                date_only, time_only = date_str.split(" ", 1)
+                                                date_formatted = date_only.replace("/", "-")
+                                                time_formatted = time_only.split(":")[:2]
+                                                if len(time_formatted) == 2:
+                                                    date_time_part = f"{date_formatted} {time_formatted[0]}:{time_formatted[1]}"
+                                                else:
+                                                    date_time_part = date_formatted
+                                            else:
+                                                date_time_part = date_str.replace("/", "-")
                                 
-                                # 3. Montar related_reference no formato desejado (sem status)
-                                if index_part and date_part:
-                                    related_reference = f"{index_part} | {date_part}"
+                                # 4. Montar related_reference no formato: "ID | Index X | DD-MM-YYYY HH:MM"
+                                # Se tiver ID, incluir no formato para facilitar verificação
+                                if ref_id and index_part and date_time_part:
+                                    related_reference = f"ID{ref_id} | {index_part} | {date_time_part}"
+                                elif index_part and date_time_part:
+                                    related_reference = f"{index_part} | {date_time_part}"
                                 else:
                                     # Fallback: usar selected_ref completo se não conseguir montar
                                     related_reference = selected_ref
@@ -1804,7 +1872,7 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                 st.markdown("<h4 style='text-align: left;'>New External Adjustment</h4>", unsafe_allow_html=True)
                 with st.form(key=f"external_adjustment_form_{farol_reference}"):
                     st.info("This is a carrier adjustment without a prior request from the company.")
-                    reason = st.selectbox("Booking Adjustment Request Reason", options=[""] + Booking_adj_reason_car)
+                    reason = st.selectbox("Adjustment Request Reason", options=[""] + Booking_adj_reason_car)
                     
                     # Para ajuste externo, sempre usar "Armador" e desabilitar
                     responsibility_options = [""] + Booking_adj_responsibility_car
@@ -1822,7 +1890,7 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                                 break
                     
                     responsibility = st.selectbox(
-                        "Booking Adjustment Responsibility",
+                        "Adjustment Responsibility",
                         options=responsibility_options,
                         index=default_index,
                         disabled=True,
@@ -1847,7 +1915,7 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
 
                     if submitted:
                         if not reason:
-                            st.error("The 'Booking Adjustment Request Reason' field is mandatory.")
+                            st.error("The 'Adjustment Request Reason' field is mandatory.")
                         else:
                             justification = {
                                 "area": "Booking",

@@ -203,9 +203,13 @@ def get_voyage_monitoring_for_reference(farol_reference):
 
 def get_available_references_for_relation(farol_reference=None):
     """Busca referências na aba 'Other Status' para relacionamento."""
+    import streamlit as st
+    st.info(f"🔍 DEBUG - get_available_references_for_relation chamada com: '{farol_reference}'")
+    
     try:
         from database import get_database_connection
         conn = get_database_connection()
+        st.info(f"🔍 DEBUG - Conexão estabelecida: {conn is not None}")
         
         if farol_reference:
             # Query para buscar referências disponíveis, excluindo as que já foram vinculadas
@@ -223,12 +227,118 @@ def get_available_references_for_relation(farol_reference=None):
                         AND UPPER(linked.FAROL_REFERENCE) = UPPER(:farol_reference)
                         AND linked.LINKED_REFERENCE IS NOT NULL
                         AND linked.LINKED_REFERENCE != 'New Adjustment'
-                        AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') || '%'
+                        AND (
+                            -- Verificação por ID (mais precisa): se o LINKED_REFERENCE contém "ID{r.ID}"
+                            linked.LINKED_REFERENCE LIKE '%ID' || CAST(r.ID AS VARCHAR2(50)) || '%'
+                            OR
+                            -- Fallback: verificação por data+hora formatada (DD-MM-YYYY HH24:MI) para formatos antigos ou quando ID não está presente
+                            (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
+                             AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%')
+                            OR
+                            -- Fallback adicional: verificação apenas por data (DD-MM-YYYY) se data+hora não encontrar
+                            (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
+                             AND linked.LINKED_REFERENCE NOT LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%'
+                             AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') || '%')
+                        )
                   )
                 ORDER BY r.ROW_INSERTED_DATE ASC
             """)
             params = {"farol_reference": farol_reference}
+            
+            # Debug: Primeiro, verificar quantos registros existem SEM o NOT EXISTS
+            query_count = text("""
+                SELECT COUNT(*) as total
+                FROM LogTransp.F_CON_RETURN_CARRIERS r
+                WHERE r.FAROL_STATUS IN ('Booking Requested', 'New Adjustment')
+                  AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
+            """)
+            count_result = conn.execute(query_count, params).scalar()
+            st.info(f"🔍 DEBUG COUNT - Total de registros 'Booking Requested' e 'New Adjustment' para '{farol_reference}': {count_result}")
+            
+            # Debug: Verificar registros que podem estar causando exclusão no NOT EXISTS
+            query_linked = text("""
+                SELECT linked.ID, linked.FAROL_REFERENCE, linked.FAROL_STATUS, linked.LINKED_REFERENCE
+                FROM LogTransp.F_CON_RETURN_CARRIERS linked
+                WHERE (linked.FAROL_STATUS = 'Received from Carrier' OR linked.FAROL_STATUS = 'Booking Approved')
+                  AND UPPER(linked.FAROL_REFERENCE) = UPPER(:farol_reference)
+                  AND linked.LINKED_REFERENCE IS NOT NULL
+                  AND linked.LINKED_REFERENCE != 'New Adjustment'
+            """)
+            linked_results = conn.execute(query_linked, params).mappings().fetchall()
+            st.info(f"🔍 DEBUG LINKED - Registros 'Received/Approved' com LINKED_REFERENCE: {len(linked_results) if linked_results else 0}")
+            if linked_results:
+                for i, linked_row in enumerate(linked_results):
+                    linked_dict = dict(linked_row)
+                    st.info(f"🔍 DEBUG LINKED {i+1}: ID={linked_dict.get('id')}, "
+                           f"STATUS='{linked_dict.get('farol_status')}', "
+                           f"LINKED_REFERENCE='{linked_dict.get('linked_reference')}'")
+            
+            # Debug: Verificar todos os registros candidatos antes do NOT EXISTS
+            query_candidates = text("""
+                SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, 
+                       TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') as date_formatted,
+                       TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') as datetime_formatted
+                FROM LogTransp.F_CON_RETURN_CARRIERS r
+                WHERE r.FAROL_STATUS IN ('Booking Requested', 'New Adjustment')
+                  AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
+            """)
+            candidates = conn.execute(query_candidates, params).mappings().fetchall()
+            st.info(f"🔍 DEBUG CANDIDATES - Registros candidatos antes do NOT EXISTS: {len(candidates) if candidates else 0}")
+            if candidates:
+                for i, cand in enumerate(candidates):
+                    cand_dict = dict(cand)
+                    st.info(f"🔍 DEBUG CANDIDATE {i+1}: ID={cand_dict.get('id')}, "
+                           f"STATUS='{cand_dict.get('farol_status')}', "
+                           f"DATE='{cand_dict.get('date_formatted')}', "
+                           f"DATETIME='{cand_dict.get('datetime_formatted')}'")
+            
+            # Debug: Para cada candidato, verificar manualmente se seria excluído
+            if candidates and linked_results:
+                st.info("🔍 DEBUG EXCLUSION - Verificando por que cada candidato está sendo excluído:")
+                for cand in candidates:
+                    cand_dict = dict(cand)
+                    cand_id = cand_dict.get('id')
+                    cand_date = cand_dict.get('date_formatted')
+                    cand_datetime = cand_dict.get('datetime_formatted')
+                    cand_status = cand_dict.get('farol_status')
+                    
+                    st.info(f"🔍 DEBUG EXCLUSION - Candidato: ID={cand_id}, STATUS='{cand_status}', DATE='{cand_date}', DATETIME='{cand_datetime}'")
+                    
+                    # Verificar se algum linked contém o ID ou a data deste candidato
+                    found_match = False
+                    for linked_row in linked_results:
+                        linked_dict = dict(linked_row)
+                        linked_ref = str(linked_dict.get('linked_reference', '') or '')
+                        
+                        # Verificar por ID
+                        if f'ID{cand_id}' in linked_ref:
+                            st.warning(f"  ❌ EXCLUÍDO por ID: LINKED_REFERENCE='{linked_ref}' contém 'ID{cand_id}'")
+                            found_match = True
+                        # Verificar por data+hora
+                        elif cand_datetime and cand_datetime in linked_ref:
+                            st.warning(f"  ❌ EXCLUÍDO por data+hora: LINKED_REFERENCE='{linked_ref}' contém '{cand_datetime}'")
+                            found_match = True
+                        # Verificar por data (fallback)
+                        elif cand_date and cand_date in linked_ref and 'ID' not in linked_ref:
+                            st.warning(f"  ❌ EXCLUÍDO por data (fallback): LINKED_REFERENCE='{linked_ref}' contém '{cand_date}'")
+                            found_match = True
+                    
+                    if not found_match:
+                        st.success(f"  ✅ NÃO EXCLUÍDO: Nenhum linked contém ID, data+hora ou data deste candidato")
+            
+            st.info(f"🔍 DEBUG - Executando query principal com parâmetro: '{farol_reference}'")
             result = conn.execute(query, params).mappings().fetchall()
+            st.info(f"🔍 DEBUG - Query retornou {len(result) if result else 0} registro(s)")
+            
+            # Debug: mostrar registros retornados
+            if result:
+                for i, row in enumerate(result[:5]):  # Mostrar até 5 primeiros
+                    row_dict = dict(row)
+                    st.info(f"🔍 DEBUG - Registro {i+1}: ID={row_dict.get('id')}, "
+                           f"FAROL_STATUS='{row_dict.get('farol_status')}', "
+                           f"LINKED_REFERENCE={repr(row_dict.get('linked_reference'))}")
+            else:
+                st.warning("🔍 DEBUG - Query não retornou nenhum registro! Todos foram excluídos pelo NOT EXISTS.")
         else:
             # Comportamento legado: somente originais (não-split) de todas as referências
             query = text("""
@@ -243,8 +353,14 @@ def get_available_references_for_relation(farol_reference=None):
         conn.close()
         if result:
             processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
+            st.info(f"🔍 DEBUG - Processados {len(processed)} registro(s)")
+            if processed:
+                st.info(f"🔍 DEBUG - Primeiro registro processado: ID={processed[0].get('ID')}, "
+                       f"FAROL_STATUS='{processed[0].get('FAROL_STATUS')}', "
+                       f"LINKED_REFERENCE={repr(processed[0].get('LINKED_REFERENCE'))}")
             return processed
         else:
+            st.warning("🔍 DEBUG - Nenhum resultado para processar, retornando lista vazia")
             return []
     except Exception as e:
         if 'conn' in locals():

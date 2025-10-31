@@ -1214,7 +1214,7 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - 📅 **Ordenação cronológica**: Mais antigo primeiro, mesmo dia ordenado por hora (descendente)
 - 🏷️ **Formato de exibição**: "FR_... | DD/MM/YYYY HH:MM | Status" (sem ícones)
 - 🚫 **Exclusões**: Não mostra "Carrier Return (Linked)" nem registros já linkados
-- 🔄 **Filtro de referências vinculadas**: Registros já usados como `LINKED_REFERENCE` em aprovações anteriores não aparecem mais na lista (filtro baseado na data de inserção formatada DD-MM-YYYY que aparece no LINKED_REFERENCE)
+- 🔄 **Filtro de referências vinculadas**: Registros já usados como `LINKED_REFERENCE` em aprovações anteriores não aparecem mais na lista (filtro baseado em ID primeiro, depois data+hora DD-MM-YYYY HH:MM, e finalmente data apenas DD-MM-YYYY como fallback)
 - ✅ **Persistência**: Uma vez vinculada, a referência não aparece mais mesmo após adicionar novos PDFs para aprovação
 
 **🆕 New Adjustment - Regras Especiais:**
@@ -4150,6 +4150,29 @@ Todos os PRs passam por revisão técnica focando em:
 - A query verifica se registros "Received from Carrier" ou "Booking Approved" já têm um `LINKED_REFERENCE` contendo a data formatada (DD-MM-YYYY) do registro candidato
 - Se a data já aparecer em algum `LINKED_REFERENCE`, o registro não aparece no selectbox (prevenção de duplicidade)
 - O formato do `related_reference` salvo é: `"Farol Reference | Status | DD/MM/YYYY HH:MM"`
+
+**✅ Status**: Implementado e testado
+
+### 🔧 **v4.2.3 - Janeiro 2025 - Inclusão de Hora no Formato do Related Reference**
+
+**🎯 Melhoria:**
+
+#### **Formato Aprimorado do LINKED_REFERENCE**
+- ✅ **Inclusão de hora**: O formato do `related_reference` agora inclui hora para maior precisão na verificação: `"ID{id} | Index X | DD-MM-YYYY HH:MM"`
+- ✅ **Verificação aprimorada**: A query NOT EXISTS agora verifica primeiro por ID, depois por data+hora, e finalmente por data apenas (fallback)
+- ✅ **Precisão melhorada**: Incluir hora reduz falsos positivos quando múltiplos registros têm a mesma data
+
+**📁 Arquivos Modificados:**
+- `history_components.py`: Atualizada lógica de formatação do `related_reference` para incluir hora (DD-MM-YYYY HH:MM)
+- `history_data.py`: Query NOT EXISTS atualizada para verificar por data+hora (`DD-MM-YYYY HH24:MI`) além de verificação por ID
+
+**🔍 Detalhes Técnicos:**
+- O formato salvo é: `"ID{id} | Index X | DD-MM-YYYY HH:MM"` (exemplo: `"ID1152 | Index 2 | 31-10-2025 00:43"`)
+- A query verifica na seguinte ordem de prioridade:
+  1. **Por ID** (mais preciso): `LINKED_REFERENCE LIKE '%ID{r.ID}%'`
+  2. **Por data+hora** (fallback para formatos antigos): `LINKED_REFERENCE LIKE '%DD-MM-YYYY HH24:MI%'` quando não contém ID
+  3. **Por data apenas** (fallback adicional): `LINKED_REFERENCE LIKE '%DD-MM-YYYY%'` quando não contém ID e data+hora não encontra
+- Debug aprimorado para mostrar data e data+hora formatadas para facilitar diagnóstico
 
 **✅ Status**: Implementado e testado
 
