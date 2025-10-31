@@ -301,14 +301,9 @@ def get_available_references_for_relation(farol_reference=None):
                             OR
                             -- Verificação por data+hora (DD-MM-YYYY HH24:MI) para formato antigo sem ID
                             -- Mais preciso que apenas data, evita excluir registros incorretos do mesmo dia
+                            -- REMOVIDO fallback por data apenas - estava excluindo incorretamente todos os registros do mesmo dia
                             (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
                              AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%')
-                            OR
-                            -- Fallback: verificação por data apenas (DD-MM-YYYY) caso data+hora não encontre correspondência
-                            -- Usado apenas como último recurso para compatibilidade com formatos muito antigos
-                            (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
-                             AND linked.LINKED_REFERENCE NOT LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%'
-                             AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') || '%')
                         )
                   )
                 ORDER BY r.ROW_INSERTED_DATE ASC
@@ -323,13 +318,36 @@ def get_available_references_for_relation(farol_reference=None):
             for idx, row in enumerate(result):
                 try:
                     row_dict = dict(row)
-                    id_val = row_dict.get('ID') or row_dict.get('id')
-                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status')
-                    linked_val = row_dict.get('Linked_Reference') or row_dict.get('LINKED_REFERENCE') or row_dict.get('linked_reference')
+                    # Verificar TODAS as chaves disponíveis para entender o problema do ID
+                    all_keys = list(row_dict.keys())
+                    print(f"[DEBUG] Registro final {idx} - Todas as chaves: {all_keys}")
+                    
+                    # Tentar obter ID de várias formas possíveis
+                    id_val = (row_dict.get('ID') or row_dict.get('id') or 
+                             row_dict.get('Id') or row_dict.get('iD'))
+                    
+                    # Se ainda não encontrou, verificar se há alguma coluna que pareça ser ID
+                    if id_val is None:
+                        for key in all_keys:
+                            if key.upper() == 'ID':
+                                id_val = row_dict.get(key)
+                                print(f"[DEBUG] ID encontrado na chave '{key}': {id_val}")
+                                break
+                    
+                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status') or row_dict.get('Farol_Status')
+                    linked_val = (row_dict.get('Linked_Reference') or row_dict.get('LINKED_REFERENCE') or 
+                                 row_dict.get('linked_reference') or row_dict.get('LINKED_REF'))
                     
                     print(f"[DEBUG] Registro final {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}'")
+                    print(f"[DEBUG] Registro final {idx} - Valores completos: {row_dict}")
+                    
+                    # AVISO se ID não foi encontrado
+                    if id_val is None:
+                        print(f"[WARNING] ID não encontrado para registro {idx}! Isso pode indicar que a coluna ID não existe na tabela do servidor ou está NULL.")
                 except Exception as e:
                     print(f"[DEBUG] Erro ao processar registro final {idx}: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             conn.close()
             print(f"[DEBUG] Conexão fechada")
