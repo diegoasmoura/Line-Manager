@@ -1646,49 +1646,29 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
 
             elif st.session_state.get(f"approval_step_{farol_reference}") == "select_internal_reference":
                 st.markdown("<h4 style='text-align: left;'>Related Reference</h4>", unsafe_allow_html=True)
-                # DEBUG 9: Antes de chamar a função
-                st.info(f"🔍 DEBUG 9 - Chamando history_get_available_references_for_relation com: '{farol_reference}'")
                 
                 # Get available references for relation
                 available_refs = history_get_available_references_for_relation(farol_reference)
-                
-                # DEBUG 10: Tipo e quantidade recebida
-                st.info(f"🔍 DEBUG 10 - available_refs recebido: tipo={type(available_refs)}, quantidade={len(available_refs) if available_refs else 0}")
                 
                 ref_options = ["Select a reference..."]
                 
                 # Adicionar opção especial "New Adjustment" sempre disponível
                 ref_options.append("🆕 New Adjustment")
                 
-                # Adicionar registros disponíveis (Booking Requested ou Adjustment Requested sem LINKED_REFERENCE)
+                # Adicionar registros disponíveis (Booking Requested ou New Adjustment sem LINKED_REFERENCE)
                 if available_refs:
-                    # DEBUG 11: Mostrar cada referência retornada com todos os campos
-                    st.info(f"🔍 DEBUG 11 - Processando {len(available_refs)} referência(s):")
-                    debug_info = []
-                    for idx, ref in enumerate(available_refs):
-                        p_status = str(ref.get('P_STATUS', '') or '').strip()
+                    for ref in available_refs:
                         b_status = str(ref.get('FAROL_STATUS', '') or '').strip()
                         linked = ref.get('LINKED_REFERENCE')
-                        farol_ref = ref.get('FAROL_REFERENCE', 'N/A')
-                        
-                        # DEBUG 12: Status exato antes do filtro
-                        st.info(f"🔍 DEBUG 12 - Registro {idx+1}: FAROL_REFERENCE='{farol_ref}', FAROL_STATUS='{b_status}', "
-                               f"P_STATUS='{p_status}', LINKED_REFERENCE={repr(linked)}")
-                        
-                        debug_info.append(f"Registro {idx+1}: Status='{b_status}', Linked={repr(linked)}, Farol={farol_ref}")
                         
                         # Check if the reference is valid for selection
-                        # Aceita Booking Requested ou Adjustment Requested sem Linked Reference
+                        # Aceita Booking Requested ou New Adjustment sem Linked Reference
                         is_booking_requested = (b_status == 'Booking Requested')
-                        is_adjustment_requested = (b_status == 'Adjustment Requested')
+                        is_new_adjustment = (b_status == 'New Adjustment')
                         has_no_linked = (linked is None or str(linked).strip() == '')
                         
-                        # DEBUG 13: Resultado do filtro
-                        st.info(f"🔍 DEBUG 13 - Registro {idx+1} filtro: is_booking={is_booking_requested}, "
-                               f"is_adjustment={is_adjustment_requested}, has_no_linked={has_no_linked}")
-                        
                         if (is_booking_requested and has_no_linked) or \
-                           (is_adjustment_requested and has_no_linked):
+                           (is_new_adjustment and has_no_linked):
                             
                             inserted_date = ref.get('ROW_INSERTED_DATE')
                             brazil_time = convert_utc_to_brazil_time(inserted_date) if inserted_date else None
@@ -1697,16 +1677,6 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                             status_display = ref.get('FAROL_STATUS', 'Status')
                             option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
                             ref_options.append(option_text)
-                            st.success(f"✅ DEBUG 14 - Registro {idx+1} ADICIONADO às opções: {option_text}")
-                        else:
-                            st.warning(f"⚠️ DEBUG 14 - Registro {idx+1} NÃO passou no filtro")
-                    
-                    # Debug: mostrar informações se não adicionou nenhuma opção
-                    if len(ref_options) == 2:  # Apenas "Select..." e "New Adjustment"
-                        st.error(f"🔍 DEBUG 15 - {len(available_refs)} referência(s) retornada(s), mas nenhuma passou no filtro:\n" + "\n".join(debug_info))
-                else:
-                    # Debug temporário para verificar o que está sendo retornado
-                    st.warning(f"🔍 DEBUG 15 - Nenhuma referência retornada da query. Farol Reference: {farol_reference}")
 
                 selected_ref = st.selectbox("Select the internal reference:", options=ref_options, key=f"internal_ref_select_{farol_reference}")
 

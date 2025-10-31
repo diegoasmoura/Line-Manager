@@ -495,8 +495,6 @@ try:
     )
 except Exception as e:
     # Em contextos de import parcial (linters/tests), ignorar falhas transitórias
-    import streamlit as st
-    st.warning(f"⚠️ DEBUG WRAPPER - Erro ao importar history_data: {str(e)}")
     _history_get_main_table_data = None
     _history_get_voyage_monitoring_for_reference = None
     _history_get_available_references_for_relation = None
@@ -521,22 +519,11 @@ def history_get_voyage_monitoring_for_reference(farol_reference):
 
 
 def history_get_available_references_for_relation(farol_reference=None):
-    import streamlit as st
-    # DEBUG WRAPPER: Verificar se função foi importada
     if _history_get_available_references_for_relation is None:
-        st.error("❌ DEBUG WRAPPER - _history_get_available_references_for_relation é None! Import falhou.")
         return []
-    
-    # DEBUG WRAPPER: Função existe, chamar
-    st.info(f"🔍 DEBUG WRAPPER - Chamando _history_get_available_references_for_relation com: '{farol_reference}'")
     try:
-        result = _history_get_available_references_for_relation(farol_reference)
-        st.info(f"🔍 DEBUG WRAPPER - Resultado recebido: {len(result) if result else 0} registro(s)")
-        return result
+        return _history_get_available_references_for_relation(farol_reference)
     except Exception as e:
-        st.error(f"❌ DEBUG WRAPPER - Erro ao executar função: {str(e)}")
-        import traceback
-        st.error(f"❌ DEBUG WRAPPER - Traceback: {traceback.format_exc()}")
         return []
 
 

@@ -4131,6 +4131,28 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.2 - Janeiro 2025 - Suporte a "New Adjustment" no Related Reference**
+
+**🎯 Nova Funcionalidade:**
+
+#### **Related Reference com "New Adjustment"**
+- ✅ **Suporte a "New Adjustment"**: O selectbox "Related Reference" agora exibe registros com status "New Adjustment" além de "Booking Requested"
+- ✅ **Prevenção de duplicidade**: Cada registro ("Booking Requested" ou "New Adjustment") só pode ser referenciado uma vez através do sistema NOT EXISTS baseado em data
+- ✅ **Filtragem inteligente**: Apenas registros sem `LINKED_REFERENCE` são exibidos no selectbox
+- ✅ **Query otimizada**: Busca específica por status `'Booking Requested'` e `'New Adjustment'` em vez de excluir apenas `'Received from Carrier'`
+
+**📁 Arquivos Modificados:**
+- `history_data.py`: Query atualizada para buscar `'Booking Requested'` e `'New Adjustment'` na função `get_available_references_for_relation()`
+- `history_components.py`: Filtro atualizado para aceitar registros "New Adjustment" no selectbox "Related Reference"
+- Removidos todos os debugs temporários de ambos os arquivos
+
+**🔍 Detalhes Técnicos:**
+- A query verifica se registros "Received from Carrier" ou "Booking Approved" já têm um `LINKED_REFERENCE` contendo a data formatada (DD-MM-YYYY) do registro candidato
+- Se a data já aparecer em algum `LINKED_REFERENCE`, o registro não aparece no selectbox (prevenção de duplicidade)
+- O formato do `related_reference` salvo é: `"Farol Reference | Status | DD/MM/YYYY HH:MM"`
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.1 - Janeiro 2025 - Colunas de Justificativa na Request Timeline**
 
 **🎯 Nova Funcionalidade:**

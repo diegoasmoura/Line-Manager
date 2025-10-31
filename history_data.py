@@ -203,18 +203,9 @@ def get_voyage_monitoring_for_reference(farol_reference):
 
 def get_available_references_for_relation(farol_reference=None):
     """Busca referências na aba 'Other Status' para relacionamento."""
-    # DEBUG 0: Primeiro debug - antes de qualquer coisa
-    import streamlit as st
-    st.info(f"🔍 DEBUG 0 - Função chamada com farol_reference = '{farol_reference}'")
-    
     try:
-        # DEBUG 1: Parâmetros recebidos
-        st.info(f"🔍 DEBUG 1 - Parâmetro recebido: farol_reference = '{farol_reference}' (tipo: {type(farol_reference)})")
-        
         from database import get_database_connection
         conn = get_database_connection()
-        # DEBUG 2: Conexão estabelecida
-        st.info(f"🔍 DEBUG 2 - Conexão estabelecida: {conn is not None}")
         
         if farol_reference:
             # Query para buscar referências disponíveis, excluindo as que já foram vinculadas
@@ -223,7 +214,7 @@ def get_available_references_for_relation(farol_reference=None):
             query = text("""
                 SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, r.P_STATUS, r.ROW_INSERTED_DATE, r.Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS r
-                WHERE r.FAROL_STATUS != 'Received from Carrier'
+                WHERE r.FAROL_STATUS IN ('Booking Requested', 'New Adjustment')
                   AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
                   AND NOT EXISTS (
                       SELECT 1 
@@ -237,20 +228,7 @@ def get_available_references_for_relation(farol_reference=None):
                 ORDER BY r.ROW_INSERTED_DATE ASC
             """)
             params = {"farol_reference": farol_reference}
-            st.info(f"🔍 DEBUG 5 - Executando query simplificada com parâmetro: '{farol_reference}'")
             result = conn.execute(query, params).mappings().fetchall()
-            
-            # DEBUG 6: Quantidade de linhas retornadas
-            st.info(f"🔍 DEBUG 6 - Query simplificada retornou {len(result) if result else 0} registro(s)")
-            
-            # DEBUG 7: Mostrar primeiros registros retornados
-            if result:
-                st.info(f"🔍 DEBUG 7 - Primeiros registros retornados:")
-                for i, row in enumerate(result[:3]):  # Mostrar até 3 primeiros
-                    row_dict = dict(row)
-                    st.info(f"  Registro {i+1}: {row_dict}")
-            else:
-                st.warning("🔍 DEBUG 7 - Query simplificada não retornou nenhum registro!")
         else:
             # Comportamento legado: somente originais (não-split) de todas as referências
             query = text("""
@@ -263,28 +241,12 @@ def get_available_references_for_relation(farol_reference=None):
             """)
             result = conn.execute(query).mappings().fetchall()
         conn.close()
-        # DEBUG 8: Processar resultado antes de retornar
         if result:
-            # DEBUG 8.1: Verificar chaves do primeiro registro antes da conversão
-            if result:
-                first_row = dict(result[0])
-                st.info(f"🔍 DEBUG 8.1 - Chaves do primeiro registro ANTES da conversão: {list(first_row.keys())}")
-            
             processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
-            st.info(f"🔍 DEBUG 8 - Resultado processado: {len(processed)} registro(s) convertido(s)")
-            if processed:
-                st.info(f"🔍 DEBUG 8.2 - Primeiro registro processado: {processed[0]}")
-                st.info(f"🔍 DEBUG 8.2 - Chaves após conversão: {list(processed[0].keys())}")
             return processed
         else:
-            st.warning("🔍 DEBUG 8 - Nenhum resultado para processar, retornando lista vazia")
             return []
     except Exception as e:
-        import traceback
-        # DEBUG 17: Verificar se há erro silencioso sendo capturado
-        st.error(f"❌ DEBUG 17 - Erro ao buscar referências disponíveis: {str(e)}")
-        st.error(f"❌ DEBUG 17 - Tipo do erro: {type(e).__name__}")
-        st.error(f"❌ DEBUG 17 - Traceback completo:\n{traceback.format_exc()}")
         if 'conn' in locals():
             try:
                 if hasattr(conn, 'is_connected') and conn.is_connected():
