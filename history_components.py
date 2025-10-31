@@ -718,11 +718,14 @@ def _generate_dynamic_column_config(df, hide_status=False, hide_linked_reference
             config[col] = None
             continue
         
-        width = "medium"
-        if col in ['PDF Name', 'Linked Reference', 'Adjustments Owner']:
-            width = "large"
-        elif col in ['Index', 'Quantity of Containers']:
-            width = "small"
+        # Definir larguras específicas por coluna
+        if col == "Linked Reference":
+            width = "large"  # Largura grande para evitar corte de texto
+        elif col in ["Quantity of Containers"]:
+            width = "medium"
+        else:
+            # Todas as outras colunas usam largura "medium" como padrão
+            width = "medium"
         
         # Todas as colunas (incluindo datas) são tratadas como TextColumn
         # Isso evita problemas de conversão do Streamlit que exibem "None" em campos vazios
@@ -730,10 +733,7 @@ def _generate_dynamic_column_config(df, hide_status=False, hide_linked_reference
         if col in ["Quantity of Containers"]:
             config[col] = st.column_config.NumberColumn(col, width=width)
         else:
-            visible_columns = [c for c in df.columns if c not in ["ADJUSTMENT_ID", "Index", "Status"] and not (c == "Linked Reference" and hide_linked_reference)]
-            is_last_column = col == visible_columns[-1] if visible_columns else False
-            final_width = None if is_last_column else width
-            config[col] = st.column_config.TextColumn(col, width=final_width)
+            config[col] = st.column_config.TextColumn(col, width=width)
     return config
 
 
@@ -945,11 +945,19 @@ def _apply_highlight_styling_combined(df_processed, combined_changes_dict):
             base_bg = 'background-color: #FFFFFF;'
         
         for i in range(len(styles)):
-            styles[i] = base_bg
+            col_name = df_styled.columns[i]
+            # Aplicar apenas background-color na coluna Index (sem width/border que possam sobrescrever CSS)
+            if col_name == "Index":
+                styles[i] = base_bg
+            else:
+                styles[i] = base_bg
         
         for (change_row_idx, col_name), change_info in combined_changes_dict.items():
             if change_row_idx == row_idx and col_name in df_styled.columns:
                 col_idx = df_styled.columns.get_loc(col_name)
+                # Não aplicar destaque na coluna Index para evitar estilos inline que sobrescrevam CSS
+                if col_name == "Index":
+                    continue
                 if change_info.get('highlight_blue', False):
                     styles[col_idx] = 'background-color: #FFE0B2; border: 2px solid #FF9800;'
                 else:
@@ -1046,6 +1054,7 @@ def render_request_timeline(df_unified, farol_reference, df_received_for_approva
         df_unified_processed = _display_tab_content(df_unified, "Request Timeline", farol_reference)
     
     edited_df_unified = None
+    # Sempre retornar df_unified_processed se foi processado, mesmo que vazio após processamento
     if df_unified_processed is not None:
         column_config = _generate_dynamic_column_config(df_unified_processed, hide_status=False)
         changes_new_adj = _detect_changes_for_new_adjustment(df_unified_processed)
@@ -1099,6 +1108,53 @@ def render_request_timeline(df_unified, farol_reference, df_received_for_approva
             format="%d"
         )
         
+        # Calcular posição da coluna Index no DataFrame final (considerando colunas visíveis)
+        # Colunas ocultas (config=None) não são renderizadas, então não contam no nth-child
+        visible_columns = [col for col in df_unified_processed_reversed.columns if col in column_config and column_config[col] is not None]
+        if "Index" in visible_columns:
+            index_position = visible_columns.index("Index") + 1  # nth-child é 1-based
+        else:
+            # Fallback: se Index não estiver na lista, assume posição 1
+            index_position = 1
+        
+        # CSS para reduzir largura da coluna Index usando nth-child com índice calculado
+        # Usa o mesmo padrão do shipments.py para garantir aplicação correta
+        index_css = f"""
+        <style>
+        /* Reduzir largura da coluna Index (posição {index_position}) - seletores específicos para forçar aplicação */
+        div[data-testid="stDataFrame"] table thead th:nth-child({index_position}) {{
+            width: 35px !important;
+            min-width: 35px !important;
+            max-width: 35px !important;
+            text-align: center !important;
+            padding: 8px 4px !important;
+        }}
+        div[data-testid="stDataFrame"] table tbody td:nth-child({index_position}) {{
+            width: 35px !important;
+            min-width: 35px !important;
+            max-width: 35px !important;
+            text-align: center !important;
+            padding: 8px 4px !important;
+        }}
+        /* Seletores adicionais com maior especificidade para garantir aplicação */
+        div[data-testid="stDataFrame"] th:nth-of-type({index_position}),
+        div[data-testid="stDataFrame"] td:nth-of-type({index_position}) {{
+            width: 35px !important;
+            min-width: 35px !important;
+            max-width: 35px !important;
+            text-align: center !important;
+        }}
+        /* Fallback para garantir aplicação mesmo com estilos inline do Pandas Styler */
+        table[data-testid*="stDataFrame"] th:nth-child({index_position}),
+        table[data-testid*="stDataFrame"] td:nth-child({index_position}) {{
+            width: 35px !important;
+            min-width: 35px !important;
+            max-width: 35px !important;
+        }}
+        </style>
+        """
+        st.markdown(index_css, unsafe_allow_html=True)
+        
         st.dataframe(
             styled_df,
             use_container_width=True,
@@ -1107,12 +1163,51 @@ def render_request_timeline(df_unified, farol_reference, df_received_for_approva
             key=f"history_unified_{farol_reference}"
         )
         
+        # Reaplicar CSS após renderização do dataframe para garantir aplicação
+        # Usa JavaScript para aplicar estilo após o DOM estar completo
+        st.markdown(f"""
+        <script>
+        (function() {{
+            function applyIndexWidth() {{
+                const tables = document.querySelectorAll('[data-testid="stDataFrame"] table');
+                tables.forEach(table => {{
+                    const th = table.querySelector('thead th:nth-child({index_position})');
+                    const tds = table.querySelectorAll('tbody td:nth-child({index_position})');
+                    if (th) {{
+                        th.style.width = '35px';
+                        th.style.minWidth = '35px';
+                        th.style.maxWidth = '35px';
+                        th.style.textAlign = 'center';
+                    }}
+                    tds.forEach(td => {{
+                        td.style.width = '35px';
+                        td.style.minWidth = '35px';
+                        td.style.maxWidth = '35px';
+                        td.style.textAlign = 'center';
+                    }});
+                }});
+            }}
+            // Aplicar imediatamente
+            applyIndexWidth();
+            // Aplicar após pequeno delay para garantir renderização completa
+            setTimeout(applyIndexWidth, 100);
+            // Aplicar quando o DOM mudar (Streamlit pode re-renderizar)
+            const observer = new MutationObserver(applyIndexWidth);
+            observer.observe(document.body, {{ childList: true, subtree: true }});
+        }})();
+        </script>
+        """, unsafe_allow_html=True)
+        
         edited_df_unified = df_unified_processed
         
         if not df_received_for_approval.empty:
             st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações. Use o selectbox na seção abaixo para selecionar e avaliar retornos dos armadores.")
         else:
             st.info("ℹ️ **Request Timeline:** Visualize o histórico completo de alterações da referência.")
+    else:
+        # Se df_unified_processed é None, ainda pode haver df_received_for_approval
+        # Retornar um DataFrame vazio ao invés de None para evitar problemas
+        edited_df_unified = pd.DataFrame()
     
     return edited_df_unified
 
@@ -1549,18 +1644,49 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
 
             elif st.session_state.get(f"approval_step_{farol_reference}") == "select_internal_reference":
                 st.markdown("<h4 style='text-align: left;'>Related Reference</h4>", unsafe_allow_html=True)
+                # DEBUG 9: Antes de chamar a função
+                st.info(f"🔍 DEBUG 9 - Chamando history_get_available_references_for_relation com: '{farol_reference}'")
+                
                 # Get available references for relation
                 available_refs = history_get_available_references_for_relation(farol_reference)
+                
+                # DEBUG 10: Tipo e quantidade recebida
+                st.info(f"🔍 DEBUG 10 - available_refs recebido: tipo={type(available_refs)}, quantidade={len(available_refs) if available_refs else 0}")
+                
                 ref_options = ["Select a reference..."]
+                
+                # Adicionar opção especial "New Adjustment" sempre disponível
+                ref_options.append("🆕 New Adjustment")
+                
+                # Adicionar registros disponíveis (Booking Requested ou Adjustment Requested sem LINKED_REFERENCE)
                 if available_refs:
-                    for ref in available_refs:
+                    # DEBUG 11: Mostrar cada referência retornada com todos os campos
+                    st.info(f"🔍 DEBUG 11 - Processando {len(available_refs)} referência(s):")
+                    debug_info = []
+                    for idx, ref in enumerate(available_refs):
                         p_status = str(ref.get('P_STATUS', '') or '').strip()
                         b_status = str(ref.get('FAROL_STATUS', '') or '').strip()
                         linked = ref.get('LINKED_REFERENCE')
+                        farol_ref = ref.get('FAROL_REFERENCE', 'N/A')
+                        
+                        # DEBUG 12: Status exato antes do filtro
+                        st.info(f"🔍 DEBUG 12 - Registro {idx+1}: FAROL_REFERENCE='{farol_ref}', FAROL_STATUS='{b_status}', "
+                               f"P_STATUS='{p_status}', LINKED_REFERENCE={repr(linked)}")
+                        
+                        debug_info.append(f"Registro {idx+1}: Status='{b_status}', Linked={repr(linked)}, Farol={farol_ref}")
                         
                         # Check if the reference is valid for selection
-                        if (b_status == 'Booking Requested' and (linked is None or str(linked).strip() == '')) or \
-                           (b_status == 'Adjustment Requested' and (linked is None or str(linked).strip() == '')):
+                        # Aceita Booking Requested ou Adjustment Requested sem Linked Reference
+                        is_booking_requested = (b_status == 'Booking Requested')
+                        is_adjustment_requested = (b_status == 'Adjustment Requested')
+                        has_no_linked = (linked is None or str(linked).strip() == '')
+                        
+                        # DEBUG 13: Resultado do filtro
+                        st.info(f"🔍 DEBUG 13 - Registro {idx+1} filtro: is_booking={is_booking_requested}, "
+                               f"is_adjustment={is_adjustment_requested}, has_no_linked={has_no_linked}")
+                        
+                        if (is_booking_requested and has_no_linked) or \
+                           (is_adjustment_requested and has_no_linked):
                             
                             inserted_date = ref.get('ROW_INSERTED_DATE')
                             brazil_time = convert_utc_to_brazil_time(inserted_date) if inserted_date else None
@@ -1569,51 +1695,132 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                             status_display = ref.get('FAROL_STATUS', 'Status')
                             option_text = f"{ref['FAROL_REFERENCE']} | {status_display} | {date_str}"
                             ref_options.append(option_text)
+                            st.success(f"✅ DEBUG 14 - Registro {idx+1} ADICIONADO às opções: {option_text}")
+                        else:
+                            st.warning(f"⚠️ DEBUG 14 - Registro {idx+1} NÃO passou no filtro")
+                    
+                    # Debug: mostrar informações se não adicionou nenhuma opção
+                    if len(ref_options) == 2:  # Apenas "Select..." e "New Adjustment"
+                        st.error(f"🔍 DEBUG 15 - {len(available_refs)} referência(s) retornada(s), mas nenhuma passou no filtro:\n" + "\n".join(debug_info))
+                else:
+                    # Debug temporário para verificar o que está sendo retornado
+                    st.warning(f"🔍 DEBUG 15 - Nenhuma referência retornada da query. Farol Reference: {farol_reference}")
 
                 selected_ref = st.selectbox("Select the internal reference:", options=ref_options, key=f"internal_ref_select_{farol_reference}")
+
+                # Formulário condicional para "New Adjustment"
+                justification = {}
+                if selected_ref == "🆕 New Adjustment":
+                    st.markdown("#### New Adjustment Justification")
+                    reason = st.selectbox(
+                        "Booking Adjustment Request Reason *", 
+                        options=[""] + Booking_adj_reason_car,
+                        key=f"new_adj_reason_{farol_reference}"
+                    )
+                    
+                    # Para ajuste interno via New Adjustment, sempre usar "Armador"
+                    responsibility_options = [""] + Booking_adj_responsibility_car
+                    default_responsibility = "Armador"
+                    default_index = 0
+                    if "Armador" in responsibility_options:
+                        default_index = responsibility_options.index("Armador")
+                    else:
+                        # Buscar case-insensitive
+                        for i, opt in enumerate(responsibility_options):
+                            if str(opt).strip().upper() == "ARMADOR":
+                                default_index = i
+                                default_responsibility = opt
+                                break
+                    
+                    responsibility = st.selectbox(
+                        "Booking Adjustment Responsibility",
+                        options=responsibility_options,
+                        index=default_index,
+                        disabled=True,
+                        help="Responsabilidade fixa em 'Armador' para ajustes do armador",
+                        key=f"new_adj_responsibility_{farol_reference}"
+                    )
+                    
+                    # Garantir que sempre use "Armador"
+                    if responsibility == "":
+                        responsibility = default_responsibility
+                    
+                    comment = st.text_area(
+                        "Comments",
+                        key=f"new_adj_comments_{farol_reference}"
+                    )
+                    
+                    # Preparar justification dict
+                    justification = {
+                        "area": "Booking",  # Valor padrão necessário pela função
+                        "request_reason": reason if reason else "",
+                        "adjustments_owner": responsibility,
+                        "comments": comment if comment else ""
+                    }
 
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("Confirm Approval", key=f"confirm_internal_approval_{farol_reference}"):
                         if selected_ref != "Select a reference...":
-                            # Montar formato: "Index X | Booking Requested | 29-10-2025"
-                            # 1. Extrair Index do carrier return selecionado
-                            selected_pdf = st.session_state.get(f"pdf_approval_select_{farol_reference}", "")
-                            index_part = ""
-                            if selected_pdf and "|" in selected_pdf:
-                                # selected_pdf formato: "Index 3 | 29/10/2025 14:59"
-                                pdf_parts = selected_pdf.split("|")
-                                if len(pdf_parts) > 0:
-                                    index_part = pdf_parts[0].strip()  # "Index 3"
-                            
-                            # 2. Extrair Status da referência interna
-                            status_part = ""
-                            date_part = ""
-                            if "|" in selected_ref:
-                                ref_parts = [p.strip() for p in selected_ref.split("|")]
-                                if len(ref_parts) >= 2:
-                                    status_part = ref_parts[1]  # "Booking Requested"
-                                if len(ref_parts) >= 3:
-                                    # Extrair data e formatar com hífen (remover hora se houver)
-                                    date_str = ref_parts[2]  # "29/10/2025 15:43" ou "29/10/2025"
-                                    date_part = date_str.split()[0].replace("/", "-")  # "29-10-2025"
-                            
-                            # 3. Montar related_reference no formato desejado
-                            if index_part and status_part and date_part:
-                                related_reference = f"{index_part} | {status_part} | {date_part}"
+                            # Tratar opção especial "New Adjustment"
+                            if selected_ref == "🆕 New Adjustment":
+                                # Validar campos obrigatórios
+                                if not justification.get("request_reason"):
+                                    st.error("The 'Booking Adjustment Request Reason' field is mandatory for New Adjustment.")
+                                else:
+                                    related_reference = "New Adjustment"
+                                    # Call approval function com justification
+                                    result = approve_carrier_return(adjustment_id, related_reference, justification)
+                                    if result:
+                                        st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
+                                        st.session_state.pop(f"approval_step_{farol_reference}", None)
+                                        st.cache_data.clear()
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to approve.")
                             else:
-                                # Fallback: usar selected_ref completo se não conseguir montar
-                                related_reference = selected_ref
-                            
-                            # Call approval function
-                            result = approve_carrier_return(adjustment_id, related_reference, {})
-                            if result:
-                                st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
-                                st.session_state.pop(f"approval_step_{farol_reference}", None)
-                                st.cache_data.clear()
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to approve.")
+                                # Montar formato: "Index X | 29-10-2025"
+                                # 1. Extrair Index do carrier return selecionado
+                                selected_pdf = st.session_state.get(f"pdf_approval_select_{farol_reference}", "")
+                                index_part = ""
+                                if selected_pdf and "|" in selected_pdf:
+                                    # selected_pdf formato: "Index 3 | 29/10/2025 14:59"
+                                    pdf_parts = selected_pdf.split("|")
+                                    if len(pdf_parts) > 0:
+                                        index_part = pdf_parts[0].strip()  # "Index 3"
+                                
+                                # 2. Extrair data da referência interna (pode estar na posição 2 ou 3 dependendo do formato)
+                                date_part = ""
+                                if "|" in selected_ref:
+                                    ref_parts = [p.strip() for p in selected_ref.split("|")]
+                                    # A data pode estar na última posição ou na terceira
+                                    if len(ref_parts) >= 3:
+                                        # Extrair data e formatar com hífen (remover hora se houver)
+                                        date_str = ref_parts[2]  # "29/10/2025 15:43" ou "29/10/2025"
+                                        date_part = date_str.split()[0].replace("/", "-")  # "29-10-2025"
+                                    elif len(ref_parts) >= 2:
+                                        # Se não houver terceira parte, tenta a segunda
+                                        date_str = ref_parts[1]
+                                        # Verifica se é uma data (contém / ou -)
+                                        if "/" in date_str or "-" in date_str:
+                                            date_part = date_str.split()[0].replace("/", "-")
+                                
+                                # 3. Montar related_reference no formato desejado (sem status)
+                                if index_part and date_part:
+                                    related_reference = f"{index_part} | {date_part}"
+                                else:
+                                    # Fallback: usar selected_ref completo se não conseguir montar
+                                    related_reference = selected_ref
+                                
+                                # Call approval function sem justification (apenas para referências vinculadas)
+                                result = approve_carrier_return(adjustment_id, related_reference, {})
+                                if result:
+                                    st.session_state["history_flash"] = {"type": "success", "msg": "✅ Approval completed successfully!"}
+                                    st.session_state.pop(f"approval_step_{farol_reference}", None)
+                                    st.cache_data.clear()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to approve.")
                         else:
                             st.warning("Please select a reference.")
                 with col2:

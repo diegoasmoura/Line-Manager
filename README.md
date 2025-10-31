@@ -1214,14 +1214,19 @@ Durante o desenvolvimento do formulário de entrada manual de dados de viagem (e
 - 📅 **Ordenação cronológica**: Mais antigo primeiro, mesmo dia ordenado por hora (descendente)
 - 🏷️ **Formato de exibição**: "FR_... | DD/MM/YYYY HH:MM | Status" (sem ícones)
 - 🚫 **Exclusões**: Não mostra "Carrier Return (Linked)" nem registros já linkados
+- 🔄 **Filtro de referências vinculadas**: Registros já usados como `LINKED_REFERENCE` em aprovações anteriores não aparecem mais na lista (filtro baseado na data de inserção formatada DD-MM-YYYY que aparece no LINKED_REFERENCE)
+- ✅ **Persistência**: Uma vez vinculada, a referência não aparece mais mesmo após adicionar novos PDFs para aprovação
 
 **🆕 New Adjustment - Regras Especiais:**
-- 📋 **Título**: "Justificativas do Armador - New Adjustment"
-- 🚫 **Campo removido**: "Booking Adjustment Area" não é exibido (não necessário)
-- ⚙️ **Preenchimento automático**: "Booking Adjustment Responsibility" é preenchido automaticamente se houver apenas 1 opção
-- 📝 **Campos obrigatórios**: Apenas "Booking Adjustment Request Reason" e "Comentários"
+- 📋 **Título**: "New Adjustment Justification"
+- 🚫 **Campo removido**: "Booking Adjustment Area" não é exibido (não necessário, usa valor padrão "Booking" internamente)
+- ⚙️ **Preenchimento automático**: "Booking Adjustment Responsibility" é preenchido automaticamente com "Armador" (desabilitado)
+- 📝 **Campos obrigatórios**: Apenas "Booking Adjustment Request Reason" (campo marcado com *)
+- 💬 **Comentários**: Campo opcional de texto livre
 - 🎯 **Opções específicas**: Usa "Booking Adj Request Reason Car" e "Booking Adj Responsibility Car" (diferente do split)
-- ✅ **Validação**: Só exige preenchimento do "Reason" pelo usuário
+- ✅ **Validação**: Exige preenchimento do "Reason" antes de permitir aprovação
+- 🔄 **Formulário condicional**: Aparece automaticamente quando "🆕 New Adjustment" é selecionado na seção "Related Reference"
+- 🎯 **Filtro inteligente**: Referências já vinculadas não aparecem mais na lista (filtra por data do ROW_INSERTED_DATE)
 
 **Mensagens de Feedback:**
 - ✅ **Sucesso**: "✅ Approval successful!" / "✅ Status atualizado para 'X'."
@@ -4012,6 +4017,15 @@ curl -X POST https://apidtz.comexia.digital/api/auth \
   - **Preservação de funcionalidades:** Voyage monitoring validation, manual data entry e audit trail permanecem intactos
   - **Index correto:** Cálculo do Index agora busca diretamente no DataFrame original (antes da reversão visual) para corresponder exatamente à coluna Index exibida na tabela
   - **Cores preservadas:** Destaques amarelos para linhas "New Adjustment" mantidos com `st.dataframe` + Pandas Styler
+
+### 📌 v3.4.1
+- **History (Return Carriers History) - Melhorias na Aprovação:**
+  - **Correção de import circular:** Resolvido problema de import circular entre `database.py` e `history_data.py` usando lazy imports (imports tardios dentro das funções)
+  - **Filtro de referências vinculadas:** Referências já usadas em aprovações anteriores não aparecem mais no dropdown "Related Reference" (filtro baseado na data de inserção formatada DD-MM-YYYY)
+  - **Formulário condicional para New Adjustment:** Quando "🆕 New Adjustment" é selecionado na seção "Related Reference", aparece automaticamente um formulário para coletar justificativas (Request Reason obrigatório, Responsibility fixo em "Armador", Comments opcional)
+  - **Validação de campos obrigatórios:** Sistema valida que "Request Reason" está preenchido antes de permitir aprovar "New Adjustment"
+  - **Persistência de vinculação:** Uma vez que uma referência é vinculada durante aprovação, ela não aparece mais na lista mesmo após adicionar novos PDFs
+  - **Simplificação da query:** Query `get_available_references_for_relation` simplificada para usar apenas comparação exata de `FAROL_REFERENCE` (removido `LIKE` para sufixos)
 
 ### 📌 v3.3
 - Sales (New Sales Record): adicionados os campos "Shipment Period Start Date" e "Shipment Period End Date" no formulário manual e no upload em massa; mapeados para `S_SHIPMENT_PERIOD_START_DATE` e `S_SHIPMENT_PERIOD_END_DATE`.

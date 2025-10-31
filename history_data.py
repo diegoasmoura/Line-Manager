@@ -4,15 +4,7 @@ from sqlalchemy import text
 from datetime import datetime
 import uuid
 
-from database import get_database_connection, load_df_udc
-
-# Carrega dados da UDC para justificativas
-df_udc = load_df_udc()
-Booking_adj_area = df_udc[df_udc["grupo"] == "Booking Adj Area"]["dado"].dropna().unique().tolist()
-Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["dado"].dropna().unique().tolist()
-Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
-Booking_adj_reason_car = df_udc[df_udc["grupo"] == "Booking Adj Request Reason Car"]["dado"].dropna().unique().tolist()
-Booking_adj_responsibility_car = df_udc[df_udc["grupo"] == "Booking Adj Responsibility Car"]["dado"].dropna().unique().tolist()
+# Nota: imports de database são feitos dentro das funções (lazy imports) para evitar ciclo de import
 
 
 def get_next_linked_reference_number(farol_reference=None):
@@ -22,6 +14,7 @@ def get_next_linked_reference_number(farol_reference=None):
     Senão, mantém comportamento atual (global).
     """
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         
         if farol_reference:
@@ -72,6 +65,7 @@ def get_referenced_line_data(linked_ref):
     
     if linked_ref_str.isdigit():
         try:
+            from database import get_database_connection
             conn = get_database_connection()
             query = text("""
                 SELECT ID, ROW_INSERTED_DATE, FAROL_REFERENCE, FAROL_STATUS
@@ -98,6 +92,7 @@ def update_missing_linked_references():
     Atualiza registros antigos que não têm LINKED_REFERENCE definido.
     """
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         
         query = text("""
@@ -146,6 +141,7 @@ def update_missing_linked_references():
 def get_voyage_monitoring_for_reference(farol_reference):
     """Busca dados de monitoramento de viagens relacionados a uma referência Farol"""
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         
         vessels_query = text("""
@@ -207,38 +203,100 @@ def get_voyage_monitoring_for_reference(farol_reference):
 
 def get_available_references_for_relation(farol_reference=None):
     """Busca referências na aba 'Other Status' para relacionamento."""
+    # DEBUG 0: Primeiro debug - antes de qualquer coisa
+    import streamlit as st
+    st.info(f"🔍 DEBUG 0 - Função chamada com farol_reference = '{farol_reference}'")
+    
     try:
+        # DEBUG 1: Parâmetros recebidos
+        st.info(f"🔍 DEBUG 1 - Parâmetro recebido: farol_reference = '{farol_reference}' (tipo: {type(farol_reference)})")
+        
+        from database import get_database_connection
         conn = get_database_connection()
+        # DEBUG 2: Conexão estabelecida
+        st.info(f"🔍 DEBUG 2 - Conexão estabelecida: {conn is not None}")
+        
         if farol_reference:
+            # Query para buscar referências disponíveis, excluindo as que já foram vinculadas
+            # Exclui registros cuja data de inserção (formatada como DD-MM-YYYY) já aparece em algum 
+            # LINKED_REFERENCE de registros "Received from Carrier" ou "Booking Approved" da mesma referência
             query = text("""
-                SELECT ID, FAROL_REFERENCE, FAROL_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
-                FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE FAROL_STATUS != 'Received from Carrier'
-                  AND UPPER(FAROL_REFERENCE) = UPPER(:farol_reference)
-                ORDER BY ROW_INSERTED_DATE ASC
+                SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, r.P_STATUS, r.ROW_INSERTED_DATE, r.Linked_Reference
+                FROM LogTransp.F_CON_RETURN_CARRIERS r
+                WHERE r.FAROL_STATUS != 'Received from Carrier'
+                  AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
+                  AND NOT EXISTS (
+                      SELECT 1 
+                      FROM LogTransp.F_CON_RETURN_CARRIERS linked
+                      WHERE (linked.FAROL_STATUS = 'Received from Carrier' OR linked.FAROL_STATUS = 'Booking Approved')
+                        AND UPPER(linked.FAROL_REFERENCE) = UPPER(:farol_reference)
+                        AND linked.LINKED_REFERENCE IS NOT NULL
+                        AND linked.LINKED_REFERENCE != 'New Adjustment'
+                        AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') || '%'
+                  )
+                ORDER BY r.ROW_INSERTED_DATE ASC
             """)
             params = {"farol_reference": farol_reference}
+            st.info(f"🔍 DEBUG 5 - Executando query simplificada com parâmetro: '{farol_reference}'")
             result = conn.execute(query, params).mappings().fetchall()
+            
+            # DEBUG 6: Quantidade de linhas retornadas
+            st.info(f"🔍 DEBUG 6 - Query simplificada retornou {len(result) if result else 0} registro(s)")
+            
+            # DEBUG 7: Mostrar primeiros registros retornados
+            if result:
+                st.info(f"🔍 DEBUG 7 - Primeiros registros retornados:")
+                for i, row in enumerate(result[:3]):  # Mostrar até 3 primeiros
+                    row_dict = dict(row)
+                    st.info(f"  Registro {i+1}: {row_dict}")
+            else:
+                st.warning("🔍 DEBUG 7 - Query simplificada não retornou nenhum registro!")
         else:
+            # Comportamento legado: somente originais (não-split) de todas as referências
             query = text("""
                 SELECT ID, FAROL_REFERENCE, FAROL_STATUS, P_STATUS, ROW_INSERTED_DATE, Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS
                 WHERE FAROL_STATUS != 'Received from Carrier'
-                  AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\.\d+$')
+                  AND NVL(S_SPLITTED_BOOKING_REFERENCE, '##NULL##') = '##NULL##' -- apenas originais
+                  AND NOT REGEXP_LIKE(FAROL_REFERENCE, '\\.\\d+$')             -- exclui refs com sufixo .n
                 ORDER BY ROW_INSERTED_DATE ASC
             """)
             result = conn.execute(query).mappings().fetchall()
         conn.close()
-        return [{k.upper(): v for k, v in dict(row).items()} for row in result] if result else []
+        # DEBUG 8: Processar resultado antes de retornar
+        if result:
+            # DEBUG 8.1: Verificar chaves do primeiro registro antes da conversão
+            if result:
+                first_row = dict(result[0])
+                st.info(f"🔍 DEBUG 8.1 - Chaves do primeiro registro ANTES da conversão: {list(first_row.keys())}")
+            
+            processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
+            st.info(f"🔍 DEBUG 8 - Resultado processado: {len(processed)} registro(s) convertido(s)")
+            if processed:
+                st.info(f"🔍 DEBUG 8.2 - Primeiro registro processado: {processed[0]}")
+                st.info(f"🔍 DEBUG 8.2 - Chaves após conversão: {list(processed[0].keys())}")
+            return processed
+        else:
+            st.warning("🔍 DEBUG 8 - Nenhum resultado para processar, retornando lista vazia")
+            return []
     except Exception as e:
-        st.error(f"❌ Erro ao buscar referências disponíveis: {str(e)}")
-        if 'conn' in locals() and conn.is_connected():
-            conn.close()
+        import traceback
+        # DEBUG 17: Verificar se há erro silencioso sendo capturado
+        st.error(f"❌ DEBUG 17 - Erro ao buscar referências disponíveis: {str(e)}")
+        st.error(f"❌ DEBUG 17 - Tipo do erro: {type(e).__name__}")
+        st.error(f"❌ DEBUG 17 - Traceback completo:\n{traceback.format_exc()}")
+        if 'conn' in locals():
+            try:
+                if hasattr(conn, 'is_connected') and conn.is_connected():
+                    conn.close()
+            except:
+                pass
         return []
 
 def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
     """Salva um anexo na tabela F_CON_ANEXOS."""
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         file_content = uploaded_file.read()
         file_name = uploaded_file.name
@@ -285,6 +343,7 @@ def save_attachment_to_db(farol_reference, uploaded_file, user_id="system"):
 def get_attachments_for_farol(farol_reference):
     """Busca todos os anexos para uma referência específica do Farol."""
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         query = text("""
             SELECT 
@@ -316,6 +375,7 @@ def get_attachments_for_farol(farol_reference):
 def delete_attachment(attachment_id, deleted_by="system"):
     """Marca um anexo como excluído (soft delete)."""
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         query = text("""
             UPDATE LogTransp.F_CON_ANEXOS
@@ -338,6 +398,7 @@ def delete_attachment(attachment_id, deleted_by="system"):
 def get_attachment_content(attachment_id):
     """Busca o conteúdo de um anexo específico."""
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         query = text("""
             SELECT attachment, file_name, file_extension, type_ as mime_type
@@ -362,6 +423,7 @@ def get_attachment_content(attachment_id):
 def get_main_table_data(farol_ref):
     """Busca dados específicos da tabela principal F_CON_SALES_BOOKING_DATA"""
     try:
+        from database import get_database_connection
         conn = get_database_connection()
         query = text("""
             SELECT 

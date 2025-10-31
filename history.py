@@ -174,7 +174,14 @@ def exibir_history():
         edited_df_unified = render_request_timeline_component(df_unified, farol_reference, df_received_for_approval)
 
     # Seção de aprovação para PDFs "Received from Carrier"
-    df_for_approval = edited_df_unified.copy() if edited_df_unified is not None else None
+    # Garantir que df_for_approval seja um DataFrame válido (não None e não vazio) para renderizar o painel
+    df_for_approval = None
+    if edited_df_unified is not None:
+        if not edited_df_unified.empty:
+            df_for_approval = edited_df_unified.copy()
+        else:
+            # Se estiver vazio mas não None, ainda permite renderizar o painel se houver df_received_for_approval
+            df_for_approval = edited_df_unified
     
     # Renderiza painel de aprovação usando componente
     if active_tab == unified_label and not df_received_for_approval.empty and df_for_approval is not None:
