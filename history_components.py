@@ -790,9 +790,9 @@ def _process_dataframe(df_to_process, farol_reference):
     
     for col in df_processed.columns:
         if df_processed[col].dtype == 'datetime64[ns]':
-            df_processed[col] = df_processed[col].astype(str).replace('NaT', '')
+            df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '')
         else:
-            df_processed[col] = df_processed[col].fillna('')
+            df_processed[col] = df_processed[col].fillna('').replace('None', '')
     
     if "Linked Reference" in df_processed.columns:
         df_processed["Linked Reference"] = df_processed.apply(
@@ -926,9 +926,9 @@ def _apply_highlight_styling_combined(df_processed, combined_changes_dict):
     
     for col in df_styled.columns:
         if df_styled[col].dtype == 'datetime64[ns]':
-            df_styled[col] = df_styled[col].astype(str).replace('NaT', '')
+            df_styled[col] = df_styled[col].astype(str).replace('NaT', '').replace('None', '')
         else:
-            df_styled[col] = df_styled[col].fillna('')
+            df_styled[col] = df_styled[col].fillna('').replace('None', '')
     
     def highlight_changes_and_zebra(row):
         styles = [''] * len(row)
@@ -1066,9 +1066,9 @@ def render_request_timeline(df_unified, farol_reference, df_received_for_approva
         
         for col in df_to_check.columns:
             if df_to_check[col].dtype == 'datetime64[ns]':
-                df_to_check[col] = df_to_check[col].astype(str).replace('NaT', '')
+                df_to_check[col] = df_to_check[col].astype(str).replace('NaT', '').replace('None', '')
             else:
-                df_to_check[col] = df_to_check[col].fillna('')
+                df_to_check[col] = df_to_check[col].fillna('').replace('None', '')
         
         if hasattr(styled_df, 'data'):
             styled_df.data = df_to_check
