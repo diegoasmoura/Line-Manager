@@ -4849,6 +4849,52 @@ terminal_options = list_terminal_names() or []
 
 ## 📝 Changelog
 
+### [v3.3.0] - 2024-12-XX
+
+#### 🏗️ Refatoração Major - Modularização do Módulo History
+
+**Objetivo**: Reduzir significativamente o tamanho do arquivo `history.py` (de ~2240 para ~220 linhas) através de modularização, mantendo 100% da funcionalidade e layout original.
+
+**Estrutura Modular Criada**:
+- **`history.py`** (~220 linhas): Arquivo principal que orquestra a exibição da tela
+  - Função principal `exibir_history()` que coordena todos os componentes
+  - Função `update_missing_linked_references()` para migração de dados legados
+- **`history_components.py`** (~1672 linhas): Componentes de UI
+  - `render_metrics_header()`: Cards de métricas superiores
+  - `render_request_timeline()`: Tabela unificada de histórico
+  - `render_voyages_timeline()`: Timeline de viagens
+  - `display_audit_trail_tab()`: Aba de audit trail
+  - `render_approval_panel()`: Painel de aprovação de PDFs
+  - `display_attachments_section()`: Gestão de anexos
+  - `render_action_buttons()`: Botões de ação (View Attachments, Export, Back)
+- **`history_helpers.py`** (~582 linhas): Funções auxiliares
+  - Formatação de dados (`format_linked_reference_display`, `convert_utc_to_brazil_time`)
+  - Preparação de DataFrames (`prepare_dataframe_for_display`, `prepare_main_data_for_display`)
+  - Gerenciamento de abas (`generate_tab_labels`, `initialize_tab_state`, `handle_tab_change`)
+  - Limpeza de session_state (`clear_history_session_state_on_selection_change`, etc.)
+  - Inicialização e validação (`initialize_history_state`, `handle_no_reference_selected`, `handle_empty_dataframe`)
+- **`history_data.py`** (~383 linhas): Queries de banco de dados
+  - Todas as funções SQL relacionadas ao History
+  - Acessadas via wrappers em `database.py` com prefixo `history_`
+
+**Benefícios**:
+- ✅ Redução de 89% no tamanho do arquivo principal (`history.py`)
+- ✅ Código mais organizado e fácil de manter
+- ✅ Separação clara de responsabilidades (UI, helpers, data)
+- ✅ 100% da funcionalidade original preservada
+- ✅ Layout e comportamento visual idênticos ao original
+- ✅ Facilita testes unitários e manutenção futura
+
+**Arquivos Criados**:
+- `history_components.py`: Componentes de UI reutilizáveis
+- `history_helpers.py`: Funções auxiliares e utilitários
+- `history_data.py`: Camada de acesso a dados
+
+**Arquivos Modificados**:
+- `history.py`: Refatorado para orquestrar componentes
+- `database.py`: Adicionados wrappers `history_*` para queries
+- `README.md`: Documentação atualizada
+
 ### [v3.2.2] - 2024-12-19
 
 #### 🎨 Novas Funcionalidades

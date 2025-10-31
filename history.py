@@ -1,28 +1,13 @@
 import streamlit as st
 import pandas as pd
 from database import (
-    get_return_carriers_by_farol, get_return_carriers_recent, load_df_udc, 
-    get_database_connection, get_current_status_from_main_table, 
-    get_return_carrier_status_by_adjustment_id, get_terminal_monitorings,
-    approve_carrier_return, update_record_status,
+    get_return_carriers_by_farol, get_return_carriers_recent,
+    get_database_connection, get_current_status_from_main_table,
     history_get_main_table_data,
     history_get_voyage_monitoring_for_reference,
-    history_get_available_references_for_relation,
-    history_save_attachment,
-    history_get_attachments,
-    history_delete_attachment,
-    history_get_attachment_content,
     history_get_next_linked_reference_number,
-    history_get_referenced_line_data,
 )
-from shipments_mapping import get_column_mapping, process_farol_status_for_display
 from sqlalchemy import text
-from datetime import datetime
-import os
-import base64
-import mimetypes
-import uuid
-from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
 from history_components import (
     display_attachments_section as display_attachments_section_component,
     render_metrics_header,
@@ -37,19 +22,14 @@ from history_helpers import (
     handle_empty_dataframe
 )
 
-# Carrega dados da UDC para justificativas
-df_udc = load_df_udc()
-Booking_adj_area = df_udc[df_udc["grupo"] == "Booking Adj Area"]["dado"].dropna().unique().tolist()
-Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["dado"].dropna().unique().tolist()
-Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
+"""
+Módulo principal da tela History (Return Carriers History).
 
-# Opções específicas para New Adjustment no history.py
-Booking_adj_reason_car = df_udc[df_udc["grupo"] == "Booking Adj Request Reason Car"]["dado"].dropna().unique().tolist()
-Booking_adj_responsibility_car = df_udc[df_udc["grupo"] == "Booking Adj Responsibility Car"]["dado"].dropna().unique().tolist()
-
-# get_next_linked_reference_number e get_referenced_line_data removidos - agora importados de history_data.py via database.py
-
-# format_linked_reference_display removido - agora importado de history_helpers.py
+Este módulo foi refatorado e modularizado para melhor organização:
+- history_components.py: Componentes de UI (cards, tabelas, painéis)
+- history_helpers.py: Funções auxiliares (formatação, preparação de dados)
+- history_data.py: Queries de banco de dados (acessadas via database.py)
+"""
 
 def update_missing_linked_references():
     """
@@ -105,18 +85,19 @@ def update_missing_linked_references():
             conn.close()
         return 0
 
-# get_voyage_monitoring_for_reference, get_available_references_for_relation, get_file_type,
-# save_attachment_to_db, get_attachments_for_farol, delete_attachment, get_attachment_content,
-# format_file_size, get_file_icon, get_main_table_data removidos - agora importados via database.py
-# display_attachments_section removido - agora importado de history_components.py
-
-# _display_attachments_section_legacy removido - agora usando display_attachments_section_component de history_components.py
 
 def exibir_history():
-    import pandas as pd
-    from datetime import datetime
+    """
+    Função principal que exibe a tela History (Return Carriers History).
     
-    # convert_utc_to_brazil_time removido - agora importado de history_helpers.py
+    Esta função orquestra a exibição de todos os componentes:
+    - Cards de métricas superiores
+    - Tabela unificada de histórico (Request Timeline)
+    - Painel de aprovação de PDFs
+    - Timeline de viagens
+    - Audit Trail
+    - Gestão de anexos
+    """
     
     st.header("📜 Return Carriers History")
     
@@ -186,19 +167,13 @@ def exibir_history():
     # Gerencia troca de abas (limpa seleções quando necessário)
     handle_tab_change(farol_reference, active_tab, unified_label, voyages_label, audit_label)
 
-    # Funções auxiliares (calculate_column_width, generate_dynamic_column_config, process_dataframe,
-    # display_tab_content, detect_changes_for_new_adjustment, detect_changes_for_carrier_return,
-    # apply_highlight_styling_combined, apply_highlight_styling) foram migradas para history_components.py
-    # e são usadas dentro de render_request_timeline. Estas funções não são mais necessárias aqui.
-
-    # Conteúdo da aba unificada "Request Timeline"
+    # Renderiza conteúdo das abas usando componentes
     edited_df_unified = None
     if active_tab == unified_label:
         from history_components import render_request_timeline as render_request_timeline_component
         edited_df_unified = render_request_timeline_component(df_unified, farol_reference, df_received_for_approval)
 
-    # Seção de aprovação para PDFs "Received from Carrier" (abaixo da tabela unificada)
-    # Usaremos o DataFrame ORIGINAL (antes da reversão) para buscar o Index correto
+    # Seção de aprovação para PDFs "Received from Carrier"
     df_for_approval = edited_df_unified.copy() if edited_df_unified is not None else None
     
     # Renderiza painel de aprovação usando componente
@@ -231,8 +206,6 @@ def exibir_history():
         st.session_state[f"last_selected_adjustment_id_{farol_reference}"] = current_adjustment_id
     else:
         clear_history_session_state_when_no_selection(farol_reference)
-
-    # apply_status_change removida - lógica de aprovação migrada para render_approval_panel_component em history_components.py
 
     # Prepara DataFrame para exportação CSV
     combined_df = edited_df_unified if (edited_df_unified is not None and not edited_df_unified.empty) else pd.DataFrame()
