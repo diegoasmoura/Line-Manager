@@ -4131,6 +4131,30 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.8 - Janeiro 2025 - Correção de Compatibilidade com Formatos Antigos de LINKED_REFERENCE**
+
+**🐛 Correção de Bug:**
+
+#### **Problema Resolvido: New Adjustment Não Aparecendo em Servidor com Formatos Antigos**
+- ✅ **Verificação flexível de LINKED_REFERENCE**: Query NOT EXISTS agora verifica primeiro por ID (formato novo: `"ID1167 | Index 2 | 31-10-2025 11:33"`) e depois por data+hora (formato antigo: `"Index 2 | 31-10-2025 11:23"`)
+- ✅ **Precisão melhorada**: Removido fallback genérico por data apenas (DD-MM-YYYY), que estava excluindo incorretamente todos os registros do mesmo dia
+- ✅ **Compatibilidade**: Sistema funciona corretamente tanto em servidores com formato antigo (sem ID) quanto em máquinas locais com formato novo (com ID)
+- ✅ **Verificação precisa**: Agora usa `DD-MM-YYYY HH24:MI` para correspondência exata de data+hora, evitando exclusões incorretas
+
+**📁 Arquivos Modificados:**
+- `history_data.py`: 
+  - Ajustada query NOT EXISTS para verificar por ID primeiro, depois por data+hora como fallback
+  - Removido fallback por data apenas (DD-MM-YYYY) que causava exclusões incorretas
+  - Removidos todos os debugs temporários adicionados durante diagnóstico
+
+**🔍 Detalhes Técnicos:**
+- **Formato novo (local)**: `"ID1167 | Index 2 | 31-10-2025 11:33"` - verificado por ID
+- **Formato antigo (servidor)**: `"Index 2 | 31-10-2025 11:23"` - verificado por data+hora completa
+- A query NOT EXISTS agora prioriza correspondência por ID quando disponível, e usa data+hora precisa quando o formato não contém ID
+- Sistema é compatível com ambos os formatos, permitindo migração gradual
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.7 - Janeiro 2025 - Correção de Busca Case-Insensitive para New Adjustment**
 
 **🐛 Correção de Bug:**

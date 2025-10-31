@@ -203,86 +203,15 @@ def get_voyage_monitoring_for_reference(farol_reference):
 
 def get_available_references_for_relation(farol_reference=None):
     """Busca referências na aba 'Other Status' para relacionamento."""
-    # DEBUG: Log inicial
-    print(f"[DEBUG] get_available_references_for_relation chamada com farol_reference: {farol_reference}")
-    
     try:
         from database import get_database_connection
         import streamlit as st
         
         conn = get_database_connection()
-        print(f"[DEBUG] Conexão com banco estabelecida")
         
         if farol_reference:
-            # DEBUG: Query simplificada para diagnóstico (sem NOT EXISTS)
-            simple_query = text("""
-                SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, r.P_STATUS, r.ROW_INSERTED_DATE, r.Linked_Reference
-                FROM LogTransp.F_CON_RETURN_CARRIERS r
-                WHERE UPPER(TRIM(r.FAROL_STATUS)) IN ('BOOKING REQUESTED', 'NEW ADJUSTMENT')
-                  AND UPPER(r.FAROL_REFERENCE) = UPPER(:farol_reference)
-                ORDER BY r.ROW_INSERTED_DATE ASC
-            """)
-            simple_params = {"farol_reference": farol_reference}
-            
-            print(f"[DEBUG] Executando query simplificada (sem NOT EXISTS) para diagnóstico...")
-            simple_result = conn.execute(simple_query, simple_params).mappings().fetchall()
-            print(f"[DEBUG] Query simplificada retornou {len(simple_result)} registros")
-            
-            # Mostrar detalhes dos registros encontrados pela query simples
-            for idx, row in enumerate(simple_result):
-                # Tentar diferentes formas de acessar os valores
-                try:
-                    # Forma 1: dict direto
-                    row_dict = dict(row)
-                    # Forma 2: tentar acessar por chaves maiúsculas
-                    row_keys = list(row_dict.keys())
-                    print(f"[DEBUG] Registro {idx} - Chaves disponíveis: {row_keys}")
-                    
-                    # Tentar acessar valores de diferentes formas
-                    id_val = row_dict.get('ID') or row_dict.get('id') or (row_dict.get(list(row_dict.keys())[0]) if row_dict else None)
-                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status') or row_dict.get(list(row_dict.keys())[1] if len(row_dict) > 1 else None)
-                    linked_val = row_dict.get('Linked_Reference') or row_dict.get('LINKED_REFERENCE') or row_dict.get('linked_reference')
-                    date_val = row_dict.get('ROW_INSERTED_DATE') or row_dict.get('row_inserted_date')
-                    
-                    print(f"[DEBUG] Registro {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}', DATE={date_val}")
-                    # Mostrar todos os valores do row para debug
-                    print(f"[DEBUG] Registro {idx} - Valores completos: {row_dict}")
-                except Exception as e:
-                    print(f"[DEBUG] Erro ao processar registro {idx}: {e}")
-                    print(f"[DEBUG] Tipo do objeto row: {type(row)}")
-                    if hasattr(row, '__dict__'):
-                        print(f"[DEBUG] __dict__: {row.__dict__}")
-            
-            # Query para verificar registros que podem estar causando exclusão no NOT EXISTS
-            linked_check_query = text("""
-                SELECT linked.ID, linked.FAROL_STATUS, linked.LINKED_REFERENCE, linked.FAROL_REFERENCE
-                FROM LogTransp.F_CON_RETURN_CARRIERS linked
-                WHERE (UPPER(TRIM(linked.FAROL_STATUS)) = 'RECEIVED FROM CARRIER' OR UPPER(TRIM(linked.FAROL_STATUS)) = 'BOOKING APPROVED')
-                  AND UPPER(linked.FAROL_REFERENCE) = UPPER(:farol_reference)
-                  AND linked.LINKED_REFERENCE IS NOT NULL
-                  AND linked.LINKED_REFERENCE != 'New Adjustment'
-            """)
-            print(f"[DEBUG] Verificando registros que podem estar causando exclusão no NOT EXISTS...")
-            linked_check_result = conn.execute(linked_check_query, simple_params).mappings().fetchall()
-            print(f"[DEBUG] Encontrados {len(linked_check_result)} registros 'Received from Carrier'/'Booking Approved' com LINKED_REFERENCE")
-            
-            for idx, row in enumerate(linked_check_result):
-                try:
-                    row_dict = dict(row)
-                    row_keys = list(row_dict.keys())
-                    
-                    id_val = row_dict.get('ID') or row_dict.get('id')
-                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status')
-                    linked_val = row_dict.get('LINKED_REFERENCE') or row_dict.get('linked_reference')
-                    
-                    print(f"[DEBUG] Registro vinculado {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}'")
-                    print(f"[DEBUG] Registro vinculado {idx} - Valores completos: {row_dict}")
-                except Exception as e:
-                    print(f"[DEBUG] Erro ao processar registro vinculado {idx}: {e}")
-            
             # Query principal para buscar referências disponíveis, excluindo as que já foram vinculadas
-            # Exclui registros cuja data de inserção (formatada como DD-MM-YYYY) já aparece em algum 
-            # LINKED_REFERENCE de registros "Received from Carrier" ou "Booking Approved" da mesma referência
+            # Verifica por ID (formato novo) ou data+hora (DD-MM-YYYY HH24:MI) para formato antigo sem ID
             query = text("""
                 SELECT r.ID, r.FAROL_REFERENCE, r.FAROL_STATUS, r.P_STATUS, r.ROW_INSERTED_DATE, r.Linked_Reference
                 FROM LogTransp.F_CON_RETURN_CARRIERS r
@@ -301,7 +230,6 @@ def get_available_references_for_relation(farol_reference=None):
                             OR
                             -- Verificação por data+hora (DD-MM-YYYY HH24:MI) para formato antigo sem ID
                             -- Mais preciso que apenas data, evita excluir registros incorretos do mesmo dia
-                            -- REMOVIDO fallback por data apenas - estava excluindo incorretamente todos os registros do mesmo dia
                             (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
                              AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%')
                         )
@@ -310,54 +238,13 @@ def get_available_references_for_relation(farol_reference=None):
             """)
             params = {"farol_reference": farol_reference}
             
-            print(f"[DEBUG] Executando query principal com NOT EXISTS...")
             result = conn.execute(query, params).mappings().fetchall()
-            print(f"[DEBUG] Query principal retornou {len(result)} registros após filtro NOT EXISTS")
-            
-            # Mostrar detalhes dos registros finais
-            for idx, row in enumerate(result):
-                try:
-                    row_dict = dict(row)
-                    # Verificar TODAS as chaves disponíveis para entender o problema do ID
-                    all_keys = list(row_dict.keys())
-                    print(f"[DEBUG] Registro final {idx} - Todas as chaves: {all_keys}")
-                    
-                    # Tentar obter ID de várias formas possíveis
-                    id_val = (row_dict.get('ID') or row_dict.get('id') or 
-                             row_dict.get('Id') or row_dict.get('iD'))
-                    
-                    # Se ainda não encontrou, verificar se há alguma coluna que pareça ser ID
-                    if id_val is None:
-                        for key in all_keys:
-                            if key.upper() == 'ID':
-                                id_val = row_dict.get(key)
-                                print(f"[DEBUG] ID encontrado na chave '{key}': {id_val}")
-                                break
-                    
-                    status_val = row_dict.get('FAROL_STATUS') or row_dict.get('farol_status') or row_dict.get('Farol_Status')
-                    linked_val = (row_dict.get('Linked_Reference') or row_dict.get('LINKED_REFERENCE') or 
-                                 row_dict.get('linked_reference') or row_dict.get('LINKED_REF'))
-                    
-                    print(f"[DEBUG] Registro final {idx}: ID={id_val}, STATUS='{status_val}', LINKED_REF='{linked_val}'")
-                    print(f"[DEBUG] Registro final {idx} - Valores completos: {row_dict}")
-                    
-                    # AVISO se ID não foi encontrado
-                    if id_val is None:
-                        print(f"[WARNING] ID não encontrado para registro {idx}! Isso pode indicar que a coluna ID não existe na tabela do servidor ou está NULL.")
-                except Exception as e:
-                    print(f"[DEBUG] Erro ao processar registro final {idx}: {e}")
-                    import traceback
-                    traceback.print_exc()
-            
             conn.close()
-            print(f"[DEBUG] Conexão fechada")
             
             if result:
                 processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
-                print(f"[DEBUG] Retornando {len(processed)} registros processados")
                 return processed
             else:
-                print(f"[DEBUG] Nenhum registro retornado - lista vazia")
                 return []
         else:
             # Comportamento legado: somente originais (não-split) de todas as referências
@@ -371,34 +258,23 @@ def get_available_references_for_relation(farol_reference=None):
             """)
             result = conn.execute(query).mappings().fetchall()
             conn.close()
-            print(f"[DEBUG] Conexão fechada (comportamento legado)")
             
             if result:
                 processed = [{k.upper(): v for k, v in dict(row).items()} for row in result]
-                print(f"[DEBUG] Retornando {len(processed)} registros processados (comportamento legado)")
                 return processed
             else:
-                print(f"[DEBUG] Nenhum registro retornado - lista vazia (comportamento legado)")
                 return []
                 
     except Exception as e:
-        print(f"[DEBUG] ERRO em get_available_references_for_relation: {type(e).__name__}: {str(e)}")
+        import streamlit as st
+        st.error(f"❌ Erro ao buscar referências para relacionamento: {str(e)}")
         import traceback
-        print(f"[DEBUG] Traceback completo:")
         traceback.print_exc()
-        
-        # Tentar mostrar erro no Streamlit se disponível
-        try:
-            import streamlit as st
-            st.error(f"Erro ao buscar referências disponíveis: {str(e)}")
-        except:
-            pass
         
         if 'conn' in locals():
             try:
                 if hasattr(conn, 'is_connected') and conn.is_connected():
                     conn.close()
-                    print(f"[DEBUG] Conexão fechada após erro")
             except:
                 pass
         return []
