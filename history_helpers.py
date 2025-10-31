@@ -493,3 +493,91 @@ def handle_tab_change(farol_reference, active_tab, unified_label, voyages_label,
         # Recolhe a seção de anexos ao trocar de aba
         st.session_state["history_show_attachments"] = False
         st.session_state[last_active_tab_key] = active_tab
+
+def display_flash_messages():
+    """
+    Exibe mensagens persistentes (flash) da última ação realizada.
+    Remove a mensagem do session_state após exibi-la.
+    """
+    try:
+        _flash = st.session_state.pop("history_flash", None)
+        if _flash:
+            level = _flash.get("type", "info")
+            msg = _flash.get("msg", "")
+            if level == "success":
+                st.success(msg)
+            elif level == "error":
+                st.error(msg)
+            elif level == "warning":
+                st.warning(msg)
+            else:
+                st.info(msg)
+    except Exception:
+        pass
+
+def initialize_history_state(farol_reference):
+    """
+    Inicializa estados do session_state para a tela History.
+    Executa apenas na primeira vez que a tela é aberta para uma referência.
+    
+    Args:
+        farol_reference: Referência Farol atual
+    """
+    init_key = f"history_initialized_{farol_reference}"
+    if not st.session_state.get(init_key):
+        st.session_state["history_show_attachments"] = False
+        # Limpa possíveis estados de processamento/expansão do módulo de anexos
+        for k in [
+            f"processed_pdf_data_{farol_reference}",
+            f"booking_pdf_file_{farol_reference}",
+            f"expander_state_{farol_reference}",
+            f"attachment_cache_{farol_reference}",
+            f"uploader_ver_{farol_reference}",
+        ]:
+            st.session_state.pop(k, None)
+        st.session_state[init_key] = True
+    
+    # Initialize approval_step in session_state if not present
+    if f"approval_step_{farol_reference}" not in st.session_state:
+        st.session_state[f"approval_step_{farol_reference}"] = None
+
+def handle_no_reference_selected():
+    """
+    Exibe mensagem e botão quando nenhuma referência está selecionada.
+    
+    Returns:
+        bool: True se deve retornar (sem referência), False caso contrário
+    """
+    st.info("Selecione uma linha em Shipments para visualizar o Ticket Journey.")
+    col = st.columns(1)[0]
+    with col:
+        if st.button("🔙 Back to Shipments"):
+            st.session_state["current_page"] = "main"
+            st.rerun()
+    return True
+
+def handle_empty_dataframe(farol_reference):
+    """
+    Trata o caso quando não há dados para a referência, tentando exibir registros recentes.
+    
+    Args:
+        farol_reference: Referência Farol atual
+    
+    Returns:
+        tuple: (df, should_return)
+            - df: DataFrame (vazio ou com registros recentes)
+            - should_return: True se deve retornar (sem dados), False caso contrário
+    """
+    from database import get_return_carriers_recent
+    
+    st.info("Nenhum registro para esta referência. Exibindo registros recentes:")
+    df = get_return_carriers_recent(limit=200)
+    if df.empty:
+        st.warning("A tabela F_CON_RETURN_CARRIERS está vazia.")
+        col = st.columns(1)[0]
+        with col:
+            if st.button("🔙 Back to Shipments"):
+                st.session_state["current_page"] = "main"
+                st.rerun()
+        return df, True
+    return df, False

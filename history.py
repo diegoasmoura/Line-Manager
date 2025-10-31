@@ -31,7 +31,9 @@ from history_helpers import (
     format_linked_reference_display, convert_utc_to_brazil_time,
     prepare_main_data_for_display, clear_history_session_state_on_selection_change,
     clear_history_session_state_when_no_selection, prepare_dataframe_for_display,
-    generate_tab_labels, initialize_tab_state, handle_tab_change
+    generate_tab_labels, initialize_tab_state, handle_tab_change,
+    display_flash_messages, initialize_history_state, handle_no_reference_selected,
+    handle_empty_dataframe
 )
 
 # Carrega dados da UDC para justificativas
@@ -116,71 +118,28 @@ def exibir_history():
     # convert_utc_to_brazil_time removido - agora importado de history_helpers.py
     
     st.header("📜 Return Carriers History")
-
-
     
     # Exibe mensagens persistentes da última ação (flash)
-    try:
-        _flash = st.session_state.pop("history_flash", None)
-        if _flash:
-            level = _flash.get("type", "info")
-            msg = _flash.get("msg", "")
-            if level == "success":
-                st.success(msg)
-            elif level == "error":
-                st.error(msg)
-            elif level == "warning":
-                st.warning(msg)
-            else:
-                st.info(msg)
-    except Exception:
-        pass
+    display_flash_messages()
     
     # Espaçamento após o título
     st.markdown("<br>", unsafe_allow_html=True)
 
     farol_reference = st.session_state.get("selected_reference")
     
-    # Initialize approval_step in session_state if not present
-    if f"approval_step_{farol_reference}" not in st.session_state:
-        st.session_state[f"approval_step_{farol_reference}"] = None
-
+    # Valida se há referência selecionada
     if not farol_reference:
-        st.info("Selecione uma linha em Shipments para visualizar o Ticket Journey.")
-        col = st.columns(1)[0]
-        with col:
-            if st.button("🔙 Back to Shipments"):
-                st.session_state["current_page"] = "main"
-                st.rerun()
-        return
+        if handle_no_reference_selected():
+            return
 
-    # Inicialização: ao entrar na tela pela primeira vez (por referência), retrai View Attachments e limpa estados residuais
-    init_key = f"history_initialized_{farol_reference}"
-    if not st.session_state.get(init_key):
-        st.session_state["history_show_attachments"] = False
-        # Limpa possíveis estados de processamento/expansão do módulo de anexos
-        for k in [
-            f"processed_pdf_data_{farol_reference}",
-            f"booking_pdf_file_{farol_reference}",
-            f"expander_state_{farol_reference}",
-            f"attachment_cache_{farol_reference}",
-            f"uploader_ver_{farol_reference}",
-        ]:
-            st.session_state.pop(k, None)
-        st.session_state[init_key] = True
+    # Inicializa estados da tela History
+    initialize_history_state(farol_reference)
 
-
+    # Busca dados e trata caso vazio
     df = get_return_carriers_by_farol(farol_reference)
     if df.empty:
-        st.info("Nenhum registro para esta referência. Exibindo registros recentes:")
-        df = get_return_carriers_recent(limit=200)
-        if df.empty:
-            st.warning("A tabela F_CON_RETURN_CARRIERS está vazia.")
-            col = st.columns(1)[0]
-            with col:
-                if st.button("🔙 Back to Shipments"):
-                    st.session_state["current_page"] = "main"
-                    st.rerun()
+        df, should_return = handle_empty_dataframe(farol_reference)
+        if should_return:
             return
 
 
