@@ -1018,7 +1018,7 @@ def _display_tab_content(df_tab, tab_name, farol_reference):
         "Estimada Transbordo (ETD)", "Chegada (ATA)", "Transbordo (ATD)",
         "PDF Name", "PDF Booking Emission Date", "Linked Reference",
         # Colunas de justificativa no final
-        "Area", "Request Reason", "Adjustments Owner", "Comments",
+        "Area", "Request Reason", "Adjustments Owner", "Comments", "Created By",
     ]
     
     def reorder_columns(df, ordered_list):

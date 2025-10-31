@@ -112,18 +112,71 @@ def process_dataframe(df_to_process, farol_reference):
         "S_REQUIRED_ARRIVAL_DATE_EXPECTED": "Required Arrival Date", "B_DATA_ESTIMATIVA_SAIDA_ETD": "ETD",
         "B_DATA_ESTIMATIVA_CHEGADA_ETA": "ETA", "B_DATA_ESTIMATIVA_ATRACACAO_ETB": "Estimativa Atracação (ETB)",
         "B_DATA_ATRACACAO_ATB": "Atracação (ATB)", "B_DATA_PARTIDA_ATD": "Partida (ATD)", "B_DATA_CHEGADA_ATA": "Chegada (ATA)",
+        "USER_INSERT": "Created By",
+        "USER_UPDATE": "User Update",
+        "DATE_UPDATE": "Date Update",
     }
     rename_map = {col: custom_overrides.get(col, mapping_upper.get(col, prettify(col))) for col in df_processed.columns}
     df_processed.rename(columns=rename_map, inplace=True)
 
+    # Combinar informação de aprovação na coluna "Created By" ANTES de converter datas para string
+    if "Created By" in df_processed.columns and "Date Update" in df_processed.columns:
+        def combine_created_and_approved(row):
+            created_by = str(row.get("Created By", "") or "").strip()
+            user_update = str(row.get("User Update", "") or "").strip() if "User Update" in df_processed.columns else ""
+            date_update = row.get("Date Update")
+            
+            # Se houver aprovação (USER_UPDATE e DATE_UPDATE preenchidos), mostrar apenas aprovador e data
+            if user_update and date_update:
+                try:
+                    # Verificar se date_update é string (já convertido) ou datetime
+                    if isinstance(date_update, str):
+                        # Tentar converter string para datetime
+                        if date_update and date_update.strip() and date_update not in ['', 'None', 'NaT', 'nan', '<NA>']:
+                            try:
+                                date_update = pd.to_datetime(date_update)
+                            except Exception:
+                                pass
+                    
+                    # Converter DATE_UPDATE para horário do Brasil e formatar
+                    if date_update and not isinstance(date_update, str):
+                        brazil_time = convert_utc_to_brazil_time(date_update)
+                        if brazil_time:
+                            date_formatted = brazil_time.strftime('%d/%m/%Y %H:%M')
+                            return f"{user_update} em {date_formatted}"
+                    
+                    # Fallback: se já for string formatada, usar diretamente
+                    if isinstance(date_update, str) and date_update.strip():
+                        return f"{user_update} em {date_update}"
+                    
+                    return user_update if user_update else created_by
+                except Exception:
+                    # Em caso de erro, retornar apenas o usuário
+                    return user_update if user_update else created_by
+            
+            # Caso contrário, mostrar apenas o criador
+            return created_by if created_by else ""
+        
+        df_processed["Created By"] = df_processed.apply(combine_created_and_approved, axis=1)
+
     # Tratamento de nulos e formatação
+    # Excluir "Created By", "User Update" e "Date Update" do tratamento padrão (já processados)
+    cols_to_skip = {"Created By", "User Update", "Date Update"}
     for col in df_processed.columns:
+        if col in cols_to_skip:
+            continue
         if pd.api.types.is_datetime64_any_dtype(df_processed[col]):
             # Converter para string e tratar todos os casos possíveis
             df_processed[col] = df_processed[col].astype(str).replace('NaT', '').replace('None', '').replace('nan', '').replace('<NA>', '')
         else:
             # Tratar None, NaN, e outros valores nulos
             df_processed[col] = df_processed[col].fillna('').astype(str).replace('None', '').replace('nan', '').replace('<NA>', '')
+    
+    # Remover colunas temporárias "User Update" e "Date Update" após processar (não precisam aparecer na tabela)
+    if "User Update" in df_processed.columns:
+        df_processed = df_processed.drop(columns=["User Update"])
+    if "Date Update" in df_processed.columns:
+        df_processed = df_processed.drop(columns=["Date Update"])
 
     if "Linked Reference" in df_processed.columns:
         df_processed["Linked Reference"] = df_processed.apply(lambda row: format_linked_reference_display(row.get("Linked Reference"), row.get("Farol Reference")), axis=1)
@@ -345,6 +398,9 @@ def get_display_columns():
         "REQUEST_REASON",
         "ADJUSTMENTS_OWNER",
         "COMMENTS",
+        "USER_INSERT",
+        "USER_UPDATE",
+        "DATE_UPDATE",
     ]
 
 def prepare_dataframe_for_display(df, farol_reference):

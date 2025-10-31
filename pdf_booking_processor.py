@@ -3324,7 +3324,11 @@ def save_pdf_booking_data(validated_data):
             pass
         # ====== Fim validação duplicidade ======
         # Usa a função existente de inserção com status "Received from Carrier"
-        success = insert_return_carrier_from_ui(validated_data, user_insert="PDF_PROCESSOR", status_override="Received from Carrier")
+        # Para processamento manual: usa o usuário logado
+        # Para processamento automático (futuro): bots devem usar identificadores como "EMAIL_BOT", "API_BOT", etc.
+        from database import get_current_user_login
+        current_user = get_current_user_login()
+        success = insert_return_carrier_from_ui(validated_data, user_insert=current_user, status_override="Received from Carrier")
         
         if success[0]:
             st.success("✅ Dados do PDF salvos com sucesso na tabela F_CON_RETURN_CARRIERS!")
@@ -3354,8 +3358,8 @@ def save_pdf_booking_data(validated_data):
                     # Reseta o ponteiro do arquivo para leitura
                     pdf_file.seek(0)
                     
-                    # Salva o PDF como anexo
-                    if save_attachment_to_db(farol_reference, pdf_file, user_id="PDF_PROCESSOR"):
+                    # Salva o PDF como anexo usando o usuário logado
+                    if save_attachment_to_db(farol_reference, pdf_file, user_id=current_user):
                         st.success("📎 PDF salvo com sucesso na lista de anexos!")
                     else:
                         st.warning("⚠️ PDF não foi salvo na lista de anexos, mas os dados foram salvos na tabela.")
@@ -3369,7 +3373,7 @@ def save_pdf_booking_data(validated_data):
                 update_success = update_farol_status_main_table(
                     farol_reference=farol_reference,
                     new_status="Received from Carrier",
-                    user_insert="PDF_PROCESSOR"
+                    user_insert=current_user
                 )
                 if update_success:
                     st.info("ℹ️ Farol Status atualizado na tabela principal")

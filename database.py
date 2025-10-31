@@ -1352,7 +1352,9 @@ def add_sales_record(form_values):
         farol_reference = unified_values.get("FAROL_REFERENCE")
         if farol_reference:
             try:
-                upsert_return_carrier_from_unified(farol_reference, user_insert=unified_values.get("USER_INSERT", "system"))
+                # Usar o usuário logado para o snapshot (mesmo que criou o registro Sales)
+                current_user = unified_values.get("USER_LOGIN_SALES_CREATED") or get_current_user_login()
+                upsert_return_carrier_from_unified(farol_reference, user_insert=current_user)
             except Exception as e:
                 # Log do erro mas não falha toda a operação, pois o registro principal já foi criado
                 print(f"Aviso: Erro ao criar snapshot em F_CON_RETURN_CARRIERS: {e}")
@@ -2780,7 +2782,9 @@ def approve_carrier_return(adjustment_id: str, related_reference: str, justifica
                         elox_update_values["ELLOX_MONITORING_ID"] = existing_monitoring_id
 
         # 3. Prepare and execute the UPDATE on F_CON_RETURN_CARRIERS
-        update_params = {"adjustment_id": adjustment_id, "user_update": "System"}
+        # Usar o usuário logado para a aprovação
+        current_user = get_current_user_login()
+        update_params = {"adjustment_id": adjustment_id, "user_update": current_user}
         update_params.update(elox_update_values)
 
         set_clauses = [f"{col} = :{col}" for col in elox_update_values.keys()]
@@ -3283,7 +3287,7 @@ def update_return_carrier_status(adjustment_id: str, new_status: str) -> bool:
         
         result = conn.execute(update_query, {
             "new_status": new_status,
-            "user_update": "System",  # Pode ser parametrizado se necessário
+            "user_update": get_current_user_login(),
             "adjustment_id": adjustment_id
         })
         

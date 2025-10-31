@@ -4176,6 +4176,37 @@ Todos os PRs passam por revisão técnica focando em:
 
 **✅ Status**: Implementado e testado
 
+### 🔧 **v4.2.4 - Janeiro 2025 - Coluna "Created By" e Informação de Aprovação**
+
+**🎯 Nova Funcionalidade:**
+
+#### **Coluna "Created By" com Informação de Aprovação**
+- ✅ **Coluna "Created By" adicionada**: Nova coluna após "Comments" na Request Timeline mostrando o usuário responsável pela inserção do registro
+- ✅ **Identificação do criador**: Mostra o usuário que criou cada registro (campo `USER_INSERT`)
+- ✅ **Informação de aprovação**: Quando um registro é aprovado (muda de "Received from Carrier" para "Booking Approved"), a coluna mostra o aprovador e data: `"{USER_UPDATE} em {DD/MM/YYYY HH:MM}"`
+- ✅ **Formato simplificado**: Sem aprovação mostra apenas o criador, com aprovação mostra apenas aprovador e data
+
+**📁 Arquivos Modificados:**
+- `history_helpers.py`: 
+  - Adicionado `USER_INSERT`, `USER_UPDATE` e `DATE_UPDATE` à lista `get_display_columns()`
+  - Adicionado mapeamento `"USER_INSERT": "Created By"` em `custom_overrides`
+  - Implementada lógica para combinar informação de aprovação na coluna "Created By"
+- `history_components.py`: Adicionado `"Created By"` após `"Comments"` na lista `desired_order`
+- `pdf_booking_processor.py`: Corrigido para usar `get_current_user_login()` em vez de `"PDF_PROCESSOR"` hardcoded
+- `database.py`: 
+  - Corrigido `add_sales_record()` para usar usuário logado em vez de "system" para registros "New Request"
+  - Corrigido `approve_carrier_return()` para usar `get_current_user_login()` em vez de "System"
+  - Corrigido `update_record_status()` para usar `get_current_user_login()` em vez de "System"
+
+**🔍 Detalhes Técnicos:**
+- A coluna "Created By" processa informação ANTES da conversão de datas para string para garantir acesso correto a `DATE_UPDATE`
+- Quando `USER_UPDATE` e `DATE_UPDATE` estão preenchidos (registro aprovado), mostra apenas `"{USER_UPDATE} em {DD/MM/YYYY HH:MM}"`
+- Quando não há aprovação, mostra apenas `"{USER_INSERT}"` (criador)
+- Formatação de `DATE_UPDATE` converte para horário do Brasil antes de exibir
+- Colunas temporárias "User Update" e "Date Update" são removidas após processamento (não aparecem na tabela)
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.1 - Janeiro 2025 - Colunas de Justificativa na Request Timeline**
 
 **🎯 Nova Funcionalidade:**
