@@ -13,6 +13,29 @@ df_udc = load_df_udc()
 Booking_adj_area = df_udc[df_udc["grupo"] == "Booking Adj Area"]["dado"].dropna().unique().tolist()
 Booking_adj_reason = df_udc[df_udc["grupo"] == "Booking Adj Request Reason"]["dado"].dropna().unique().tolist()
 Booking_adj_responsibility = df_udc[df_udc["grupo"] == "Booking Adj Responsibility"]["dado"].dropna().unique().tolist()
+
+# Mapeamento de Reason para Responsibility
+REASON_TO_RESPONSIBILITY = {
+    "Other Delays": "",
+    "Operational Restrictions": "Armador",
+    "Route Adjustments": "Armador",
+    "SSCO Problems": "Armador",
+    "Vessel Omission": "Armador",
+    "Lack of Equipment": "Armador/ Cooperativa",
+    "Terminal Schedule Restriction": "Armador/ Terminal de Embarque",
+    "NF Problems": "Cargill",
+    "Cargo Delivery Antecipated": "Cargill/ Exportador",
+    "Cargo Delivery Delay": "Cargill/ Exportador",
+    "Over Allocation": "Cargill/ Exportador",
+    "Strike": "De acordo com a categoria",
+    "Producer's Request": "Exportador",
+    "Damages": "Exportador/ Transportadora",
+    "Buyer's Request": "Importador",
+    "Customs Problem": "RFB/ MAPA",
+    "Stuffing Delay": "Terminal de Estufagem/ Controladora",
+    "Allocation Problems": "Time de Alocação",
+    "Missing deadline draft": ""
+}
  
 def resetar_estado():
     keys_to_remove = [
@@ -298,9 +321,53 @@ def show_split_form():
         with col_a:
             area = st.selectbox("Booking Adjustment Area", [""] + Booking_adj_area)
         with col_b:
-            reason = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason)
+            # Inicializar session_state para rastrear mudanças no reason
+            reason_key = "last_reason_split"
+            responsibility_key = "auto_responsibility_split"
+            
+            reason = st.selectbox("Booking Adjustment Request Reason", [""] + Booking_adj_reason, key="split_reason_selectbox")
+            
+            # Verificar se o reason mudou e atualizar responsibility automaticamente
+            reason_changed = False
+            if reason_key not in st.session_state or st.session_state[reason_key] != reason:
+                st.session_state[reason_key] = reason
+                # Obter responsibility mapeado
+                mapped_responsibility = REASON_TO_RESPONSIBILITY.get(reason, "")
+                st.session_state[responsibility_key] = mapped_responsibility
+                reason_changed = True
+            
+            # Obter o valor atual de responsibility (pode ser mapeado automaticamente ou editado pelo usuário)
+            responsibility_options = [""] + Booking_adj_responsibility
+            current_responsibility = st.session_state.get(responsibility_key, "")
+            
+            # Se houver um valor mapeado e ele estiver nas opções, usar esse índice
+            default_index = 0
+            if current_responsibility:
+                # Buscar o índice do valor mapeado (case-insensitive)
+                for i, opt in enumerate(responsibility_options):
+                    if str(opt).strip() == current_responsibility:
+                        default_index = i
+                        break
+                else:
+                    # Se não encontrar exato, buscar case-insensitive
+                    for i, opt in enumerate(responsibility_options):
+                        if str(opt).strip().upper() == current_responsibility.upper():
+                            default_index = i
+                            current_responsibility = opt  # Usar o valor da lista com a capitalização correta
+                            st.session_state[responsibility_key] = opt
+                            break
+            
         with col_c:
-            responsibility = st.selectbox("Booking Adjustment Responsibility", [""] + Booking_adj_responsibility)
+            responsibility = st.selectbox(
+                "Booking Adjustment Responsibility", 
+                [""] + Booking_adj_responsibility,
+                index=default_index,
+                help="Preenchido automaticamente baseado no motivo selecionado, mas pode ser editado se necessário",
+                key="split_responsibility_selectbox"
+            )
+            
+            # Atualizar session_state com o valor selecionado (caso tenha sido editado)
+            st.session_state[responsibility_key] = responsibility
         col_d, col_e = st.columns([2, 1])
         with col_d:
             comment = st.text_area("Comentários")

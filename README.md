@@ -4131,6 +4131,37 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.6 - Janeiro 2025 - Automação de Preenchimento de Booking Adjustment Responsibility**
+
+**🎯 Nova Funcionalidade:**
+
+#### **Preenchimento Automático de Responsibility Baseado em Reason**
+- ✅ **Automação inteligente**: O campo "Booking Adjustment Responsibility" é preenchido automaticamente quando um "Booking Adjustment Request Reason" é selecionado
+- ✅ **Mapeamento completo**: Implementado dicionário de mapeamento com todas as associações entre Reason e Responsibility
+- ✅ **Campo editável**: O campo de responsabilidade continua editável caso o usuário precise ajustar manualmente
+- ✅ **Aplicação universal**: Funcionalidade implementada tanto no formulário "Changed by Carrier" (History) quanto no formulário de ajustes/splits
+- ✅ **Busca inteligente**: Busca case-insensitive para encontrar valores mesmo com diferenças de capitalização
+- ✅ **Persistência**: Valores são mantidos mesmo após reruns do Streamlit usando session_state
+
+**📁 Arquivos Modificados:**
+- `history_components.py`: 
+  - Criado dicionário `REASON_TO_RESPONSIBILITY` com mapeamento completo (~linha 1503-1524)
+  - Removida lógica que fixava responsabilidade em "Armador" e desabilitava o campo (~linhas 1678-1703)
+  - Implementada atualização automática usando `st.session_state` para rastrear mudanças (~linhas 1696-1743)
+  - Campo agora é editável mas pré-preenchido automaticamente
+- `shipments_split.py`: 
+  - Criado mesmo dicionário `REASON_TO_RESPONSIBILITY` (~linhas 17-38)
+  - Implementada mesma lógica de atualização automática (~linhas 324-368)
+  - Uso de chaves únicas para session_state para evitar conflitos
+
+**🔍 Detalhes Técnicos:**
+- **Mapeamento implementado**: 19 associações entre Reason e Responsibility, incluindo casos especiais como "Strike" → "De acordo com a categoria"
+- **Lógica de atualização**: Sistema detecta mudanças no campo Reason e atualiza automaticamente o Responsibility usando session_state
+- **Tratamento de casos especiais**: Valores vazios são tratados corretamente, busca case-insensitive para valores não encontrados exatamente
+- **Experiência do usuário**: Reduz trabalho manual e erros de preenchimento, mantendo flexibilidade para ajustes manuais quando necessário
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.5 - Janeiro 2025 - Remoção da Coluna Carrier Returns e Booking Status Editável**
 
 **🎯 Mudanças na Interface:**

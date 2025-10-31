@@ -1500,6 +1500,29 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
     Booking_adj_reason_car = df_udc[df_udc["grupo"] == "Booking Adj Request Reason Car"]["dado"].dropna().unique().tolist()
     Booking_adj_responsibility_car = df_udc[df_udc["grupo"] == "Booking Adj Responsibility Car"]["dado"].dropna().unique().tolist()
     
+    # Mapeamento de Reason para Responsibility
+    REASON_TO_RESPONSIBILITY = {
+        "Other Delays": "",
+        "Operational Restrictions": "Armador",
+        "Route Adjustments": "Armador",
+        "SSCO Problems": "Armador",
+        "Vessel Omission": "Armador",
+        "Lack of Equipment": "Armador/ Cooperativa",
+        "Terminal Schedule Restriction": "Armador/ Terminal de Embarque",
+        "NF Problems": "Cargill",
+        "Cargo Delivery Antecipated": "Cargill/ Exportador",
+        "Cargo Delivery Delay": "Cargill/ Exportador",
+        "Over Allocation": "Cargill/ Exportador",
+        "Strike": "De acordo com a categoria",
+        "Producer's Request": "Exportador",
+        "Damages": "Exportador/ Transportadora",
+        "Buyer's Request": "Importador",
+        "Customs Problem": "RFB/ MAPA",
+        "Stuffing Delay": "Terminal de Estufagem/ Controladora",
+        "Allocation Problems": "Time de Alocação",
+        "Missing deadline draft": ""
+    }
+    
     if active_tab == unified_label and not df_received_for_approval.empty and df_for_approval is not None:
         st.markdown("---")
         st.markdown("### ⚡ Evaluate Carrier Return")
@@ -1669,38 +1692,57 @@ def render_approval_panel(df_received_for_approval, df_for_approval, farol_refer
                 justification = {}
                 if selected_ref == "🆕 Changed by Carrier":
                     st.markdown("#### New Adjustment Justification")
+                    
+                    # Inicializar session_state para rastrear mudanças no reason
+                    reason_key = f"last_reason_{farol_reference}"
+                    responsibility_key = f"auto_responsibility_{farol_reference}"
+                    
                     reason = st.selectbox(
                         "Adjustment Request Reason *", 
                         options=[""] + Booking_adj_reason_car,
                         key=f"new_adj_reason_{farol_reference}"
                     )
                     
-                    # Para ajuste interno via New Adjustment, sempre usar "Armador"
+                    # Verificar se o reason mudou e atualizar responsibility automaticamente
+                    reason_changed = False
+                    if reason_key not in st.session_state or st.session_state[reason_key] != reason:
+                        st.session_state[reason_key] = reason
+                        # Obter responsibility mapeado
+                        mapped_responsibility = REASON_TO_RESPONSIBILITY.get(reason, "")
+                        st.session_state[responsibility_key] = mapped_responsibility
+                        reason_changed = True
+                    
+                    # Obter o valor atual de responsibility (pode ser mapeado automaticamente ou editado pelo usuário)
                     responsibility_options = [""] + Booking_adj_responsibility_car
-                    default_responsibility = "Armador"
+                    current_responsibility = st.session_state.get(responsibility_key, "")
+                    
+                    # Se houver um valor mapeado e ele estiver nas opções, usar esse índice
                     default_index = 0
-                    if "Armador" in responsibility_options:
-                        default_index = responsibility_options.index("Armador")
-                    else:
-                        # Buscar case-insensitive
+                    if current_responsibility:
+                        # Buscar o índice do valor mapeado (case-insensitive)
                         for i, opt in enumerate(responsibility_options):
-                            if str(opt).strip().upper() == "ARMADOR":
+                            if str(opt).strip() == current_responsibility:
                                 default_index = i
-                                default_responsibility = opt
                                 break
+                        else:
+                            # Se não encontrar exato, buscar case-insensitive
+                            for i, opt in enumerate(responsibility_options):
+                                if str(opt).strip().upper() == current_responsibility.upper():
+                                    default_index = i
+                                    current_responsibility = opt  # Usar o valor da lista com a capitalização correta
+                                    st.session_state[responsibility_key] = opt
+                                    break
                     
                     responsibility = st.selectbox(
                         "Adjustment Responsibility",
                         options=responsibility_options,
                         index=default_index,
-                        disabled=True,
-                        help="Responsabilidade fixa em 'Armador' para ajustes do armador",
+                        help="Preenchido automaticamente baseado no motivo selecionado, mas pode ser editado se necessário",
                         key=f"new_adj_responsibility_{farol_reference}"
                     )
                     
-                    # Garantir que sempre use "Armador"
-                    if responsibility == "":
-                        responsibility = default_responsibility
+                    # Atualizar session_state com o valor selecionado (caso tenha sido editado)
+                    st.session_state[responsibility_key] = responsibility
                     
                     comment = st.text_area(
                         "Comments",
