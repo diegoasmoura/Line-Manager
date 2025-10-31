@@ -30,7 +30,8 @@ from history_components import (
 from history_helpers import (
     format_linked_reference_display, convert_utc_to_brazil_time,
     prepare_main_data_for_display, clear_history_session_state_on_selection_change,
-    clear_history_session_state_when_no_selection
+    clear_history_session_state_when_no_selection, prepare_dataframe_for_display,
+    generate_tab_labels, initialize_tab_state, handle_tab_change
 )
 
 # Carrega dados da UDC para justificativas
@@ -200,186 +201,30 @@ def exibir_history():
 
     st.markdown("---")
 
-    # Grade principal com colunas relevantes (ADJUSTMENT_ID oculto mas usado internamente)
-    # ID removido da visualização - não é mais necessário para o usuário
-    display_cols = [
-        "ROW_INSERTED_DATE",
-        "FAROL_REFERENCE",
-        "FAROL_STATUS",
-        "B_BOOKING_REFERENCE",
-        "B_VESSEL_NAME",
-        "B_VOYAGE_CARRIER",
-        "B_VOYAGE_CODE",
-        "S_QUANTITY_OF_CONTAINERS",
-        "S_PLACE_OF_RECEIPT",
-        "S_PORT_OF_LOADING_POL",
-        "S_PORT_OF_DELIVERY_POD",
-        "S_FINAL_DESTINATION",
-        "B_TRANSHIPMENT_PORT",
-        "B_TERMINAL",
-        "S_REQUIRED_ARRIVAL_DATE_EXPECTED",
-        "S_REQUESTED_DEADLINE_START_DATE",
-        "S_REQUESTED_DEADLINE_END_DATE",
-        "B_DATA_DRAFT_DEADLINE",
-        "B_DATA_DEADLINE",
-        "B_DATA_ESTIMATIVA_SAIDA_ETD",
-        "B_DATA_ESTIMATIVA_CHEGADA_ETA",
-        "B_DATA_ABERTURA_GATE",
-        "B_DATA_CONFIRMACAO_EMBARQUE",
-        "B_DATA_ESTIMADA_TRANSBORDO_ETD",
-        "B_DATA_TRANSBORDO_ATD",
-        "P_PDF_NAME",
-        "PDF_BOOKING_EMISSION_DATE",
-        "LINKED_REFERENCE",
-        "B_DATA_ESTIMATIVA_ATRACACAO_ETB",
-        "B_DATA_ATRACACAO_ATB",
-        "B_DATA_PARTIDA_ATD",
-        "B_DATA_CHEGADA_ATA",
-        "ADJUSTMENTS_OWNER",
-    ]
-
-    # Inclui ADJUSTMENT_ID nos dados para funcionalidade interna
-    internal_cols = display_cols + ["ADJUSTMENT_ID"]
-    
-    df_show = df[[c for c in internal_cols if c in df.columns]].copy()
-    
-    # Força a ordem correta das colunas baseada na lista display_cols
-    ordered_cols = [c for c in internal_cols if c in df_show.columns]
-    df_show = df_show[ordered_cols]
-    
-    # Aplica ordenação por Inserted Date antes de separar em abas
-    if "ROW_INSERTED_DATE" in df_show.columns:
-        # Ordenação primária por data inserida (mais antigo → mais novo)
-        # Critério secundário estável: raiz da Farol Reference e sufixo numérico (.1, .2, ...)
-        if "FAROL_REFERENCE" in df_show.columns:
-            refs_base = df_show["FAROL_REFERENCE"].astype(str)
-            df_show["__ref_root"] = refs_base.str.split(".").str[0]
-            df_show["__ref_suffix_num"] = (
-                refs_base.str.extract(r"\.(\d+)$")[0].fillna("0").astype(str).astype(int)
-            )
-            df_show = df_show.sort_values(
-                by=["ROW_INSERTED_DATE", "__ref_root", "__ref_suffix_num"],
-                ascending=[True, True, True],
-                kind="mergesort",
-            )
-            df_show = df_show.drop(columns=["__ref_root", "__ref_suffix_num"])  # limpeza
-        else:
-            df_show = df_show.sort_values(by=["ROW_INSERTED_DATE"], ascending=[True], kind="mergesort")
-    
-    # Cria cópia do DataFrame (coluna Index será adicionada na função display_tab_content)
-    df_display = df_show.copy()
-    
-    # DataFrame unificado - todas as linhas juntas
-    df_unified = df_display.copy()
-    
-    # Remove splits informativos (exceto a referência atual) para contagem de rótulos
-    df_other_status = df_display[df_display["FAROL_STATUS"] != "Received from Carrier"].copy()
-    
-    if not df_other_status.empty:
-        # Filtrar linhas que são splits EXCETO a referência atual
-        has_ref_col = "FAROL_REFERENCE" in df_other_status.columns
-        
-        if has_ref_col and farol_reference:
-            import re
-            # Mantém apenas:
-            # 1. A referência atual (seja original ou split)
-            # 2. Registros que NÃO são splits (não têm padrão .n)
-            current_ref = str(farol_reference).strip()
-            
-            df_other_status = df_other_status[
-                # É a referência atual OU não é um split
-                (df_other_status["FAROL_REFERENCE"].astype(str) == current_ref) |
-                (~df_other_status["FAROL_REFERENCE"].astype(str).str.match(r'.*\.\d+$', na=False))
-            ].copy()
-    
-    # Separar PDFs "Received from Carrier" da referência atual para aprovação
-    df_received_count = df_display[df_display["FAROL_STATUS"] == "Received from Carrier"].copy()
-    df_received_for_approval = pd.DataFrame()
-
-    try:
-        if not df_received_count.empty and "FAROL_REFERENCE" in df_received_count.columns and farol_reference is not None:
-            fr_sel = str(farol_reference).strip().upper()
-            df_received_for_approval = df_received_count[
-                df_received_count["FAROL_REFERENCE"].astype(str).str.upper() == fr_sel
-            ].copy()
-    except Exception:
-        pass
-    
-    # Rótulos das abas
-    unified_label = f"📋 Request Timeline ({len(df_unified)} records)"
-    received_label = f"📨 Returns Awaiting Review ({len(df_received_for_approval)} records)"
+    # Prepara DataFrame para exibição (colunas, ordenação, filtros)
+    df_display, df_unified, df_received_for_approval = prepare_dataframe_for_display(df, farol_reference)
     
     # Busca dados de monitoramento relacionados aos navios desta referência
     df_voyage_monitoring = history_get_voyage_monitoring_for_reference(farol_reference)
-
-    # Contagem de combinações distintas (Navio + Viagem + Terminal)
-    try:
-        if df_voyage_monitoring is not None and not df_voyage_monitoring.empty:
-            df_tmp_count = df_voyage_monitoring.copy()
-            df_tmp_count['navio'] = df_tmp_count['navio'].astype(str)
-            df_tmp_count['viagem'] = df_tmp_count['viagem'].astype(str)
-            # Alguns datasets usam 'terminal' ou 'port_terminal_city'
-            terminal_col = 'terminal' if 'terminal' in df_tmp_count.columns else ('port_terminal_city' if 'port_terminal_city' in df_tmp_count.columns else None)
-            if terminal_col:
-                df_tmp_count[terminal_col] = df_tmp_count[terminal_col].astype(str)
-                distinct_count = df_tmp_count.drop_duplicates(subset=['navio', 'viagem', terminal_col]).shape[0]
-            else:
-                distinct_count = df_tmp_count.drop_duplicates(subset=['navio', 'viagem']).shape[0]
-        else:
-            distinct_count = 0
-    except Exception:
-        distinct_count = len(df_voyage_monitoring) if df_voyage_monitoring is not None else 0
-
-    voyages_label = f"📅 Voyage Timeline ({distinct_count} distinct)"
-
-    # Contagem para aba Audit Trail
-    try:
-        from sqlalchemy import text as _text_audit
-        conn_cnt = get_database_connection()
-        cnt_query = _text_audit("""
-            SELECT COUNT(*)
-            FROM LogTransp.V_FAROL_AUDIT_TRAIL
-            WHERE FAROL_REFERENCE = :farol_ref
-        """)
-        audit_count = conn_cnt.execute(cnt_query, {"farol_ref": farol_reference}).scalar() or 0
-        conn_cnt.close()
-    except Exception:
-        audit_count = 0
-
-    # Label da aba Audit Trail
-    audit_label = f"🔍 Audit Trail ({audit_count} records)"
-
-    # Controle de "aba" ativa (segmented control) para detectar troca e limpar seleções da outra
+    
+    # Gera rótulos das abas com contagens
+    unified_label, voyages_label, audit_label = generate_tab_labels(
+        df_unified, df_received_for_approval, df_voyage_monitoring, farol_reference
+    )
+    
+    # Inicializa estado das abas
+    initialize_tab_state(farol_reference, unified_label)
+    
+    # Renderiza controle de abas
     active_tab_key = f"history_active_tab_{farol_reference}"
-    last_active_tab_key = f"history_last_active_tab_{farol_reference}"
-    if active_tab_key not in st.session_state:
-        st.session_state[active_tab_key] = unified_label
-        st.session_state[last_active_tab_key] = unified_label
-
     active_tab = st.segmented_control(
         "",
         options=[unified_label, voyages_label, audit_label],
         key=active_tab_key
     )
-
-    # Se detectarmos troca de aba, limpamos as seleções das outras abas
-    prev_tab = st.session_state.get(last_active_tab_key)
-    if prev_tab != active_tab:
-        if active_tab == unified_label:
-            # Ao entrar na aba unificada, limpar qualquer seleção pendente
-            if f"pdf_approval_select_{farol_reference}" in st.session_state:
-                del st.session_state[f"pdf_approval_select_{farol_reference}"]
-        elif active_tab == audit_label:
-            # Limpamos seleção quando entrar na Audit Trail
-            if f"pdf_approval_select_{farol_reference}" in st.session_state:
-                del st.session_state[f"pdf_approval_select_{farol_reference}"]
-        else:  # voyages_label
-            # Limpamos seleção ao entrar na aba Voyages
-            if f"pdf_approval_select_{farol_reference}" in st.session_state:
-                del st.session_state[f"pdf_approval_select_{farol_reference}"]
-        # Ao trocar de aba, recolhe a seção de anexos para manter a tela limpa
-        st.session_state["history_show_attachments"] = False
-        st.session_state[last_active_tab_key] = active_tab
+    
+    # Gerencia troca de abas (limpa seleções quando necessário)
+    handle_tab_change(farol_reference, active_tab, unified_label, voyages_label, audit_label)
 
     # Funções auxiliares (calculate_column_width, generate_dynamic_column_config, process_dataframe,
     # display_tab_content, detect_changes_for_new_adjustment, detect_changes_for_carrier_return,
