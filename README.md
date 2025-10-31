@@ -4131,6 +4131,42 @@ Todos os PRs passam por revisão técnica focando em:
 
 ## 📋 Changelog
 
+### 🔧 **v4.2.5 - Janeiro 2025 - Remoção da Coluna Carrier Returns e Booking Status Editável**
+
+**🎯 Mudanças na Interface:**
+
+#### **Remoção da Coluna "Carrier Returns"**
+- ✅ **Coluna removida**: A coluna "Carrier Returns" foi completamente removida da tabela principal (`shipments.py`)
+- ✅ **Função removida**: Removida a função `get_carrier_returns_count` que calculava a contagem de retornos dos carriers
+- ✅ **Colunas removidas**: Removidas tanto "Carrier Returns" quanto "Carrier Returns Status" do DataFrame e da configuração de colunas
+- ✅ **CSS removido**: Removido o CSS personalizado que fixava a largura de "Carrier Returns Status"
+- ✅ **Filtros atualizados**: "Carrier Returns" e "Carrier Returns Status" foram adicionadas ao conjunto de colunas excluídas do filtro "Advanced Filters"
+- ✅ **Código limpo**: Todas as referências a essas colunas foram removidas do código
+
+#### **Booking Status Editável em Todos os Stages**
+- ✅ **Editável em Sales Data**: A coluna "Booking Status" agora é editável no stage "Sales Data" (anteriormente não editável)
+- ✅ **Editável em todos os stages**: "Booking Status" já era editável em "Booking Management" e "General View", agora também é em "Sales Data"
+
+**📁 Arquivos Modificados:**
+- `shipments.py`: 
+  - Removida função `get_carrier_returns_count` (~linhas 1542-1563)
+  - Removida criação das colunas "Carrier Returns" e "Carrier Returns Status" (~linhas 1565-1581)
+  - Removida adição dessas colunas à lista de desabilitadas (~linhas 1761-1765)
+  - Removida configuração de `column_config` para "Carrier Returns Status"
+  - Removida lógica de posicionamento de "Carrier Returns Status" após "Farol Status"
+  - Removido CSS personalizado para "Carrier Returns Status"
+  - Adicionadas "CARRIER RETURNS" e "CARRIER RETURNS STATUS" ao conjunto `quick_filter_columns_upper` em `aplicar_filtros_interativos`
+- `shipments_mapping.py`: 
+  - Removido "Booking Status" da lista `non_editable` no stage "Sales Data" (~linha 144)
+
+**🔍 Detalhes Técnicos:**
+- A remoção de "Carrier Returns" foi solicitada pelo time, que indicou que a coluna não é mais necessária
+- A coluna "Carrier Returns" contava registros com status "Received from Carrier" para cada Farol Reference
+- O status "Received from Carrier" continua sendo rastreado através do "Farol Status" na tabela principal
+- "Booking Status" agora pode ser editado diretamente na tabela em todos os stages do sistema
+
+**✅ Status**: Implementado e testado
+
 ### 🔧 **v4.2.2 - Janeiro 2025 - Suporte a "New Adjustment" no Related Reference**
 
 **🎯 Nova Funcionalidade:**

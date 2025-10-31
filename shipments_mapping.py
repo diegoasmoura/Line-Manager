@@ -141,7 +141,6 @@ def non_editable_columns(stage):
             "Adjusts Critic",
             "Sales Owner",
             "Booking Owner",
-            "Booking Status",  # Não editável no stage Sales Data
         ]
     elif stage == "Booking Management":
         non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]

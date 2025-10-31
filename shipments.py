@@ -1538,48 +1538,6 @@ def exibir_shipments():
       # Filtro removido - agora todos os splits são visíveis na grade
     # Os splits podem ser gerenciados através do histórico
 
-    # Adiciona coluna com contagem de registros recebidos dos carriers
-    def get_carrier_returns_count(refs):
-        try:
-            conn = get_database_connection()
-            placeholders = ",".join([f":r{i}" for i in range(len(refs))])
-            params = {f"r{i}": r for i, r in enumerate(refs)}
-            params["status"] = "Received from Carrier"
-            
-            sql = text(f"""
-                SELECT farol_reference, COUNT(*) as count
-                FROM LogTransp.F_CON_RETURN_CARRIERS
-                WHERE UPPER(FAROL_STATUS) = UPPER(:status)
-                AND farol_reference IN ({placeholders})
-                GROUP BY farol_reference
-            """)
-            
-            result = conn.execute(sql, params).fetchall()
-            conn.close()
-            
-            # Monta dicionário {ref: count}
-            return {ref: count for ref, count in result}
-        except Exception:
-            return {}  # fallback seguro
-
-    # Busca contagens para todas as referências visíveis
-    refs = df[farol_ref_col].dropna().astype(str).unique().tolist()
-    actions_count = get_carrier_returns_count(refs) if refs else {}
-
-    def branch_count(ref: str) -> int:
-        ref = str(ref)
-        return int(actions_count.get(ref, 0))
-
-    def format_carrier_returns_status(count: int) -> str:
-        """Formata o status de retornos com badges coloridos e quantidade"""
-        if count == 0:
-            return "🔵 OK (0)"  # Azul - Sem pendências
-        else:
-            return f"🟡 PENDING ({count})"  # Amarelo - Pendente com quantidade
-
-    df["Carrier Returns"] = df[farol_ref_col].apply(branch_count).astype(int)
-    df["Carrier Returns Status"] = df["Carrier Returns"].apply(format_carrier_returns_status)
-
     previous_stage = st.session_state.get("previous_stage")
     unsaved_changes = st.session_state.get("changes") is not None and not st.session_state["changes"].empty
  
@@ -1800,11 +1758,6 @@ def exibir_shipments():
     # Ajusta nomes das colunas desabilitadas considerando renomeações para "Farol Reference"
     if rename_map:
         disabled_columns = [rename_map.get(col, col) for col in disabled_columns]
-    # Garante que Carrier Returns e Carrier Returns Status sejam somente leitura
-    if "Carrier Returns" not in disabled_columns:
-        disabled_columns.append("Carrier Returns")
-    if "Carrier Returns Status" not in disabled_columns:
-        disabled_columns.append("Carrier Returns Status")
     
     # Oculta "Booking Registered Date" nas visualizações "Booking Management" e "General View"
     if choose in ["Booking Management", "General View"]:
@@ -1834,28 +1787,17 @@ def exibir_shipments():
 
     # Garante que a coluna Farol Reference está pinada à esquerda
     column_config[farol_ref_col] = st.column_config.TextColumn(farol_ref_col, pinned="left")
-    
-    # Configuração da coluna Carrier Returns Status
-    column_config["Carrier Returns Status"] = st.column_config.TextColumn(
-        "Carrier Returns", 
-        help="Status of returns received from carriers (🔵 OK (0) = No pending, 🟡 PENDING (X) = X returns to evaluate)",
-        disabled=True
-    )
 
-    # Reordena colunas e posiciona "Carrier Returns" após "Farol Status"
+    # Reordena colunas
     colunas_ordenadas = ["Select", farol_ref_col] + [col for col in df.columns if col not in ["Select", farol_ref_col]]
 
-    # Remove a coluna de contagem bruta para evitar duplicidade na exibição
+    # Remove a coluna Carrier Returns e Carrier Returns Status se existirem
     if "Carrier Returns" in colunas_ordenadas:
         colunas_ordenadas.remove("Carrier Returns")
-    
-    # Posiciona "Carrier Returns Status" após "Farol Status"
-    if "Carrier Returns Status" in colunas_ordenadas and "Farol Status" in colunas_ordenadas:
+    if "Carrier Returns Status" in colunas_ordenadas:
         colunas_ordenadas.remove("Carrier Returns Status")
-        idx_status = colunas_ordenadas.index("Farol Status")
-        colunas_ordenadas.insert(idx_status + 1, "Carrier Returns Status")
     
-            # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
+    # Posiciona "Splitted Booking Reference" imediatamente após "Comments Sales"
         if "Splitted Booking Reference" in colunas_ordenadas and "Comments Sales" in colunas_ordenadas:
             # Remove e reinsere antes de Comments Sales (lado esquerdo)
             colunas_ordenadas.remove("Splitted Booking Reference")
@@ -2008,19 +1950,6 @@ def exibir_shipments():
 
     # Aplica filtros avançados APÓS a reordenação das colunas
     df = aplicar_filtros_interativos(df, colunas_ordenadas)
-
-    # Fixar largura da coluna Carrier Returns Status aproximadamente ao tamanho do título
-    if "Carrier Returns Status" in colunas_ordenadas:
-        idx_returns = colunas_ordenadas.index("Carrier Returns Status") + 1  # nth-child é 1-based
-        returns_css = (
-            f"[data-testid='stDataEditor'] thead th:nth-child({idx_returns}),"
-            f"[data-testid='stDataEditor'] tbody td:nth-child({idx_returns}),"
-            f"[data-testid='stDataFrame'] thead th:nth-child({idx_returns}),"
-            f"[data-testid='stDataFrame'] tbody td:nth-child({idx_returns}) {{"
-            " width: 16ch !important; min-width: 16ch !important; max-width: 16ch !important;"
-            " }}"
-        )
-        st.markdown(f"<style>{returns_css}</style>", unsafe_allow_html=True)
 
     # Remove qualquer CSS forçado para Farol Status; usa width nativa do componente
 
