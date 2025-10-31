@@ -299,9 +299,15 @@ def get_available_references_for_relation(farol_reference=None):
                             -- Verificação por ID (formato novo): se o LINKED_REFERENCE contém "ID{r.ID}"
                             linked.LINKED_REFERENCE LIKE '%ID' || CAST(r.ID AS VARCHAR2(50)) || '%'
                             OR
-                            -- Verificação por data apenas (DD-MM-YYYY) - mais flexível para formato antigo sem ID
-                            -- Verifica apenas a data, ignorando diferenças de hora
+                            -- Verificação por data+hora (DD-MM-YYYY HH24:MI) para formato antigo sem ID
+                            -- Mais preciso que apenas data, evita excluir registros incorretos do mesmo dia
                             (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
+                             AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%')
+                            OR
+                            -- Fallback: verificação por data apenas (DD-MM-YYYY) caso data+hora não encontre correspondência
+                            -- Usado apenas como último recurso para compatibilidade com formatos muito antigos
+                            (linked.LINKED_REFERENCE NOT LIKE '%ID%' 
+                             AND linked.LINKED_REFERENCE NOT LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY HH24:MI') || '%'
                              AND linked.LINKED_REFERENCE LIKE '%' || TO_CHAR(r.ROW_INSERTED_DATE, 'DD-MM-YYYY') || '%')
                         )
                   )
