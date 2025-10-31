@@ -72,6 +72,48 @@ def render_divider():
     st.markdown("---")
 
 
+def render_action_buttons(farol_reference: str, combined_df: pd.DataFrame) -> None:
+    """
+    Renderiza a seção de botões de ação (View Attachments, Export CSV, Back to Shipments).
+    
+    Args:
+        farol_reference: Referência Farol atual
+        combined_df: DataFrame unificado para exportação CSV
+    """
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Toggle de anexos
+        view_open = st.session_state.get("history_show_attachments", False)
+        if st.button("📎 View Attachments", key="history_view_attachments"):
+            st.session_state["history_show_attachments"] = not view_open
+            st.rerun()
+    
+    with col2:
+        # Export CSV
+        if not combined_df.empty:
+            st.download_button(
+                "⬇️ Export CSV",
+                data=combined_df.to_csv(index=False).encode("utf-8"),
+                file_name=f"return_carriers_{farol_reference}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.download_button(
+                "⬇️ Export CSV",
+                data="".encode("utf-8"),
+                file_name=f"return_carriers_{farol_reference}.csv",
+                mime="text/csv",
+                disabled=True
+            )
+    
+    with col3:
+        if st.button("🔙 Back to Shipments"):
+            st.session_state["current_page"] = "main"
+            st.rerun()
+
+
 # As seções abaixo serão migradas nas próximas etapas sem alterar o layout ou keys.
 
 from pdf_booking_processor import (

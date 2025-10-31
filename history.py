@@ -25,7 +25,8 @@ import uuid
 from pdf_booking_processor import process_pdf_booking, display_pdf_validation_interface, save_pdf_booking_data
 from history_components import (
     display_attachments_section as display_attachments_section_component,
-    render_metrics_header
+    render_metrics_header,
+    render_action_buttons
 )
 from history_helpers import (
     format_linked_reference_display, convert_utc_to_brazil_time,
@@ -233,34 +234,13 @@ def exibir_history():
 
     # apply_status_change removida - lógica de aprovação migrada para render_approval_panel_component em history_components.py
 
-    # Atualizar seção de Export CSV para usar apenas o DataFrame unificado
-    if edited_df_unified is not None and not edited_df_unified.empty:
-        combined_df = edited_df_unified
-    else:
-        combined_df = pd.DataFrame()
+    # Prepara DataFrame para exportação CSV
+    combined_df = edited_df_unified if (edited_df_unified is not None and not edited_df_unified.empty) else pd.DataFrame()
 
-    # Seção de botões de ação (View Attachments, Export, Back)
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        # Toggle de anexos
-        view_open = st.session_state.get("history_show_attachments", False)
-        if st.button("📎 View Attachments", key="history_view_attachments"):
-            st.session_state["history_show_attachments"] = not view_open
-            st.rerun()
-    with col2:
-        # Export CSV
-        if not combined_df.empty:
-            st.download_button("⬇️ Export CSV", data=combined_df.to_csv(index=False).encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv")
-        else:
-            st.download_button("⬇️ Export CSV", data="".encode("utf-8"), file_name=f"return_carriers_{farol_reference}.csv", mime="text/csv", disabled=True)
-    with col3:
-        if st.button("🔙 Back to Shipments"):
-            st.session_state["current_page"] = "main"
-            st.rerun()
+    # Renderiza botões de ação usando componente
+    render_action_buttons(farol_reference, combined_df)
 
     # Seção de anexos (toggle)
-    
     if st.session_state.get("history_show_attachments", False):
         st.markdown("---")
         st.subheader("📎 Attachment Management")
