@@ -472,6 +472,99 @@ def get_return_carriers_recent(limit: int = 200) -> pd.DataFrame:
         return df
     finally:
         conn.close()
+
+# --- HISTORY WRAPPERS (centraliza ponto de acesso) ---
+# Nota: enquanto as queries específicas do History permanecem em history_data.py,
+# disponibilizamos wrappers aqui para padronizar o consumo a partir de database.py
+# sem alterar o comportamento atual da aplicação.
+try:
+    # Import local para evitar ciclos de import no carregamento inicial
+    from history_data import (
+        get_main_table_data as _history_get_main_table_data,
+        get_voyage_monitoring_for_reference as _history_get_voyage_monitoring_for_reference,
+        get_available_references_for_relation as _history_get_available_references_for_relation,
+        save_attachment_to_db as _history_save_attachment_to_db,
+        get_attachments_for_farol as _history_get_attachments_for_farol,
+        delete_attachment as _history_delete_attachment,
+        get_attachment_content as _history_get_attachment_content,
+        get_next_linked_reference_number as _history_get_next_linked_reference_number,
+        get_referenced_line_data as _history_get_referenced_line_data,
+    )
+except Exception:
+    # Em contextos de import parcial (linters/tests), ignorar falhas transitórias
+    _history_get_main_table_data = None
+    _history_get_voyage_monitoring_for_reference = None
+    _history_get_available_references_for_relation = None
+    _history_save_attachment_to_db = None
+    _history_get_attachments_for_farol = None
+    _history_delete_attachment = None
+    _history_get_attachment_content = None
+    _history_get_next_linked_reference_number = None
+    _history_get_referenced_line_data = None
+
+
+def history_get_main_table_data(farol_ref):
+    return _history_get_main_table_data(farol_ref) if _history_get_main_table_data else None
+
+
+def history_get_voyage_monitoring_for_reference(farol_reference):
+    return (
+        _history_get_voyage_monitoring_for_reference(farol_reference)
+        if _history_get_voyage_monitoring_for_reference
+        else pd.DataFrame()
+    )
+
+
+def history_get_available_references_for_relation(farol_reference=None):
+    return (
+        _history_get_available_references_for_relation(farol_reference)
+        if _history_get_available_references_for_relation
+        else []
+    )
+
+
+def history_save_attachment(farol_reference, uploaded_file, user_id="system"):
+    return (
+        _history_save_attachment_to_db(farol_reference, uploaded_file, user_id)
+        if _history_save_attachment_to_db
+        else False
+    )
+
+
+def history_get_attachments(farol_reference):
+    return (
+        _history_get_attachments_for_farol(farol_reference)
+        if _history_get_attachments_for_farol
+        else pd.DataFrame()
+    )
+
+
+def history_delete_attachment(attachment_id, deleted_by="system"):
+    return (
+        _history_delete_attachment(attachment_id, deleted_by)
+        if _history_delete_attachment
+        else False
+    )
+
+
+def history_get_attachment_content(attachment_id):
+    return (
+        _history_get_attachment_content(attachment_id)
+        if _history_get_attachment_content
+        else (None, None, None)
+    )
+
+
+def history_get_next_linked_reference_number(farol_reference=None):
+    return (
+        _history_get_next_linked_reference_number(farol_reference)
+        if _history_get_next_linked_reference_number
+        else (f"{farol_reference}-R01" if farol_reference else 1)
+    )
+
+
+def history_get_referenced_line_data(linked_ref):
+    return _history_get_referenced_line_data(linked_ref) if _history_get_referenced_line_data else None
  
 #Obter os dados das tabelas principais Sales
 #@st.cache_data(ttl=300)
