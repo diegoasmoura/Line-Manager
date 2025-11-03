@@ -2135,134 +2135,170 @@ def exibir_shipments():
     else:
         st.session_state["changes"] = pd.DataFrame()
  
-    # Exibe a seção de alterações logo após a mensagem de sucesso
-    if "changes" in st.session_state and not st.session_state["changes"].empty:
- 
+    # Verificar se há mensagem flash para exibir (mostrar seção temporariamente)
+    show_flash_message = False
+    flash = None
+    if "shipments_flash" in st.session_state:
+        flash = st.session_state.get("shipments_flash")
+        flash_time = st.session_state.get("shipments_flash_time", time.time())
+        
+        # Se passou menos de 2 segundos, exibe a mensagem
+        if time.time() - flash_time < 2:
+            show_flash_message = True
+        else:
+            # Remove a mensagem após 2 segundos
+            st.session_state.pop("shipments_flash", None)
+            st.session_state.pop("shipments_flash_time", None)
+            # Rerun para remover a mensagem da tela
+            st.rerun()
+    
+    # Exibe a seção de alterações OU apenas mensagem de sucesso temporariamente
+    # Mostra a seção se houver changes OU se houver mensagem flash ativa (< 2 segundos)
+    has_changes = "changes" in st.session_state and not st.session_state["changes"].empty
+    should_show_section = has_changes or show_flash_message
+    
+    if should_show_section:
         st.markdown("### ✏️ Changes Made")
-        changes_df = st.session_state["changes"].copy()
+        
+        # Exibir mensagem flash abaixo do título se existir
+        if show_flash_message and flash:
+            if flash.get("type") == "success":
+                st.success(flash.get("msg", ""))
+            elif flash.get("type") == "error":
+                st.error(flash.get("msg", ""))
+            elif flash.get("type") == "warning":
+                st.warning(flash.get("msg", ""))
+        
+        # Só mostra a grade de changes e campos se realmente houver changes
+        if has_changes:
+            changes_df = st.session_state["changes"].copy()
    
-        # Garante que a coluna Comments exista
-        if "Comments" not in changes_df.columns:
-           
-            # Stage único:
-            changes_df["Stage"] = "Sales Data"
-           
-        col_left, col_adjust, col_right  = st.columns([3,1,3])  # Grade e campo de texto lado a lado
-   
-        with col_left:
- 
-            st.dataframe(
-                changes_df[["Farol Reference", "Column", "Previous Value", "New Value","Stage"]],
-                use_container_width=True,
-                hide_index=True)
-   
-        with col_right:
-            st.text_area("📌 Reasons for Change", key="info_complementar")
-   
-           
-        col1, col2, col3, col4  = st.columns([1, 1, 2, 3])
-        with col1:
-            if has_access_level('EDIT'):
-                if st.button("✅ Save Changes"):
-                    comments = st.session_state.get("info_complementar", "").strip()
+            # Garante que a coluna Comments exista
+            if "Comments" not in changes_df.columns:
+               
+                # Stage único:
+                changes_df["Stage"] = "Sales Data"
+               
+            col_left, col_adjust, col_right  = st.columns([3,1,3])  # Grade e campo de texto lado a lado
        
-                    if comments:
-                        # Iniciar batch para agrupar todas as mudanças
-                        from database import begin_change_batch, end_change_batch
-                        begin_change_batch(random_uuid)
-                        
-                        try:
-                            # Loop de auditoria (substitui insert_adjustments_basics)
-                            conn = get_database_connection()
-                            transaction = conn.begin()
+            with col_left:
+ 
+                st.dataframe(
+                    changes_df[["Farol Reference", "Column", "Previous Value", "New Value","Stage"]],
+                    use_container_width=True,
+                    hide_index=True)
+       
+            with col_right:
+                st.text_area("📌 Reasons for Change", key="info_complementar")
+            
+            # Botões só aparecem quando há changes para salvar
+            col1, col2, col3, col4  = st.columns([1, 1, 2, 3])
+            with col1:
+                if has_access_level('EDIT'):
+                    if st.button("✅ Save Changes"):
+                        comments = st.session_state.get("info_complementar", "").strip()
+       
+                        if comments:
+                            # Iniciar batch para agrupar todas as mudanças
+                            from database import begin_change_batch, end_change_batch
+                            begin_change_batch(random_uuid)
                             
-                            for _, row in st.session_state["changes"].iterrows():
-                                from database import audit_change, update_field_in_sales_booking_data, create_adjustment_requested_timeline_record, insert_return_carrier_snapshot
-                                from shipments_mapping import get_database_column_name, clean_farol_status_value
+                            try:
+                                # Loop de auditoria (substitui insert_adjustments_basics)
+                                conn = get_database_connection()
+                                transaction = conn.begin()
                                 
-                                farol_ref = row["Farol Reference"]
-                                column = row["Column"]
-                                old_value = row["Previous Value"]
-                                new_value = row["New Value"]
-                                
-                                # Converter nome da coluna para nome técnico do banco de dados
-                                db_column_name = get_database_column_name(column)
-                                
-                                # Processar tipos de dados especiais
-                                if column == "Farol Status" or db_column_name == "FAROL_STATUS":
-                                    db_new_value = clean_farol_status_value(new_value)
-                                else:
-                                    db_new_value = new_value
-                                
-                                # Converter pandas.Timestamp para datetime nativo
-                                if hasattr(db_new_value, 'to_pydatetime'):
-                                    db_new_value = db_new_value.to_pydatetime()
-                                
-                                # Converter para date se for coluna de data específica
-                                if db_column_name in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
-                                    if db_new_value is not None and hasattr(db_new_value, 'date'):
-                                        db_new_value = db_new_value.date()
-                                
-                                # 1. Auditar a mudança (usa nome técnico)
-                                audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', 
-                                            db_column_name, old_value, new_value, 
-                                            'shipments', 'UPDATE', adjustment_id=random_uuid)
-                                
-                                # 2. Persistir a mudança na tabela principal (usa nome técnico)
-                                update_field_in_sales_booking_data(conn, farol_ref, db_column_name, db_new_value)
-
-                                # 3. Criar histórico quando Farol Status é alterado
-                                if db_column_name == "FAROL_STATUS":
-                                    # Limpar valores para comparação correta
-                                    clean_old_status = clean_farol_status_value(old_value) if old_value else None
-                                    clean_new_status = clean_farol_status_value(new_value) if new_value else None
+                                for _, row in st.session_state["changes"].iterrows():
+                                    from database import audit_change, update_field_in_sales_booking_data, create_adjustment_requested_timeline_record, insert_return_carrier_snapshot
+                                    from shipments_mapping import get_database_column_name, clean_farol_status_value
                                     
-                                    # Verificar se realmente houve mudança de status
-                                    if clean_old_status != clean_new_status:
-                                        current_user = st.session_state.get("username", "System")
+                                    farol_ref = row["Farol Reference"]
+                                    column = row["Column"]
+                                    old_value = row["Previous Value"]
+                                    new_value = row["New Value"]
+                                    
+                                    # Converter nome da coluna para nome técnico do banco de dados
+                                    db_column_name = get_database_column_name(column)
+                                    
+                                    # Processar tipos de dados especiais
+                                    if column == "Farol Status" or db_column_name == "FAROL_STATUS":
+                                        db_new_value = clean_farol_status_value(new_value)
+                                    else:
+                                        db_new_value = new_value
+                                    
+                                    # Converter pandas.Timestamp para datetime nativo
+                                    if hasattr(db_new_value, 'to_pydatetime'):
+                                        db_new_value = db_new_value.to_pydatetime()
+                                    
+                                    # Converter para date se for coluna de data específica
+                                    if db_column_name in ['B_DATA_CHEGADA_DESTINO_ETA', 'B_DATA_CHEGADA_DESTINO_ATA']:
+                                        if db_new_value is not None and hasattr(db_new_value, 'date'):
+                                            db_new_value = db_new_value.date()
+                                    
+                                    # 1. Auditar a mudança (usa nome técnico)
+                                    audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', 
+                                                db_column_name, old_value, new_value, 
+                                                'shipments', 'UPDATE', adjustment_id=random_uuid)
+                                    
+                                    # 2. Persistir a mudança na tabela principal (usa nome técnico)
+                                    update_field_in_sales_booking_data(conn, farol_ref, db_column_name, db_new_value)
+
+                                    # 3. Criar histórico quando Farol Status é alterado
+                                    if db_column_name == "FAROL_STATUS":
+                                        # Limpar valores para comparação correta
+                                        clean_old_status = clean_farol_status_value(old_value) if old_value else None
+                                        clean_new_status = clean_farol_status_value(new_value) if new_value else None
                                         
-                                        # Caso especial: New Adjustment → Adjustment Requested
-                                        # Usa dados da linha anterior em F_CON_RETURN_CARRIERS
-                                        if clean_old_status == "New Adjustment" and clean_new_status == "Adjustment Requested":
-                                            create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
-                                        else:
-                                            # Para TODAS as outras mudanças de Farol Status
-                                            # Usa dados da tabela principal F_CON_SALES_BOOKING_DATA (já atualizada)
-                                            try:
-                                                insert_return_carrier_snapshot(
-                                                    farol_reference=farol_ref,
-                                                    status_override=clean_new_status,
-                                                    user_insert=current_user
-                                                )
-                                            except Exception as e:
-                                                # Log do erro mas não interrompe o processo
-                                                print(f"⚠️ Aviso: Erro ao criar histórico de mudança de Farol Status de '{clean_old_status}' para '{clean_new_status}': {e}")
-                            
-                            transaction.commit()
-                            conn.close()
-                            
-                            st.success("✅ Changes successfully registered in the database!")
-                            st.session_state["changes"] = pd.DataFrame()
-                           
-                            #Liberando o cache salvo das consultas
-                            st.cache_data.clear()
-                            resetar_estado()
-                            st.rerun()
-                        finally:
-                            # Encerrar batch
-                            end_change_batch()
-                    else:
-                        st.error("⚠️ The 'Reasons for Change' field is required.")
-            else:
-                st.warning("⚠️ Você não tem permissão para editar dados. Nível de acesso: Visualização")
+                                        # Verificar se realmente houve mudança de status
+                                        if clean_old_status != clean_new_status:
+                                            current_user = st.session_state.get("username", "System")
+                                            
+                                            # Caso especial: New Adjustment → Adjustment Requested
+                                            # Usa dados da linha anterior em F_CON_RETURN_CARRIERS
+                                            if clean_old_status == "New Adjustment" and clean_new_status == "Adjustment Requested":
+                                                create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                            else:
+                                                # Para TODAS as outras mudanças de Farol Status
+                                                # Usa dados da tabela principal F_CON_SALES_BOOKING_DATA (já atualizada)
+                                                try:
+                                                    insert_return_carrier_snapshot(
+                                                        farol_reference=farol_ref,
+                                                        status_override=clean_new_status,
+                                                        user_insert=current_user
+                                                    )
+                                                except Exception as e:
+                                                    # Log do erro mas não interrompe o processo
+                                                    print(f"⚠️ Aviso: Erro ao criar histórico de mudança de Farol Status de '{clean_old_status}' para '{clean_new_status}': {e}")
+                                
+                                transaction.commit()
+                                conn.close()
+                                
+                                # Armazenar mensagem de sucesso para exibir após rerun
+                                st.session_state["shipments_flash"] = {
+                                    "type": "success",
+                                    "msg": "✅ Changes successfully registered in the database!"
+                                }
+                                st.session_state["shipments_flash_time"] = time.time()
+                                st.session_state["changes"] = pd.DataFrame()
+                               
+                                #Liberando o cache salvo das consultas
+                                st.cache_data.clear()
+                                resetar_estado()
+                                st.rerun()
+                            finally:
+                                # Encerrar batch
+                                end_change_batch()
+                        else:
+                            st.error("⚠️ The 'Reasons for Change' field is required.")
+                else:
+                    st.warning("⚠️ Você não tem permissão para editar dados. Nível de acesso: Visualização")
  
-        with col2:
-            if st.button("❌ Discard Changes"):
- 
-                st.warning("Changes discarded.")
-                st.session_state["changes"] = pd.DataFrame()
-                st.session_state["grid_update_key"] = str(time.time())
-                st.rerun()
+                with col2:
+                    if st.button("❌ Discard Changes"):
+                        st.warning("Changes discarded.")
+                        st.session_state["changes"] = pd.DataFrame()
+                        st.session_state["grid_update_key"] = str(time.time())
+                        st.rerun()
  
     # Verifica se linha foi selecionada
     selected_rows = edited_df[edited_df["Select"] == True]
