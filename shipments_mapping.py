@@ -612,6 +612,8 @@ def get_farol_status_icons():
         "Booking Approved": "✅",
         "Booking Cancelled": "❌",
         "Booking Rejected": "🚫",
+        "Shipped": "🚢",
+        "Arrived at destination": "🏁",
     }
 
 def get_icon_only(status: str) -> str:

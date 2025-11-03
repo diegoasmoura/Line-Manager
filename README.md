@@ -740,6 +740,22 @@ Para melhorar a experiência do usuário, o sistema Farol utiliza ícones visuai
 
 **Princípio Chave**: A lógica de ícones é uma camada de **apresentação (frontend)**. O banco de dados continua armazenando apenas o texto puro do status (ex: `Booking Approved`), enquanto a interface se encarrega de adicionar e remover os ícones (ex: `✅ Booking Approved`) dinamicamente.
 
+#### Tabela de Status e Ícones
+
+| Status | Ícone |
+|--------|-------|
+| New Request | 📦 |
+| Booking Requested | 📋 |
+| Received from Carrier | 📨 |
+| Booking Under Review | 🔍 |
+| New Adjustment | 🛠️ |
+| Adjustment Requested | ✏️ |
+| Booking Approved | ✅ |
+| Booking Cancelled | ❌ |
+| Booking Rejected | 🚫 |
+| Shipped | 🚢 |
+| Arrived at destination | 🏁 |
+
 #### Arquivo Central da Lógica
 
 Toda a funcionalidade de mapeamento de ícones está centralizada no arquivo:

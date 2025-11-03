@@ -99,14 +99,17 @@ Para alterar ou adicionar ícones, edite apenas a função `get_farol_status_ico
 
 | Status | Ícone |
 |--------|-------|
-| New Request | 🆕 |
+| New Request | 📦 |
 | Booking Requested | 📋 |
 | Received from Carrier | 📨 |
 | Booking Under Review | 🔍 |
+| New Adjustment | 🛠️ |
 | Adjustment Requested | ✏️ |
 | Booking Approved | ✅ |
 | Booking Cancelled | ❌ |
 | Booking Rejected | 🚫 |
+| Shipped | 🚢 |
+| Arrived at destination | 🏁 |
 
 ### Problema 3: Duplicidade de Status por Capitalização
 
