@@ -619,13 +619,21 @@ def get_icon_only(status: str) -> str:
     icons = get_farol_status_icons()
     # Limpa o status para garantir a correspondência
     clean_status = get_status_from_display(status)
-    return icons.get(clean_status, "⚫")
+    # Busca case-insensitive
+    for key, icon in icons.items():
+        if key.lower() == clean_status.lower():
+            return icon
+    return "⚫"
 
 def get_display_from_status(status: str) -> str:
     """Adiciona o ícone a uma string de status limpa."""
     # Tratar None, NaN, ou valores vazios: usar "New Request" como padrão
     if not isinstance(status, str) or not status or (isinstance(status, float) and pd.isna(status)):
         return "📦 New Request"
+
+    # Normaliza o status para Title Case para unificar variações
+    status = status.strip().title()
+    
     icon = get_icon_only(status)
     # Evita adicionar ícone se já tiver um
     if not status.startswith(icon):

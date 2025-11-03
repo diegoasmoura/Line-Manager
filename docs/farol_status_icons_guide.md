@@ -107,3 +107,13 @@ Para alterar ou adicionar ícones, edite apenas a função `get_farol_status_ico
 | Booking Approved | ✅ |
 | Booking Cancelled | ❌ |
 | Booking Rejected | 🚫 |
+
+### Problema 3: Duplicidade de Status por Capitalização
+
+-   **Sintoma**: A lista de opções do "Farol Status" exibia valores duplicados, como "📦 New Request" e "⚫ New request", devido a inconsistências de capitalização no banco de dados.
+-   **Causa**: A busca pelo ícone correspondente era sensível a maiúsculas e minúsculas. Um status como "New request" (com 'r' minúsculo) não era encontrado no mapa de ícones, fazendo com que o sistema atribuísse um ícone padrão (⚫) e o tratasse como uma opção diferente.
+-   **Solução**:
+    1.  **Busca Case-Insensitive**: A função `get_icon_only` foi modificada para realizar uma busca insensível a maiúsculas e minúsculas, garantindo que o ícone correto seja encontrado independentemente da capitalização.
+    2.  **Normalização na Exibição**: A função `get_display_from_status` agora padroniza o status para o formato "Title Case" (ex: "New Request") antes de exibi-lo.
+    3.  **Remoção de Duplicatas**: A lógica em `shipments.py` que popula as opções do dropdown foi ajustada para aplicar um `set` (conjunto) após a normalização, eliminando quaisquer duplicatas resultantes.
+-   **Prevenção**: A combinação dessas três mudanças garante que variações de capitalização nos dados de origem não resultem em duplicatas visuais na interface, mantendo a lista de status limpa e consistente.

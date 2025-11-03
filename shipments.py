@@ -109,7 +109,7 @@ def exibir_formulario():
         ])))
         # Adiciona ícones conforme mapeamento
         from shipments_mapping import get_display_from_status
-        farol_status_options = [get_display_from_status(s) for s in farol_status_options]
+        farol_status_options = sorted(list(set([get_display_from_status(s) for s in farol_status_options])))
         type_of_shipment_options = [""
         ] + df_udc[df_udc["grupo"] == "Type of Shipment"]["dado"].dropna().astype(str).unique().tolist()
         container_type_options = [""
