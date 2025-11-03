@@ -854,6 +854,81 @@ As regras são implementadas na função `update_field_in_sales_booking_data()` 
 - ✅ Todas as mudanças são registradas automaticamente na auditoria
 - ✅ Não dispara loops infinitos (apenas atualiza uma vez por preenchimento)
 
+### 📜 Criação Automática de Histórico por Mudança de Farol Status
+
+O sistema implementa uma funcionalidade que cria automaticamente registros históricos na tabela `F_CON_RETURN_CARRIERS` sempre que o **Farol Status** é alterado na tabela principal `F_CON_SALES_BOOKING_DATA`. Isso garante rastreabilidade completa de todas as mudanças de status ao longo do tempo.
+
+#### 🎯 Regras de Negócio
+
+O sistema utiliza **fontes de dados diferentes** dependendo do tipo de mudança de status:
+
+**Cenário 1: "New Adjustment" → "Adjustment Requested"**
+- **Fonte de dados**: Última linha anterior em `F_CON_RETURN_CARRIERS` (ordenada por `ROW_INSERTED_DATE DESC`)
+- **Motivo**: Neste ponto do fluxo, a tabela principal `F_CON_SALES_BOOKING_DATA` pode não ter os dados mais atualizados ainda
+- **Função utilizada**: `create_adjustment_requested_timeline_record()`
+- **Fallback**: Se não encontrar registro em `F_CON_RETURN_CARRIERS`, busca da tabela principal como fallback
+
+**Cenário 2: Todas as outras mudanças de Farol Status**
+- **Fonte de dados**: Tabela principal `F_CON_SALES_BOOKING_DATA` (já atualizada na linha anterior)
+- **Motivo**: A tabela principal já contém os dados atualizados após `update_field_in_sales_booking_data()`
+- **Função utilizada**: `insert_return_carrier_snapshot()`
+
+#### 📍 Onde a Funcionalidade é Aplicada
+
+A criação automática de histórico ocorre em **três pontos diferentes** da aplicação:
+
+1. **Grade Principal (`shipments.py` - linha ~2174)**
+   - Quando o usuário edita o Farol Status diretamente na grade de embarques
+   - Detecção automática de mudanças via `st.data_editor`
+
+2. **Form View - Sales Tab (`shipments.py` - linha ~731)**
+   - Quando o usuário edita o Farol Status na aba Sales do formulário detalhado
+   - Processamento dentro do contexto de alterações de Sales
+
+3. **Form View - Booking Tab (`shipments.py` - linha ~1343)**
+   - Quando o usuário edita o Farol Status na aba Booking do formulário detalhado
+   - Processamento dentro do contexto de alterações de Booking
+
+#### 🔧 Implementação Técnica
+
+**Processamento de Status:**
+- Valores de status são normalizados usando `clean_farol_status_value()` antes da comparação
+- Verificação de mudança real: apenas cria histórico se `clean_old_status != clean_new_status`
+- Tratamento de erros: falhas na criação de histórico não interrompem o processo principal (apenas log de aviso)
+
+**Estrutura do Registro Histórico:**
+- `FAROL_REFERENCE`: Referência do embarque
+- `FAROL_STATUS`: Novo status após a mudança
+- `ADJUSTMENT_ID`: UUID único gerado automaticamente
+- `USER_INSERT`: Usuário que realizou a alteração
+- `ROW_INSERTED_DATE`: Data/hora da criação do registro histórico
+- Todos os campos de dados do embarque (Sales e Booking) copiados da fonte apropriada
+
+#### 📝 Registros na Auditoria
+
+Todas as mudanças de Farol Status também são registradas na tabela de auditoria (`F_CON_CHANGE_LOG`):
+- Tabela: `F_CON_SALES_BOOKING_DATA`
+- Campo: `FAROL_STATUS`
+- Source: `'shipments'` (quando alterado manualmente)
+- Action: `'UPDATE'`
+
+#### ⚙️ Localização da Implementação
+
+As funções estão implementadas em:
+- `database.py`:
+  - `create_adjustment_requested_timeline_record()` (linha ~258)
+  - `insert_return_carrier_snapshot()` (linha ~2102)
+- `database_empresa.py`:
+  - `create_adjustment_requested_timeline_record()` (linha ~260)
+  - `insert_return_carrier_snapshot()` (implementação paralela)
+
+#### ✅ Benefícios
+
+- **Rastreabilidade Completa**: Histórico de todas as mudanças de status preservado
+- **Auditoria**: Registros completos de quem e quando alterou o status
+- **Timeline Visual**: Base para exibição de timeline de mudanças no módulo de histórico
+- **Consistência de Dados**: Dados corretos preservados de acordo com o contexto da mudança
+
 
 ## 🧩 Módulos do Sistema
 

@@ -260,8 +260,9 @@ def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
     Creates a new record in F_CON_RETURN_CARRIERS when the status of a shipment
     is manually changed from 'New Adjustment' to 'Adjustment Requested'.
 
-    This function fetches the current data from F_CON_SALES_BOOKING_DATA and creates
-    a new timeline event with P_STATUS = 'Adjusts Cargill'.
+    Esta função busca os dados da última linha anterior em F_CON_RETURN_CARRIERS
+    (não da tabela principal) porque a tabela principal pode não ter os dados mais
+    atualizados ainda neste ponto do fluxo.
 
     Args:
         conn: The database connection object.
@@ -272,7 +273,7 @@ def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
         bool: True if the record was created successfully, False otherwise.
     """
     try:
-        # 1. Fetch current data from F_CON_SALES_BOOKING_DATA
+        # 1. Buscar última linha anterior em F_CON_RETURN_CARRIERS
         fetch_query = text("""
             SELECT
                 S_QUANTITY_OF_CONTAINERS, S_PORT_OF_LOADING_POL, S_PORT_OF_DELIVERY_POD,
@@ -285,14 +286,35 @@ def create_adjustment_requested_timeline_record(conn, farol_ref, user_id):
                 B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA,
                 B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
                 B_TRANSHIPMENT_PORT
-            FROM LogTransp.F_CON_SALES_BOOKING_DATA
+            FROM LogTransp.F_CON_RETURN_CARRIERS
             WHERE FAROL_REFERENCE = :farol_ref
+            ORDER BY ROW_INSERTED_DATE DESC
+            FETCH FIRST 1 ROWS ONLY
         """)
         source_data = conn.execute(fetch_query, {"farol_ref": farol_ref}).mappings().fetchone()
 
+        # Fallback: Se não encontrar na F_CON_RETURN_CARRIERS, busca da tabela principal
         if not source_data:
-            # If no data is found, we cannot proceed.
-            return False
+            fetch_query_fallback = text("""
+                SELECT
+                    S_QUANTITY_OF_CONTAINERS, S_PORT_OF_LOADING_POL, S_PORT_OF_DELIVERY_POD,
+                    S_PLACE_OF_RECEIPT, S_FINAL_DESTINATION, B_TERMINAL, B_VOYAGE_CARRIER,
+                    B_VESSEL_NAME, B_VOYAGE_CODE, B_BOOKING_REFERENCE, B_DATA_DRAFT_DEADLINE,
+                    B_DATA_DEADLINE, S_REQUESTED_DEADLINE_START_DATE, S_REQUESTED_DEADLINE_END_DATE,
+                    S_REQUIRED_ARRIVAL_DATE_EXPECTED, B_DATA_ESTIMATIVA_SAIDA_ETD,
+                    B_DATA_ESTIMATIVA_CHEGADA_ETA, B_DATA_ABERTURA_GATE, B_DATA_CONFIRMACAO_EMBARQUE,
+                    B_DATA_PARTIDA_ATD, B_DATA_ESTIMADA_TRANSBORDO_ETD, B_DATA_CHEGADA_ATA,
+                    B_DATA_TRANSBORDO_ATD, B_DATA_CHEGADA_DESTINO_ETA, B_DATA_CHEGADA_DESTINO_ATA,
+                    B_DATA_ESTIMATIVA_ATRACACAO_ETB, B_DATA_ATRACACAO_ATB,
+                    B_TRANSHIPMENT_PORT
+                FROM LogTransp.F_CON_SALES_BOOKING_DATA
+                WHERE FAROL_REFERENCE = :farol_ref
+            """)
+            source_data = conn.execute(fetch_query_fallback, {"farol_ref": farol_ref}).mappings().fetchone()
+            
+            if not source_data:
+                # If no data is found in either table, we cannot proceed.
+                return False
 
         # 2. Prepare the dictionary for the new record
         record_data = {

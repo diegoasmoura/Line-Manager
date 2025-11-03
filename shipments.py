@@ -728,13 +728,33 @@ def exibir_formulario():
                             audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, old_val, new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
                             update_field_in_sales_booking_data(conn, farol_ref, db_col, db_new_val)
 
+                            # Criar histórico quando Farol Status é alterado
                             if db_col == "FAROL_STATUS":
-                                from_status = clean_farol_status_value(old_val)
-                                to_status = clean_farol_status_value(new_val)
-                                if from_status == "New Adjustment" and to_status == "Adjustment Requested":
-                                    from database import create_adjustment_requested_timeline_record
+                                # Limpar valores para comparação correta
+                                from_status = clean_farol_status_value(old_val) if old_val else None
+                                to_status = clean_farol_status_value(new_val) if new_val else None
+                                
+                                # Verificar se realmente houve mudança de status
+                                if from_status != to_status:
+                                    from database import create_adjustment_requested_timeline_record, insert_return_carrier_snapshot
                                     current_user = st.session_state.get("username", "System")
-                                    create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                    
+                                    # Caso especial: New Adjustment → Adjustment Requested
+                                    # Usa dados da linha anterior em F_CON_RETURN_CARRIERS
+                                    if from_status == "New Adjustment" and to_status == "Adjustment Requested":
+                                        create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                    else:
+                                        # Para TODAS as outras mudanças de Farol Status
+                                        # Usa dados da tabela principal F_CON_SALES_BOOKING_DATA (já atualizada)
+                                        try:
+                                            insert_return_carrier_snapshot(
+                                                farol_reference=farol_ref,
+                                                status_override=to_status,
+                                                user_insert=current_user
+                                            )
+                                        except Exception as e:
+                                            # Log do erro mas não interrompe o processo
+                                            print(f"⚠️ Aviso: Erro ao criar histórico de mudança de Farol Status de '{from_status}' para '{to_status}': {e}")
                         transaction.commit()
                         conn.close()
                         st.success("✅ Alterações de Sales salvas!")
@@ -1320,13 +1340,33 @@ def exibir_formulario():
                             audit_change(conn, farol_ref, 'F_CON_SALES_BOOKING_DATA', db_col, old_val, new_val, 'shipments', 'UPDATE', adjustment_id=batch_id)
                             update_field_in_sales_booking_data(conn, farol_ref, db_col, db_new_val)
 
+                            # Criar histórico quando Farol Status é alterado
                             if db_col == "FAROL_STATUS":
-                                from_status = clean_farol_status_value(old_val)
-                                to_status = clean_farol_status_value(new_val)
-                                if from_status == "New Adjustment" and to_status == "Adjustment Requested":
-                                    from database import create_adjustment_requested_timeline_record
+                                # Limpar valores para comparação correta
+                                from_status = clean_farol_status_value(old_val) if old_val else None
+                                to_status = clean_farol_status_value(new_val) if new_val else None
+                                
+                                # Verificar se realmente houve mudança de status
+                                if from_status != to_status:
+                                    from database import create_adjustment_requested_timeline_record, insert_return_carrier_snapshot
                                     current_user = st.session_state.get("username", "System")
-                                    create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                    
+                                    # Caso especial: New Adjustment → Adjustment Requested
+                                    # Usa dados da linha anterior em F_CON_RETURN_CARRIERS
+                                    if from_status == "New Adjustment" and to_status == "Adjustment Requested":
+                                        create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                    else:
+                                        # Para TODAS as outras mudanças de Farol Status
+                                        # Usa dados da tabela principal F_CON_SALES_BOOKING_DATA (já atualizada)
+                                        try:
+                                            insert_return_carrier_snapshot(
+                                                farol_reference=farol_ref,
+                                                status_override=to_status,
+                                                user_insert=current_user
+                                            )
+                                        except Exception as e:
+                                            # Log do erro mas não interrompe o processo
+                                            print(f"⚠️ Aviso: Erro ao criar histórico de mudança de Farol Status de '{from_status}' para '{to_status}': {e}")
                         transaction.commit()
                         conn.close()
                         st.success("✅ Alterações de Booking salvas!")
@@ -2137,7 +2177,7 @@ def exibir_shipments():
                             transaction = conn.begin()
                             
                             for _, row in st.session_state["changes"].iterrows():
-                                from database import audit_change, update_field_in_sales_booking_data, create_adjustment_requested_timeline_record
+                                from database import audit_change, update_field_in_sales_booking_data, create_adjustment_requested_timeline_record, insert_return_carrier_snapshot
                                 from shipments_mapping import get_database_column_name, clean_farol_status_value
                                 
                                 farol_ref = row["Farol Reference"]
@@ -2171,11 +2211,32 @@ def exibir_shipments():
                                 # 2. Persistir a mudança na tabela principal (usa nome técnico)
                                 update_field_in_sales_booking_data(conn, farol_ref, db_column_name, db_new_value)
 
-                                # 3. Trigger para criar Timeline
+                                # 3. Criar histórico quando Farol Status é alterado
                                 if db_column_name == "FAROL_STATUS":
-                                    if old_value == "New Adjustment" and new_value == "Adjustment Requested":
+                                    # Limpar valores para comparação correta
+                                    clean_old_status = clean_farol_status_value(old_value) if old_value else None
+                                    clean_new_status = clean_farol_status_value(new_value) if new_value else None
+                                    
+                                    # Verificar se realmente houve mudança de status
+                                    if clean_old_status != clean_new_status:
                                         current_user = st.session_state.get("username", "System")
-                                        create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                        
+                                        # Caso especial: New Adjustment → Adjustment Requested
+                                        # Usa dados da linha anterior em F_CON_RETURN_CARRIERS
+                                        if clean_old_status == "New Adjustment" and clean_new_status == "Adjustment Requested":
+                                            create_adjustment_requested_timeline_record(conn, farol_ref, current_user)
+                                        else:
+                                            # Para TODAS as outras mudanças de Farol Status
+                                            # Usa dados da tabela principal F_CON_SALES_BOOKING_DATA (já atualizada)
+                                            try:
+                                                insert_return_carrier_snapshot(
+                                                    farol_reference=farol_ref,
+                                                    status_override=clean_new_status,
+                                                    user_insert=current_user
+                                                )
+                                            except Exception as e:
+                                                # Log do erro mas não interrompe o processo
+                                                print(f"⚠️ Aviso: Erro ao criar histórico de mudança de Farol Status de '{clean_old_status}' para '{clean_new_status}': {e}")
                             
                             transaction.commit()
                             conn.close()
