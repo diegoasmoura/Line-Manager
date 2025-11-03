@@ -816,6 +816,44 @@ if col == "Farol Status":
     })
 ```
 
+### ⚙️ Regras Automáticas de Atualização do Farol Status
+
+O sistema implementa regras automáticas que atualizam o Farol Status quando campos de data específicos são preenchidos pela primeira vez. Isso permite rastreamento automático do progresso do embarque sem intervenção manual.
+
+#### Regras Implementadas
+
+**Regra 1: Confirmação de Embarque → "Shipped"**
+- **Trigger**: Quando o campo `B_DATA_CONFIRMACAO_EMBARQUE` (Confirmação de Embarque) é preenchido pela primeira vez (estava NULL e agora tem valor)
+- **Ação**: Farol Status é atualizado automaticamente para `"Shipped"` 🚢
+- **Registro**: Mudança é registrada na auditoria com source `'AUTO_STATUS_UPDATE'`
+
+**Regra 2: Chegada no Destino → "Arrived at destination"**
+- **Trigger**: Quando o campo `B_DATA_CHEGADA_DESTINO_ATA` (Chegada no Destino - ATA) é preenchido pela primeira vez (estava NULL e agora tem valor)
+- **Ação**: Farol Status é atualizado automaticamente para `"Arrived at destination"` 🏁
+- **Registro**: Mudança é registrada na auditoria com source `'AUTO_STATUS_UPDATE'`
+
+#### Regras de Exceção
+
+As regras automáticas **NÃO são aplicadas** se o Farol Status atual for um dos seguintes status iniciais:
+- `"New Request"` 📦
+- `"Booking Requested"` 📋
+
+Esses status iniciais são protegidos para evitar sobrescrita acidental e manter o controle manual do processo inicial.
+
+#### Localização da Implementação
+
+As regras são implementadas na função `update_field_in_sales_booking_data()` em:
+- `database.py`
+- `database_empresa.py`
+
+#### Comportamento
+
+- ✅ Atualização ocorre dentro da mesma transação do campo original
+- ✅ Verifica se o valor anterior era NULL antes de aplicar a regra
+- ✅ Evita atualizações desnecessárias (verifica se status já não é o desejado)
+- ✅ Todas as mudanças são registradas automaticamente na auditoria
+- ✅ Não dispara loops infinitos (apenas atualiza uma vez por preenchimento)
+
 
 ## 🧩 Módulos do Sistema
 

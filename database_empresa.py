@@ -150,6 +150,7 @@ def audit_change(conn, farol_ref: str, table: str, column: str,
 def update_field_in_sales_booking_data(conn, farol_reference: str, column_name: str, new_value):
     """
     Atualiza um campo específico na tabela F_CON_SALES_BOOKING_DATA.
+    Também atualiza automaticamente o Farol Status quando campos específicos são preenchidos.
     
     Args:
         conn: Conexão com o banco de dados
@@ -157,6 +158,23 @@ def update_field_in_sales_booking_data(conn, farol_reference: str, column_name: 
         column_name: Nome técnico da coluna no banco (em UPPER CASE, ex: S_QUANTITY_OF_CONTAINERS)
         new_value: Novo valor a ser atualizado
     """
+    # Buscar valores atuais antes de atualizar (para verificação de regras automáticas)
+    current_values_query = text("""
+        SELECT FAROL_STATUS, B_DATA_CONFIRMACAO_EMBARQUE, B_DATA_CHEGADA_DESTINO_ATA
+        FROM LogTransp.F_CON_SALES_BOOKING_DATA
+        WHERE FAROL_REFERENCE = :farol_ref
+    """)
+    current_row = conn.execute(current_values_query, {"farol_ref": farol_reference}).fetchone()
+    
+    old_field_value = None
+    old_farol_status = None
+    if current_row:
+        old_farol_status = current_row[0]
+        if column_name == "B_DATA_CONFIRMACAO_EMBARQUE":
+            old_field_value = current_row[1]
+        elif column_name == "B_DATA_CHEGADA_DESTINO_ATA":
+            old_field_value = current_row[2]
+    
     # Nome da coluna já deve vir no formato técnico (UPPER CASE)
     # Não precisa de aspas duplas pois não tem espaços
     update_sql = text(f"""
@@ -168,6 +186,55 @@ def update_field_in_sales_booking_data(conn, farol_reference: str, column_name: 
         "new_value": new_value,
         "farol_reference": farol_reference
     })
+    
+    # Regras automáticas de atualização do Farol Status
+    # Verificar se campo estava NULL e agora está preenchido
+    field_was_null = old_field_value is None or (hasattr(pd, 'isna') and pd.isna(old_field_value))
+    field_is_now_filled = new_value is not None and not (hasattr(pd, 'isna') and pd.isna(new_value))
+    
+    # Regra de exceção: não atualizar automaticamente se status for inicial
+    protected_statuses = ["New Request", "Booking Requested"]
+    status_is_protected = old_farol_status is not None and str(old_farol_status).strip() in protected_statuses
+    
+    # Regra 1: Se B_DATA_CONFIRMACAO_EMBARQUE foi preenchido, atualizar para "Shipped"
+    if column_name == "B_DATA_CONFIRMACAO_EMBARQUE" and field_was_null and field_is_now_filled and not status_is_protected:
+        new_status = "Shipped"
+        if old_farol_status != new_status:
+            # Atualizar Farol Status
+            status_update_sql = text("""
+                UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                SET FAROL_STATUS = :new_status, DATE_UPDATE = SYSDATE
+                WHERE FAROL_REFERENCE = :farol_ref
+            """)
+            conn.execute(status_update_sql, {
+                "new_status": new_status,
+                "farol_ref": farol_reference
+            })
+            # Registrar na auditoria
+            audit_change(
+                conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'FAROL_STATUS',
+                old_farol_status, new_status, 'AUTO_STATUS_UPDATE', 'UPDATE'
+            )
+    
+    # Regra 2: Se B_DATA_CHEGADA_DESTINO_ATA foi preenchido, atualizar para "Arrived at destination"
+    elif column_name == "B_DATA_CHEGADA_DESTINO_ATA" and field_was_null and field_is_now_filled and not status_is_protected:
+        new_status = "Arrived at destination"
+        if old_farol_status != new_status:
+            # Atualizar Farol Status
+            status_update_sql = text("""
+                UPDATE LogTransp.F_CON_SALES_BOOKING_DATA
+                SET FAROL_STATUS = :new_status, DATE_UPDATE = SYSDATE
+                WHERE FAROL_REFERENCE = :farol_ref
+            """)
+            conn.execute(status_update_sql, {
+                "new_status": new_status,
+                "farol_ref": farol_reference
+            })
+            # Registrar na auditoria
+            audit_change(
+                conn, farol_reference, 'F_CON_SALES_BOOKING_DATA', 'FAROL_STATUS',
+                old_farol_status, new_status, 'AUTO_STATUS_UPDATE', 'UPDATE'
+            )
  
 # Configurações do banco de dados (podem ser sobrescritas por variáveis de ambiente)
 # CONFIGURAÇÃO PARA AMBIENTE CORPORATIVO CARGILL
