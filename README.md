@@ -5464,6 +5464,7 @@ O template Excel deve conter as seguintes colunas (nomes exatos):
 - **Destino_City**: Porto de destino (mapeado para `S_PORT_OF_DELIVERY_POD`)
 - **Destino_Country**: País de destino (mapeado para `B_POD_COUNTRY_ACRONYM`)
 - **Margem**: Margem (mapeado para `B_MARGIN`)
+- **Afloat**: Afloat (mapeado para `S_AFLOAT`)
 - **BOOKING**: Referência do booking (mapeado para `B_BOOKING_REFERENCE`)
 - **Total Price**: Preço total do frete em USD (mapeado para `B_FREIGHT_RATE_USD`)
 - **Bogey**: Preço de venda Bogey em USD (mapeado para `B_BOGEY_SALE_PRICE_USD`)
@@ -5674,7 +5675,7 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 **Mudanças Implementadas**:
 
 ##### 1. Novo Mapeamento de Colunas
-- **Substituído `POD_MAPPING`** por `EXCEL_COLUMN_MAPPING` com 19 colunas mapeadas
+- **Substituído `POD_MAPPING`** por `EXCEL_COLUMN_MAPPING` com 20 colunas mapeadas
 - **Criado `EXCEL_DISPLAY_NAMES`** para exibir colunas com nomes padrão do sistema
 - **Definido `REQUIRED_EXCEL_COLS`** com 4 colunas obrigatórias: REFERENCIA, CTNRS, Week, DTHC
 
@@ -5686,6 +5687,7 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 - Destino_City → Port of Delivery POD
 - Destino_Country → POD Country Acronym
 - Margem → Margin
+- Afloat → Afloat
 - CTNRS → Quantity of Containers
 - Week → Requested Shipment Week
 - BOOKING → Booking Reference
@@ -5729,7 +5731,7 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 - Referências a colunas antigas do Excel
 
 **Benefícios**:
-- ✅ Template mais completo com 19 colunas vs 7 anteriores
+- ✅ Template mais completo com 20 colunas vs 7 anteriores
 - ✅ Suporte a novos campos financeiros (Margem, PnL, ML)
 - ✅ Suporte a dados de booking (BOOKING, NAVIO, VIAGEM, ETD)
 - ✅ Integração completa com campos B_ do banco de dados
