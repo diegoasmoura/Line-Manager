@@ -25,8 +25,8 @@ terminal_options = list_terminal_names() or list_terminal_names_from_unified() o
 EXCEL_COLUMN_MAPPING = {
     "REFERENCIA": "s_sales_order_reference",
     "Carrier": "b_voyage_carrier",
-    "Origem": "s_plant_of_origin",
-    "Destino_City": "s_final_destination",
+    "Origem": "s_port_of_loading_pol",
+    "Destino_City": "s_port_of_delivery_pod",
     "Destino_Country": "b_pod_country_acronym",
     "Margem": "b_margin",
     "CTNRS": "s_quantity_of_containers",
@@ -51,8 +51,8 @@ REQUIRED_EXCEL_COLS = ["REFERENCIA", "CTNRS", "Week", "DTHC"]
 EXCEL_DISPLAY_NAMES = {
     "REFERENCIA": "Sales Order Reference",
     "Carrier": "Carrier",
-    "Origem": "Plant of Origin",
-    "Destino_City": "Final Destination",
+    "Origem": "Port of Loading POL",
+    "Destino_City": "Port of Delivery POD",
     "Destino_Country": "POD Country Acronym",
     "Margem": "Margin",
     "CTNRS": "Quantity of Containers",

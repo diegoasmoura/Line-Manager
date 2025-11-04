@@ -5460,8 +5460,8 @@ O template Excel deve conter as seguintes colunas (nomes exatos):
 
 #### Colunas Opcionais
 - **Carrier**: Armador da viagem (mapeado para `B_VOYAGE_CARRIER`)
-- **Origem**: Origem da planta (mapeado para `S_PLANT_OF_ORIGIN`)
-- **Destino_City**: Cidade de destino (mapeado para `S_FINAL_DESTINATION`)
+- **Origem**: Porto de origem (mapeado para `S_PORT_OF_LOADING_POL`)
+- **Destino_City**: Porto de destino (mapeado para `S_PORT_OF_DELIVERY_POD`)
 - **Destino_Country**: País de destino (mapeado para `B_POD_COUNTRY_ACRONYM`)
 - **Margem**: Margem (mapeado para `B_MARGIN`)
 - **BOOKING**: Referência do booking (mapeado para `B_BOOKING_REFERENCE`)
@@ -5588,8 +5588,8 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 **Colunas do Template**:
 - REFERENCIA → Sales Order Reference
 - Carrier → Carrier
-- Origem → Plant of Origin
-- Destino_City → Final Destination
+- Origem → Port of Loading POL
+- Destino_City → Port of Delivery POD
 - Destino_Country → POD Country Acronym
 - Margem → Margin
 - CTNRS → Quantity of Containers
