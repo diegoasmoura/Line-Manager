@@ -1459,6 +1459,7 @@ def add_sales_record(form_values):
             "b_pod_country_acronym": "B_POD_COUNTRY_ACRONYM",
             "b_destination_trade_region": "B_DESTINATION_TRADE_REGION",
             "b_margin": "B_MARGIN",
+            "b_ref_sharepoint": "B_REF_SHAREPOINT",
         }
 
         unified_values = {}

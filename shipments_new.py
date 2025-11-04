@@ -50,6 +50,7 @@ EXCEL_COLUMN_MAPPING = {
     "ETD": "b_data_estimativa_saida_etd",
     "DTHC": "s_dthc_prepaid",
     "REGION": "b_destination_trade_region",
+    "Ref_Sharepoint": "b_ref_sharepoint",
 }
 
 # Colunas obrigatórias do novo template
@@ -57,7 +58,7 @@ REQUIRED_EXCEL_COLS = ["REFERENCIA", "CTNRS", "Week", "DTHC"]
 
 # Mapeamento de colunas do Excel para nomes de exibição padrão
 EXCEL_DISPLAY_NAMES = {
-    "REFERENCIA": "Sales Order Reference",
+    "REFERENCIA": "Referência SharePoint",
     "Carrier": "Carrier",
     "Origem": "Port of Loading POL",
     "Destino_City": "Port of Delivery POD",
@@ -77,6 +78,7 @@ EXCEL_DISPLAY_NAMES = {
     "ETD": "ETD",
     "DTHC": "DTHC",
     "REGION": "Destination Trade Region",
+    "Ref_Sharepoint": "SharePoint Reference",
 }
 
 # Campos do formulário e seus nomes internos
@@ -260,6 +262,7 @@ def generate_excel_template():
         "CTNRS",
         "Week",
         "BOOKING",
+        "Ref_Sharepoint",
         "Total Price",
         "Bogey",
         "PnL Frete",
