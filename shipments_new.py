@@ -65,7 +65,7 @@ EXCEL_DISPLAY_NAMES = {
     "ML": "ML Profit Margin",
     "NAVIO": "Vessel Name",
     "VIAGEM": "Voyage Code",
-    "ETD": "data_estimativa_saida",
+    "ETD": "ETD",
     "DTHC": "DTHC",
     "REGION": "Destination Trade Region",
 }
