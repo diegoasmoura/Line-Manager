@@ -589,7 +589,12 @@ def show_add_form():
         
         st.markdown("---")
         uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
-        df_excel = None
+        
+        # Manter df_excel no session_state para evitar perda de estado ao recarregar
+        if "df_excel_upload" not in st.session_state:
+            st.session_state.df_excel_upload = None
+        
+        df_excel = st.session_state.df_excel_upload
         
         # Processa e exibe o arquivo automaticamente quando carregado
         if uploaded_file:
@@ -598,6 +603,9 @@ def show_add_form():
                 
                 # Detectar e remover linha de cabeçalho (linha 0) se presente
                 df_excel = detect_and_remove_header_row(df_excel)
+                
+                # Salvar no session_state para manter estado
+                st.session_state.df_excel_upload = df_excel
                 
                 # Validar portos e carrier durante carregamento para destacar células inválidas
                 invalid_port_cells = []  # Lista de células inválidas: (row_idx, col_name)
@@ -680,6 +688,19 @@ def show_add_form():
                             styles.append('')
                     return styles
                 
+                # CSS para remover padding das células do DataFrame
+                st.markdown("""
+                <style>
+                div[data-testid="stDataFrame"] table td,
+                div[data-testid="stDataFrame"] table th {
+                    padding: 0 !important;
+                }
+                div[data-testid="stDataFrame"] table {
+                    border-collapse: collapse;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
                 st.dataframe(df_display.style.apply(highlight_cols_and_invalid_ports, axis=1))
                 
                 # Exibir aviso se houver portos ou carriers inválidos
@@ -715,6 +736,7 @@ def show_add_form():
                 back_bulk = st.form_submit_button("🔙 Back to Shipments")
             
             if back_bulk:
+                st.session_state.pop("df_excel_upload", None)
                 st.session_state["current_page"] = "main"
                 st.rerun()
             
@@ -888,6 +910,9 @@ def show_add_form():
                 st.success(f"✅ {success} shipments successfully uploaded!")
                 if fail:
                     st.error(f"❌ {fail} shipments failed. Please check the file data.")
+                
+                # Limpar estado do upload após processamento
+                st.session_state.pop("df_excel_upload", None)
                 
                 # Limpa o cache e volta para a tela principal
                 st.cache_data.clear()
