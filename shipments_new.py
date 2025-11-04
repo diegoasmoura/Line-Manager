@@ -11,6 +11,10 @@ import time
 import pandas as pd # Added for Excel upload
 import unicodedata
 import re
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
  
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
@@ -235,6 +239,106 @@ def validate_port_value(value, valid_options, port_type):
         tuple: (valor_corrigido, is_valid, error_message)
     """
     return find_best_match(value, valid_options, port_type)
+
+# ---------- Função para Gerar Template Excel ----------
+def generate_excel_template():
+    """
+    Gera um arquivo Excel formatado com o template para upload em massa.
+    
+    Returns:
+        bytes: Arquivo Excel em formato binário
+    """
+    # Ordem das colunas conforme template do usuário
+    column_order = [
+        "REFERENCIA",
+        "Carrier",
+        "Origem",
+        "Destino_City",
+        "Destino_Country",
+        "Margem",
+        "Afloat",
+        "CTNRS",
+        "Week",
+        "BOOKING",
+        "Total Price",
+        "Bogey",
+        "PnL Frete",
+        "PnL Bogey",
+        "ML",
+        "NAVIO",
+        "VIAGEM",
+        "ETD",
+        "DTHC",
+        "REGION",
+    ]
+    
+    # Criar workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Template"
+    
+    # Estilos
+    # Cabeçalho obrigatório (amarelo claro)
+    header_required_fill = PatternFill(start_color="FFFACD", end_color="FFFACD", fill_type="solid")
+    # Cabeçalho opcional (azul claro)
+    header_optional_fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
+    # Texto de ajuda (cinza claro)
+    help_fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+    
+    bold_font = Font(bold=True, size=11)
+    italic_font = Font(italic=True, size=9)
+    
+    center_alignment = Alignment(horizontal="center", vertical="center")
+    left_alignment = Alignment(horizontal="left", vertical="center")
+    
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Linha 1: Cabeçalhos (nomes originais para compatibilidade)
+    for col_idx, col_name in enumerate(column_order, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=col_name)
+        cell.font = bold_font
+        cell.alignment = center_alignment
+        cell.border = thin_border
+        
+        # Aplicar cor baseado se é obrigatória ou não
+        if col_name in REQUIRED_EXCEL_COLS:
+            cell.fill = header_required_fill
+        else:
+            cell.fill = header_optional_fill
+    
+    # Linha 2: Nomes alternativos (EXCEL_DISPLAY_NAMES)
+    for col_idx, col_name in enumerate(column_order, start=1):
+        display_name = EXCEL_DISPLAY_NAMES.get(col_name, col_name)
+        cell = ws.cell(row=2, column=col_idx, value=f"Alt: {display_name}")
+        cell.font = italic_font
+        cell.alignment = center_alignment
+        cell.fill = help_fill
+        cell.border = thin_border
+    
+    # Linha 3: Linha de exemplo vazia
+    for col_idx in range(1, len(column_order) + 1):
+        cell = ws.cell(row=3, column=col_idx)
+        cell.border = thin_border
+        cell.alignment = left_alignment
+    
+    # Ajustar largura das colunas
+    for col_idx, col_name in enumerate(column_order, start=1):
+        col_letter = get_column_letter(col_idx)
+        # Ajustar largura baseado no nome da coluna
+        max_length = max(len(col_name), len(EXCEL_DISPLAY_NAMES.get(col_name, "")) + 4)
+        ws.column_dimensions[col_letter].width = min(max_length + 2, 30)
+    
+    # Salvar em BytesIO
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return output.getvalue()
  
 # ---------- 4. Função principal ----------
 def show_add_form():
@@ -416,7 +520,21 @@ def show_add_form():
                 st.rerun()
 
     with tab_excel:
-        st.markdown("Download the <a href='/docs/template_embarques.xlsx' download>Excel template</a> to ensure the correct format.", unsafe_allow_html=True)
+        # Botão de download do template
+        template_data = generate_excel_template()
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("**Download the Excel template to ensure the correct format:**")
+        with col2:
+            st.download_button(
+                label="📥 Download Template",
+                data=template_data,
+                file_name=f"template_sales_upload_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_template_btn"
+            )
+        
+        st.markdown("---")
         uploaded_file = st.file_uploader("Select an Excel file (.xlsx)", type=["xlsx"], key="excel_mass_upload")
         df_excel = None
         

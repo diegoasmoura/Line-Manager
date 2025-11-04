@@ -5450,6 +5450,12 @@ O sistema oferece funcionalidade de upload em massa de registros de vendas atrav
 
 ### Template Excel
 
+O sistema oferece um template Excel formatado para download diretamente na interface. O template inclui:
+- **Cabeçalhos destacados**: Colunas obrigatórias em amarelo claro, opcionais em azul claro
+- **Nomes alternativos**: Segunda linha mostra os nomes alternativos (EXCEL_DISPLAY_NAMES) para referência
+- **Formatação profissional**: Bordas, alinhamento e largura de colunas ajustadas automaticamente
+- **Download dinâmico**: Template sempre atualizado com as últimas colunas do sistema
+
 O template Excel deve conter as seguintes colunas (nomes exatos):
 
 #### Colunas Obrigatórias
@@ -5607,6 +5613,46 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 - **database.py**: Adicionados novos campos B_ ao `unified_map`
 
 ## 📝 Changelog
+
+### [v3.4.2] - 2024-12-XX
+
+#### 📥 Template Excel Formatado para Download
+
+**Objetivo**: Criar template Excel formatado profissionalmente para facilitar o upload em massa, com formatação visual e compatibilidade com múltiplos nomes de colunas.
+
+**Mudanças Implementadas**:
+
+##### 1. Função de Geração de Template
+- **Função `generate_excel_template()`**: Gera arquivo Excel formatado em memória usando openpyxl
+- **Formatação visual**: Cabeçalhos com cores, bordas, negrito e alinhamento centralizado
+- **Colunas destacadas**: Obrigatórias em amarelo claro (#FFFACD), opcionais em azul claro (#E6F3FF)
+
+##### 2. Estrutura do Template
+- **Linha 1**: Cabeçalhos com nomes originais (EXCEL_COLUMN_MAPPING) para compatibilidade
+- **Linha 2**: Nomes alternativos (EXCEL_DISPLAY_NAMES) com prefixo "Alt:" para referência
+- **Linha 3**: Linha de exemplo vazia para preenchimento dos dados
+
+##### 3. Integração na Interface
+- **Botão de download**: Adicionado botão "📥 Download Template" na aba Excel Upload
+- **Download dinâmico**: Template gerado sob demanda, sempre atualizado
+- **Nome do arquivo**: `template_sales_upload_YYYYMMDD.xlsx`
+
+##### 4. Formatação Visual
+- **Cores de fundo**: Distinção visual entre campos obrigatórios e opcionais
+- **Bordas**: Todas as células com bordas finas para melhor visualização
+- **Largura automática**: Colunas ajustadas automaticamente baseado no conteúdo
+- **Alinhamento**: Cabeçalhos centralizados, dados alinhados à esquerda
+
+**Arquivos Modificados**:
+- `shipments_new.py`: Adicionada função `generate_excel_template()` e integração do botão de download
+- Importações: Adicionados `io`, `openpyxl` e estilos necessários
+
+**Benefícios**:
+- ✅ Template profissional e formatado
+- ✅ Facilita identificação de colunas obrigatórias
+- ✅ Melhora UX com cores e formatação visual
+- ✅ Compatibilidade com ambos os nomes de colunas (originais e alternativos)
+- ✅ Download dinâmico sempre atualizado
 
 ### [v3.4.1] - 2024-12-XX
 
