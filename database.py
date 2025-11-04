@@ -701,6 +701,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
     SELECT 
         FAROL_REFERENCE                    AS s_farol_reference,
         COALESCE(FAROL_STATUS, 'New Request') AS s_farol_status,
+        FAROL_STATUS                         AS farol_status,
         S_SHIPMENT_STATUS                  AS s_shipment_status,
         S_TYPE_OF_SHIPMENT                 AS s_type_of_shipment,
         S_CREATION_OF_SHIPMENT             AS s_creation_of_shipment,
@@ -756,10 +757,6 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
         # Aplicar o mapeamento de colunas antes de retornar os dados
         column_mapping = get_column_mapping()
         df.rename(columns=column_mapping, inplace=True)
-        
-        # Garante a existência de 'Booking Status' para alinhamento quando ausente
-        if "Booking Status" not in df.columns:
-            df["Booking Status"] = pd.NA
         
         # Filtrando as colunas e definindo a ordem de exibição (alinhada entre ratios)
         desired_cols_sales = [

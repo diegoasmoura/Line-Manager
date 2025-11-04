@@ -5342,6 +5342,16 @@ python ellox_sync_daemon.py stop
 
 ## 📝 Changelog
 
+### v1.0.1 (2025-01-XX) - Correção Booking Status no Sales Data
+
+#### 🐛 Correções de Bugs
+- **Booking Status não aparecia no Sales Data**: Corrigido problema onde alterações no "Booking Status" só eram visíveis no stage "Booking Management" e não apareciam no "Sales Data"
+  - **Causa**: A query SQL do `get_data_salesData` não buscava o campo `FAROL_STATUS AS farol_status` necessário para o mapeamento
+  - **Solução**: Adicionado `FAROL_STATUS AS farol_status` na query SQL para permitir mapeamento correto via `get_column_mapping()`
+  - **Arquivo modificado**: `database.py` - função `get_data_salesData()`
+  - **Removido**: Fallback desnecessário que criava "Booking Status" como `pd.NA` quando ausente
+  - **Resultado**: Agora o "Booking Status" é exibido corretamente em ambos os stages (Sales Data e Booking Management) com valores sincronizados do banco de dados
+
 ### v1.0.0 (2025-10-05) - Solução Realista F5
 
 #### ✅ Melhorias Implementadas
