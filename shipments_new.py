@@ -21,23 +21,53 @@ from database import list_terminal_names, list_terminal_names_from_unified
 terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
  
 # ---------- 3. Constantes ----------
-# Mapeamento de valores POD do Excel para valores da tabela UDC
-# Permite que os valores do Excel Bulk Upload sejam exibidos corretamente nos dropdowns
-POD_MAPPING = {
-    "ANQING": "Anqing",
-    "CARTAGENA": "Cartagen",
-    "CHATTOGRAM": "Chattog",
-    "HAIPHONG": "Haiphong",
-    "HO CHI MINH CITY": "Hochimin",
-    "ISKENDERUN": "Iskender",
-    "IZMIR": "Izmir",
-    "JAKARTA": "Jakarta",
-    "KWANGYANG": "Kwangyan",
-    "MUNDRA": "Mundra",
-    "NHAVA SHEVA (JNP)": "Nhavashe",
-    "PORT QASIM/KARACHI": "Karachi",
-    "QINGDAO": "Qingdao",
-    "ZHANGJIAGANG": "Zhangjia",
+# Mapeamento de colunas do Excel para campos internos do sistema
+EXCEL_COLUMN_MAPPING = {
+    "REFERENCIA": "s_sales_order_reference",
+    "Carrier": "b_voyage_carrier",
+    "Origem": "s_plant_of_origin",
+    "Destino_City": "s_final_destination",
+    "Destino_Country": "b_pod_country_acronym",
+    "Margem": "b_margin",
+    "CTNRS": "s_quantity_of_containers",
+    "Week": "s_requested_shipment_week",
+    "BOOKING": "b_booking_reference",
+    "Total Price": "b_freight_rate_usd",
+    "Bogey": "b_bogey_sale_price_usd",
+    "PnL Frete": "b_freightppnl",
+    "PnL Bogey": "b_bogey_pnl",
+    "ML": "b_ml_profit_margin",
+    "NAVIO": "b_vessel_name",
+    "VIAGEM": "b_voyage_code",
+    "ETD": "b_data_estimativa_saida_etd",
+    "DTHC": "s_dthc_prepaid",
+    "REGION": "b_destination_trade_region",
+}
+
+# Colunas obrigatórias do novo template
+REQUIRED_EXCEL_COLS = ["REFERENCIA", "CTNRS", "Week", "DTHC"]
+
+# Mapeamento de colunas do Excel para nomes de exibição padrão
+EXCEL_DISPLAY_NAMES = {
+    "REFERENCIA": "Sales Order Reference",
+    "Carrier": "Carrier",
+    "Origem": "Plant of Origin",
+    "Destino_City": "Final Destination",
+    "Destino_Country": "POD Country Acronym",
+    "Margem": "Margin",
+    "CTNRS": "Sales Quantity of Containers",
+    "Week": "Requested Shipment Week",
+    "BOOKING": "Booking Reference",
+    "Total Price": "Freight Rate USD",
+    "Bogey": "Bogey Sale Price USD",
+    "PnL Frete": "Freight PNL",
+    "PnL Bogey": "Bogey PNL",
+    "ML": "ML Profit Margin",
+    "NAVIO": "Vessel Name",
+    "VIAGEM": "Voyage Code",
+    "ETD": "data_estimativa_saida",
+    "DTHC": "DTHC",
+    "REGION": "Destination Trade Region",
 }
 
 # Campos do formulário e seus nomes internos
@@ -256,19 +286,30 @@ def show_add_form():
         if uploaded_file:
             try:
                 df_excel = pd.read_excel(uploaded_file)
-                highlighted_cols = ["HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND", "TERM"]
+                
+                # Criar cópia para exibição com nomes padrão
+                df_display = df_excel.copy()
+                
+                # Renomear colunas para nomes de exibição padrão
+                rename_dict = {}
+                for col in df_display.columns:
+                    if col in EXCEL_DISPLAY_NAMES:
+                        rename_dict[col] = EXCEL_DISPLAY_NAMES[col]
+                
+                if rename_dict:
+                    df_display.rename(columns=rename_dict, inplace=True)
+                
+                # Destacar colunas importantes (todas as colunas mapeadas)
+                highlighted_cols = list(EXCEL_DISPLAY_NAMES.values())
                 def highlight_specific_cols(s):
                     return [
                         'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
                         for _ in s
                     ]
-                st.dataframe(df_excel.style.apply(highlight_specific_cols, axis=0))
+                st.dataframe(df_display.style.apply(highlight_specific_cols, axis=0))
                 
                 # Validação das colunas obrigatórias
-                required_cols = [
-                    "HC", "Week", "LIMITE EMBARQUE - PNL", "DTHC", "TIPO EMBARQUE", "POD", "INLAND"
-                ]
-                missing_cols = [col for col in required_cols if col not in df_excel.columns]
+                missing_cols = [col for col in REQUIRED_EXCEL_COLS if col not in df_excel.columns]
                 if missing_cols:
                     st.error(f"The file is missing the required columns: {', '.join(missing_cols)}")
                 else:
@@ -294,75 +335,77 @@ def show_add_form():
                 progress_bar = st.progress(0, text="Processing shipments...")
                 
                 for idx, row in df_excel.iterrows():
-                    sales_comments = (str(row.get("RESTRIÇÃO ARMADOR +", "")) + " " + str(row.get("CONTRATO OPÇÃO DESTINO", ""))).strip()
-                    tipo_embarque_val = row.get("TIPO EMBARQUE", "")
-                    s_afloat_val = "Yes" if str(tipo_embarque_val).strip().lower() == "afloat" else "No"
-                    hc_val = row.get("HC", "")
-                    try:
-                        hc_val = int(float(hc_val)) if pd.notna(hc_val) and str(hc_val).strip() != "" else 0
-                    except Exception:
-                        hc_val = 0
-                    
-                    # Mapeamento do campo TERM para s_vip_pnl_risk
-                    term_val = str(row.get("TERM", "")).strip().upper()
-                    s_vip_pnl_risk = ""
-                    if term_val in ["VIP", "PNL", "RISK"]:
-                        s_vip_pnl_risk = term_val
-                    
-                    # Mapeamento do s_pnl_destination baseado no s_vip_pnl_risk
-                    s_pnl_destination = "Yes" if s_vip_pnl_risk == "PNL" else "No"
-                    
-                    # REMOVIDO: Mapeamento incorreto que colocava VIP/PNL/RISK em s_final_destination
-                    # O campo s_final_destination deve ser preenchido manualmente pelo usuário
-                    # O campo s_vip_pnl_risk é independente e não deve afetar s_final_destination
-                    s_final_destination = ""
-                    
-                    # Tratamento da coluna LIMITE EMBARQUE - PNL para validar se é uma data válida
-                    limite_embarque_val = row.get("LIMITE EMBARQUE - PNL", "")
-                    s_required_arrival_date_expected = None
-                    
-                    if pd.notna(limite_embarque_val) and str(limite_embarque_val).strip() != "":
-                        try:
-                            # Tenta converter para datetime
-                            if isinstance(limite_embarque_val, str):
-                                # Se for string, tenta fazer parse
-                                parsed_date = pd.to_datetime(limite_embarque_val)
-                                s_required_arrival_date_expected = parsed_date
-                            elif isinstance(limite_embarque_val, (int, float)):
-                                # Se for número (como 0), ignora
-                                s_required_arrival_date_expected = None
-                            else:
-                                # Se for datetime/date, mantém como está
-                                s_required_arrival_date_expected = limite_embarque_val
-                        except (ValueError, TypeError):
-                            # Se não conseguir converter, ignora o valor
-                            s_required_arrival_date_expected = None
-                    
-                    # Aplicar mapeamento POD para compatibilidade com UDC
-                    pod_value = row.get("POD", "")
-                    pod_mapped = POD_MAPPING.get(pod_value, pod_value)
-                    
                     values = {
+                        # Campos padrão
                         "s_farol_status": "New request",
                         "s_type_of_shipment": "Forecast",
-                        "s_quantity_of_containers": hc_val,
-                        "s_requested_shipment_week": row.get("Week", ""),
-                        "s_required_arrival_date_expected": s_required_arrival_date_expected,
-                        "s_requested_deadlines_start_date": "",
-                        "s_requested_deadlines_end_date": "",
-                        "s_shipment_period_start_date": "",
-                        "s_shipment_period_end_date": "",
-                        "s_dthc_prepaid": row.get("DTHC", ""),
-                        "s_afloat": s_afloat_val,
-                        "s_port_of_loading_pol": "",
-                        "s_vip_pnl_risk": s_vip_pnl_risk,
-                        "s_pnl_destination": s_pnl_destination,
-                        "s_port_of_delivery_pod": pod_mapped,
-                        "s_final_destination": s_final_destination,
-                        "s_comments": sales_comments,
                         "adjustment_id": str(uuid.uuid4()),
-                        "user_insert": ''
+                        "user_insert": '',
                     }
+                    
+                    # Mapear todas as colunas do Excel para os campos internos
+                    for excel_col, internal_field in EXCEL_COLUMN_MAPPING.items():
+                        if excel_col in df_excel.columns:
+                            cell_value = row.get(excel_col, "")
+                            
+                            # Tratamento especial para diferentes tipos de dados
+                            if internal_field in ["s_quantity_of_containers"]:
+                                # Converter para inteiro
+                                try:
+                                    values[internal_field] = int(float(cell_value)) if pd.notna(cell_value) and str(cell_value).strip() != "" else 0
+                                except (ValueError, TypeError):
+                                    values[internal_field] = 0
+                            
+                            elif internal_field in ["b_data_estimativa_saida_etd"]:
+                                # Converter datas
+                                if pd.notna(cell_value) and str(cell_value).strip() != "":
+                                    try:
+                                        if isinstance(cell_value, str):
+                                            values[internal_field] = pd.to_datetime(cell_value)
+                                        elif isinstance(cell_value, (int, float)):
+                                            values[internal_field] = None
+                                        else:
+                                            values[internal_field] = cell_value
+                                    except (ValueError, TypeError):
+                                        values[internal_field] = None
+                                else:
+                                    values[internal_field] = None
+                            
+                            elif internal_field in ["b_margin", "b_freight_rate_usd", "b_bogey_sale_price_usd", 
+                                                     "b_freightppnl", "b_bogey_pnl", "b_ml_profit_margin"]:
+                                # Converter valores numéricos monetários
+                                try:
+                                    if pd.notna(cell_value) and str(cell_value).strip() != "":
+                                        values[internal_field] = float(cell_value)
+                                    else:
+                                        values[internal_field] = None
+                                except (ValueError, TypeError):
+                                    values[internal_field] = None
+                            
+                            else:
+                                # Campos de texto simples
+                                if pd.notna(cell_value):
+                                    values[internal_field] = str(cell_value).strip()
+                                else:
+                                    values[internal_field] = ""
+                    
+                    # Validação de campos obrigatórios
+                    required_check_fields = {
+                        "s_sales_order_reference": "REFERENCIA",
+                        "s_quantity_of_containers": "CTNRS",
+                        "s_requested_shipment_week": "Week",
+                        "s_dthc_prepaid": "DTHC",
+                    }
+                    
+                    missing_required = []
+                    for field, excel_col in required_check_fields.items():
+                        if not values.get(field) or (isinstance(values.get(field), (int, float)) and values.get(field) == 0):
+                            missing_required.append(excel_col)
+                    
+                    if missing_required:
+                        fail += 1
+                        continue
+                    
                     try:
                         if add_sales_record(values):
                             success += 1
@@ -370,6 +413,7 @@ def show_add_form():
                             fail += 1
                     except Exception as e:
                         fail += 1
+                        print(f"Erro ao processar linha {idx + 1}: {e}")
                     
                     # Atualiza a barra de progresso
                     progress = (idx + 1) / len(df_excel)

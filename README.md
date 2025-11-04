@@ -5436,7 +5436,211 @@ terminal_options = list_terminal_names() or []
 - **Experiência do Usuário**: Interface uniforme e intuitiva
 - **Manutenibilidade**: Configuração centralizada no `shipments_mapping.py`
 
+## 📤 Upload em Massa via Excel (Excel Upload Bulk)
+
+### Visão Geral
+
+O sistema oferece funcionalidade de upload em massa de registros de vendas através de arquivos Excel (.xlsx), permitindo importar múltiplos embarques de uma única vez com validação automática e processamento em lote.
+
+### Localização
+
+- **Arquivo Principal**: `shipments_new.py`
+- **Função**: `show_add_form()` → Aba "Excel Upload (Bulk)"
+- **Banco de Dados**: `database.py` → `add_sales_record()`
+
+### Template Excel
+
+O template Excel deve conter as seguintes colunas (nomes exatos):
+
+#### Colunas Obrigatórias
+- **REFERENCIA**: Referência do pedido de venda (mapeado para `S_SALE_ORDER_REFERENCE`)
+- **CTNRS**: Quantidade de containers (mapeado para `S_QUANTITY_OF_CONTAINERS`)
+- **Week**: Semana solicitada de embarque (mapeado para `S_REQUESTED_SHIPMENT_WEEK`)
+- **DTHC**: DTHC Prepaid (mapeado para `S_DTHC_PREPAID`)
+
+#### Colunas Opcionais
+- **Carrier**: Armador da viagem (mapeado para `B_VOYAGE_CARRIER`)
+- **Origem**: Origem da planta (mapeado para `S_PLANT_OF_ORIGIN`)
+- **Destino_City**: Cidade de destino (mapeado para `S_FINAL_DESTINATION`)
+- **Destino_Country**: País de destino (mapeado para `B_POD_COUNTRY_ACRONYM`)
+- **Margem**: Margem (mapeado para `B_MARGIN`)
+- **BOOKING**: Referência do booking (mapeado para `B_BOOKING_REFERENCE`)
+- **Total Price**: Preço total do frete em USD (mapeado para `B_FREIGHT_RATE_USD`)
+- **Bogey**: Preço de venda Bogey em USD (mapeado para `B_BOGEY_SALE_PRICE_USD`)
+- **PnL Frete**: PnL do frete (mapeado para `B_FREIGHTPPNL`)
+- **PnL Bogey**: PnL do Bogey (mapeado para `B_BOGEY_PNL`)
+- **ML**: Margem de lucro ML (mapeado para `B_ML_PROFIT_MARGIN`)
+- **NAVIO**: Nome do navio (mapeado para `B_VESSEL_NAME`)
+- **VIAGEM**: Código da viagem (mapeado para `B_VOYAGE_CODE`)
+- **ETD**: Data estimada de saída (mapeado para `B_DATA_ESTIMATIVA_SAIDA_ETD`)
+- **REGION**: Região de comércio de destino (mapeado para `B_DESTINATION_TRADE_REGION`)
+
+### Mapeamento de Colunas
+
+O sistema possui três níveis de mapeamento:
+
+1. **EXCEL_COLUMN_MAPPING**: Mapeia colunas do Excel para campos internos do sistema
+2. **EXCEL_DISPLAY_NAMES**: Mapeia colunas do Excel para nomes de exibição padrão
+3. **unified_map** (em `database.py`): Mapeia campos internos para colunas da tabela unificada
+
+### Processamento de Dados
+
+#### Conversão Automática de Tipos
+
+O sistema realiza conversão automática de tipos de dados:
+
+- **Inteiros**: `CTNRS` → convertido para inteiro (0 se inválido)
+- **Decimais/Monetários**: `Margem`, `Total Price`, `Bogey`, `PnL Frete`, `PnL Bogey`, `ML` → convertido para float (None se inválido)
+- **Datas**: `ETD` → convertido para datetime usando `pd.to_datetime()` (None se inválido)
+- **Texto**: Demais campos → mantidos como string, com `.strip()` aplicado
+
+#### Validação
+
+Antes de processar cada linha:
+1. Verifica se todas as colunas obrigatórias estão presentes
+2. Valida se os valores obrigatórios não estão vazios ou zero
+3. Registra erros de validação sem interromper o processamento das demais linhas
+
+#### Exibição Visual
+
+- Colunas mapeadas são destacadas em azul claro (`#e6f3ff`) com fonte em negrito
+- Colunas são renomeadas para nomes padrão do sistema antes da exibição
+- Barra de progresso mostra o andamento do processamento
+- Relatório final exibe quantidade de sucessos e falhas
+
+### Fluxo de Processamento
+
+1. **Upload do Arquivo**: Usuário seleciona arquivo Excel (.xlsx)
+2. **Validação de Colunas**: Sistema verifica se colunas obrigatórias estão presentes
+3. **Exibição Prévia**: DataFrame é exibido com nomes padrão e colunas destacadas
+4. **Confirmação**: Usuário clica em "Confirm Bulk Upload"
+5. **Processamento em Lote**:
+   - Para cada linha do Excel:
+     - Mapeia colunas para campos internos
+     - Converte tipos de dados automaticamente
+     - Valida campos obrigatórios
+     - Chama `add_sales_record()` para salvar no banco
+   - Atualiza barra de progresso
+6. **Feedback Final**: Exibe resumo de sucessos e falhas
+
+### Campos Padrão Aplicados
+
+Todos os registros criados via Excel Upload recebem automaticamente:
+- `s_farol_status`: "New request"
+- `s_type_of_shipment`: "Forecast"
+- `adjustment_id`: UUID único gerado automaticamente
+- `user_insert`: String vazia (será preenchido pelo sistema)
+
+### Integração com Banco de Dados
+
+Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` através do `unified_map` em `database.py`. Os novos campos B_ adicionados incluem:
+
+- `B_VOYAGE_CARRIER`
+- `B_BOOKING_REFERENCE`
+- `B_FREIGHT_RATE_USD`
+- `B_BOGEY_SALE_PRICE_USD`
+- `B_FREIGHTPPNL`
+- `B_BOGEY_PNL`
+- `B_ML_PROFIT_MARGIN`
+- `B_VESSEL_NAME`
+- `B_VOYAGE_CODE`
+- `B_DATA_ESTIMATIVA_SAIDA_ETD`
+- `B_POD_COUNTRY_ACRONYM`
+- `B_DESTINATION_TRADE_REGION`
+- `B_MARGIN`
+
+### Tratamento de Erros
+
+- **Erros de leitura do arquivo**: Exibidos como mensagem de erro no Streamlit
+- **Colunas faltantes**: Lista as colunas obrigatórias ausentes
+- **Erros de processamento**: Cada linha com erro incrementa o contador de falhas, mas não interrompe o processamento das demais
+- **Erros de banco de dados**: Capturados e registrados no log, linha marcada como falha
+
+### Limitações e Observações
+
+- Arquivo deve estar no formato `.xlsx` (Excel 2007+)
+- Ordem das colunas no Excel não importa
+- Valores vazios em campos opcionais são tratados como `None` ou string vazia conforme o tipo
+- Datas devem estar em formato reconhecível pelo pandas (ou serão ignoradas)
+- Números devem estar em formato numérico (não texto com formatação)
+
+### Arquivos Modificados
+
+- **shipments_new.py**: Lógica completa de upload e processamento
+- **database.py**: Adicionados novos campos B_ ao `unified_map`
+
 ## 📝 Changelog
+
+### [v3.4.0] - 2024-12-XX
+
+#### 🚀 Nova Funcionalidade - Excel Upload Bulk com Novo Template
+
+**Objetivo**: Substituir completamente o template antigo de Excel Upload por um novo template com colunas expandidas e mapeamento para novos campos B_ do banco de dados.
+
+**Mudanças Implementadas**:
+
+##### 1. Novo Mapeamento de Colunas
+- **Substituído `POD_MAPPING`** por `EXCEL_COLUMN_MAPPING` com 19 colunas mapeadas
+- **Criado `EXCEL_DISPLAY_NAMES`** para exibir colunas com nomes padrão do sistema
+- **Definido `REQUIRED_EXCEL_COLS`** com 4 colunas obrigatórias: REFERENCIA, CTNRS, Week, DTHC
+
+##### 2. Novo Template Excel
+**Colunas do Template**:
+- REFERENCIA → Sales Order Reference
+- Carrier → Carrier
+- Origem → Plant of Origin
+- Destino_City → Final Destination
+- Destino_Country → POD Country Acronym
+- Margem → Margin
+- CTNRS → Sales Quantity of Containers
+- Week → Requested Shipment Week
+- BOOKING → Booking Reference
+- Total Price → Freight Rate USD
+- Bogey → Bogey Sale Price USD
+- PnL Frete → Freight PNL
+- PnL Bogey → Bogey PNL
+- ML → ML Profit Margin
+- NAVIO → Vessel Name
+- VIAGEM → Voyage Code
+- ETD → ETD (data_estimativa_saida)
+- DTHC → DTHC
+- REGION → Destination Trade Region
+
+##### 3. Processamento Inteligente
+- **Conversão automática de tipos**: Inteiros, decimais, datas e texto
+- **Validação de campos obrigatórios** antes de inserir no banco
+- **Tratamento robusto de valores vazios/NaN**
+- **Exibição visual** com colunas renomeadas e destacadas
+
+##### 4. Integração com Banco de Dados
+- **Adicionados 13 novos campos B_** ao `unified_map` em `database.py`:
+  - `b_voyage_carrier`, `b_booking_reference`, `b_freight_rate_usd`
+  - `b_bogey_sale_price_usd`, `b_freightppnl`, `b_bogey_pnl`
+  - `b_ml_profit_margin`, `b_vessel_name`, `b_voyage_code`
+  - `b_data_estimativa_saida_etd`, `b_pod_country_acronym`
+  - `b_destination_trade_region`, `b_margin`
+
+##### 5. Melhorias de UX
+- **Exibição com nomes padrão**: Colunas do Excel são renomeadas para nomes padrão do sistema antes da visualização
+- **Destaque visual**: Todas as colunas mapeadas são destacadas em azul claro
+- **Feedback claro**: Mensagens de sucesso/erro detalhadas
+
+**Arquivos Modificados**:
+- `shipments_new.py`: Reescrita completa da seção Excel Upload
+- `database.py`: Adicionados novos campos B_ ao unified_map
+
+**Código Removido**:
+- `POD_MAPPING` (não mais necessário)
+- Lógica antiga de processamento (HC, LIMITE EMBARQUE - PNL, TIPO EMBARQUE, POD, INLAND, TERM)
+- Referências a colunas antigas do Excel
+
+**Benefícios**:
+- ✅ Template mais completo com 19 colunas vs 7 anteriores
+- ✅ Suporte a novos campos financeiros (Margem, PnL, ML)
+- ✅ Suporte a dados de booking (BOOKING, NAVIO, VIAGEM, ETD)
+- ✅ Integração completa com campos B_ do banco de dados
+- ✅ Exibição padronizada com nomes do sistema
+- ✅ Processamento robusto com validação e tratamento de erros
 
 ### [v3.3.0] - 2024-12-XX
 

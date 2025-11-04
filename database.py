@@ -1445,6 +1445,20 @@ def add_sales_record(form_values):
             "s_sales_owner": "USER_LOGIN_SALES_CREATED",
             "s_comments": "S_COMMENTS",
             "b_terminal": "B_TERMINAL",
+            # Novos campos B_ para o novo template Excel
+            "b_voyage_carrier": "B_VOYAGE_CARRIER",
+            "b_booking_reference": "B_BOOKING_REFERENCE",
+            "b_freight_rate_usd": "B_FREIGHT_RATE_USD",
+            "b_bogey_sale_price_usd": "B_BOGEY_SALE_PRICE_USD",
+            "b_freightppnl": "B_FREIGHTPPNL",
+            "b_bogey_pnl": "B_BOGEY_PNL",
+            "b_ml_profit_margin": "B_ML_PROFIT_MARGIN",
+            "b_vessel_name": "B_VESSEL_NAME",
+            "b_voyage_code": "B_VOYAGE_CODE",
+            "b_data_estimativa_saida_etd": "B_DATA_ESTIMATIVA_SAIDA_ETD",
+            "b_pod_country_acronym": "B_POD_COUNTRY_ACRONYM",
+            "b_destination_trade_region": "B_DESTINATION_TRADE_REGION",
+            "b_margin": "B_MARGIN",
         }
 
         unified_values = {}
