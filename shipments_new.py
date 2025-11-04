@@ -54,7 +54,7 @@ EXCEL_COLUMN_MAPPING = {
 }
 
 # Colunas obrigatórias do novo template
-REQUIRED_EXCEL_COLS = ["Referencia", "Ctns", "Week", "Dthc"]
+REQUIRED_EXCEL_COLS = ["Ref_Sharepoint", "Ctns", "Week", "Dthc"]
 
 # Mapeamento de colunas do Excel para nomes de exibição padrão
 EXCEL_DISPLAY_NAMES = {
@@ -241,6 +241,57 @@ def validate_port_value(value, valid_options, port_type):
         tuple: (valor_corrigido, is_valid, error_message)
     """
     return find_best_match(value, valid_options, port_type)
+
+# ---------- Função para Detectar e Remover Linha de Cabeçalho ----------
+def detect_and_remove_header_row(df):
+    """
+    Detecta se a primeira linha do DataFrame parece ser um cabeçalho/linha de ajuda
+    e a remove se necessário.
+    
+    Critérios para detectar linha de cabeçalho:
+    - Contém texto "Alt:" (indicando nomes alternativos)
+    - Contém valores que parecem nomes de colunas de exibição
+    - Muitos valores são strings que correspondem a EXCEL_DISPLAY_NAMES
+    
+    Args:
+        df: DataFrame do Excel
+    
+    Returns:
+        DataFrame sem a linha de cabeçalho (se detectada)
+    """
+    if df.empty or len(df) == 0:
+        return df
+    
+    # Verificar primeira linha
+    first_row = df.iloc[0]
+    
+    # Contar quantos valores da primeira linha parecem ser nomes de colunas
+    display_names_values = list(EXCEL_DISPLAY_NAMES.values())
+    matches_count = 0
+    contains_alt = False
+    
+    for value in first_row.values:
+        if pd.notna(value):
+            value_str = str(value).strip()
+            
+            # Verificar se contém "Alt:"
+            if "Alt:" in value_str or "alt:" in value_str.lower():
+                contains_alt = True
+            
+            # Verificar se é um nome de exibição
+            if value_str in display_names_values:
+                matches_count += 1
+    
+    # Se mais de 50% dos valores correspondem ou contém "Alt:", é provavelmente linha de cabeçalho
+    total_values = len([v for v in first_row.values if pd.notna(v)])
+    if total_values > 0:
+        match_ratio = matches_count / total_values
+        
+        # Se tem "Alt:" ou mais de 50% dos valores são nomes de exibição, remove
+        if contains_alt or match_ratio > 0.5:
+            return df.iloc[1:].reset_index(drop=True)
+    
+    return df
 
 # ---------- Função para Gerar Template Excel ----------
 def generate_excel_template():
@@ -545,6 +596,9 @@ def show_add_form():
             try:
                 df_excel = pd.read_excel(uploaded_file)
                 
+                # Detectar e remover linha de cabeçalho (linha 0) se presente
+                df_excel = detect_and_remove_header_row(df_excel)
+                
                 # Validar portos e carrier durante carregamento para destacar células inválidas
                 invalid_port_cells = []  # Lista de células inválidas: (row_idx, col_name)
                 
@@ -781,7 +835,7 @@ def show_add_form():
                     
                     # Validação de campos obrigatórios
                     required_check_fields = {
-                        "s_sales_order_reference": "Referencia",
+                        "b_ref_sharepoint": "Ref_Sharepoint",
                         "s_quantity_of_containers": "Ctns",
                         "s_requested_shipment_week": "Week",
                         "s_dthc_prepaid": "Dthc",
