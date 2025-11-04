@@ -532,7 +532,7 @@ def show_add_form():
             st.download_button(
                 label="📥 Download Template",
                 data=template_data,
-                file_name=f"template_sales_upload_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                file_name=f"template_forecast_upload_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_template_btn"
             )
