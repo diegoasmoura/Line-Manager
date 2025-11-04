@@ -801,7 +801,7 @@ def exibir_formulario():
             # Ordem exata conforme grid
             booking_order = [
                 "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
-                "Transaction Number",
+                "Transaction Number", "SharePoint Reference",
                 "Quantity of Containers", "Container Type",
                 "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
                 "Shipment Requested Date", "Sales Order Reference", "data_sales_order", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
@@ -809,8 +809,8 @@ def exibir_formulario():
                 "data_confirmacao_embarque", "data_atracacao", "data_partida", "data_chegada",
                 "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
                 "data_chegada_destino_eta", "data_chegada_destino_ata",
-                "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
-                "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+                "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region", "Margin",
+                "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "ML Profit Margin",
                 "Deviation Document", "Deviation Responsible", "Deviation Reason",
                 "Booking Owner",
                 "Comments Booking"
@@ -842,8 +842,10 @@ def exibir_formulario():
                     "Terminal": {"width": 1, "cols": 3},
                     "POD Country": {"width": 1, "cols": 3},
                     "Destination Trade Region": {"width": 1, "cols": 3},
+                    "Margin": {"width": 1, "cols": 3},
                     "Award Status": {"width": 1, "cols": 3},
-                    "Transaction Number": {"width": 1, "cols": 3}
+                    "Transaction Number": {"width": 1, "cols": 3},
+                    "SharePoint Reference": {"width": 1, "cols": 3}
                 }
                 
                 # Campos grandes (1/2 da largura)
@@ -856,7 +858,8 @@ def exibir_formulario():
                     "Sales Order Reference": {"width": 1, "cols": 2},
                     "Freight Rate USD": {"width": 1, "cols": 2},
                     "Bogey Sale Price USD": {"width": 1, "cols": 2},
-                    "Freight PNL": {"width": 1, "cols": 2}
+                    "Freight PNL": {"width": 1, "cols": 2},
+                    "ML Profit Margin": {"width": 1, "cols": 2}
                 }
                 
                 # Campos extra grandes (largura completa)
@@ -890,14 +893,14 @@ def exibir_formulario():
             
             # Renderiza campos de Booking organizados por seções
             booking_sections = {
-                "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Transaction Number"],
+                "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Transaction Number", "SharePoint Reference"],
                 "📦 Produto e Quantidade": ["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"],
                 "🏢 Cliente e Negócio": [],  # mantém ordem consistente com Sales
-                "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
+                "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region", "Margin"],
                 "📅 Cronograma": ["Booking Registered Date", "Booking Requested Date", "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada"],
                 "⚙️ Configurações": [],  # mantém ordem consistente com Sales
                 "🚢 Carrier e Vessel": ["Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal"],
-                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "Award Status"],
+                "💰 Financeiro": ["Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "ML Profit Margin", "Award Status"],
                 "⚠️ Justificativa de Desvios": ["Deviation Document", "Deviation Responsible", "Deviation Reason"],
                 "💬 Observações": ["Comments Booking", "Booking Owner"]
             }
@@ -966,6 +969,17 @@ def exibir_formulario():
 
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_b_log2]
+
+                    # Terceira linha: Margin
+                    if "Margin" in available_fields:
+                        cols_margin = st.columns([1,1,1,1,1])
+                        with cols_margin[0]:
+                            label = "Margin"
+                            internal_key = "Margin"
+                            current_val = row_booking.get(internal_key, "")
+                            disabled_flag = (label in disabled_cols_b)
+                            new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"booking_margin_{farol_ref}")
+                        available_fields = [f for f in available_fields if f != "Margin"]
 
                 # Observações (Booking): Comments Booking (2 colunas) | Booking Owner (1 coluna)
                 if section_title == "💬 Observações":
@@ -1046,6 +1060,17 @@ def exibir_formulario():
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_b]
 
+                    # Segunda linha: SharePoint Reference
+                    if "SharePoint Reference" in available_fields:
+                        cols_sharepoint = st.columns([1,1,1,1,1])
+                        with cols_sharepoint[0]:
+                            label = "SharePoint Reference"
+                            internal_key = "SharePoint Reference"
+                            current_val = row_booking.get(internal_key, "")
+                            disabled_flag = (label in disabled_cols_b)
+                            new_values_booking[label] = st.text_input(label, value=str(current_val if current_val is not None else ""), disabled=disabled_flag, key=f"booking_sharepoint_{farol_ref}")
+                        available_fields = [f for f in available_fields if f != "SharePoint Reference"]
+
                 # Linha fixa em Produto e Quantidade (Booking): Sales Order Reference | Quantity of Containers | Container Type | Customer
                 if section_title == "📦 Produto e Quantidade":
                     first_row_fields_bt = ["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"]
@@ -1114,12 +1139,13 @@ def exibir_formulario():
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_time]
 
-                # Linha única em Financeiro (Booking): Freight Rate USD | Bogey Sale Price USD | Freight PNL
+                # Linha única em Financeiro (Booking): Freight Rate USD | Bogey Sale Price USD | Freight PNL | ML Profit Margin
                 if section_title == "💰 Financeiro":
                     first_row_fields_fin = [
                         "Freight Rate USD",
                         "Bogey Sale Price USD",
                         "Freight PNL",
+                        "ML Profit Margin",
                     ]
                     available_top_fin = [f for f in first_row_fields_fin if f in available_fields]
                     if available_top_fin:
@@ -1897,6 +1923,7 @@ def exibir_shipments():
             "POD Country",
             "POD Country Acronym", 
             "Destination Trade Region",
+            "Margin",
             "data_booking_confirmation",
             "data_estimativa_saida",
             "data_estimativa_chegada", 
@@ -1913,6 +1940,7 @@ def exibir_shipments():
             "data_chegada_destino_eta",
             "data_chegada_destino_ata",
             "Freight Rate USD",
+            "ML Profit Margin",
             "Deviation Document",
             "Deviation Responsible",
             "Deviation Reason"
@@ -1976,6 +2004,12 @@ def exibir_shipments():
         colunas_ordenadas.remove("Transaction Number")
         idx_booking = colunas_ordenadas.index(booking_ref_col)
         colunas_ordenadas.insert(idx_booking + 1, "Transaction Number")
+    
+    # Posiciona "SharePoint Reference" após "Transaction Number"
+    if "SharePoint Reference" in colunas_ordenadas and "Transaction Number" in colunas_ordenadas:
+        colunas_ordenadas.remove("SharePoint Reference")
+        idx_trans = colunas_ordenadas.index("Transaction Number")
+        colunas_ordenadas.insert(idx_trans + 1, "SharePoint Reference")
 
     # Posicionar "Required Sail Date" entre Shipment Period End e Required Arrival Date
     if "data_required_sail_date" in colunas_ordenadas:

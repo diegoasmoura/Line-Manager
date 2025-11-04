@@ -823,6 +823,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_POD_COUNTRY                        AS b_pod_country,
         B_POD_COUNTRY_ACRONYM                AS b_pod_country_acronym,
         B_DESTINATION_TRADE_REGION           AS b_destination_trade_region,
+        B_MARGIN                             AS b_margin,
         /* Campos de cut-offs/ETAs/ETDs */
         B_DATA_DRAFT_DEADLINE                AS b_data_draft_deadline,
         B_DATA_DEADLINE                      AS b_data_deadline,
@@ -842,11 +843,13 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
         B_BOGEY_SALE_PRICE_USD               AS b_bogey_sale_price_usd,
         B_FreightPpnl                        AS b_freightppnl,
+        B_ML_PROFIT_MARGIN                   AS b_ml_profit_margin,
         B_AWARD_STATUS                       AS b_award_status,
         B_COMMENTS                           AS b_comments,
         B_DEVIATION_DOCUMENT                 AS b_deviation_document,
         B_DEVIATION_RESPONSIBLE              AS b_deviation_responsible,
         B_DEVIATION_REASON                   AS b_deviation_reason,
+        B_REF_SHAREPOINT                     AS b_ref_sharepoint,
         ADJUSTMENT_ID                        AS adjustment_id,
         /* Campos de Sales necessários para exibição no Booking */
         S_CREATION_OF_SHIPMENT               AS s_creation_of_shipment,
@@ -894,7 +897,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
         df = df[[
             # Identificação
             "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
-            "Transaction Number",
+            "Transaction Number", "SharePoint Reference",
             # Capacidade
             "Quantity of Containers", "Container Type",
             # Rotas (unificado)
@@ -906,9 +909,9 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             "data_estimativa_atracacao", "data_estimada_transbordo", "data_transbordo",
             "data_chegada_destino_eta", "data_chegada_destino_ata",
             # Armador/viagem
-            "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Carrier", "Freight Forwarder", "Vessel Name", "Voyage Code", "Terminal", "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region", "Margin",
             # Financeiro
-            "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL",
+            "Freight Rate USD", "Bogey Sale Price USD", "Freight PNL", "ML Profit Margin",
             # Justificativa de Desvios
             "Deviation Document", "Deviation Responsible", "Deviation Reason",
             # Administração
@@ -994,6 +997,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_POD_COUNTRY                        AS b_pod_country,
         B_POD_COUNTRY_ACRONYM                AS b_pod_country_acronym,
         B_DESTINATION_TRADE_REGION           AS b_destination_trade_region,
+        B_MARGIN                             AS b_margin,
         B_DATA_DRAFT_DEADLINE                AS b_data_draft_deadline,
         B_DATA_DEADLINE                      AS b_data_deadline,
         B_DATA_ESTIMATIVA_SAIDA_ETD          AS b_data_estimativa_saida_etd,
@@ -1011,11 +1015,13 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         B_FREIGHT_RATE_USD                   AS b_freight_rate_usd,
         B_BOGEY_SALE_PRICE_USD               AS b_bogey_sale_price_usd,
         B_FreightPpnl                        AS b_freightppnl,
+        B_ML_PROFIT_MARGIN                   AS b_ml_profit_margin,
         B_AWARD_STATUS                       AS b_award_status,
         B_COMMENTS                           AS b_comments,
         B_DEVIATION_DOCUMENT                 AS b_deviation_document,
         B_DEVIATION_RESPONSIBLE              AS b_deviation_responsible,
         B_DEVIATION_REASON                   AS b_deviation_reason,
+        B_REF_SHAREPOINT                     AS b_ref_sharepoint,
         ADJUSTMENT_ID                        AS adjustment_id
     FROM LogTransp.F_CON_SALES_BOOKING_DATA
     ORDER BY FAROL_REFERENCE DESC'''
@@ -1034,7 +1040,9 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
 
         # Aplicar o mapeamento de colunas para nomes amigáveis
         column_mapping = get_column_mapping()
-        df.rename(columns=column_mapping, inplace=True)
+        # Filtrar apenas as colunas que existem no DataFrame para evitar erros
+        column_mapping_filtered = {k: v for k, v in column_mapping.items() if k in df.columns}
+        df.rename(columns=column_mapping_filtered, inplace=True)
 
         # Converter colunas de data/hora para datetime (igual aos outros ratios)
         datetime_columns = [
@@ -1062,7 +1070,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
         combined_cols = [
             # 1. IDENTIFICAÇÃO BÁSICA
             "Sales Farol Reference", "Farol Status", "Carrier Returns Status", "Type of Shipment", "Booking Status",
-            "Transaction Number",
+            "Transaction Number", "SharePoint Reference",
             "Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             
             # 2. DATAS INICIAIS
@@ -1070,7 +1078,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             
             # 3. INFORMAÇÕES DE NAVEGAÇÃO
             "Carrier", "Vessel Name", "Voyage Code", "Terminal", "Freight Forwarder", 
-            "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region",
+            "Transhipment Port", "POD Country", "POD Country Acronym", "Destination Trade Region", "Margin",
             
             # 4. PRAZOS E PERÍODOS
             "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
@@ -1085,7 +1093,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             "data_estimada_transbordo", "data_transbordo", "data_chegada_destino_eta", "data_chegada_destino_ata",
             
             # 7. FRETE
-            "Freight Rate USD",
+            "Freight Rate USD", "ML Profit Margin",
             
             # 8. JUSTIFICATIVA DE DESVIOS
             "Deviation Document", "Deviation Responsible", "Deviation Reason",

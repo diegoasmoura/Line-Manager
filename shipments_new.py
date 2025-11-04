@@ -782,7 +782,7 @@ def show_add_form():
                                 else:
                                     values[internal_field] = None
                             
-                            elif internal_field in ["b_margin", "b_freight_rate_usd", "b_bogey_sale_price_usd", 
+                            elif internal_field in ["b_freight_rate_usd", "b_bogey_sale_price_usd", 
                                                      "b_freightppnl", "b_bogey_pnl", "b_ml_profit_margin"]:
                                 # Converter valores numéricos monetários
                                 try:

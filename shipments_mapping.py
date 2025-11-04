@@ -100,6 +100,9 @@ def get_column_mapping():
         "b_deviation_document": "Deviation Document",
         "b_deviation_responsible": "Deviation Responsible",
         "b_deviation_reason": "Deviation Reason",
+        "b_ref_sharepoint": "SharePoint Reference",
+        "b_margin": "Margin",
+        "b_ml_profit_margin": "ML Profit Margin",
  
         # Loading Container
         "l_id": "ID Loading",
@@ -441,11 +444,19 @@ def get_display_names():
         # Deviation Fields
         "Deviation Document": "Deviation Document",
         "Deviation Responsible": "Deviation Responsible",
-        "Deviation Reason": "Deviation Reason"
+        "Deviation Reason": "Deviation Reason",
+        
+        # New B_ fields
+        "b_ref_sharepoint": "SharePoint Reference",
+        "b_margin": "Margin",
+        "b_ml_profit_margin": "ML Profit Margin",
+        "SharePoint Reference": "SharePoint Reference",
+        "Margin": "Margin",
+        "ML Profit Margin": "ML Profit Margin"
     }
  
- 
- 
+
+
 #Função utilizada para coletar os dados chaves referente a alterações simples para cada stage
 def get_reverse_mapping():
     column_mapping = get_column_mapping()
@@ -544,6 +555,9 @@ def get_alias_to_database_column_mapping():
         "b_deviation_document": "B_DEVIATION_DOCUMENT",
         "b_deviation_responsible": "B_DEVIATION_RESPONSIBLE",
         "b_deviation_reason": "B_DEVIATION_REASON",
+        "b_ref_sharepoint": "B_REF_SHAREPOINT",
+        "b_margin": "B_MARGIN",
+        "b_ml_profit_margin": "B_ML_PROFIT_MARGIN",
         
         # ⚠️ IMPORTANTE: Aliases com b_ que na verdade apontam para colunas S_*
         # (usado em Booking Management para exibir campos de Sales)

@@ -5614,6 +5614,58 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 
 ## 📝 Changelog
 
+### [v3.4.3] - 2024-12-XX
+
+#### ✨ Adição de Novas Colunas B_ no Sistema
+
+**Objetivo**: Adicionar as novas colunas B_ criadas no banco de dados (B_Ref_Sharepoint, B_Margin, B_Terminal, B_Ml_Profit_Margin, B_Bogey_Sale_Price_Usd) nas views Booking Management, General View e Form View.
+
+**Mudanças Implementadas**:
+
+##### 1. Integração nas Queries SQL
+- **`get_data_bookingData()`**: Adicionadas colunas `B_REF_SHAREPOINT`, `B_MARGIN`, `B_ML_PROFIT_MARGIN` nas queries SQL
+- **`get_data_generalView()`**: Adicionadas as mesmas colunas para manter consistência
+- **Filtragem de colunas**: Adicionadas novas colunas nas listas de filtragem para garantir exibição correta
+
+##### 2. Mapeamentos em shipments_mapping.py
+- **`get_column_mapping()`**: Adicionados mapeamentos para `b_ref_sharepoint`, `b_margin`, `b_ml_profit_margin`
+- **`get_alias_to_database_column_mapping()`**: Adicionados mapeamentos para colunas do banco
+- **`get_display_names()`**: Adicionados nomes de exibição amigáveis
+
+##### 3. Form View (shipments.py)
+- **Seção Informações Básicas**: Adicionado campo "SharePoint Reference"
+- **Seção Portos e Destinos**: Adicionado campo "Margin" (junto com POD Country Acronym e Destination Trade Region)
+- **Seção Financeiro**: Adicionado campo "ML Profit Margin" (junto com Freight Rate USD, Bogey Sale Price USD, Freight PNL)
+- **Configurações de layout**: Campos configurados com tamanhos apropriados (pequenos, médios, grandes)
+
+##### 4. Grid Principal (shipments.py)
+- **Ordem de colunas**: Adicionadas novas colunas na lista `specific_order`
+- **Posicionamento**: "SharePoint Reference" após "Transaction Number", "Margin" após "Destination Trade Region", "ML Profit Margin" após "Freight Rate USD"
+
+##### 5. Correção no Upload Massivo
+- **Correção crítica**: Campo "Margem" (b_margin) estava sendo tratado como numérico monetário (float), mas no banco é Varchar2(50)
+- **Solução**: Removido `b_margin` da lista de campos numéricos monetários, agora é tratado como texto simples
+- **Impacto**: Resolve problema onde campo ficava vazio após upload massivo
+
+**Arquivos Modificados**:
+- `database.py`: Adicionadas colunas nas queries SQL e filtragem
+- `shipments_mapping.py`: Adicionados mapeamentos e display names
+- `shipments.py`: Adicionados campos no Form View e ordem na grid
+- `shipments_new.py`: Corrigido tratamento de `b_margin` no upload massivo
+
+**Campos Adicionados**:
+- `B_Ref_Sharepoint` (Varchar2(50)) → SharePoint Reference
+- `B_Margin` (Varchar2(50)) → Margin
+- `B_Ml_Profit_Margin` (Number) → ML Profit Margin
+- `B_Bogey_Sale_Price_Usd` (Number) → Bogey Sale Price USD (já existia, verificado)
+- `B_Terminal` (Varchar2(100)) → Terminal (já existia, verificado)
+
+**Benefícios**:
+- ✅ Novas colunas visíveis e editáveis em todas as views
+- ✅ Correção de bug crítico no upload massivo (campo Margin)
+- ✅ Consistência entre tipos de dados no banco e tratamento no código
+- ✅ Organização lógica das colunas nas seções apropriadas
+
 ### [v3.4.2] - 2024-12-XX
 
 #### 📥 Template Excel Formatado para Download
