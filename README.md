@@ -5501,6 +5501,42 @@ Antes de processar cada linha:
 2. Valida se os valores obrigatórios não estão vazios ou zero
 3. Registra erros de validação sem interromper o processamento das demais linhas
 
+#### Validação Inteligente de Portos e Carriers
+
+O sistema implementa uma validação inteligente que detecta variações de formatação para encontrar correspondências corretas na base UDC, mesmo quando o texto do Excel está ligeiramente diferente.
+
+**Campos Validados**:
+- **Port of Loading POL** (Origem): Valida contra lista de portos de origem da UDC
+- **Port of Delivery POD** (Destino_City): Valida contra lista de portos de destino da UDC
+- **Carrier**: Valida contra lista de carriers da UDC
+
+**Estratégia de Matching em 5 Etapas**:
+
+1. **Busca Exata Case-Insensitive**: Compara valor original do Excel com opções da base (ignorando maiúsculas/minúsculas)
+2. **Busca Normalizada Exata**: Remove parênteses, acentos e normaliza espaços antes de comparar
+   - Exemplo: `"KWANGYANG (JEJU ISLAND)"` → encontra `"KWANGYANG"`
+   - Exemplo: `"PARANAGUA"` → encontra `"PARANAGUÁ"` (com acento)
+3. **Busca Parcial**: Verifica se o valor contém ou está contido na opção (mínimo 3 caracteres)
+   - Exemplo: `"HO CHI MINH CITY"` → encontra `"HO CHI MINH"`
+4. **Busca por Primeira Palavra**: Para portos com nomes compostos, compara primeira palavra
+   - Exemplo: `"PORT QUASIM"` → encontra portos que começam com `"PORT"`
+5. **Mapeamento de Abreviações**: Para carriers, usa mapeamento de abreviações conhecidas
+   - `"CMA"` → encontra `"CMA CGM"`
+   - `"HAPAG"` → encontra `"HAPAG-LLOYD"`
+   - `"CGM"` → encontra `"CMA CGM"`
+   - `"LLOYD"` → encontra `"HAPAG-LLOYD"`
+
+**Feedback Visual**:
+- Valores inválidos são destacados em vermelho (`#ffcccc`) na prévia do Excel
+- Mensagem de aviso lista os campos com problemas antes do upload
+- Após processamento, exibe resumo detalhado de valores não encontrados com sugestões de correção
+
+**Normalização Automática**:
+- Remove conteúdo entre parênteses automaticamente
+- Remove acentos para comparação (mantém original na base)
+- Normaliza espaços extras
+- Retorna valor exato da base UDC quando encontrado (mantém padrão)
+
 #### Exibição Visual
 
 - Colunas mapeadas são destacadas em azul claro (`#e6f3ff`) com fonte em negrito
@@ -5570,6 +5606,64 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 - **database.py**: Adicionados novos campos B_ ao `unified_map`
 
 ## 📝 Changelog
+
+### [v3.4.1] - 2024-12-XX
+
+#### ✨ Validação Inteligente de Portos e Carriers
+
+**Objetivo**: Implementar sistema de validação inteligente que detecta variações de formatação para encontrar correspondências corretas na base UDC, reduzindo falsos negativos e melhorando a experiência do usuário.
+
+**Mudanças Implementadas**:
+
+##### 1. Sistema de Normalização de Texto
+- **Função `normalize_text_for_matching()`**: Remove parênteses, acentos e normaliza espaços para comparação
+- **Suporte a Unicode**: Normalização NFD para remover marcas diacríticas
+- **Conversão automática**: Texto normalizado em UPPERCASE para consistência
+
+##### 2. Matching Inteligente em 5 Etapas
+- **Busca Exata Case-Insensitive**: Comparação direta ignorando maiúsculas/minúsculas
+- **Busca Normalizada**: Remove parênteses e acentos antes de comparar
+- **Busca Parcial**: Detecta se valor contém ou está contido na opção (mínimo 3 caracteres)
+- **Busca por Primeira Palavra**: Para portos compostos, compara primeira palavra
+- **Mapeamento de Abreviações**: Mapeamento conhecido para carriers (CMA→CMA CGM, HAPAG→HAPAG-LLOYD)
+
+##### 3. Mapeamento de Abreviações de Carriers
+- **Dicionário `CARRIER_ABBREVIATIONS`**: Mapeamento de abreviações comuns
+  - `"CMA"` → `"CMA CGM"`
+  - `"HAPAG"` → `"HAPAG-LLOYD"`
+  - `"CGM"` → `"CMA CGM"`
+  - `"LLOYD"` → `"HAPAG-LLOYD"`
+  - E outras variações
+
+##### 4. Validação Durante Carregamento
+- **Validação em tempo real**: Valida valores ao carregar o Excel
+- **Destaque visual**: Células inválidas destacadas em vermelho na prévia
+- **Feedback imediato**: Mensagem de aviso lista campos com problemas
+
+##### 5. Validação Durante Processamento
+- **Coleta de erros**: Registra todos os valores não encontrados durante processamento
+- **Resumo detalhado**: Exibe linha, coluna e valores original/corrigido após processamento
+- **Mantém padrão UDC**: Retorna valor exato da base quando encontrado
+
+**Exemplos de Matching**:
+- `"CMA"` → encontra `"CMA CGM"` via mapeamento
+- `"HAPAG"` → encontra `"HAPAG-LLOYD"` via mapeamento
+- `"HO CHI MINH CITY"` → encontra `"HO CHI MINH"` via busca parcial
+- `"KWANGYANG (JEJU ISLAND)"` → encontra `"KWANGYANG"` após remover parênteses
+- `"PARANAGUA"` → encontra `"PARANAGUÁ"` após normalização de acentos
+- `"PORT QUASIM"` → encontra portos que começam com `"PORT"` via primeira palavra
+
+**Arquivos Modificados**:
+- `shipments_new.py`: Implementadas funções `normalize_text_for_matching()` e `find_best_match()`
+- `shipments_new.py`: Atualizada função `validate_port_value()` para usar matching inteligente
+- `shipments_new.py`: Adicionado dicionário `CARRIER_ABBREVIATIONS` com mapeamentos conhecidos
+
+**Benefícios**:
+- ✅ Reduz falsos negativos (valores que existem mas não eram encontrados)
+- ✅ Melhora experiência do usuário (menos erros de validação)
+- ✅ Mantém padrão da base UDC (retorna valor exato quando encontrado)
+- ✅ Flexível e extensível (fácil adicionar novos mapeamentos)
+- ✅ Suporte a variações de formatação (parênteses, acentos, abreviações)
 
 ### [v3.4.0] - 2024-12-XX
 

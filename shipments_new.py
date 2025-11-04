@@ -9,11 +9,14 @@ from datetime import datetime, timedelta
 import uuid
 import time
 import pandas as pd # Added for Excel upload
+import unicodedata
+import re
  
 # ---------- 2. Carregamento de dados externos ----------
 df_udc = load_df_udc()
 ports_pol_options = df_udc[df_udc["grupo"] == "Porto Origem"]["dado"].dropna().unique().tolist()
 ports_pod_options = df_udc[df_udc["grupo"] == "Porto Destino"]["dado"].dropna().unique().tolist()
+carrier_options = df_udc[df_udc["grupo"] == "Carrier"]["dado"].dropna().unique().tolist()
 dthc_options = df_udc[df_udc["grupo"] == "DTHC"]["dado"].dropna().unique().tolist()
 vip_pnl_risk_options = df_udc[df_udc["grupo"] == "VIP PNL Risk"]["dado"].dropna().unique().tolist()
 # Carregar terminais da tabela F_ELLOX_TERMINALS (com fallback para unificada)
@@ -97,6 +100,139 @@ required_fields = {
     "s_dthc_prepaid": "**:green[DTHC Prepaid]***",
     "s_afloat": "**:green[Afloat]***"
 }
+
+# ---------- Funções de Normalização e Matching Inteligente ----------
+
+# Mapeamento de abreviações conhecidas para carriers
+CARRIER_ABBREVIATIONS = {
+    "CMA": "CMA CGM",
+    "CGM": "CMA CGM",
+    "CMA-CGM": "CMA CGM",
+    "HAPAG": "HAPAG-LLOYD",
+    "LLOYD": "HAPAG-LLOYD",
+    "HAPAG LLOYD": "HAPAG-LLOYD",
+    "HLAG": "HAPAG-LLOYD",
+}
+
+def normalize_text_for_matching(text):
+    """
+    Normaliza texto para comparação removendo parênteses, acentos e normalizando espaços.
+    
+    Args:
+        text: Texto a ser normalizado
+    
+    Returns:
+        Texto normalizado em UPPERCASE
+    """
+    if not text or pd.isna(text):
+        return ""
+    
+    text_str = str(text).strip()
+    
+    # Remove conteúdo entre parênteses
+    text_str = re.sub(r'\s*\([^)]*\)', '', text_str)
+    
+    # Remove acentos (normaliza unicode e remove marcas diacríticas)
+    text_str = unicodedata.normalize('NFD', text_str)
+    text_str = ''.join(char for char in text_str if unicodedata.category(char) != 'Mn')
+    
+    # Normaliza espaços extras
+    text_str = re.sub(r'\s+', ' ', text_str).strip()
+    
+    # Converte para UPPERCASE
+    return text_str.upper()
+
+def find_best_match(value, valid_options, field_type):
+    """
+    Encontra a melhor correspondência para um valor na lista de opções válidas.
+    Usa estratégia de busca em múltiplas etapas para lidar com variações de formatação.
+    
+    Args:
+        value: Valor a ser encontrado
+        valid_options: Lista de opções válidas da base UDC
+        field_type: Tipo do campo ("Port of Loading POL", "Port of Delivery POD", "Carrier")
+    
+    Returns:
+        tuple: (valor_corrigido, is_valid, error_message)
+    """
+    if not value or pd.isna(value) or str(value).strip() == "":
+        return "", True, None
+    
+    value_str = str(value).strip()
+    value_normalized = normalize_text_for_matching(value_str)
+    
+    # Etapa 1: Busca exata case-insensitive (valor original vs. base)
+    for option in valid_options:
+        option_str = str(option).strip()
+        if option_str.lower() == value_str.lower():
+            return option_str, True, None  # Retorna valor exato da base
+    
+    # Etapa 2: Busca normalizada exata (após remover parênteses, acentos, etc.)
+    for option in valid_options:
+        option_str = str(option).strip()
+        option_normalized = normalize_text_for_matching(option_str)
+        if option_normalized == value_normalized and value_normalized != "":
+            return option_str, True, None  # Retorna valor exato da base
+    
+    # Etapa 3: Busca parcial (valor contém ou está contido na opção)
+    value_lower = value_str.lower()
+    value_normalized_lower = value_normalized.lower()
+    
+    for option in valid_options:
+        option_str = str(option).strip()
+        option_lower = option_str.lower()
+        option_normalized = normalize_text_for_matching(option_str)
+        option_normalized_lower = option_normalized.lower()
+        
+        # Verifica se um contém o outro (case-insensitive)
+        if (value_lower in option_lower or option_lower in value_lower) and len(value_lower) >= 3:
+            return option_str, True, None
+        
+        # Verifica se um contém o outro (normalizado)
+        if (value_normalized_lower in option_normalized_lower or option_normalized_lower in value_normalized_lower) and len(value_normalized_lower) >= 3:
+            return option_str, True, None
+    
+    # Etapa 4: Busca por primeira palavra (para portos com nomes compostos)
+    if field_type in ["Port of Loading POL", "Port of Delivery POD"]:
+        value_first_word = value_normalized.split()[0] if value_normalized else ""
+        if len(value_first_word) >= 3:
+            for option in valid_options:
+                option_str = str(option).strip()
+                option_normalized = normalize_text_for_matching(option_str)
+                option_first_word = option_normalized.split()[0] if option_normalized else ""
+                if option_first_word == value_first_word:
+                    return option_str, True, None
+    
+    # Etapa 5: Mapeamento de abreviações conhecidas (apenas para carriers)
+    if field_type == "Carrier":
+        value_upper = value_str.upper()
+        if value_upper in CARRIER_ABBREVIATIONS:
+            mapped_value = CARRIER_ABBREVIATIONS[value_upper]
+            # Verifica se o valor mapeado existe na lista de opções válidas
+            for option in valid_options:
+                option_str = str(option).strip()
+                if option_str.upper() == mapped_value.upper():
+                    return option_str, True, None
+    
+    # Não encontrado - retorna valor normalizado (sem parênteses, em UPPERCASE) mas marca como inválido
+    value_final = value_str.upper()  # Mantém formato UPPERCASE para consistência
+    return value_final, False, f"{field_type} '{value_str}' não encontrado na base de dados"
+
+# ---------- Função de Validação de Portos ----------
+def validate_port_value(value, valid_options, port_type):
+    """
+    Valida se o valor do porto/carrier existe na lista de opções válidas.
+    Usa matching inteligente para lidar com variações de formatação.
+    
+    Args:
+        value: Valor do porto/carrier do Excel
+        valid_options: Lista de opções válidas da base UDC
+        port_type: Tipo do campo ("Port of Loading POL", "Port of Delivery POD", "Carrier")
+    
+    Returns:
+        tuple: (valor_corrigido, is_valid, error_message)
+    """
+    return find_best_match(value, valid_options, port_type)
  
 # ---------- 4. Função principal ----------
 def show_add_form():
@@ -287,6 +423,33 @@ def show_add_form():
             try:
                 df_excel = pd.read_excel(uploaded_file)
                 
+                # Validar portos e carrier durante carregamento para destacar células inválidas
+                invalid_port_cells = []  # Lista de células inválidas: (row_idx, col_name)
+                
+                if "Origem" in df_excel.columns:
+                    for idx, row in df_excel.iterrows():
+                        port_value = row.get("Origem", "")
+                        if pd.notna(port_value) and str(port_value).strip() != "":
+                            _, is_valid, _ = validate_port_value(port_value, ports_pol_options, "Port of Loading POL")
+                            if not is_valid:
+                                invalid_port_cells.append((idx, "Origem"))
+                
+                if "Destino_City" in df_excel.columns:
+                    for idx, row in df_excel.iterrows():
+                        port_value = row.get("Destino_City", "")
+                        if pd.notna(port_value) and str(port_value).strip() != "":
+                            _, is_valid, _ = validate_port_value(port_value, ports_pod_options, "Port of Delivery POD")
+                            if not is_valid:
+                                invalid_port_cells.append((idx, "Destino_City"))
+                
+                if "Carrier" in df_excel.columns:
+                    for idx, row in df_excel.iterrows():
+                        carrier_value = row.get("Carrier", "")
+                        if pd.notna(carrier_value) and str(carrier_value).strip() != "":
+                            _, is_valid, _ = validate_port_value(carrier_value, carrier_options, "Carrier")
+                            if not is_valid:
+                                invalid_port_cells.append((idx, "Carrier"))
+                
                 # Criar cópia para exibição com nomes padrão
                 df_display = df_excel.copy()
                 
@@ -299,14 +462,55 @@ def show_add_form():
                 if rename_dict:
                     df_display.rename(columns=rename_dict, inplace=True)
                 
-                # Destacar colunas importantes (todas as colunas mapeadas)
-                highlighted_cols = list(EXCEL_DISPLAY_NAMES.values())
-                def highlight_specific_cols(s):
-                    return [
-                        'background-color: #e6f3ff; font-weight: bold;' if s.name in highlighted_cols else ''
-                        for _ in s
-                    ]
-                st.dataframe(df_display.style.apply(highlight_specific_cols, axis=0))
+                # Função para destacar colunas importantes e células inválidas
+                def highlight_cols_and_invalid_ports(row):
+                    styles = []
+                    for col_name in df_display.columns:
+                        # Verificar se é coluna importante
+                        is_important = col_name in list(EXCEL_DISPLAY_NAMES.values())
+                        
+                        # Verificar se é célula de porto inválida
+                        is_invalid_port = False
+                        row_idx = row.name
+                        
+                        # Verificar se esta célula é um porto ou carrier inválido
+                        for invalid_row_idx, invalid_col in invalid_port_cells:
+                            if invalid_row_idx == row_idx:
+                                # Mapear coluna original para coluna de exibição
+                                if invalid_col == "Origem" and col_name == "Port of Loading POL":
+                                    is_invalid_port = True
+                                    break
+                                elif invalid_col == "Destino_City" and col_name == "Port of Delivery POD":
+                                    is_invalid_port = True
+                                    break
+                                elif invalid_col == "Carrier" and col_name == "Carrier":
+                                    is_invalid_port = True
+                                    break
+                        
+                        # Aplicar estilo
+                        if is_invalid_port:
+                            styles.append('background-color: #ffcccc; color: #cc0000; font-weight: bold;')
+                        elif is_important:
+                            styles.append('background-color: #e6f3ff; font-weight: bold;')
+                        else:
+                            styles.append('')
+                    return styles
+                
+                st.dataframe(df_display.style.apply(highlight_cols_and_invalid_ports, axis=1))
+                
+                # Exibir aviso se houver portos ou carriers inválidos
+                if invalid_port_cells:
+                    invalid_count = len(invalid_port_cells)
+                    invalid_items = []
+                    for _, col in invalid_port_cells:
+                        if col == "Origem":
+                            invalid_items.append("Port of Loading POL")
+                        elif col == "Destino_City":
+                            invalid_items.append("Port of Delivery POD")
+                        elif col == "Carrier":
+                            invalid_items.append("Carrier")
+                    items_text = ", ".join(set(invalid_items))
+                    st.warning(f"⚠️ {invalid_count} valor(es) não encontrado(s) na base de dados (destacados em vermelho): {items_text}. Corrija os valores antes de confirmar o upload.")
                 
                 # Validação das colunas obrigatórias
                 missing_cols = [col for col in REQUIRED_EXCEL_COLS if col not in df_excel.columns]
@@ -332,6 +536,7 @@ def show_add_form():
             
             if confirm_bulk and df_excel is not None:
                 success, fail = 0, 0
+                port_validation_errors = []  # Coletar erros de validação de portos
                 progress_bar = st.progress(0, text="Processing shipments...")
                 
                 for idx, row in df_excel.iterrows():
@@ -389,6 +594,61 @@ def show_add_form():
                                 else:
                                     values[internal_field] = ""
                     
+                    # Validação de portos após mapeamento
+                    # Validar Port of Loading POL (Origem)
+                    if "s_port_of_loading_pol" in values:
+                        original_value = values["s_port_of_loading_pol"]
+                        corrected_value, is_valid, error_msg = validate_port_value(
+                            original_value,
+                            ports_pol_options,
+                            "Port of Loading POL"
+                        )
+                        values["s_port_of_loading_pol"] = corrected_value
+                        if not is_valid:
+                            port_validation_errors.append({
+                                "row": idx + 1,
+                                "column": "Origem",
+                                "value": original_value,
+                                "corrected_value": corrected_value,
+                                "message": error_msg
+                            })
+                    
+                    # Validar Port of Delivery POD (Destino_City)
+                    if "s_port_of_delivery_pod" in values:
+                        original_value = values["s_port_of_delivery_pod"]
+                        corrected_value, is_valid, error_msg = validate_port_value(
+                            original_value,
+                            ports_pod_options,
+                            "Port of Delivery POD"
+                        )
+                        values["s_port_of_delivery_pod"] = corrected_value
+                        if not is_valid:
+                            port_validation_errors.append({
+                                "row": idx + 1,
+                                "column": "Destino_City",
+                                "value": original_value,
+                                "corrected_value": corrected_value,
+                                "message": error_msg
+                            })
+                    
+                    # Validar Carrier
+                    if "b_voyage_carrier" in values:
+                        original_value = values["b_voyage_carrier"]
+                        corrected_value, is_valid, error_msg = validate_port_value(
+                            original_value,
+                            carrier_options,
+                            "Carrier"
+                        )
+                        values["b_voyage_carrier"] = corrected_value
+                        if not is_valid:
+                            port_validation_errors.append({
+                                "row": idx + 1,
+                                "column": "Carrier",
+                                "value": original_value,
+                                "corrected_value": corrected_value,
+                                "message": error_msg
+                            })
+                    
                     # Validação de campos obrigatórios
                     required_check_fields = {
                         "s_sales_order_reference": "REFERENCIA",
@@ -420,6 +680,27 @@ def show_add_form():
                     progress_bar.progress(progress, text=f"Processing shipment {idx+1} of {len(df_excel)}...")
                 
                 progress_bar.empty()
+                
+                # Exibir warnings de validação de portos e carriers se houver
+                if port_validation_errors:
+                    error_types = {}
+                    for error in port_validation_errors:
+                        col_type = error['column']
+                        if col_type not in error_types:
+                            error_types[col_type] = []
+                        error_types[col_type].append(error)
+                    
+                    error_summary = []
+                    for col_type, errors in error_types.items():
+                        error_summary.append(f"{len(errors)} {col_type}(s)")
+                    
+                    st.warning(f"⚠️ {len(port_validation_errors)} valor(es) não encontrado(s) na base de dados ({', '.join(error_summary)}):")
+                    error_details = []
+                    for error in port_validation_errors:
+                        error_details.append(f"Linha {error['row']}, Coluna '{error['column']}': Valor '{error['value']}' → Corrigido para '{error['corrected_value']}' (não encontrado na base)")
+                    st.text("\n".join(error_details))
+                    st.info("💡 Os valores foram capitalizados automaticamente. Verifique se os valores estão corretos na base UDC ou se precisam ser adicionados.")
+                
                 st.success(f"✅ {success} shipments successfully uploaded!")
                 if fail:
                     st.error(f"❌ {fail} shipments failed. Please check the file data.")
