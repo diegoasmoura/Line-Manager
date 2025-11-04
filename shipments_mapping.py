@@ -24,7 +24,7 @@ def get_column_mapping():
         "s_plant_of_origin": "Plant of Origin",
         "s_type_of_shipment": "Type of Shipment",
         "s_volume_in_tons": "Volume in Tons",
-        "s_quantity_of_containers": "Sales Quantity of Containers",
+        "s_quantity_of_containers": "Quantity of Containers",
         "s_container_type": "Container Type",
         "s_port_of_loading_pol": "Port of Loading POL",
         "s_port_of_delivery_pod": "Port of Delivery POD",
@@ -143,15 +143,15 @@ def non_editable_columns(stage):
             "Booking Owner",
         ]
     elif stage == "Booking Management":
-        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
+        non_editable = ["Booking Farol Reference", "Booking Registered Date", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
     elif stage == "General View":
         non_editable = list(dict.fromkeys([
             "Sales Farol Reference", "Shipment Requested Date", "Adjusts Basic", "Adjusts Critic",
-            "Booking Registered Date", "Type of Shipment", "Sales Quantity of Containers", "Container Type", 
+            "Booking Registered Date", "Type of Shipment", "Quantity of Containers", "Container Type", 
             "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"
         ]))
     elif stage == "Container Delivery at Port":
-        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
+        non_editable = ["Loading Farol Reference", "Creation Of Cargo Loading", "Adjusts Basic", "Adjusts Critic", "Type of Shipment", "Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Sales Owner", "Booking Owner"]
     else:
         non_editable = []
  
@@ -226,7 +226,7 @@ def drop_downs(data_show, df_udc):
         "Shipment Requested Date": "datetime",  # Adiciona coluna de criação como datetime
         # "First Vessel ETD": "date",  # coluna removida na unificada
         "Volume in Tons": "numeric",
-        "Sales Quantity of Containers": "numeric",
+        "Quantity of Containers": "numeric",
         "Requested Shipment Week": "numeric",
         
 

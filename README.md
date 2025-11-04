@@ -5592,7 +5592,7 @@ Os campos são mapeados para a tabela unificada `F_CON_SALES_BOOKING_DATA` atrav
 - Destino_City → Final Destination
 - Destino_Country → POD Country Acronym
 - Margem → Margin
-- CTNRS → Sales Quantity of Containers
+- CTNRS → Quantity of Containers
 - Week → Requested Shipment Week
 - BOOKING → Booking Reference
 - Total Price → Freight Rate USD

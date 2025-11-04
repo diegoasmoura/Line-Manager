@@ -763,7 +763,7 @@ def get_data_salesData(page_number: int = 1, page_size: int = 25, all_rows: bool
             # Identificação
             "Sales Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             # Capacidade
-            "Sales Quantity of Containers", "Container Type",
+            "Quantity of Containers", "Container Type",
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas
@@ -896,7 +896,7 @@ def get_data_bookingData(page_number: int = 1, page_size: int = 25, all_rows: bo
             "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
             "Transaction Number",
             # Capacidade
-            "Sales Quantity of Containers", "Container Type",
+            "Quantity of Containers", "Container Type",
             # Rotas (unificado)
             "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             # Datas de planejamento
@@ -1063,7 +1063,7 @@ def get_data_generalView(page_number: int = 1, page_size: int = 25, all_rows: bo
             # 1. IDENTIFICAÇÃO BÁSICA
             "Sales Farol Reference", "Farol Status", "Carrier Returns Status", "Type of Shipment", "Booking Status",
             "Transaction Number",
-            "Sales Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
+            "Quantity of Containers", "Container Type", "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
             
             # 2. DATAS INICIAIS
             "Shipment Requested Date", "Booking Registered Date", "Booking Requested Date",
@@ -1284,7 +1284,7 @@ def get_data_loadingData():
         df.rename(columns=column_mapping, inplace=True)
  
         #Filtrando as colunas e definindo a ordem de exibição
-        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Type of Shipment", "Sales Quantity of Containers", "Container Type", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
+        df = df[["Loading Farol Reference","Farol Status","Truck Loading Status", "Type of Shipment", "Quantity of Containers", "Container Type", "Creation Of Cargo Loading", "Logistics Analyst", "Supplier",
             "Port of Loading POL", "Port of Delivery POD", "Stuffing Terminal", "Stuffing Terminal Acceptance", "Drayage Carrier", "Status ITAS", "Truck Loading Farol",
             "Expected Truck Load Start Date", "Expected Truck Load End Date",
             "Quantity Tons Loaded Origin", "Actual Truck Load Date", "Container Release Farol",
@@ -1643,7 +1643,7 @@ def perform_split_operation(farol_ref_original, edited_display, num_splits, comm
         insert_loading.append(loading_dict)
  
         # Captura do valor de containers do split
-        quantity_value = row.get("Sales Quantity of Containers", "")
+        quantity_value = row.get("Quantity of Containers", "")
  
         insert_logs.append(pd.DataFrame([{
             "Farol Reference": new_ref,
@@ -2308,7 +2308,6 @@ def insert_return_carrier_from_ui(ui_data, user_insert=None, status_override=Non
             "Voyage Code": "B_VOYAGE_CODE",
             "Vessel Name": "B_VESSEL_NAME",
             "Quantity of Containers": "S_QUANTITY_OF_CONTAINERS",
-            "Sales Quantity of Containers": "S_QUANTITY_OF_CONTAINERS",
             "Port of Loading POL": "S_PORT_OF_LOADING_POL",
             "Port of Delivery POD": "S_PORT_OF_DELIVERY_POD",
             "Place of Receipt": "S_PLACE_OF_RECEIPT",

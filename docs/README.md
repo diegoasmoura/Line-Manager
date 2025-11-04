@@ -506,7 +506,7 @@ Na tela de Shipments, a exibição dos botões de ação depende do status origi
 📌 **Restrições de Edição por Stage:**
 * **Campos do Sales Data**: Editáveis apenas no stage "Sales Data"
     * **Type of Shipment**: Somente leitura nos outros stages
-    * **Sales Quantity of Containers**: Somente leitura nos outros stages
+    * **Quantity of Containers**: Somente leitura nos outros stages
     * **Container Type**: Somente leitura nos outros stages
     * **Booking Port of Loading POL**: Somente leitura no Booking Management (dados do Sales Data)
     * **Booking Port of Delivery POD**: Somente leitura no Booking Management (dados do Sales Data)
@@ -870,12 +870,12 @@ Quando o status é alterado para **"Booking Approved"**, o sistema executa autom
 #### 🆕 **Campos Adicionados**
 - **Transhipment Port**: Porto de transbordo (dropdown da UDC)
 - **Port Terminal City**: Cidade do terminal portuário (dropdown da UDC)
-- **Configuração de coluna**: "Sales Quantity of Containers" configurada como NumberColumn
+- **Configuração de coluna**: "Quantity of Containers" configurada como NumberColumn
 
 ### 💾 **Persistência de Dados Melhorada**
 
 #### 🔧 **Correção na Função `insert_return_carrier_from_ui`**
-- **Mapeamento duplo**: Aceita tanto "Quantity of Containers" quanto "Sales Quantity of Containers"
+- **Mapeamento**: Aceita "Quantity of Containers"
 - **Prevenção de NULL**: Evita gravar valores nulos na quantidade
 - **Conversão segura**: Converte para inteiro quando possível
 

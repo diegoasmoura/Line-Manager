@@ -55,7 +55,7 @@ EXCEL_DISPLAY_NAMES = {
     "Destino_City": "Final Destination",
     "Destino_Country": "POD Country Acronym",
     "Margem": "Margin",
-    "CTNRS": "Sales Quantity of Containers",
+    "CTNRS": "Quantity of Containers",
     "Week": "Requested Shipment Week",
     "BOOKING": "Booking Reference",
     "Total Price": "Freight Rate USD",

@@ -164,7 +164,7 @@ def show_split_form():
         split_dict = dict(split_data)
         df_selected = pd.DataFrame([{
             "Farol Reference": split_data["s_farol_reference"],
-            "Sales Quantity of Containers": split_data["s_quantity_of_containers"],
+            "Quantity of Containers": split_data["s_quantity_of_containers"],
             "Port of Loading POL": split_data["s_port_of_loading_pol"],
             "Port of Delivery POD": split_data["s_port_of_delivery_pod"],
             "Place of Receipt": split_data["s_place_of_receipt"],
@@ -194,11 +194,11 @@ def show_split_form():
        
         for i, ref in enumerate(new_refs, start=1):
             df_split.at[i, "Farol Reference"] = ref
-            df_split.at[i, "Sales Quantity of Containers"] = 0
+            df_split.at[i, "Quantity of Containers"] = 0
  
         editable_columns = [
             "Farol Reference",
-            "Sales Quantity of Containers",
+            "Quantity of Containers",
             "Port of Loading POL",
             "Port of Delivery POD",
             "Place of Receipt",
@@ -240,7 +240,7 @@ def show_split_form():
         terminal_options = list_terminal_names() or list_terminal_names_from_unified() or []
 
         column_config = {
-            "Sales Quantity of Containers": st.column_config.NumberColumn(
+            "Quantity of Containers": st.column_config.NumberColumn(
                 "Quantity of Containers"
             ),
             "Port of Loading POL": st.column_config.SelectboxColumn(
@@ -373,7 +373,7 @@ def show_split_form():
             comment = st.text_area("Comentários")
  
         if "original_quantity" not in st.session_state:
-            st.session_state["original_quantity"] = df_selected["Sales Quantity of Containers"].iloc[0]
+            st.session_state["original_quantity"] = df_selected["Quantity of Containers"].iloc[0]
  
         col_btn1, col_btn2, col_btn3, col_btn4 = st.columns(4)
  
@@ -396,7 +396,7 @@ def show_split_form():
                                 st.warning("⚠️ Preencha todos os campos de justificativa (Area, Reason e Responsibility) antes de confirmar.")
                             else:
                                 # Validação 3 (quando houver splits): quantidades dos splits devem ser > 0
-                                split_quantities = edited_display["Sales Quantity of Containers"].iloc[1:]
+                                split_quantities = edited_display["Quantity of Containers"].iloc[1:]
                                 if num_splits > 0 and (split_quantities <= 0).any():
                                     st.warning("⚠️ Todos os splits devem ter quantidade maior que 0.")
                                 else:
@@ -409,7 +409,7 @@ def show_split_form():
 
                                     # Recalcula a quantidade do item original APENAS quando há splits
                                     if num_splits > 0:
-                                        edited_display.at[0, "Sales Quantity of Containers"] = original_quantity - total_split
+                                        edited_display.at[0, "Quantity of Containers"] = original_quantity - total_split
                                     df_split.update(edited_display)
          
                                     # Gera um único UUID para toda a requisição
@@ -444,7 +444,7 @@ def show_split_form():
                                                         "Voyage Code": "B_VOYAGE_CODE",
                                                         "Booking Reference": "B_BOOKING_REFERENCE",
                                                         "Vessel Name": "B_VESSEL_NAME",
-                                                        "Sales Quantity of Containers": "S_QUANTITY_OF_CONTAINERS"
+                                                        "Quantity of Containers": "S_QUANTITY_OF_CONTAINERS"
                                                     }
                                                     
                                                     if column in column_mapping:

@@ -46,16 +46,14 @@ Este documento detalha as melhorias implementadas nos últimos pedidos do sistem
 ## 💾 **Banco de Dados (database.py)**
 
 ### ✅ **Mudanças Implementadas**
-- **Correção de NULL**: `insert_return_carrier_from_ui` aceita "Sales Quantity of Containers"
-- **Mapeamento duplo**: Busca quantidade em ambos os campos possíveis
+- **Correção de NULL**: `insert_return_carrier_from_ui` aceita "Quantity of Containers"
+- **Mapeamento**: Busca quantidade no campo "Quantity of Containers"
 - **Conversão segura**: Tratamento adequado de tipos e valores nulos
 
 ### 🔧 **Detalhes Técnicos**
 ```python
-# Mapeamento duplo para quantidade
+# Mapeamento para quantidade
 qty = ui_row.get("Quantity of Containers")
-if qty is None:
-    qty = ui_row.get("Sales Quantity of Containers")
 try:
     qty = int(qty) if qty is not None and str(qty).strip() != "" else None
 except Exception:

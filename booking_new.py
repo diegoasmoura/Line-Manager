@@ -85,7 +85,7 @@ def show_booking_management_form():
         if not sales_row.empty:
             sales_row = sales_row.iloc[0]
             # Preenchendo os campos do formulário com os dados do registro de vendas
-            booking_data["sales_quantity_of_containers"] = sales_row.get("Sales Quantity of Containers", "")
+            booking_data["sales_quantity_of_containers"] = sales_row.get("Quantity of Containers", "")
             booking_data["requested_cut_off_start_date"] = sales_row.get("Requested Deadline Start Date", "")
             booking_data["requested_cut_off_end_date"] = sales_row.get("Requested Deadline End Date", "")
             booking_data["booking_port_of_loading_pol"] = sales_row.get("Port of Loading POL", "")

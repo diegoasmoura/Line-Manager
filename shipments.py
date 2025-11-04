@@ -137,7 +137,7 @@ def exibir_formulario():
             # Ordem exata conforme grid
             sales_order = [
                 "Sales Farol Reference", "Splitted Booking Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
-                "Sales Quantity of Containers", "Container Type",
+                "Quantity of Containers", "Container Type",
                 "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
                 "Shipment Requested Date", "Requested Shipment Week", "data_requested_deadline_start", "data_requested_deadline_end",
                 "data_shipment_period_start", "data_shipment_period_end", "data_required_sail_date", "data_required_arrival_expected",
@@ -162,7 +162,7 @@ def exibir_formulario():
                     "Farol Reference": {"width": 1, "cols": 4},
                     "Farol Status": {"width": 1, "cols": 4},
                     "Container Type": {"width": 1, "cols": 4},
-                    "Sales Quantity of Containers": {"width": 1, "cols": 4}, 
+                    "Quantity of Containers": {"width": 1, "cols": 4}, 
                     "DTHC": {"width": 1, "cols": 4},
                     "Afloat": {"width": 1, "cols": 4},
                     "Partial Allowed": {"width": 1, "cols": 4},
@@ -222,7 +222,7 @@ def exibir_formulario():
             # Renderiza campos agrupados por layout com seções organizadas
             sections = {
                 "📋 Informações Básicas": ["Sales Farol Reference", "Farol Status", "Type of Shipment"],
-                "📦 Produto e Quantidade": ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer", "SKU"],
+                "📦 Produto e Quantidade": ["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer", "SKU"],
                 "🏢 Cliente e Negócio": ["Customer PO"],
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Incoterm", "Mode"],
                 "📅 Datas e Prazos": ["data_sales_order", "Shipment Requested Date", "data_requested_deadline_start", "data_requested_deadline_end", "data_required_sail_date", "data_required_arrival_expected"],
@@ -463,15 +463,15 @@ def exibir_formulario():
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_second_dt]
 
-                # Linha fixa na seção Produto e Quantidade: Sales Order Reference | Sales Quantity of Containers | Container Type | Customer
+                # Linha fixa na seção Produto e Quantidade: Sales Order Reference | Quantity of Containers | Container Type | Customer
                 if section_title == "📦 Produto e Quantidade":
-                    first_row_fields_pq = ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]
+                    first_row_fields_pq = ["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"]
                     available_top_pq = [f for f in first_row_fields_pq if f in available_fields]
                     if available_top_pq:
                         # Padrão: [1,1,1,1,1] (5 colunas iguais)
                         cols_top_pq = st.columns([1,1,1,1,1])
-                        # Ordem fixa: Sales Order Reference | Sales Quantity of Containers | Container Type | Customer (Customer usa a 4ª coluna se existir)
-                        for idx, col_name in enumerate(["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]):
+                        # Ordem fixa: Sales Order Reference | Quantity of Containers | Container Type | Customer (Customer usa a 4ª coluna se existir)
+                        for idx, col_name in enumerate(["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"]):
                             if col_name not in available_top_pq:
                                 continue
                             with cols_top_pq[idx]:
@@ -483,7 +483,7 @@ def exibir_formulario():
                                 only_booking = db_col_candidate.lower().startswith("b_")
                                 disabled_flag = (label in disabled_cols) or only_booking
 
-                                if label == "Sales Quantity of Containers":
+                                if label == "Quantity of Containers":
                                     try:
                                         default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
                                     except Exception:
@@ -618,7 +618,7 @@ def exibir_formulario():
                                     except Exception:
                                         default_index = 0
                                     new_values_sales[label] = st.selectbox(label, yes_no_options, index=default_index, disabled=disabled_flag, key=f"sales_{farol_ref}_{label}")
-                                elif label in ("Sales Quantity of Containers", "Requested Shipment Week"):
+                                elif label in ("Quantity of Containers", "Requested Shipment Week"):
                                     try:
                                         default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
                                     except Exception:
@@ -710,7 +710,7 @@ def exibir_formulario():
                         reverse_map_all = get_reverse_mapping()
                         for ch in changes_sales:
                             # 1) tenta mapear friendly -> alias; 2) alias/display -> coluna DB
-                            alias_or_label = reverse_map_all.get(ch["Column"], ch["Column"])  # ex.: 'Sales Quantity of Containers' -> 's_quantity_of_containers'
+                            alias_or_label = reverse_map_all.get(ch["Column"], ch["Column"])  # ex.: 'Quantity of Containers' -> 's_quantity_of_containers'
                             db_col = get_database_column_name(alias_or_label)
                             new_val = ch["New Value"]
                             old_val = ch["Previous Value"]
@@ -802,7 +802,7 @@ def exibir_formulario():
             booking_order = [
                 "Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Booking Reference",
                 "Transaction Number",
-                "Sales Quantity of Containers", "Container Type",
+                "Quantity of Containers", "Container Type",
                 "Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination",
                 "Shipment Requested Date", "Sales Order Reference", "data_sales_order", "Booking Registered Date", "Booking Requested Date", "data_booking_confirmation",
                 "data_estimativa_saida", "data_estimativa_chegada", "data_deadline", "data_draft_deadline", "data_abertura_gate",
@@ -827,7 +827,7 @@ def exibir_formulario():
                     "Farol Reference": {"width": 1, "cols": 4},
                     "Farol Status": {"width": 1, "cols": 4},
                     "Container Type": {"width": 1, "cols": 4},
-                    "Sales Quantity of Containers": {"width": 1, "cols": 4},
+                    "Quantity of Containers": {"width": 1, "cols": 4},
                     "Booking Status": {"width": 1, "cols": 4},
                     "Type of Shipment": {"width": 1, "cols": 4},
                     "POD Country Acronym": {"width": 1, "cols": 4}
@@ -891,7 +891,7 @@ def exibir_formulario():
             # Renderiza campos de Booking organizados por seções
             booking_sections = {
                 "📋 Informações Básicas": ["Booking Farol Reference", "Farol Status", "Type of Shipment", "Booking Status", "Transaction Number"],
-                "📦 Produto e Quantidade": ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"],
+                "📦 Produto e Quantidade": ["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"],
                 "🏢 Cliente e Negócio": [],  # mantém ordem consistente com Sales
                 "🌍 Portos e Destinos": ["Port of Loading POL", "Port of Delivery POD", "Place of Receipt", "Final Destination", "Transhipment Port", "POD Country", "Destination Trade Region"],
                 "📅 Cronograma": ["Booking Registered Date", "Booking Requested Date", "data_booking_confirmation", "data_estimativa_saida", "data_estimativa_chegada"],
@@ -1046,15 +1046,15 @@ def exibir_formulario():
                         # Evita duplicar esses campos no restante da seção
                         available_fields = [f for f in available_fields if f not in available_top_b]
 
-                # Linha fixa em Produto e Quantidade (Booking): Sales Order Reference | Sales Quantity of Containers | Container Type | Customer
+                # Linha fixa em Produto e Quantidade (Booking): Sales Order Reference | Quantity of Containers | Container Type | Customer
                 if section_title == "📦 Produto e Quantidade":
-                    first_row_fields_bt = ["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]
+                    first_row_fields_bt = ["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"]
                     available_top_bt = [f for f in first_row_fields_bt if f in available_fields]
                     if available_top_bt:
                         # Padrão: [1,1,1,1,1] (5 colunas iguais)
                         cols_top_bt = st.columns([1,1,1,1,1])
                         # Ordem fixa igual à Sales
-                        for idx, col_name in enumerate(["Sales Order Reference", "Sales Quantity of Containers", "Container Type", "Customer"]):
+                        for idx, col_name in enumerate(["Sales Order Reference", "Quantity of Containers", "Container Type", "Customer"]):
                             if col_name not in available_top_bt:
                                 continue
                             with cols_top_bt[idx]:
@@ -1063,7 +1063,7 @@ def exibir_formulario():
                                 current_val = row_booking.get(internal_key, "")
                                 disabled_flag = (label in disabled_cols_b)
 
-                                if label == "Sales Quantity of Containers":
+                                if label == "Quantity of Containers":
                                     try:
                                         default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
                                     except Exception:
@@ -1230,7 +1230,7 @@ def exibir_formulario():
                                     from shipments_mapping import get_display_names
                                     disp = get_display_names().get(label, label)
                                     new_values_booking[label] = st.date_input(disp, value=(dt.date() if pd.notna(dt) else None), disabled=disabled_flag, key=f"booking_{farol_ref}_{label}")
-                                elif label in ("Sales Quantity of Containers",):
+                                elif label in ("Quantity of Containers",):
                                     try:
                                         default_num = int(current_val) if pd.notna(current_val) and str(current_val).strip() != "" else 0
                                     except Exception:
@@ -1815,8 +1815,8 @@ def exibir_shipments():
             "Booking", width="medium", disabled=False
         )
     # Alias de exibição para Quantity of Containers mantendo a coluna original
-    if "Sales Quantity of Containers" in df.columns:
-        column_config["Sales Quantity of Containers"] = st.column_config.NumberColumn(
+    if "Quantity of Containers" in df.columns:
+        column_config["Quantity of Containers"] = st.column_config.NumberColumn(
             "Quantity of Containers", format="%d"
         )
  
