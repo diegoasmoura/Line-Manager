@@ -585,6 +585,14 @@ def show_add_form():
                 if rename_dict:
                     df_display.rename(columns=rename_dict, inplace=True)
                 
+                # Garantir que não há colunas duplicadas (pode acontecer se múltiplas colunas mapearem para o mesmo nome)
+                if df_display.columns.duplicated().any():
+                    # Remover colunas duplicadas, mantendo apenas a primeira ocorrência
+                    df_display = df_display.loc[:, ~df_display.columns.duplicated()]
+                
+                # Garantir que o índice seja único
+                df_display = df_display.reset_index(drop=True)
+                
                 # Função para destacar colunas importantes e células inválidas
                 def highlight_cols_and_invalid_ports(row):
                     styles = []
