@@ -252,7 +252,7 @@ def generate_excel_template():
     """
     # Ordem das colunas conforme template do usuário
     column_order = [
-        "Referencia",
+        "Ref_Sharepoint",
         "Carrier",
         "Origem",
         "Destino_City",
@@ -262,7 +262,6 @@ def generate_excel_template():
         "Ctns",
         "Week",
         "Booking",
-        "Ref_Sharepoint",
         "Total Price",
         "Bogey",
         "PnL Frete",
