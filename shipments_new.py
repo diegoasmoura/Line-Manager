@@ -30,54 +30,54 @@ terminal_options = list_terminal_names() or list_terminal_names_from_unified() o
 # ---------- 3. Constantes ----------
 # Mapeamento de colunas do Excel para campos internos do sistema
 EXCEL_COLUMN_MAPPING = {
-    "REFERENCIA": "s_sales_order_reference",
+    "Referencia": "s_sales_order_reference",
     "Carrier": "b_voyage_carrier",
     "Origem": "s_port_of_loading_pol",
     "Destino_City": "s_port_of_delivery_pod",
     "Destino_Country": "b_pod_country_acronym",
     "Margem": "b_margin",
     "Afloat": "s_afloat",
-    "CTNRS": "s_quantity_of_containers",
+    "Ctns": "s_quantity_of_containers",
     "Week": "s_requested_shipment_week",
-    "BOOKING": "b_booking_reference",
+    "Booking": "b_booking_reference",
     "Total Price": "b_freight_rate_usd",
     "Bogey": "b_bogey_sale_price_usd",
     "PnL Frete": "b_freightppnl",
     "PnL Bogey": "b_bogey_pnl",
     "ML": "b_ml_profit_margin",
-    "NAVIO": "b_vessel_name",
-    "VIAGEM": "b_voyage_code",
+    "Navio": "b_vessel_name",
+    "Viagem": "b_voyage_code",
     "ETD": "b_data_estimativa_saida_etd",
-    "DTHC": "s_dthc_prepaid",
-    "REGION": "b_destination_trade_region",
+    "Dthc": "s_dthc_prepaid",
+    "Region": "b_destination_trade_region",
     "Ref_Sharepoint": "b_ref_sharepoint",
 }
 
 # Colunas obrigatórias do novo template
-REQUIRED_EXCEL_COLS = ["REFERENCIA", "CTNRS", "Week", "DTHC"]
+REQUIRED_EXCEL_COLS = ["Referencia", "Ctns", "Week", "Dthc"]
 
 # Mapeamento de colunas do Excel para nomes de exibição padrão
 EXCEL_DISPLAY_NAMES = {
-    "REFERENCIA": "SharePoint Reference",
+    "Referencia": "SharePoint Reference",
     "Carrier": "Carrier",
     "Origem": "Port of Loading POL",
     "Destino_City": "Port of Delivery POD",
     "Destino_Country": "POD Country Acronym",
     "Margem": "Margin",
     "Afloat": "Afloat",
-    "CTNRS": "Quantity of Containers",
+    "Ctns": "Quantity of Containers",
     "Week": "Requested Shipment Week",
-    "BOOKING": "Booking Reference",
+    "Booking": "Booking Reference",
     "Total Price": "Freight Rate USD",
     "Bogey": "Bogey Sale Price USD",
     "PnL Frete": "Freight PNL",
     "PnL Bogey": "Bogey PNL",
     "ML": "ML Profit Margin",
-    "NAVIO": "Vessel Name",
-    "VIAGEM": "Voyage Code",
+    "Navio": "Vessel Name",
+    "Viagem": "Voyage Code",
     "ETD": "ETD",
-    "DTHC": "DTHC",
-    "REGION": "Destination Trade Region",
+    "Dthc": "DTHC",
+    "Region": "Destination Trade Region",
     "Ref_Sharepoint": "SharePoint Reference",
 }
 
@@ -252,27 +252,27 @@ def generate_excel_template():
     """
     # Ordem das colunas conforme template do usuário
     column_order = [
-        "REFERENCIA",
+        "Referencia",
         "Carrier",
         "Origem",
         "Destino_City",
         "Destino_Country",
         "Margem",
         "Afloat",
-        "CTNRS",
+        "Ctns",
         "Week",
-        "BOOKING",
+        "Booking",
         "Ref_Sharepoint",
         "Total Price",
         "Bogey",
         "PnL Frete",
         "PnL Bogey",
         "ML",
-        "NAVIO",
-        "VIAGEM",
+        "Navio",
+        "Viagem",
         "ETD",
-        "DTHC",
-        "REGION",
+        "Dthc",
+        "Region",
     ]
     
     # Criar workbook
@@ -774,10 +774,10 @@ def show_add_form():
                     
                     # Validação de campos obrigatórios
                     required_check_fields = {
-                        "s_sales_order_reference": "REFERENCIA",
-                        "s_quantity_of_containers": "CTNRS",
+                        "s_sales_order_reference": "Referencia",
+                        "s_quantity_of_containers": "Ctns",
                         "s_requested_shipment_week": "Week",
-                        "s_dthc_prepaid": "DTHC",
+                        "s_dthc_prepaid": "Dthc",
                     }
                     
                     missing_required = []
