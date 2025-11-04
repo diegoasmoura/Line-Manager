@@ -58,7 +58,7 @@ REQUIRED_EXCEL_COLS = ["REFERENCIA", "CTNRS", "Week", "DTHC"]
 
 # Mapeamento de colunas do Excel para nomes de exibição padrão
 EXCEL_DISPLAY_NAMES = {
-    "REFERENCIA": "Referência SharePoint",
+    "REFERENCIA": "SharePoint Reference",
     "Carrier": "Carrier",
     "Origem": "Port of Loading POL",
     "Destino_City": "Port of Delivery POD",
